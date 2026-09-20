@@ -12247,12 +12247,15 @@ fun MoreScreen(viewModel: AppViewModel) {
     }
 
     if (showDevPortalModal) {
+        val effectivePortalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html")) "https://pay.swapnopay.top/portal.html" else systemConfig.developerPortalUrl
+
         EnterpriseGestureModal(
             onDismissRequest = { showDevPortalModal = false },
             title = "Developer Portal & API Gateway",
             subtitle = "Customized & managed via Admin Panel Firebase",
             icon = Icons.Outlined.Code
         ) {
+
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -12285,8 +12288,6 @@ fun MoreScreen(viewModel: AppViewModel) {
                                 )
                             }
                         }
-
-                        val effectivePortalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html")) "https://pay.swapnopay.top/portal.html" else systemConfig.developerPortalUrl
 
                         Text(
                             text = effectivePortalUrl,
