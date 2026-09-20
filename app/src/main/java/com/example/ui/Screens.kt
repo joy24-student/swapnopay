@@ -12247,7 +12247,7 @@ fun MoreScreen(viewModel: AppViewModel) {
     }
 
     if (showDevPortalModal) {
-        val effectivePortalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html")) "https://pay.swapnopay.top/portal.html" else systemConfig.developerPortalUrl
+        val effectivePortalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html") || systemConfig.developerPortalUrl.contains("pay.swapnopay.top/portal.html")) "https://swapnopay.top/portal.html" else systemConfig.developerPortalUrl
 
         EnterpriseGestureModal(
             onDismissRequest = { showDevPortalModal = false },

@@ -19,7 +19,9 @@ export const merchantId = value => {
 export function hostname(value) {
   if (typeof value !== 'string' || /[\s/:@?#\\]/.test(value)) throw new ShopError(400, 'INVALID_DOMAIN', 'Enter a domain name without a protocol, path or port.')
   const host = domainToASCII(value.toLowerCase())
-  if (host.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) throw new ShopError(400, 'INVALID_DOMAIN', 'Enter a valid public domain name.')
+  if (host.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) {
+    throw new ShopError(400, 'INVALID_DOMAIN', 'Enter a valid public domain name (e.g. yourbrand.com or shop.yourbrand.com).')
+  }
   return host
 }
 const reserved = new Set(['www','api','admin','pay','shop','shops','mail','smtp','ftp','localhost','portal','docs','status'])
@@ -38,7 +40,17 @@ export function launchInput(body, existing = null) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ShopError(400, 'INVALID_EMAIL', 'Enter the store administrator’s email address.')
   const password = body.admin_password || ''
   if (typeof password !== 'string' || (password && (password.length < 12 || Buffer.byteLength(password) > 72))) throw new ShopError(400, 'WEAK_PASSWORD', 'Use a password of at least 12 characters (at most 72 UTF-8 bytes), or leave it blank to generate one.')
-  const customDomain = body.custom_domain === undefined ? existing?.custom_domain || null : body.custom_domain ? hostname(body.custom_domain.trim()) : null
+  let customDomain = null
+  if (body.custom_domain !== undefined) {
+    if (body.custom_domain && typeof body.custom_domain === 'string') {
+      const clean = body.custom_domain.trim()
+      if (clean && clean.toLowerCase() !== 'null' && clean.toLowerCase() !== 'none' && clean.toLowerCase() !== 'undefined') {
+        customDomain = hostname(clean)
+      }
+    }
+  } else {
+    customDomain = existing?.custom_domain || null
+  }
   return { merchant_id: id, store_name: name, shop_slug: slug, currency, theme_color: color, admin_email: email, custom_domain: customDomain, password }
 }
 export const schemaName = id => `store_${merchantId(id).replaceAll('-', '')}`

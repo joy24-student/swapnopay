@@ -748,8 +748,8 @@ fun SupportScreen(viewModel: AppViewModel) {
                                     Button(
                                         onClick = {
                                             try {
-                                                val docsUrl = if (systemConfig.developerDocsUrl.isBlank() || systemConfig.developerDocsUrl.contains("swapnopay.app")) {
-                                                    "https://pay.swapnopay.top/docs.html"
+                                                val docsUrl = if (systemConfig.developerDocsUrl.isBlank() || systemConfig.developerDocsUrl.contains("swapnopay.app") || systemConfig.developerDocsUrl.contains("pay.swapnopay.top/docs.html")) {
+                                                    "https://swapnopay.top/docs.html"
                                                 } else {
                                                     systemConfig.developerDocsUrl
                                                 }
@@ -1665,6 +1665,7 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
     var showPublishSheet by remember { mutableStateOf(false) }
     var aiPromptText by remember { mutableStateOf("") }
     var isGeneratingAi by remember { mutableStateOf(false) }
+    var showFormLimitDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchPaymentForms()
@@ -2018,8 +2019,12 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                                      .weight(1f)
                                      .clip(RoundedCornerShape(12.dp))
                                      .clickable {
-                                         viewModel.createNewHostedForm("New Payment Form")
-                                         viewModel.navigateTo("FormBuilderStudio")
+                                         if (formsList.size >= 20) {
+                                             showFormLimitDialog = true
+                                         } else {
+                                             viewModel.createNewHostedForm("New Payment Form")
+                                             viewModel.navigateTo("FormBuilderStudio")
+                                         }
                                      }
                                     .padding(vertical = 6.dp)
                             ) {
@@ -2377,9 +2382,14 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                showTemplatePickerModal = false
-                                viewModel.createNewHostedForm(title, templateKey)
-                                viewModel.navigateTo("FormBuilderStudio")
+                                if (formsList.size >= 20) {
+                                    showTemplatePickerModal = false
+                                    showFormLimitDialog = true
+                                } else {
+                                    showTemplatePickerModal = false
+                                    viewModel.createNewHostedForm(title, templateKey)
+                                    viewModel.navigateTo("FormBuilderStudio")
+                                }
                             },
                         shape = RoundedCornerShape(12.dp),
                         color = containerBg,
@@ -2457,6 +2467,18 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                 }
             }
         }
+    }
+
+    // 20-form limit dialog
+    if (showFormLimitDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showFormLimitDialog = false },
+            title = { Text("Form Limit Reached") },
+            text = { Text("You can create a maximum of 20 checkout forms per merchant account. Please delete an existing form to create a new one.") },
+            confirmButton = {
+                TextButton(onClick = { showFormLimitDialog = false }) { Text("OK") }
+            }
+        )
     }
 }
 
@@ -3241,8 +3263,8 @@ fun ApiDocScreen(viewModel: AppViewModel) {
                                 Button(
                                     onClick = {
                                         try {
-                                            val portalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html")) {
-                                                "https://pay.swapnopay.top/portal.html"
+                                            val portalUrl = if (systemConfig.developerPortalUrl.isBlank() || systemConfig.developerPortalUrl.contains("swapnopay.app") || systemConfig.developerPortalUrl.endsWith("/docs") || systemConfig.developerPortalUrl.endsWith("/docs.html") || systemConfig.developerPortalUrl.contains("pay.swapnopay.top/portal.html")) {
+                                                "https://swapnopay.top/portal.html"
                                             } else {
                                                 systemConfig.developerPortalUrl
                                             }
@@ -3263,8 +3285,8 @@ fun ApiDocScreen(viewModel: AppViewModel) {
                                 Button(
                                     onClick = {
                                         try {
-                                            val docsUrl = if (systemConfig.developerDocsUrl.isBlank() || systemConfig.developerDocsUrl.contains("swapnopay.app")) {
-                                                "https://pay.swapnopay.top/docs.html"
+                                            val docsUrl = if (systemConfig.developerDocsUrl.isBlank() || systemConfig.developerDocsUrl.contains("swapnopay.app") || systemConfig.developerDocsUrl.contains("pay.swapnopay.top/docs.html")) {
+                                                "https://swapnopay.top/docs.html"
                                             } else {
                                                 systemConfig.developerDocsUrl
                                             }

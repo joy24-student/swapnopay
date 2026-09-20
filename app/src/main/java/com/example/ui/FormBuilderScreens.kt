@@ -1531,6 +1531,7 @@ private fun FormBuilderTab(
                         if (activePageFields.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                 activePageFields.forEach { field ->
+                                    key(field.id) {
                                     val currentVal = dynamicFieldValues[field.id] ?: ""
                                     val fieldError = formErrors[field.id]
 
@@ -1969,6 +1970,7 @@ private fun FormBuilderTab(
                             }
                         }
                     }
+                }
 
                     HorizontalDivider(color = cardBorder, thickness = 1.dp)
 

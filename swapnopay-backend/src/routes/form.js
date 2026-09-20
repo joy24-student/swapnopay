@@ -599,6 +599,47 @@ export function formRouter(io = null) {
           .catch(() => {})
       } catch {}
 
+      // Mirror submission to merchant's own Supabase DB so Android app can read it
+      try {
+        if (form.merchant_id) {
+          const creds = await getMerchantCredentials(form.merchant_id)
+          if (creds && creds.supabase_url && creds.supabase_anon_key) {
+            const { createClient } = await import('@supabase/supabase-js')
+            const mClient = createClient(creds.supabase_url, creds.supabase_anon_key, {
+              auth: { persistSession: false, autoRefreshToken: false }
+            })
+            await mClient.from('form_submissions').insert({
+              id: normalizeUuid(submissionId) || undefined,
+              form_id: form.id,
+              form_slug: form.slug,
+              customer_name: clientName,
+              customer_phone: clientPhone,
+              customer_email: clientEmail,
+              answers: answers,
+              amount: calculatedAmount,
+              payment_method: payment_method,
+              payment_status: paymentRequired ? 'PENDING' : 'FREE',
+              created_at: new Date().toISOString()
+            })
+            await mClient.from('merchant_notifications').insert({
+              id: crypto.randomUUID(),
+              merchant_id: form.merchant_id,
+              type: 'FORM_SUBMISSION',
+              title: `New form response: ${form.title || 'Your Form'}`,
+              message: `${clientName} submitted a response${paymentRequired ? ` for ৳${calculatedAmount}` : ''}`,
+              severity: 'INFO',
+              entity_type: 'FORM_SUBMISSION',
+              entity_id: normalizeUuid(submissionId) || undefined,
+              created_at: new Date().toISOString(),
+              read_at: null
+            })
+            console.log('[form-router] Submission & notification mirrored to merchant DB')
+          }
+        }
+      } catch (mSubErr) {
+        console.warn('[form-router] Merchant DB submission mirror notice:', mSubErr.message)
+      }
+
       // Emit realtime WebSocket event to merchant dashboard
       if (io && form.merchant_id) {
         io.to(`merchant:${form.merchant_id}`).emit('form_submission_received', {
@@ -613,6 +654,28 @@ export function formRouter(io = null) {
           timestamp: new Date().toISOString()
         })
         console.log(`[form-router] Realtime submission broadcasted to merchant:${form.merchant_id}`)
+      }
+
+      // Insert in-app notification for merchant
+      try {
+        if (form.merchant_id) {
+          const admin = getAdminClient()
+          await admin.from('merchant_notifications').insert({
+            id: crypto.randomUUID(),
+            merchant_id: form.merchant_id,
+            type: 'FORM_SUBMISSION',
+            title: `New form response: ${form.title || 'Your Form'}`,
+            message: `${clientName} submitted a response${paymentRequired ? ` for ৳${calculatedAmount}` : ''}`,
+            severity: 'INFO',
+            entity_type: 'FORM_SUBMISSION',
+            entity_id: submissionId,
+            created_at: new Date().toISOString(),
+            read_at: null
+          })
+          console.log('[form-router] Merchant notification inserted')
+        }
+      } catch (notifErr) {
+        console.warn('[form-router] Notification insert notice:', notifErr.message)
       }
 
       // Send SMS Notification if configured

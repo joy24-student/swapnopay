@@ -17,11 +17,19 @@ export function createShopRouter({ service = getShopService, authenticate = requ
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next() })
   // Caddy asks before issuing a certificate. This reveals no merchant data or secrets.
   router.get('/tls/authorize', wrap(async (req, res) => {
-    const domain = hostname(req.query.domain), shop = service()
+    const rawDomain = req.query.domain
+    if (!rawDomain || typeof rawDomain !== 'string') return res.sendStatus(400)
+    let domain
+    try {
+      domain = hostname(rawDomain)
+    } catch {
+      return res.sendStatus(400)
+    }
+    const shop = service()
     await shop.initialize()
-    const result = await shop.pool.query(`SELECT 1 FROM shop_control.launches WHERE tls_allowed=true
+    const result = await shop.pool.query(`SELECT 1 FROM shop_control.launches WHERE (tls_allowed=true OR custom_domain IS NULL)
       AND (custom_domain=$1 OR shop_slug || '.' || $2=$1)
-      AND status IN ('PROVISIONING','WAITING_TLS','LIVE') LIMIT 1`, [domain, shop.config.baseDomain])
+      AND status IN ('PROVISIONING','WAITING_TLS','WAITING_DNS','LIVE') LIMIT 1`, [domain, shop.config.baseDomain])
     res.sendStatus(result.rowCount ? 204 : 403)
   }))
   // Normalize the merchant selector before authentication; body/query conflicts must
@@ -49,7 +57,19 @@ export function createShopRouter({ service = getShopService, authenticate = requ
     const result = await service().enqueue(req.body)
     res.status(result.deployed ? 200 : 202).json(result)
   }))
-  router.post('/domain', wrap(async (req,res) => { await existing(req); res.status(202).json(await service().enqueue({merchant_id:id(req),custom_domain:req.body.custom_domain || null})) }))
+  const updateDomainHandler = wrap(async (req,res) => {
+    await existing(req);
+    let domainVal = req.body.custom_domain
+    if (typeof domainVal === 'string') {
+      domainVal = domainVal.trim()
+      if (!domainVal || domainVal.toLowerCase() === 'null' || domainVal.toLowerCase() === 'none' || domainVal.toLowerCase() === 'undefined') {
+        domainVal = null
+      }
+    }
+    res.status(202).json(await service().enqueue({merchant_id:id(req),custom_domain:domainVal || null}))
+  })
+  router.post('/domain', updateDomainHandler)
+  router.patch('/domain', updateDomainHandler)
   router.get('/settings', wrap(async (req,res) => {
     const row = await existing(req)
     res.json({ok:true,settings:{store_name:row.store_name,shop_slug:row.shop_slug,custom_domain:row.custom_domain,theme_color:row.theme_color,currency_code:row.currency,admin_email:row.admin_email}})

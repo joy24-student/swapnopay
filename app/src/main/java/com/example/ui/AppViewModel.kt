@@ -1145,10 +1145,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     data class SystemRemoteConfig(
-        val developerPortalUrl: String = "https://pay.swapnopay.top/portal.html",
-        val developerDocsUrl: String = "https://pay.swapnopay.top/docs.html",
-        val apiPortalUrl: String = "https://pay.swapnopay.top/portal.html#credentials",
-        val webhookDocsUrl: String = "https://pay.swapnopay.top/docs.html#webhooks",
+        val developerPortalUrl: String = "https://swapnopay.top/portal.html",
+        val developerDocsUrl: String = "https://swapnopay.top/docs.html",
+        val apiPortalUrl: String = "https://swapnopay.top/portal.html#credentials",
+        val webhookDocsUrl: String = "https://swapnopay.top/docs.html#webhooks",
         val supportHotline: String = "+880 1794 827103",
         val supportEmail: String = "support@swapnopay.top",
         val supportWhatsapp: String = "+8801712963652",
@@ -1268,29 +1268,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val current = _systemRemoteConfig.value
             val rawDevPortal = json.optString("developer_portal_url", current.developerPortalUrl).trim()
-            val devPortal = if (rawDevPortal.isBlank() || rawDevPortal.contains("swapnopay.app") || rawDevPortal.endsWith("/docs") || rawDevPortal.endsWith("/docs.html")) {
-                "https://pay.swapnopay.top/portal.html"
+            val devPortal = if (rawDevPortal.isBlank() || rawDevPortal.contains("swapnopay.app") || rawDevPortal.endsWith("/docs") || rawDevPortal.endsWith("/docs.html") || rawDevPortal.contains("pay.swapnopay.top/portal.html")) {
+                "https://swapnopay.top/portal.html"
             } else {
                 rawDevPortal
             }
 
             val rawDevDocs = json.optString("developer_docs_url", current.developerDocsUrl).trim()
-            val devDocs = if (rawDevDocs.isBlank() || rawDevDocs.contains("swapnopay.app")) {
-                "https://pay.swapnopay.top/docs.html"
+            val devDocs = if (rawDevDocs.isBlank() || rawDevDocs.contains("swapnopay.app") || rawDevDocs.contains("pay.swapnopay.top/docs.html")) {
+                "https://swapnopay.top/docs.html"
             } else {
                 rawDevDocs
             }
 
             val rawApiPortal = json.optString("api_portal_url", current.apiPortalUrl).trim()
-            val apiPortal = if (rawApiPortal.isBlank() || rawApiPortal.contains("swapnopay.app")) {
-                "https://pay.swapnopay.top/portal.html#credentials"
+            val apiPortal = if (rawApiPortal.isBlank() || rawApiPortal.contains("swapnopay.app") || rawApiPortal.contains("pay.swapnopay.top/portal.html")) {
+                "https://swapnopay.top/portal.html#credentials"
             } else {
                 rawApiPortal
             }
 
             val rawWebhookDocs = json.optString("webhook_docs_url", current.webhookDocsUrl).trim()
-            val webhookDocs = if (rawWebhookDocs.isBlank() || rawWebhookDocs.contains("swapnopay.app")) {
-                "https://pay.swapnopay.top/docs.html#webhooks"
+            val webhookDocs = if (rawWebhookDocs.isBlank() || rawWebhookDocs.contains("swapnopay.app") || rawWebhookDocs.contains("pay.swapnopay.top/docs.html")) {
+                "https://swapnopay.top/docs.html#webhooks"
             } else {
                 rawWebhookDocs
             }
@@ -11600,7 +11600,7 @@ function executePayment() {
     private fun loadWebShopStatusInternal() {
         try {
             val merchantId = getEffectiveMerchantUuid()
-            val backendBases = listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")
+            val backendBases = (listOf(controlPlaneUrl.value.trim().trimEnd('/')) + listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")).filter { it.isNotBlank() }.distinct()
             var lastResponseBody: String? = null
             var lastResponseCode = -1
 
@@ -11681,7 +11681,7 @@ function executePayment() {
     fun deployWebShop(
         storeName: String,
         shopSlug: String,
-        customDomain: String,
+        customDomain: String? = null,
         primaryCurrency: String = "BDT",
         themeColor: String = "#4F46E5",
         adminEmail: String = "",
@@ -11711,14 +11711,26 @@ function executePayment() {
                 }
 
                 val merchantId = getEffectiveMerchantUuid()
-                val cleanDomain = customDomain.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+                val cleanDomain = (customDomain ?: "").trim()
+                    .removePrefix("https://")
+                    .removePrefix("http://")
+                    .substringBefore('/')
+                    .substringBefore(':')
+                    .trim()
                 val cleanSlug = shopSlug.trim().lowercase().replace(Regex("[^a-z0-9-]"), "-").trim('-').ifBlank { "store" }
+
+                val isUsableCustomDomain = cleanDomain.isNotBlank() &&
+                    cleanDomain.contains(".") &&
+                    !cleanDomain.equals("null", ignoreCase = true) &&
+                    !cleanDomain.equals("none", ignoreCase = true) &&
+                    !cleanDomain.endsWith(".swapnopay.top", ignoreCase = true) &&
+                    !cleanDomain.equals("swapnopay.top", ignoreCase = true)
 
                 val payload = JSONObject().apply {
                     put("merchant_id", merchantId)
                     put("store_name", storeName.trim().ifBlank { "My Web Store" })
                     put("shop_slug", cleanSlug)
-                    if (cleanDomain.isNotBlank()) {
+                    if (isUsableCustomDomain) {
                         put("custom_domain", cleanDomain)
                     }
                     put("primary_currency", primaryCurrency.ifBlank { "BDT" })
@@ -11728,7 +11740,7 @@ function executePayment() {
                 }
 
                 val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val backendBases = listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")
+                val backendBases = (listOf(controlPlaneUrl.value.trim().trimEnd('/')) + listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")).filter { it.isNotBlank() }.distinct()
                 var lastErrorMessage = "Failed to deploy website"
 
                 for (backendBase in backendBases) {
@@ -11764,7 +11776,7 @@ function executePayment() {
                                         adminLoginUrl = adminLoginUrl,
                                         adminEmail = finalEmail,
                                         adminPassword = finalPass,
-                                        customDomain = cleanDomain,
+                                        customDomain = if (isUsableCustomDomain) cleanDomain else json.optString("custom_domain", ""),
                                         primaryCurrency = primaryCurrency,
                                         themeColor = themeColor,
                                         lastSyncedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
@@ -11800,37 +11812,57 @@ function executePayment() {
     }
 
     fun updateWebShopCustomDomain(domain: String, onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
-        val cleanDomain = domain.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+        val cleanDomain = domain.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore('/')
+            .substringBefore(':')
+            .trim()
+        val effectiveDomain = if (cleanDomain.isBlank() || cleanDomain.equals("null", ignoreCase = true) || cleanDomain.equals("none", ignoreCase = true) || cleanDomain.endsWith(".swapnopay.top", ignoreCase = true)) {
+            ""
+        } else {
+            cleanDomain
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val merchantId = getEffectiveMerchantUuid()
-                val backendBase = "https://api.swapnopay.top"
+                val backendBases = (listOf(controlPlaneUrl.value.trim().trimEnd('/')) + listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")).filter { it.isNotBlank() }.distinct()
                 val payload = JSONObject().apply {
                     put("merchant_id", merchantId)
-                    put("custom_domain", cleanDomain.ifBlank { JSONObject.NULL })
+                    put("custom_domain", effectiveDomain.ifBlank { JSONObject.NULL })
                 }
                 val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val request = buildWebShopRequest("$backendBase/v1/shop/domain")
-                    .post(body)
-                    .build()
-                webShopHttpClient.newCall(request).execute().use { response ->
-                    val respStr = response.body?.string()
-                    val json = if (!respStr.isNullOrBlank()) JSONObject(respStr) else JSONObject()
-                    val isSuccess = (response.isSuccessful || response.code == 202) && json.optBoolean("ok", true)
-                    if (isSuccess) {
-                        _webShopState.update { current ->
-                            current.copy(customDomain = cleanDomain)
+                var lastErrMsg = "Failed to update custom domain"
+
+                for (backendBase in backendBases) {
+                    try {
+                        val request = buildWebShopRequest("$backendBase/v1/shop/domain")
+                            .post(body)
+                            .build()
+                        webShopHttpClient.newCall(request).execute().use { response ->
+                            val respStr = response.body?.string()
+                            val json = if (!respStr.isNullOrBlank()) JSONObject(respStr) else JSONObject()
+                            val isSuccess = (response.isSuccessful || response.code == 202) && json.optBoolean("ok", true)
+                            if (isSuccess) {
+                                _webShopState.update { current ->
+                                    current.copy(customDomain = effectiveDomain)
+                                }
+                                withContext(Dispatchers.Main) {
+                                    onComplete(true, if (effectiveDomain.isNotBlank()) "Custom domain bound successfully: $effectiveDomain" else "Custom domain cleared. Store is active on free platform link.")
+                                }
+                                pollWebShopUntilLive()
+                                return@launch
+                            } else {
+                                lastErrMsg = json.optString("error", json.optString("message", "Failed to bind custom domain (HTTP ${response.code})"))
+                            }
                         }
-                        withContext(Dispatchers.Main) {
-                            onComplete(true, if (cleanDomain.isNotBlank()) "Custom domain bound successfully: $cleanDomain" else "Custom domain removed")
-                        }
-                        pollWebShopUntilLive()
-                    } else {
-                        val errMsg = json.optString("error", "Failed to bind custom domain (HTTP ${response.code})")
-                        withContext(Dispatchers.Main) {
-                            onComplete(false, errMsg)
-                        }
+                    } catch (netEx: Exception) {
+                        lastErrMsg = netEx.message ?: "Network error on $backendBase"
                     }
+                }
+                withContext(Dispatchers.Main) {
+                    onComplete(false, lastErrMsg)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

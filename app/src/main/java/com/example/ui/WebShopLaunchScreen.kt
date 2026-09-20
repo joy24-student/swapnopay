@@ -85,7 +85,13 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
         }
     }
 
-    val effectiveUrl = if (customDomain.isNotBlank()) "https://${customDomain.trim()}" else webShopState.shopUrl
+    val freePlatformUrl = "https://${storeSubdomain.ifBlank { "store" }}.shop.swapnopay.top"
+    val isPlatformDomain = customDomain.isBlank() || customDomain.contains("swapnopay.top")
+    val effectiveUrl = when {
+        customDomain.isNotBlank() && !customDomain.contains("swapnopay.top") -> "https://${customDomain.trim()}"
+        webShopState.shopUrl.isNotBlank() -> webShopState.shopUrl
+        else -> freePlatformUrl
+    }
 
     val screenBg = if (isDarkMode) Color(0xFF0C0C0E) else Color(0xFFFAFAFC)
     val cardBg = if (isDarkMode) Color(0xFF13100C) else Color(0xFFFFFFFF)
@@ -137,7 +143,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                 val (statusText, statusBg, statusColor) = when (webShopState.status) {
                     "LIVE" -> Triple("LIVE VPS", successGreen.copy(alpha = 0.15f), successGreen)
                     "QUEUED", "PROVISIONING" -> Triple("PROVISIONING...", Color(0xFF3B82F6).copy(alpha = 0.15f), Color(0xFF3B82F6))
-                    "WAITING_DNS" -> Triple("DNS PENDING", Color(0xFFF59E0B).copy(alpha = 0.15f), Color(0xFFF59E0B))
+                    "WAITING_DNS" -> if (isPlatformDomain) Triple("SECURING SSL", Color(0xFF3B82F6).copy(alpha = 0.15f), Color(0xFF3B82F6)) else Triple("DNS PENDING", Color(0xFFF59E0B).copy(alpha = 0.15f), Color(0xFFF59E0B))
                     "WAITING_TLS" -> Triple("SECURING SSL", Color(0xFFF59E0B).copy(alpha = 0.15f), Color(0xFFF59E0B))
                     "DEGRADED" -> Triple("DEGRADED", Color(0xFFF97316).copy(alpha = 0.15f), Color(0xFFF97316))
                     "FAILED" -> Triple("FAILED", Color(0xFFEF4444).copy(alpha = 0.15f), Color(0xFFEF4444))
@@ -232,35 +238,89 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
 
                         // Live Website Storefront Actions
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    if (effectiveUrl.isNotBlank()) {
-                                        runCatching {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(effectiveUrl))
-                                            context.startActivity(intent)
-                                        }.onFailure {
-                                            Toast.makeText(context, "Could not open browser for: $effectiveUrl", Toast.LENGTH_SHORT).show()
+                            // Direct 1-Click Launch Button when not deployed
+                            if (!webShopState.isDeployed) {
+                                Button(
+                                    onClick = {
+                                        viewModel.deployWebShop(
+                                            storeName = storeName.ifBlank { "My Store" },
+                                            shopSlug = storeSubdomain.ifBlank { "store" },
+                                            customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
+                                            primaryCurrency = primaryCurrency,
+                                            adminEmail = adminEmailInput,
+                                            adminPassword = adminPasswordInput
+                                        ) { _, msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                         }
+                                    },
+                                    enabled = !webShopState.isDeploying,
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = successGreen,
+                                        disabledContainerColor = successGreen.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    if (webShopState.isDeploying || webShopState.status in listOf("QUEUED", "PROVISIONING")) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Provisioning Cloud Storefront...", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                    } else {
+                                        Icon(Icons.Default.RocketLaunch, null, modifier = Modifier.size(18.dp), tint = Color.White)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("⚡ 1-CLICK LAUNCH WEBSITE (FREE HOSTING)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                                     }
-                                },
-                                enabled = webShopState.isDeployed && effectiveUrl.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth().height(44.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0F172A),
-                                    disabledContainerColor = Color(0xFF0F172A).copy(alpha = 0.4f)
-                                ),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp), tint = Color.White)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (webShopState.isDeployed) "VISIT LIVE WEB STOREFRONT"
-                                    else if (webShopState.isDeploying || webShopState.status in listOf("QUEUED", "PROVISIONING")) "PROVISIONING VPS STOREFRONT..."
-                                    else "LAUNCH STOREFRONT BELOW",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        if (effectiveUrl.isNotBlank()) {
+                                            runCatching {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(effectiveUrl))
+                                                context.startActivity(intent)
+                                            }.onFailure {
+                                                Toast.makeText(context, "Could not open browser for: $effectiveUrl", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    enabled = effectiveUrl.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF0F172A),
+                                        disabledContainerColor = Color(0xFF0F172A).copy(alpha = 0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "VISIT LIVE WEB STOREFRONT",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            if (webShopState.statusMessage.isNotBlank()) {
+                                val displayBannerMsg = if (webShopState.status == "WAITING_DNS" && isPlatformDomain) {
+                                    "⚡ Free instant hosting active! Securing SSL certificate for $effectiveUrl..."
+                                } else {
+                                    webShopState.statusMessage
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (webShopState.isDeployed) successGreen.copy(alpha = 0.12f) else Color(0xFF3B82F6).copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, if (webShopState.isDeployed) successGreen.copy(alpha = 0.3f) else Color(0xFF3B82F6).copy(alpha = 0.3f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = displayBannerMsg,
+                                        fontSize = 11.5.sp,
+                                        color = if (webShopState.isDeployed) successGreen else Color(0xFF2563EB),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
                             }
 
                             Row(
@@ -309,6 +369,31 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                     Icon(Icons.Default.Share, null, modifier = Modifier.size(14.dp), tint = primaryText)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Share Store", fontSize = 12.sp, color = primaryText)
+                                }
+                            }
+
+                            if (webShopState.isDeployed) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.deployWebShop(
+                                            storeName = storeName.ifBlank { "My Store" },
+                                            shopSlug = storeSubdomain.ifBlank { "store" },
+                                            customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
+                                            primaryCurrency = primaryCurrency,
+                                            adminEmail = adminEmailInput,
+                                            adminPassword = adminPasswordInput
+                                        ) { _, msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        }
+                                    },
+                                    enabled = !webShopState.isDeploying,
+                                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = primaryText)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Re-deploy / Update Website", fontSize = 12.sp, color = primaryText)
                                 }
                             }
                         }
@@ -396,7 +481,14 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
 
                         OutlinedTextField(
                             value = domainInput,
-                            onValueChange = { domainInput = it.trim().lowercase().removePrefix("https://").removePrefix("http://").trimEnd('/') },
+                            onValueChange = { input ->
+                                domainInput = input.trim().lowercase()
+                                    .removePrefix("https://")
+                                    .removePrefix("http://")
+                                    .replace(Regex("^/+"), "")
+                                    .replace(Regex("/.*$"), "")
+                                    .replace(Regex(":[0-9]+$"), "")
+                            },
                             placeholder = { Text("e.g. yourbrand.com or shop.brand.com", fontSize = 13.sp, color = secondaryText) },
                             leadingIcon = { Icon(Icons.Default.Link, null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp)) },
                             trailingIcon = {
@@ -417,17 +509,44 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                             )
                         )
 
+                        Text(
+                            text = "💡 1-Click Free Hosting is included automatically at https://${storeSubdomain.ifBlank { "store" }}.shop.swapnopay.top. Connect a custom domain only if you purchased your own domain (e.g. yourbrand.com).",
+                            fontSize = 11.5.sp,
+                            color = secondaryText
+                        )
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = {
+                                    val cleanDomain = domainInput.trim().lowercase()
+                                        .removePrefix("https://")
+                                        .removePrefix("http://")
+                                        .replace(Regex("^/+"), "")
+                                        .replace(Regex("/.*$"), "")
+                                        .replace(Regex(":[0-9]+$"), "")
+
+                                    if (!webShopState.isDeployed) {
+                                        Toast.makeText(context, "Please click '1-Click Launch Website' first before connecting a custom domain.", Toast.LENGTH_LONG).show()
+                                        return@Button
+                                    }
+                                    if (cleanDomain.isNotBlank() && cleanDomain.contains("swapnopay.top")) {
+                                        Toast.makeText(context, "Free platform domain is already active! Custom domain is for your own domain (e.g. brand.com).", Toast.LENGTH_LONG).show()
+                                        return@Button
+                                    }
+                                    if (cleanDomain.isNotBlank() && !cleanDomain.contains(".")) {
+                                        Toast.makeText(context, "Please enter a valid domain name with an extension (e.g. yourbrand.com)", Toast.LENGTH_LONG).show()
+                                        return@Button
+                                    }
                                     isBindingDomain = true
-                                    viewModel.updateWebShopCustomDomain(domainInput) { success, msg ->
+                                    viewModel.updateWebShopCustomDomain(cleanDomain) { success, msg ->
                                         isBindingDomain = false
-                                        customDomain = domainInput
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        if (success) {
+                                            customDomain = cleanDomain
+                                        }
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                     }
                                 },
                                 enabled = !isBindingDomain,
@@ -949,6 +1068,11 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         if (webShopState.statusMessage.isNotBlank()) {
+                            val displayStatusMsg = if (webShopState.status == "WAITING_DNS" && isPlatformDomain) {
+                                "⚡ Free instant hosting active! Securing SSL certificate for $effectiveUrl..."
+                            } else {
+                                webShopState.statusMessage
+                            }
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (webShopState.isDeployed) successGreen.copy(alpha = 0.1f) else Color(0xFFF59E0B).copy(alpha = 0.1f),
@@ -956,7 +1080,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = webShopState.statusMessage,
+                                    text = displayStatusMsg,
                                     fontSize = 12.sp,
                                     color = if (webShopState.isDeployed) successGreen else Color(0xFFF59E0B),
                                     modifier = Modifier.padding(10.dp)
@@ -970,7 +1094,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                 viewModel.deployWebShop(
                                     storeName = storeName.ifBlank { "My Store" },
                                     shopSlug = storeSubdomain.ifBlank { "store" },
-                                    customDomain = customDomain,
+                                    customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
                                     primaryCurrency = primaryCurrency,
                                     adminEmail = adminEmailInput,
                                     adminPassword = adminPasswordInput

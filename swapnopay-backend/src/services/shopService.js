@@ -205,7 +205,9 @@ export class ShopService {
         if (!sameSettings || !samePassword) throw new ShopError(409,'LAUNCH_IN_PROGRESS','A launch is already in progress. Wait for it to finish before changing settings.')
         await client.query('COMMIT'); return this.publicStatus(existing)
       }
-      if (input.custom_domain && (input.custom_domain === this.config.baseDomain || input.custom_domain.endsWith(`.${this.config.baseDomain}`) || input.custom_domain === 'swapnopay.top' || input.custom_domain.endsWith('.swapnopay.top'))) throw new ShopError(400, 'RESERVED_DOMAIN', 'Use the store address field for platform subdomains.')
+      if (input.custom_domain && (input.custom_domain === this.config.baseDomain || input.custom_domain.endsWith(`.${this.config.baseDomain}`) || input.custom_domain === 'swapnopay.top' || input.custom_domain.endsWith('.swapnopay.top'))) {
+        input.custom_domain = null
+      }
       const configuration = existing ? decryptConfig(existing.secret_config, this.config.key) : { dbPassword: generatedPassword() }
       configuration.resetAdminPassword=Boolean(input.password || !existing)
       if (input.password || !existing) {
@@ -350,14 +352,17 @@ export class ShopService {
         await client.query(`UPDATE shop_control.launches SET status='PROVISIONING',message='Preparing files and database.',next_attempt=now()+interval '30 seconds',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id])
         try {
           await this.provision(client,row)
+          const isPlatform = !row.custom_domain || row.custom_domain === this.config.baseDomain || row.custom_domain.endsWith('.' + this.config.baseDomain) || row.custom_domain.endsWith('.swapnopay.top')
           const host = row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
-          let status='WAITING_DNS', message=`Point ${host} to ${this.config.addresses[0]}. We will check again automatically.`
+          let status='WAITING_DNS', message=isPlatform
+            ? `Store instance ready! Securing SSL certificate for https://${host}...`
+            : `Point ${host} A-record to ${this.config.addresses[0]}. We will check again automatically.`
           const dnsReady = await this.dns(host,this.config.addresses)
-          await client.query('UPDATE shop_control.launches SET tls_allowed=$2 WHERE merchant_id=$1',[row.merchant_id,dnsReady])
+          await client.query('UPDATE shop_control.launches SET tls_allowed=$2 WHERE merchant_id=$1',[row.merchant_id, Boolean(dnsReady || isPlatform)])
           if (dnsReady) {
             const health = await this.probe(host,this.config.addresses[0],row.merchant_id)
             status=health.ready ? 'LIVE' : 'WAITING_TLS'
-            message=health.ready ? 'Your storefront and admin login are ready over HTTPS.' : health.message
+            message=health.ready ? 'Your storefront and admin login are ready over HTTPS.' : (isPlatform ? `Storefront provisioned! Securing SSL certificate for https://${host}...` : health.message)
           }
           await client.query(`UPDATE shop_control.launches SET status=$2,message=$3,attempts=attempts+1,next_attempt=now()+interval '30 seconds',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id,status,message])
         } catch (error) {
