@@ -1079,8 +1079,11 @@ CREATE POLICY "Admin self read" ON public.admin_users FOR SELECT TO authenticate
   USING (id = auth.uid());
 
 DROP POLICY IF EXISTS "Super admin manage admins" ON public.admin_users;
-CREATE POLICY "Super admin manage admins" ON public.admin_users FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.admin_users WHERE id = auth.uid() AND role = 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can manage all admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admins can manage all admin records" ON public.admin_users;
+CREATE POLICY "Super admins can manage all admin records" ON public.admin_users FOR ALL TO authenticated
+  USING (public.is_super_admin(auth.uid()))
+  WITH CHECK (public.is_super_admin(auth.uid()));
 
 DO $$
 DECLARE
@@ -1097,7 +1100,7 @@ DECLARE
 BEGIN
   FOREACH tbl IN ARRAY admin_tables LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Admin full access on %I" ON public.%I;', tbl, tbl);
-    EXECUTE format('CREATE POLICY "Admin full access on %I" ON public.%I FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.admin_users WHERE id = auth.uid()));', tbl, tbl);
+    EXECUTE format('CREATE POLICY "Admin full access on %I" ON public.%I FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));', tbl, tbl);
   END LOOP;
 END $$;
 

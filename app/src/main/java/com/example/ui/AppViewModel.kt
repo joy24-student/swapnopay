@@ -1855,11 +1855,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isRefreshingKyc.value = true
             try {
-                val result = checkMerchantAccountOnBackend(_userEmail.value.orEmpty())
+                val email = _userEmail.value.orEmpty()
+                val merchantId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" }
+                val result = checkMerchantAccountOnBackend(email, merchantId)
                     ?: error("Platform account could not be loaded. Please retry.")
-                val updated = _activeProfile.value.copy(kycStatus = result.kycStatus,
-                    kycRejectionReason = result.kycRejectionReason, nidNumber = result.nidNumber,
-                    nidFrontUrl = result.nidFrontUrl, nidBackUrl = result.nidBackUrl)
+                val rawKyc = result.kycStatus.trim().uppercase()
+                val normalizedKyc = when (rawKyc) {
+                    "APPROVED", "VERIFIED" -> "VERIFIED"
+                    "REJECTED" -> "REJECTED"
+                    "PENDING", "UNDER_REVIEW" -> "PENDING"
+                    else -> if (rawKyc.isNotBlank()) rawKyc else "UNVERIFIED"
+                }
+                val updated = _activeProfile.value.copy(
+                    kycStatus = normalizedKyc,
+                    kycRejectionReason = result.kycRejectionReason,
+                    nidNumber = result.nidNumber.ifBlank { _activeProfile.value.nidNumber },
+                    nidFrontUrl = result.nidFrontUrl.ifBlank { _activeProfile.value.nidFrontUrl },
+                    nidBackUrl = result.nidBackUrl.ifBlank { _activeProfile.value.nidBackUrl }
+                )
                 _activeProfile.value = updated
                 repository.insertMerchantProfile(updated)
                 onComplete?.invoke(updated.kycStatus, updated.kycRejectionReason)
@@ -2179,13 +2192,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun applyRestoredMerchantSetup(result: MerchantBackendCheckResult) {
+        val rawKyc = result.kycStatus.trim().uppercase()
+        val normalizedKyc = when (rawKyc) {
+            "APPROVED", "VERIFIED" -> "VERIFIED"
+            "REJECTED" -> "REJECTED"
+            "PENDING", "UNDER_REVIEW" -> "PENDING"
+            else -> if (rawKyc.isNotBlank()) rawKyc else "UNVERIFIED"
+        }
         val saved = repository.getMerchantProfileById(result.merchantId)
         val restored = (saved ?: MerchantProfileEntity(id = result.merchantId, businessName = "", email = "", phone = "",
             businessType = "", website = "", primaryBank = "", accountHolder = "", accountNumber = "", kycStatus = "UNVERIFIED"))
-            .copy(businessName = result.businessName, email = result.email, phone = result.phone,
-                businessType = result.businessType, accountHolder = result.accountHolder, photoUrl = result.photoUrl,
-                kycStatus = result.kycStatus, kycRejectionReason = result.kycRejectionReason,
-                nidNumber = result.nidNumber, nidFrontUrl = result.nidFrontUrl, nidBackUrl = result.nidBackUrl)
+            .copy(
+                businessName = result.businessName,
+                email = result.email,
+                phone = result.phone,
+                businessType = result.businessType,
+                accountHolder = result.accountHolder,
+                photoUrl = result.photoUrl,
+                kycStatus = normalizedKyc,
+                kycRejectionReason = result.kycRejectionReason,
+                nidNumber = result.nidNumber.ifBlank { saved?.nidNumber.orEmpty() },
+                nidFrontUrl = result.nidFrontUrl.ifBlank { saved?.nidFrontUrl.orEmpty() },
+                nidBackUrl = result.nidBackUrl.ifBlank { saved?.nidBackUrl.orEmpty() }
+            )
         _activeProfile.value = restored
         repository.insertMerchantProfile(restored)
         repository.switchProfile(restored.id)
@@ -2211,6 +2240,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         fetchSystemConfigFromSupabase()
         listenToSupportChatFromPlatformOwner()
+        pullAllMerchantDataFromRemote(restored.id)
     }
 
     suspend fun completeMerchantOnboarding(profile: MerchantProfileEntity, databaseUrl: String, databaseKey: String): Boolean {
@@ -4848,6 +4878,124 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         logFirebaseStatus("Saved active form settings & integrations for form ID: $currentId")
         registerBrandedHostedFormRoute(snapshot)
+    }
+
+    fun deletePaymentForm(formId: String, setAsDraft: Boolean = false, onComplete: (() -> Unit)? = null) {
+        val targetId = formId.trim()
+        if (targetId.isBlank()) return
+
+        if (setAsDraft) {
+            val currentList = hostedFormsList.value
+            val existing = currentList.find { it.id == targetId }
+            if (existing != null) {
+                val updated = existing.copy(status = "DRAFT")
+                hostedFormsList.value = currentList.map { if (it.id == targetId) updated else it }
+                if (activeFormId.value == targetId) {
+                    formStatus.value = "DRAFT"
+                }
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val payload = hostedFormToJson(updated)
+                    repository.upsertPaymentFormCache(
+                        PaymentFormCacheEntity(
+                            id = updated.id,
+                            merchantId = activeProfile.value.id,
+                            payloadJson = payload.toString(),
+                            isDirty = true
+                        )
+                    )
+                    val active = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+                    if (active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+                        com.example.data.remote.SupabaseClient.updatePaymentForm(
+                            url = active.supabaseUrl,
+                            anonKey = active.anonKey,
+                            token = active.authSessionToken,
+                            formId = updated.id,
+                            payload = org.json.JSONObject().put("status", "DRAFT")
+                        )
+                    }
+                    val candidateRouters = listOf(
+                        hostedFormRouterOrigin,
+                        "https://swapnopay.top",
+                        "https://api.swapnopay.top",
+                        "https://pay.swapnopay.top"
+                    ).distinct()
+                    for (origin in candidateRouters) {
+                        com.example.data.remote.SupabaseClient.unregisterHostedFormRoute(
+                            routerBaseUrl = origin,
+                            token = active.authSessionToken,
+                            formId = targetId
+                        )
+                    }
+                    hostedFormRouteStatus.update { it - targetId }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        logFirebaseStatus("Form moved to draft: ${updated.title}")
+                        onComplete?.invoke()
+                    }
+                }
+            }
+        } else {
+            val currentList = hostedFormsList.value
+            hostedFormsList.value = currentList.filterNot { it.id == targetId }
+
+            if (activeFormId.value == targetId) {
+                val next = hostedFormsList.value.firstOrNull()
+                if (next != null) {
+                    selectHostedForm(next.id)
+                } else {
+                    activeFormId.value = java.util.UUID.randomUUID().toString()
+                    formTitle.value = "Untitled Payment Form"
+                    formSlug.value = ""
+                    formDescription.value = ""
+                    formStatus.value = "DRAFT"
+                    formFieldsList.value = emptyList()
+                    formProductsList.value = emptyList()
+                    formPagesList.value = listOf(FormPageItem())
+                }
+            }
+
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                // Delete from Room cache
+                repository.deletePaymentFormCache(targetId)
+
+                // Delete from Supabase cloud database
+                val active = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+                if (active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+                    com.example.data.remote.SupabaseClient.deletePaymentForm(
+                        url = active.supabaseUrl,
+                        anonKey = active.anonKey,
+                        token = active.authSessionToken,
+                        formId = targetId,
+                        onSuccess = {
+                            logFirebaseStatus("Payment form deleted from cloud database: $targetId")
+                        },
+                        onFailure = { err ->
+                            logFirebaseStatus("Notice deleting payment form from Supabase: $err")
+                        }
+                    )
+                }
+
+                // Unregister route from all candidate routers
+                val candidateRouters = listOf(
+                    hostedFormRouterOrigin,
+                    "https://swapnopay.top",
+                    "https://api.swapnopay.top",
+                    "https://pay.swapnopay.top"
+                ).distinct()
+                for (origin in candidateRouters) {
+                    com.example.data.remote.SupabaseClient.unregisterHostedFormRoute(
+                        routerBaseUrl = origin,
+                        token = active.authSessionToken,
+                        formId = targetId
+                    )
+                }
+                hostedFormRouteStatus.update { it - targetId }
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    logFirebaseStatus("Form deleted permanently: $targetId")
+                    onComplete?.invoke()
+                }
+            }
+        }
     }
 
     fun publishActiveHostedForm() {
@@ -8893,6 +9041,42 @@ function executePayment() {
 
     private inline fun org.json.JSONArray.forEachJsonObject(block: (org.json.JSONObject) -> Unit) {
         for (index in 0 until length()) optJSONObject(index)?.let(block)
+    }
+
+    fun pullAllMerchantDataFromRemote(merchantId: String = activeProfile.value.id) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                logFirebaseStatus("Pulling merchant data from cloud databases...")
+                // 1. Refresh merchant KYC status from backend and Supabase
+                refreshMerchantKycStatus()
+
+                // 2. Fetch payment forms and form submissions
+                fetchPaymentForms()
+                fetchFormSubmissions()
+
+                // 3. Pull business data from Supabase (customers, suppliers, products, ledgers, pos, etc.)
+                val targetProfile = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+                if (targetProfile.supabaseUrl.isNotBlank() && targetProfile.anonKey.isNotBlank()) {
+                    pullAllBusinessDataFromSupabase(targetProfile)
+                }
+
+                // 4. Also run repository sync routines as resilient fallbacks
+                repository.syncCustomersFromSupabase()
+                repository.syncSuppliersFromSupabase()
+                repository.syncProductsFromSupabase()
+                repository.syncLedgerFromSupabase()
+                repository.syncPosSalesFromSupabase()
+                repository.syncMerchantNumbersFromSupabase()
+                repository.syncOrdersFromSupabase()
+                repository.syncPaymentsFromSupabase()
+                repository.syncAppealsFromSupabase()
+                repository.syncDevicesFromSupabase()
+
+                logFirebaseStatus("Merchant data synchronization complete.")
+            } catch (e: Exception) {
+                logFirebaseStatus("Notice during merchant data pull: ${e.message}")
+            }
+        }
     }
 
     fun createPaymentForm(

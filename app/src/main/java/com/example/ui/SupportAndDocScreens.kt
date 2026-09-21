@@ -1666,6 +1666,7 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
     var aiPromptText by remember { mutableStateOf("") }
     var isGeneratingAi by remember { mutableStateOf(false) }
     var showFormLimitDialog by remember { mutableStateOf(false) }
+    var formToDelete by remember { mutableStateOf<org.json.JSONObject?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchPaymentForms()
@@ -2279,7 +2280,7 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
@@ -2297,6 +2298,18 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                                     )
                                 }
 
+                                IconButton(
+                                    onClick = { formToDelete = form },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = "Delete Form",
+                                        tint = Color(0xFFEF4444).copy(alpha = 0.8f),
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = "Open",
@@ -2306,6 +2319,70 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // ── DELETE / DRAFT FORM CONFIRMATION MODAL ──────────────────────────────
+    formToDelete?.let { targetForm ->
+        val targetId = targetForm.optString("id")
+        val targetTitle = targetForm.optString("title", "Untitled Payment Form")
+        EnterpriseGestureModal(
+            onDismissRequest = { formToDelete = null },
+            title = "Delete or Move to Draft?",
+            subtitle = targetTitle,
+            icon = Icons.Outlined.Delete
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = "What would you like to do with '$targetTitle'? You can move it back to draft (unpublish) or permanently delete it from local and cloud databases.",
+                    fontSize = 13.sp,
+                    color = textPrimary,
+                    lineHeight = 18.sp
+                )
+
+                // Option 1: Move to Draft
+                Button(
+                    onClick = {
+                        viewModel.deletePaymentForm(targetId, setAsDraft = true) {
+                            Toast.makeText(context, "Form '$targetTitle' moved to Draft", Toast.LENGTH_SHORT).show()
+                        }
+                        formToDelete = null
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black)
+                ) {
+                    Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Move to Draft (Unpublish)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+
+                // Option 2: Delete Permanently
+                Button(
+                    onClick = {
+                        viewModel.deletePaymentForm(targetId, setAsDraft = false) {
+                            Toast.makeText(context, "Form '$targetTitle' permanently deleted", Toast.LENGTH_SHORT).show()
+                        }
+                        formToDelete = null
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White)
+                ) {
+                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Form Permanently", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+
+                OutlinedButton(
+                    onClick = { formToDelete = null },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Text("Cancel", color = textPrimary, fontSize = 13.sp)
                 }
             }
         }

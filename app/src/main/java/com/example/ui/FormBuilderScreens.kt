@@ -1023,46 +1023,58 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
             subtitle = "Permanently remove this payment form",
             icon = Icons.Outlined.Delete
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    text = "Are you sure you want to delete '$formTitle'? This will remove it from your hosted forms list and you will be returned to the forms dashboard.",
+                    text = "Choose whether to move '$formTitle' back to draft status (unpublish) or permanently delete it from local and cloud databases.",
                     fontSize = 13.sp,
                     color = textPrimary,
                     lineHeight = 18.sp
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // Option 1: Move to Draft (Instant unpublish)
+                Button(
+                    onClick = {
+                        val currentId = viewModel.activeFormId.value
+                        viewModel.deletePaymentForm(currentId, setAsDraft = true) {
+                            Toast.makeText(context, "Form '$formTitle' moved to Draft", Toast.LENGTH_SHORT).show()
+                        }
+                        showDeleteFormDialog = false
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black)
                 ) {
-                    OutlinedButton(
-                        onClick = { showDeleteFormDialog = false },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, cardBorder)
-                    ) {
-                        Text("Cancel", color = textPrimary, fontSize = 14.sp)
-                    }
+                    Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Move to Draft (Unpublish)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
 
-                    Button(
-                        onClick = {
-                            val currentId = viewModel.activeFormId.value
-                            viewModel.hostedFormsList.value = viewModel.hostedFormsList.value.filterNot { it.id == currentId }
-                            viewModel.saveFormDraft()
-                            Toast.makeText(context, "Form '$formTitle' deleted", Toast.LENGTH_SHORT).show()
-                            showDeleteFormDialog = false
-                            viewModel.navigateTo("PaymentForms")
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White)
-                    ) {
-                        Text("Delete Form", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
+                // Option 2: Delete Permanently
+                Button(
+                    onClick = {
+                        val currentId = viewModel.activeFormId.value
+                        viewModel.deletePaymentForm(currentId, setAsDraft = false) {
+                            Toast.makeText(context, "Form '$formTitle' deleted permanently", Toast.LENGTH_SHORT).show()
+                        }
+                        showDeleteFormDialog = false
+                        viewModel.navigateTo("PaymentForms")
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White)
+                ) {
+                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Form Permanently", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+
+                OutlinedButton(
+                    onClick = { showDeleteFormDialog = false },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Text("Cancel", color = textPrimary, fontSize = 13.sp)
                 }
             }
         }

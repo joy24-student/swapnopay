@@ -36,14 +36,14 @@ BEGIN
 END; $$;
 
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id UUID DEFAULT auth.uid())
-RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, auth AS $$
 BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
   RETURN EXISTS (SELECT 1 FROM public.admin_users WHERE id = p_user_id AND is_active = true AND role IN ('super_admin', 'admin'));
 END; $$;
 
 CREATE OR REPLACE FUNCTION public.is_super_admin(p_user_id UUID DEFAULT auth.uid())
-RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, auth AS $$
 BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
   RETURN EXISTS (SELECT 1 FROM public.admin_users WHERE id = p_user_id AND is_active = true AND role = 'super_admin');
@@ -55,6 +55,9 @@ DROP POLICY IF EXISTS "Service Role full access on admin_users" ON public.admin_
 CREATE POLICY "Service Role full access on admin_users" ON public.admin_users FOR ALL TO service_role USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Authenticated users can read their own admin record" ON public.admin_users;
 CREATE POLICY "Authenticated users can read their own admin record" ON public.admin_users FOR SELECT TO authenticated USING (id = auth.uid());
+DROP POLICY IF EXISTS "Super admin manage admins" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admins can manage all admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Self-bootstrap initial super admin" ON public.admin_users;
 DROP POLICY IF EXISTS "Super admins can manage all admin records" ON public.admin_users;
 CREATE POLICY "Super admins can manage all admin records" ON public.admin_users FOR ALL TO authenticated USING (public.is_super_admin(auth.uid())) WITH CHECK (public.is_super_admin(auth.uid()));
 

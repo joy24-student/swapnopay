@@ -25,5 +25,7 @@ __pycache__/
 **/__pycache__/
 swapnopay-backend/data/test-db/
 swapnopay-backend/data/shop-runtime/
+swapnopay-backend/data/form_routes.json
+swapnopay-backend/data/*.json
 *.pyc
 

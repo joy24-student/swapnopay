@@ -51,16 +51,54 @@ export async function lookupMerchantInAdminDb(email, userId, admin = getAdminCli
   const name = merchant?.business_name || gateway?.merchant_name || ''
   const placeholder = /^(my store|my business|google user|facebook user|demo store|business setup required)$/i.test(name.trim())
   const onboarded = Boolean(merchant?.onboarded_at || own || (name.trim() && !placeholder && merchant?.phone))
+
+  let kycStatus = merchant?.kyc_status || 'UNVERIFIED'
+  let nidNumber = merchant?.nid_number || ''
+  let nidFront = merchant?.nid_front_url || ''
+  let nidBack = merchant?.nid_back_url || ''
+  let facePhoto = merchant?.face_photo_url || ''
+  let rejectionReason = merchant?.kyc_rejection_reason || ''
+
+  // Query merchant_kyc_submissions to ensure previous NID verification is restored on login
+  try {
+    const { data: latestKyc } = await admin
+      .from('merchant_kyc_submissions')
+      .select('*')
+      .or(`merchant_id.eq.${merchantId},merchant_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestKyc) {
+      if (latestKyc.status === 'APPROVED' || latestKyc.status === 'VERIFIED') {
+        kycStatus = 'VERIFIED'
+      } else if (latestKyc.status === 'PENDING' && (!kycStatus || kycStatus === 'UNVERIFIED')) {
+        kycStatus = 'PENDING'
+      } else if (latestKyc.status === 'REJECTED' && (!kycStatus || kycStatus === 'UNVERIFIED')) {
+        kycStatus = 'REJECTED'
+        if (latestKyc.rejection_reason) rejectionReason = latestKyc.rejection_reason
+      }
+      if (!nidNumber && latestKyc.nid_number) nidNumber = latestKyc.nid_number
+      if (!nidFront && latestKyc.nid_front_url) nidFront = latestKyc.nid_front_url
+      if (!nidBack && latestKyc.nid_back_url) nidBack = latestKyc.nid_back_url
+      if (!facePhoto && latestKyc.face_photo_url) facePhoto = latestKyc.face_photo_url
+    }
+  } catch (_) {
+    // Non-blocking fallback
+  }
+
+  if (kycStatus === 'APPROVED') kycStatus = 'VERIFIED'
+
   return {
     exists: Boolean(merchant || gateway || connection), isOnboarded: onboarded, isNewUser: !onboarded,
     merchantId,
     merchant: {
       id: merchantId, user_id: userId, business_name: name, email: merchant?.email || cleanEmail,
       phone: merchant?.phone || '', business_type: merchant?.business_type || 'Retail Store',
-      photo_url: merchant?.photo_url || gateway?.merchant_logo_url || '',
+      photo_url: facePhoto || merchant?.photo_url || gateway?.merchant_logo_url || '',
       account_holder: merchant?.account_holder || name, status: merchant?.status || 'PENDING_VERIFICATION',
-      kyc_status: merchant?.kyc_status || 'UNVERIFIED', kyc_rejection_reason: merchant?.kyc_rejection_reason || '',
-      nid_number: merchant?.nid_number || '', nid_front_url: merchant?.nid_front_url || '', nid_back_url: merchant?.nid_back_url || '',
+      kyc_status: kycStatus, kyc_rejection_reason: rejectionReason,
+      nid_number: nidNumber, nid_front_url: nidFront, nid_back_url: nidBack,
     },
     database: { has_own_database: Boolean(own), supabase_url: own?.url || '', supabase_anon_key: own?.key || '', project_ref: connection?.selected_project_ref || '' },
   }

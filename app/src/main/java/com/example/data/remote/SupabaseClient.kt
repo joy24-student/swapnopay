@@ -372,6 +372,46 @@ object SupabaseClient {
                     Log.w("SupabaseClient", "Gateway settings lookup notice: ${gwErr.message}")
                 }
 
+                // Check merchant_kyc_submissions if kyc_status is not yet VERIFIED/APPROVED
+                val curKyc = m.optString("kyc_status", "UNVERIFIED").uppercase()
+                if (curKyc != "VERIFIED" && curKyc != "APPROVED") {
+                    try {
+                        val kycReq = Request.Builder()
+                            .url("$cleanUrl/rest/v1/merchant_kyc_submissions?merchant_id=eq.$merchantId&order=created_at.desc&limit=1")
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", authHeader)
+                            .addHeader("Accept", "application/json")
+                            .get()
+                            .build()
+                        val kycResp = client.newCall(kycReq).execute()
+                        val kycBody = kycResp.body?.string().orEmpty()
+                        if (kycResp.isSuccessful && kycBody.isNotBlank()) {
+                            val kycArr = runCatching { JSONArray(kycBody) }.getOrNull()
+                            if (kycArr != null && kycArr.length() > 0) {
+                                val kycSub = kycArr.getJSONObject(0)
+                                val subStatus = kycSub.optString("status", "").uppercase()
+                                if (subStatus == "APPROVED" || subStatus == "VERIFIED") {
+                                    m.put("kyc_status", "VERIFIED")
+                                    if (m.optString("nid_number").isBlank()) {
+                                        m.put("nid_number", kycSub.optString("nid_number"))
+                                    }
+                                    if (m.optString("nid_front_url").isBlank()) {
+                                        m.put("nid_front_url", kycSub.optString("nid_front_url", kycSub.optString("document_front_url")))
+                                    }
+                                    if (m.optString("nid_back_url").isBlank()) {
+                                        m.put("nid_back_url", kycSub.optString("nid_back_url", kycSub.optString("document_back_url")))
+                                    }
+                                } else if (subStatus == "PENDING" && curKyc == "UNVERIFIED") {
+                                    m.put("kyc_status", "PENDING")
+                                }
+                            }
+                        }
+                        kycResp.close()
+                    } catch (kycErr: Exception) {
+                        Log.w("SupabaseClient", "Direct KYC submissions lookup notice: ${kycErr.message}")
+                    }
+                }
+
                 val dbObj = JSONObject().apply {
                     put("has_own_database", hasOwnDb)
                     put("supabase_url", ownUrl)
@@ -556,21 +596,31 @@ object SupabaseClient {
 
         try {
             withContext(Dispatchers.IO) {
+                var foundStatus = "UNVERIFIED"
+                var foundReason = ""
+                var foundNidNum = ""
+                var foundNidName = ""
+                var foundNidDob = ""
+                var recordLoaded = false
+
+                // 1. Primary check: merchants table
                 client.newCall(request).execute().use { response ->
                     val body = response.body?.string() ?: "[]"
                     if (response.isSuccessful) {
                         val arr = org.json.JSONArray(body)
                         if (arr.length() > 0) {
                             val obj = arr.getJSONObject(0)
-                            val status = obj.optString("kyc_status", "UNVERIFIED")
-                            val reason = obj.optString("kyc_rejection_reason", "")
-                            val nidNum = obj.optString("nid_number", "")
-                            val nidName = obj.optString("nid_name", "")
-                            val nidDob = obj.optString("nid_dob", "")
-                            onSuccess(status, reason, nidNum, nidName, nidDob)
-                            return@use
+                            foundStatus = obj.optString("kyc_status", "UNVERIFIED")
+                            foundReason = obj.optString("kyc_rejection_reason", "")
+                            foundNidNum = obj.optString("nid_number", "")
+                            foundNidName = obj.optString("nid_name", "")
+                            foundNidDob = obj.optString("nid_dob", "")
+                            recordLoaded = true
                         }
                     }
+                }
+
+                if (!recordLoaded) {
                     val fallbackReq = Request.Builder()
                         .url("$cleanUrl/rest/v1/merchants?user_id=eq.$merchantId&select=kyc_status,kyc_rejection_reason,nid_number,nid_name,nid_dob")
                         .addHeader("apikey", anonKey)
@@ -584,20 +634,60 @@ object SupabaseClient {
                                 val arr = org.json.JSONArray(fbBody)
                                 if (arr.length() > 0) {
                                     val obj = arr.getJSONObject(0)
-                                    val status = obj.optString("kyc_status", "UNVERIFIED")
-                                    val reason = obj.optString("kyc_rejection_reason", "")
-                                    val nidNum = obj.optString("nid_number", "")
-                                    val nidName = obj.optString("nid_name", "")
-                                    val nidDob = obj.optString("nid_dob", "")
-                                    onSuccess(status, reason, nidNum, nidName, nidDob)
-                                    return@use
+                                    foundStatus = obj.optString("kyc_status", "UNVERIFIED")
+                                    foundReason = obj.optString("kyc_rejection_reason", "")
+                                    foundNidNum = obj.optString("nid_number", "")
+                                    foundNidName = obj.optString("nid_name", "")
+                                    foundNidDob = obj.optString("nid_dob", "")
+                                    recordLoaded = true
                                 }
                             }
-                            onFailure("Merchant record not found")
                         }
-                    } catch (e: Exception) {
-                        onFailure(e.localizedMessage ?: "Failed to fetch KYC status")
-                    }
+                    } catch (_: Exception) {}
+                }
+
+                // 2. Audit check: merchant_kyc_submissions table (ensures APPROVED / VERIFIED is never lost)
+                if (foundStatus.uppercase() !in listOf("VERIFIED", "APPROVED")) {
+                    try {
+                        val subReq = Request.Builder()
+                            .url("$cleanUrl/rest/v1/merchant_kyc_submissions?merchant_id=eq.$merchantId&order=created_at.desc&limit=1&select=status,rejection_reason,nid_number,nid_name,nid_dob")
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                            .get()
+                            .build()
+                        client.newCall(subReq).execute().use { sRes ->
+                            val sBody = sRes.body?.string() ?: "[]"
+                            if (sRes.isSuccessful) {
+                                val sArr = org.json.JSONArray(sBody)
+                                if (sArr.length() > 0) {
+                                    val sObj = sArr.getJSONObject(0)
+                                    val subStatus = sObj.optString("status", "")
+                                    if (subStatus.equals("APPROVED", true) || subStatus.equals("VERIFIED", true)) {
+                                        foundStatus = "VERIFIED"
+                                        recordLoaded = true
+                                    } else if (subStatus.equals("PENDING", true) && foundStatus == "UNVERIFIED") {
+                                        foundStatus = "PENDING"
+                                        recordLoaded = true
+                                    } else if (subStatus.equals("REJECTED", true) && foundStatus == "UNVERIFIED") {
+                                        foundStatus = "REJECTED"
+                                        foundReason = sObj.optString("rejection_reason", foundReason)
+                                        recordLoaded = true
+                                    }
+                                    if (foundNidNum.isBlank()) foundNidNum = sObj.optString("nid_number", "")
+                                    if (foundNidName.isBlank()) foundNidName = sObj.optString("nid_name", "")
+                                    if (foundNidDob.isBlank()) foundNidDob = sObj.optString("nid_dob", "")
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (foundStatus.equals("APPROVED", true)) foundStatus = "VERIFIED"
+
+                if (recordLoaded || foundNidNum.isNotBlank()) {
+                    onSuccess(foundStatus, foundReason, foundNidNum, foundNidName, foundNidDob)
+                } else {
+                    onFailure("Merchant record not found")
                 }
             }
         } catch (error: Exception) {
@@ -1569,6 +1659,41 @@ object SupabaseClient {
         }
     }
 
+    suspend fun unregisterHostedFormRoute(
+        routerBaseUrl: String,
+        token: String = "",
+        formId: String,
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
+    ) {
+        val endpoint = "${routerBaseUrl.trimEnd('/')}/v1/routes/${java.net.URLEncoder.encode(formId, "UTF-8")}"
+        val request = runCatching {
+            val builder = Request.Builder()
+                .url(endpoint)
+                .delete()
+            if (token.isNotBlank()) {
+                builder.addHeader("Authorization", "Bearer $token")
+            }
+            builder.build()
+        }.getOrElse {
+            onFailure("Invalid branded form router URL.")
+            return
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        onSuccess()
+                    } else {
+                        onFailure("Route removal failed (HTTP ${response.code})")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            onFailure(e.localizedMessage ?: "Unable to unregister route.")
+        }
+    }
+
     // 16.5 UPDATE PAYMENT FORM
     suspend fun updatePaymentForm(
         url: String,
@@ -1576,8 +1701,8 @@ object SupabaseClient {
         token: String,
         formId: String,
         payload: JSONObject,
-        onSuccess: () -> Unit,
-        onFailure: (String) -> Unit
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
     ) {
         val cleanUrl = url.trimEnd('/')
         val endpoint = "$cleanUrl/rest/v1/payment_forms?id=eq.$formId"
@@ -1585,9 +1710,43 @@ object SupabaseClient {
         val request = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer $token")
+            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
             .addHeader("Content-Type", "application/json")
             .patch(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        try {
+            withContext(Dispatchers.IO) {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        onSuccess()
+                    } else {
+                        onFailure("HTTP error: ${response.code}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            onFailure(e.localizedMessage ?: "Connection error.")
+        }
+    }
+
+    // 16.6 DELETE PAYMENT FORM
+    suspend fun deletePaymentForm(
+        url: String,
+        anonKey: String,
+        token: String,
+        formId: String,
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
+    ) {
+        val cleanUrl = url.trimEnd('/')
+        val endpoint = "$cleanUrl/rest/v1/payment_forms?id=eq.$formId"
+
+        val request = Request.Builder()
+            .url(endpoint)
+            .addHeader("apikey", anonKey)
+            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+            .delete()
             .build()
 
         try {

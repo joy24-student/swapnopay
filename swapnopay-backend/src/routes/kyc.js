@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
 import { fileURLToPath } from 'node:url'
 import { submitMerchantKyc, listPendingKycSubmissions, reviewMerchantKyc, getAdminClient, getSubscriptionConfig } from '../services/adminSupabase.js'
-import { requirePlatformUser, requirePlatformMerchant } from '../services/merchantAccount.js'
+import { requirePlatformUser, requirePlatformMerchant, lookupMerchantInAdminDb } from '../services/merchantAccount.js'
 import { requireAdminSecret } from '../middleware/auth.js'
 import { extractBangladeshiNid } from '../services/nidOcrService.js'
 
@@ -352,6 +352,36 @@ router.post('/extract-nid', requirePlatformUser, async (req, res) => {
   } catch (err) {
     console.error('[kyc/extract-nid POST]', err.message)
     res.status(500).json({ error: 'NID extraction failed: ' + err.message })
+  }
+})
+
+// ----------------------------------------------------------------------------
+// GET /v1/kyc/status — Current KYC status and verified NID for merchant
+// ----------------------------------------------------------------------------
+router.get('/status', requirePlatformUser, async (req, res) => {
+  try {
+    const userId = req.platformUser.id
+    const userEmail = req.platformUser.email
+    const lookup = await lookupMerchantInAdminDb(userEmail, userId)
+    const m = lookup.merchant
+    const isVerified = m.kyc_status === 'VERIFIED' || m.kyc_status === 'APPROVED'
+
+    return res.json({
+      ok: true,
+      kyc_status: isVerified ? 'VERIFIED' : (m.kyc_status || 'UNVERIFIED'),
+      is_verified: isVerified,
+      kyc_rejection_reason: m.kyc_rejection_reason || null,
+      nid_number: m.nid_number || '',
+      nid_name: m.business_name || '',
+      nid_front_url: m.nid_front_url || null,
+      nid_back_url: m.nid_back_url || null,
+      face_photo_url: m.photo_url || null,
+      merchant_id: lookup.merchantId,
+      merchant: m
+    })
+  } catch (err) {
+    console.error('[kyc/status GET]', err.message)
+    res.status(500).json({ ok: false, error: 'Failed to fetch KYC status: ' + err.message })
   }
 })
 

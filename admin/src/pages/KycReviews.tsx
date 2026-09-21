@@ -50,27 +50,75 @@ export default function KycReviews() {
   const [actionLoading, setActionLoading] = useState(false)
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Fetch KYC records from merchants table
+  // Fetch KYC records from merchants table with backend API fallback
   async function loadKycRecords() {
     try {
-      const { data, error } = await adminSupabase
-        .from('merchants')
-        .select('*')
-        .order('kyc_submitted_at', { ascending: false, nullsFirst: false })
-
-      if (error) throw error
-
-      // Also fetch submission audits to augment missing document URLs
+      let data: any[] | null = null
       let subData: any[] | null = null
+
+      // 1. Attempt direct Supabase PostgREST queries
+      try {
+        const res = await adminSupabase
+          .from('merchants')
+          .select('*')
+          .order('kyc_submitted_at', { ascending: false, nullsFirst: false })
+        if (!res.error && res.data) {
+          data = res.data
+        }
+      } catch (err: any) {
+        console.warn('[KycReviews] Direct merchants query notice:', err.message)
+      }
+
       try {
         const res = await adminSupabase
           .from('merchant_kyc_submissions')
           .select('*')
           .order('created_at', { ascending: false })
-        subData = res.data
-      } catch (_) {}
+        if (!res.error && res.data) {
+          subData = res.data
+        }
+      } catch (err: any) {
+        console.warn('[KycReviews] Direct kyc_submissions query notice:', err.message)
+      }
 
-      if (data) {
+      // 2. Resilient fallback: backend API via Master Key / Admin Auth
+      const masterSecret = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('swapnopay_admin_secret') : null
+      const base = (import.meta as any).env?.VITE_BACKEND_URL || 'https://api.swapnopay.top'
+      const { data: { session } } = await adminSupabase.auth.getSession()
+
+      const backendHeaders: Record<string, string> = { 'Accept': 'application/json' }
+      if (masterSecret) backendHeaders['X-Admin-Secret'] = masterSecret
+      if (session?.access_token) backendHeaders['Authorization'] = `Bearer ${session.access_token}`
+
+      if (!data || data.length === 0) {
+        try {
+          const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/merchants`, { headers: backendHeaders })
+          if (res.ok) {
+            const json = await res.json()
+            if (json.ok && Array.isArray(json.merchants)) {
+              data = json.merchants
+            }
+          }
+        } catch (bkErr: any) {
+          console.warn('[KycReviews] Backend merchants fetch notice:', bkErr.message)
+        }
+      }
+
+      if (!subData || subData.length === 0) {
+        try {
+          const res = await fetch(`${base.replace(/\/$/, '')}/v1/kyc/submissions`, { headers: backendHeaders })
+          if (res.ok) {
+            const json = await res.json()
+            if (json.ok && Array.isArray(json.submissions)) {
+              subData = json.submissions
+            }
+          }
+        } catch (bkErr: any) {
+          console.warn('[KycReviews] Backend submissions fetch notice:', bkErr.message)
+        }
+      }
+
+      if (data && data.length > 0) {
         const mergedList = (data as KycRecord[]).map(m => {
           const sub = subData?.find(s => s.merchant_id === m.id || s.merchant_id === m.user_id)
           return {
@@ -84,6 +132,7 @@ export default function KycReviews() {
           }
         })
         setSubmissions(mergedList)
+        setActionMessage(null)
         if (!selectedMerchant && mergedList.length > 0) {
           const firstPending = mergedList.find(m => m.kyc_status === 'PENDING' || m.kyc_status === 'PENDING_REVIEW')
           setSelectedMerchant(firstPending || mergedList[0])

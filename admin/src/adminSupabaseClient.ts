@@ -187,36 +187,106 @@ export const DEFAULT_RADYMATE_GALLERY: RadymateGalleryItem[] = [
 
 /** Fetch the singleton gateway config row */
 export async function fetchGatewayConfig() {
-  const { data, error } = await adminSupabase
-    .from('gateway_config')
-    .select('*')
-    .eq('id', GATEWAY_CONFIG_ID)
-    .single()
-  if (error) throw new Error('Failed to fetch gateway config: ' + error.message)
-  return data
+  try {
+    const { data, error } = await adminSupabase
+      .from('gateway_config')
+      .select('*')
+      .eq('id', GATEWAY_CONFIG_ID)
+      .single()
+    if (!error && data) return data
+  } catch (err: any) {
+    console.warn('[adminSupabaseClient] Direct gateway_config notice:', err.message)
+  }
+
+  // Backend fallback
+  try {
+    const masterSecret = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('swapnopay_admin_secret') : null
+    const base = (import.meta as any).env?.VITE_BACKEND_URL || 'https://api.swapnopay.top'
+    const headers: Record<string, string> = { 'Accept': 'application/json' }
+    if (masterSecret) headers['X-Admin-Secret'] = masterSecret
+    const { data: { session } } = await adminSupabase.auth.getSession()
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
+    const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/gateway-settings`, { headers })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.ok && json.config) return json.config
+    }
+  } catch (bkErr) {
+    console.warn('[adminSupabaseClient] Backend gateway-settings notice:', bkErr)
+  }
+  return null
 }
 
 /** Update the singleton gateway config row */
 export async function updateGatewayConfig(updates: Record<string, unknown>) {
-  const { data, error } = await adminSupabase
-    .from('gateway_config')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', GATEWAY_CONFIG_ID)
-    .select('*')
-    .single()
-  if (error) throw new Error('Failed to save gateway config: ' + error.message)
-  return data
+  try {
+    const { data, error } = await adminSupabase
+      .from('gateway_config')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', GATEWAY_CONFIG_ID)
+      .select('*')
+      .single()
+    if (!error && data) return data
+  } catch (err: any) {
+    console.warn('[adminSupabaseClient] Direct updateGatewayConfig notice:', err.message)
+  }
+
+  // Backend fallback
+  try {
+    const masterSecret = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('swapnopay_admin_secret') : null
+    const base = (import.meta as any).env?.VITE_BACKEND_URL || 'https://api.swapnopay.top'
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+    if (masterSecret) headers['X-Admin-Secret'] = masterSecret
+    const { data: { session } } = await adminSupabase.auth.getSession()
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
+    const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/gateway-settings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(updates),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.ok && json.config) return json.config
+    }
+  } catch (bkErr) {
+    console.warn('[adminSupabaseClient] Backend update gateway-settings notice:', bkErr)
+  }
+  return updates
 }
 
 /** Fetch recent platform payment events */
 export async function fetchPaymentEvents(limit = 50) {
-  const { data, error } = await adminSupabase
-    .from('payment_events')
-    .select('*')
-    .order('recorded_at', { ascending: false })
-    .limit(limit)
-  if (error) throw new Error('Failed to fetch payment events: ' + error.message)
-  return data || []
+  try {
+    const { data, error } = await adminSupabase
+      .from('payment_events')
+      .select('*')
+      .order('recorded_at', { ascending: false })
+      .limit(limit)
+    if (!error && data) return data
+  } catch (err: any) {
+    console.warn('[adminSupabaseClient] Direct payment_events notice:', err.message)
+  }
+
+  // Backend fallback
+  try {
+    const masterSecret = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('swapnopay_admin_secret') : null
+    const base = (import.meta as any).env?.VITE_BACKEND_URL || 'https://api.swapnopay.top'
+    const headers: Record<string, string> = { 'Accept': 'application/json' }
+    if (masterSecret) headers['X-Admin-Secret'] = masterSecret
+    const { data: { session } } = await adminSupabase.auth.getSession()
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
+    const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/payment-events?limit=${limit}`, { headers })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.ok && Array.isArray(json.events)) return json.events
+    }
+  } catch (bkErr) {
+    console.warn('[adminSupabaseClient] Backend payment-events notice:', bkErr)
+  }
+  return []
 }
 
 /** Fetch all API key records (no digest exposed) */

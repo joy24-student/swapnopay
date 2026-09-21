@@ -970,6 +970,275 @@ class AppRepository(private val context: Context) {
         success
     }
 
+    suspend fun syncCustomersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = active.authSessionToken,
+                tableName = "customers",
+                selectQuery = "*",
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch customers: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching customers", e)
+        }
+
+        if (resultData != null) {
+            val customers = mutableListOf<CustomerEntity>()
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id", active.id)
+                if (merchantId == active.id) {
+                    customers.add(
+                        CustomerEntity(
+                            id = obj.getString("id"),
+                            merchantId = active.id,
+                            name = obj.getString("name"),
+                            phone = obj.optString("phone", ""),
+                            email = if (obj.isNull("email")) null else obj.optString("email"),
+                            address = if (obj.isNull("address")) null else obj.optString("address"),
+                            openingBalance = obj.optDouble("opening_balance", 0.0),
+                            currentBalance = obj.optDouble("current_balance", 0.0),
+                            status = obj.optString("status", "VIP"),
+                            createdAt = parseIsoDateToMillis(obj.optString("created_at")),
+                            code = obj.optString("code", "")
+                        )
+                    )
+                }
+            }
+            if (customers.isNotEmpty()) {
+                dao.insertCustomers(customers)
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun syncSuppliersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = active.authSessionToken,
+                tableName = "suppliers",
+                selectQuery = "*",
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch suppliers: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching suppliers", e)
+        }
+
+        if (resultData != null) {
+            val suppliers = mutableListOf<SupplierEntity>()
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id", active.id)
+                if (merchantId == active.id) {
+                    suppliers.add(
+                        SupplierEntity(
+                            id = obj.getString("id"),
+                            merchantId = active.id,
+                            name = obj.getString("name"),
+                            phone = obj.optString("phone", ""),
+                            email = if (obj.isNull("email")) null else obj.optString("email"),
+                            address = if (obj.isNull("address")) null else obj.optString("address"),
+                            openingBalance = obj.optDouble("opening_balance", 0.0),
+                            currentBalance = obj.optDouble("current_balance", 0.0),
+                            createdAt = parseIsoDateToMillis(obj.optString("created_at")),
+                            code = obj.optString("code", "")
+                        )
+                    )
+                }
+            }
+            if (suppliers.isNotEmpty()) {
+                dao.insertSuppliers(suppliers)
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun syncLedgerFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = active.authSessionToken,
+                tableName = "ledger_transactions",
+                selectQuery = "*",
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch ledger transactions: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching ledger transactions", e)
+        }
+
+        if (resultData != null) {
+            val txs = mutableListOf<LedgerTransactionEntity>()
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id", active.id)
+                if (merchantId == active.id) {
+                    txs.add(
+                        LedgerTransactionEntity(
+                            id = obj.getString("id"),
+                            merchantId = active.id,
+                            customerId = if (obj.isNull("customer_id") || obj.optString("customer_id").isBlank()) null else obj.optString("customer_id"),
+                            supplierId = if (obj.isNull("supplier_id") || obj.optString("supplier_id").isBlank()) null else obj.optString("supplier_id"),
+                            type = obj.optString("type", "credit"),
+                            amount = obj.optDouble("amount", 0.0),
+                            date = parseIsoDateToMillis(obj.optString("date", obj.optString("created_at"))),
+                            note = if (obj.isNull("note")) null else obj.optString("note"),
+                            productDetailsJson = obj.opt("product_details")?.toString() ?: "[]",
+                            isVoiceEntry = obj.optBoolean("is_voice_entry", false),
+                            attachmentUri = if (obj.isNull("attachment_url")) null else obj.optString("attachment_url"),
+                            paymentMethod = obj.optString("payment_method", "Cash"),
+                            invoiceNo = if (obj.isNull("invoice_no")) null else obj.optString("invoice_no"),
+                            isSynced = true
+                        )
+                    )
+                }
+            }
+            if (txs.isNotEmpty()) {
+                dao.insertLedgerTransactions(txs)
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun syncPosSalesFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = active.authSessionToken,
+                tableName = "pos_sales",
+                selectQuery = "*",
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch pos sales: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching pos sales", e)
+        }
+
+        if (resultData != null) {
+            val sales = mutableListOf<PosSaleEntity>()
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id", active.id)
+                if (merchantId == active.id) {
+                    sales.add(
+                        PosSaleEntity(
+                            id = obj.getString("id"),
+                            merchantId = active.id,
+                            invoiceNo = obj.optString("invoice_no", "INV-${obj.optString("id").takeLast(6)}"),
+                            customerId = if (obj.isNull("customer_id") || obj.optString("customer_id").isBlank()) null else obj.optString("customer_id"),
+                            customerName = obj.optString("customer_name", "Walk-in Customer"),
+                            customerPhone = obj.optString("customer_phone", ""),
+                            subtotal = obj.optDouble("subtotal", 0.0),
+                            discount = obj.optDouble("discount", 0.0),
+                            netTotal = obj.optDouble("net_total", 0.0),
+                            cashReceived = obj.optDouble("cash_received", 0.0),
+                            changeDue = obj.optDouble("change_due", 0.0),
+                            paymentMethod = obj.optString("payment_method", "Cash"),
+                            paymentStatus = obj.optString("payment_status", "PAID"),
+                            itemCount = obj.optInt("item_count", 1),
+                            cartItemsJson = obj.opt("cart_items")?.toString() ?: "[]",
+                            timestamp = parseIsoDateToMillis(obj.optString("timestamp", obj.optString("created_at"))),
+                            isSynced = true
+                        )
+                    )
+                }
+            }
+            if (sales.isNotEmpty()) {
+                dao.insertPosSales(sales)
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun syncMerchantNumbersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = active.authSessionToken,
+                tableName = "merchant_numbers",
+                selectQuery = "*",
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch merchant numbers: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching merchant numbers", e)
+        }
+
+        if (resultData != null) {
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id", active.id)
+                if (merchantId == active.id) {
+                    val numStr = obj.optString("number")
+                    if (numStr.isNotBlank()) {
+                        dao.upsertMerchantNumber(
+                            MerchantNumberEntity(
+                                number = numStr,
+                                merchantId = active.id,
+                                method = obj.optString("type", "bKash"),
+                                accountType = obj.optString("account_type", "Personal"),
+                                isActive = obj.optBoolean("active", true),
+                                isDefault = obj.optBoolean("is_default", false),
+                                qrCodeUrl = if (obj.isNull("qr_code_url")) null else obj.optString("qr_code_url"),
+                                updatedAt = parseIsoDateToMillis(obj.optString("created_at"))
+                            )
+                        )
+                    }
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     // Product Variants & QR Code Operations
     fun observeProductVariants(merchantId: String): Flow<List<ProductVariantEntity>> = dao.observeProductVariants(merchantId)
     suspend fun getVariantsByProductId(productId: String, merchantId: String): List<ProductVariantEntity> =

@@ -57,15 +57,47 @@ export default function Merchants() {
 
   const loadMerchants = async () => {
     try {
-      const { data, error } = await adminSupabase
-        .from('merchants')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (!error && data) {
-        setRows(data as MerchantRecord[])
+      let loadedData: MerchantRecord[] | null = null
+
+      try {
+        const { data, error } = await adminSupabase
+          .from('merchants')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (!error && data && data.length > 0) {
+          loadedData = data as MerchantRecord[]
+        }
+      } catch (e) {
+        console.warn('[Merchants] Supabase fetch notice:', e)
+      }
+
+      // Backend fallback if direct Supabase query fails or returns empty
+      if (!loadedData || loadedData.length === 0) {
+        try {
+          const masterSecret = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('swapnopay_admin_secret') : null
+          const base = (import.meta as any).env?.VITE_BACKEND_URL || 'https://api.swapnopay.top'
+          const headers: Record<string, string> = { 'Accept': 'application/json' }
+          if (masterSecret) headers['X-Admin-Secret'] = masterSecret
+          const { data: { session } } = await adminSupabase.auth.getSession()
+          if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
+          const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/merchants`, { headers })
+          if (res.ok) {
+            const json = await res.json()
+            if (json.ok && Array.isArray(json.merchants)) {
+              loadedData = json.merchants as MerchantRecord[]
+            }
+          }
+        } catch (bkErr) {
+          console.warn('[Merchants] Backend fallback notice:', bkErr)
+        }
+      }
+
+      if (loadedData) {
+        setRows(loadedData)
       }
     } catch (e) {
-      console.warn('[Merchants] Supabase fetch warning:', e)
+      console.warn('[Merchants] Fetch warning:', e)
     } finally {
       setLoading(false)
     }

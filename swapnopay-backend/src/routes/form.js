@@ -206,9 +206,9 @@ export function formRouter(io = null) {
   })
 
   // ──────────────────────────────────────────────────────────────────────────
-  // DELETE /v1/routes/:id
+  // DELETE /v1/routes/:id and DELETE /v1/forms/:id
   // ──────────────────────────────────────────────────────────────────────────
-  router.delete('/routes/:id', (req, res) => {
+  function handleDeleteFormRoute(req, res) {
     const id = (req.params.id || '').toLowerCase().trim()
     const compactId = id.replace(/-/g, '')
     const existing = routeById.get(compactId) || routeBySlug.get(id)
@@ -221,7 +221,10 @@ export function formRouter(io = null) {
       saveRoutesToDisk()
     }
     return res.status(200).json({ ok: true })
-  })
+  }
+
+  router.delete('/routes/:id', handleDeleteFormRoute)
+  router.delete('/forms/:id', handleDeleteFormRoute)
 
   // ──────────────────────────────────────────────────────────────────────────
   // GET /v1/forms/:slugOrId
