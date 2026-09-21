@@ -2424,19 +2424,51 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
 
                 Button(
                     onClick = {
+                        val prompt = aiPromptText.trim()
+                        if (prompt.isBlank()) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Please describe your form first",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                            return@Button
+                        }
+                        if (formsList.size >= 20) {
+                            showAiGeneratorModal = false
+                            showFormLimitDialog = true
+                            return@Button
+                        }
                         isGeneratingAi = true
+                        // 1. Create a fresh form so we land on a new one (not an existing active form)
+                        viewModel.createNewHostedForm("AI: ${prompt.take(40)}")
+                        // 2. Actually call the AI generator with the user's prompt (was missing!)
+                        viewModel.generateFormWithAI(prompt)
+                        // 3. Navigate to the studio to show the generated result
                         viewModel.navigateTo("FormBuilderStudio")
                         showAiGeneratorModal = false
+                        isGeneratingAi = false
                     },
+                    enabled = !isGeneratingAi,
                     colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
-                    Text("Generate with AI ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    if (isGeneratingAi) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.Black,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Generating...", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    } else {
+                        Text("Generate with AI ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
                 }
             }
         }
     }
+
 
     // ── 6. TEMPLATE PICKER MODAL ────────────────────────────────────────────────
     if (showTemplatePickerModal) {
