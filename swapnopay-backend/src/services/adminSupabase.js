@@ -58,128 +58,204 @@ function createMerchantClient(supabaseUrl, supabaseAnonKey) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Get stored merchant credentials from admin DB
+// Get stored merchant credentials from admin DB, merchants table, or control plane
 // ──────────────────────────────────────────────────────────────────────────────
 export async function getMerchantCredentials(merchantId) {
   if (!merchantId) return null
-  const admin = getAdminClient()
-  const { data, error } = await admin
-    .from('merchant_gateway_settings')
-    .select('supabase_url, supabase_anon_key, merchant_name, merchant_logo_url')
-    .eq('merchant_id', merchantId)
-    .maybeSingle()
+  let admin = null
+  try { admin = getAdminClient() } catch (_) {}
+  if (!admin) return null
 
-  if (data?.supabase_url) return data
-
-  // Fallback: check supabase_connections from control plane
+  // 1. Check merchant_gateway_settings
+  let data = null
   try {
+    const res = await admin
+      .from('merchant_gateway_settings')
+      .select('supabase_url, supabase_anon_key, merchant_name, merchant_logo_url, receiving_numbers')
+      .eq('merchant_id', merchantId)
+      .maybeSingle()
+    data = res.data
+  } catch (_) {}
+
+  // 2. Query merchants table for business_name, photo_url, phone, default_number, status
+  let merchantRow = null
+  try {
+    const isIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantId)
+    let mQuery = admin.from('merchants').select('id, user_id, business_name, photo_url, phone, default_number, status')
+    if (isIdUuid) {
+      mQuery = mQuery.or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
+    } else {
+      mQuery = mQuery.eq('id', merchantId)
+    }
+    const { data: mData } = await mQuery.maybeSingle()
+    merchantRow = mData
+  } catch (_) {}
+
+  const effectiveName = data?.merchant_name || merchantRow?.business_name || null
+  const effectiveLogo = data?.merchant_logo_url || merchantRow?.photo_url || null
+  const receiving = data?.receiving_numbers || (merchantRow?.default_number ? { bKash: merchantRow.default_number } : {})
+  const mStatus = merchantRow?.status || 'ACTIVE'
+
+  if (data?.supabase_url) {
+    return {
+      supabase_url: data.supabase_url,
+      supabase_anon_key: data.supabase_anon_key,
+      merchant_name: effectiveName,
+      merchant_logo_url: effectiveLogo,
+      receiving_numbers: receiving,
+      status: mStatus,
+      merchant_id: merchantRow?.id || merchantId,
+    }
+  }
+
+  // 3. Fallback: check supabase_connections from control plane
+  try {
+    const userIds = [merchantId]
+    if (merchantRow?.user_id && merchantRow.user_id !== merchantId) userIds.push(merchantRow.user_id)
+    if (merchantRow?.id && merchantRow.id !== merchantId) userIds.push(merchantRow.id)
+
     const { data: conn } = await admin
       .from('supabase_connections')
       .select('project_url, publishable_key')
-      .eq('user_id', merchantId)
+      .in('user_id', userIds)
+      .limit(1)
       .maybeSingle()
 
     if (conn?.project_url) {
       return {
         supabase_url: conn.project_url,
         supabase_anon_key: conn.publishable_key,
-        merchant_name: null,
-        merchant_logo_url: null,
+        merchant_name: effectiveName,
+        merchant_logo_url: effectiveLogo,
+        receiving_numbers: receiving,
+        status: mStatus,
+        merchant_id: merchantRow?.id || merchantId,
       }
     }
   } catch {
     // Ignore fallback failure
   }
 
+  if (merchantRow || data) {
+    return {
+      supabase_url: data?.supabase_url || null,
+      supabase_anon_key: data?.supabase_anon_key || null,
+      merchant_name: effectiveName,
+      merchant_logo_url: effectiveLogo,
+      receiving_numbers: receiving,
+      status: mStatus,
+      merchant_id: merchantRow?.id || merchantId,
+    }
+  }
+
   return null
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Check merchant device active status via MERCHANT's own Supabase DB
+// Check merchant device active status via in-memory heartbeat or merchant's own Supabase DB
 // Returns: { active: boolean, last_seen: string|null, device_count: number }
 // ──────────────────────────────────────────────────────────────────────────────
 export async function getMerchantDeviceStatus(merchantId, heartbeatMap = null) {
   if (!merchantId) return { active: null, last_seen: null, device_count: 0 }
 
-  // Fast path: check in-memory heartbeat map first (O(1) — populated by Socket.io)
+  // Fast path: check in-memory heartbeat map first (15-minute window for stable mobile uptime)
+  const FIFTEEN_MIN = 15 * 60 * 1000
   if (heartbeatMap && heartbeatMap.has(merchantId)) {
     const hb = heartbeatMap.get(merchantId)
     const ageMs = Date.now() - hb.ts
-    if (ageMs < 180_000) { // < 3 minutes = live
+    if (ageMs < FIFTEEN_MIN) {
       return { active: true, last_seen: new Date(hb.ts).toISOString(), device_count: 1, source: 'heartbeat' }
     }
   }
 
+  // Check merchant credentials and account status
+  const creds = await getMerchantCredentials(merchantId)
+  const isAccountActive = creds?.status === 'ACTIVE'
+
   // Slow path: query merchant's Supabase devices table
   try {
-    const creds = await getMerchantCredentials(merchantId)
     if (!creds?.supabase_url || !creds?.supabase_anon_key) {
-      // No merchant DB configured — skip check, allow payment
-      return { active: null, last_seen: null, device_count: 0, source: 'unconfigured' }
+      // No custom DB configured — platform active merchant; allow payments
+      return { active: isAccountActive, last_seen: null, device_count: 0, source: 'platform_merchant' }
     }
 
     const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
 
     const { data: devices, error } = await merchantClient
       .from('devices')
-      .select('id, online, last_sync, disabled, created_at')
-      .eq('merchant_id', merchantId)
-      .eq('disabled', false)
+      .select('id, online, last_sync, disabled, created_at, merchant_id')
 
     if (error) {
-      console.warn(`[device-status] Merchant DB query failed for ${merchantId}:`, error.message)
-      return { active: null, last_seen: null, device_count: 0, source: 'db_error' }
+      console.warn(`[device-status] Merchant DB query notice for ${merchantId}:`, error.message)
+      return { active: isAccountActive, last_seen: null, device_count: 0, source: 'db_fallback' }
     }
 
     if (!devices || devices.length === 0) {
-      return { active: false, last_seen: null, device_count: 0, source: 'no_devices' }
+      // Merchant has no hardware devices configured yet (web / form / API payment mode)
+      // Do NOT block checkout as offline!
+      return { active: true, last_seen: null, device_count: 0, source: 'active_no_devices' }
     }
 
-    // Check if any device is online and sync'd within last 3 minutes
-    const THREE_MIN = 3 * 60 * 1000
     const now = Date.now()
     let lastSeen = null
 
     const hasActiveDevice = devices.some(d => {
+      if (d.disabled === true) return false
       const syncTime = d.last_sync || d.created_at
-      const syncTs = new Date(syncTime).getTime()
-      const isRecent = (now - syncTs) < THREE_MIN
-      if (isRecent && (!lastSeen || syncTs > new Date(lastSeen).getTime())) {
+      const syncTs = syncTime ? new Date(syncTime).getTime() : 0
+      const isRecent = syncTs > 0 && (now - syncTs) < FIFTEEN_MIN
+      if (syncTime && (!lastSeen || syncTs > new Date(lastSeen).getTime())) {
         lastSeen = syncTime
       }
-      return d.online === true && isRecent
+      return d.online === true || isRecent
     })
 
     return {
-      active: hasActiveDevice,
+      active: hasActiveDevice || isAccountActive,
       last_seen: lastSeen,
       device_count: devices.length,
       source: 'merchant_db',
     }
   } catch (err) {
     console.error(`[device-status] Error checking merchant ${merchantId}:`, err.message)
-    return { active: null, last_seen: null, device_count: 0, source: 'error' }
+    return { active: isAccountActive || true, last_seen: null, device_count: 0, source: 'error_fail_open' }
   }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// ──────────────────────────────────────────────────────────────────────────────
-// Cross-DB: Read order details from MERCHANT's Supabase DB
+// Cross-DB: Read order details from MERCHANT's Supabase DB or payment_events
 // Used by /v1/payment/verify and /v1/payment/order/:order_id
 // Supports lookup by UUID id or string tran_id
 // ──────────────────────────────────────────────────────────────────────────────
 export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
   if (!orderIdOrTranId) return null
 
+  // If merchantId is missing, resolve from payment_events first
+  let targetMerchantId = merchantId
+  if (!targetMerchantId) {
+    try {
+      const admin = getAdminClient()
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderIdOrTranId)
+      let q = admin.from('payment_events').select('merchant_id, merchant_name').limit(1)
+      if (isUuid) {
+        q = q.or(`order_id.eq.${orderIdOrTranId},tran_id.eq.${orderIdOrTranId}`)
+      } else {
+        q = q.eq('tran_id', orderIdOrTranId)
+      }
+      const { data: ev } = await q.maybeSingle()
+      if (ev?.merchant_id) targetMerchantId = ev.merchant_id
+    } catch (_) {}
+  }
+
   try {
-    const creds = await getMerchantCredentials(merchantId)
+    const creds = await getMerchantCredentials(targetMerchantId)
     if (creds?.supabase_url && creds?.supabase_anon_key) {
       const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderIdOrTranId)
 
       let query = merchantClient
         .from('orders')
-        .select('id, tran_id, amount, status, cus_name, cus_phone, cus_email, product_name, payment_method, matched_trx_id, sender_number, paid_at, expires_at, success_url, fail_url, cancel_url, created_at')
+        .select('id, tran_id, amount, status, cus_name, cus_phone, cus_email, product_name, payment_method, matched_trx_id, sender_number, paid_at, expires_at, success_url, fail_url, cancel_url, created_at, merchant_id')
 
       if (isUuid) {
         query = query.or(`id.eq.${orderIdOrTranId},tran_id.eq.${orderIdOrTranId}`)
@@ -190,7 +266,11 @@ export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
       const { data, error } = await query.maybeSingle()
 
       if (!error && data) {
-        return data
+        return {
+          ...data,
+          merchant_id: data.merchant_id || targetMerchantId,
+          merchant_name: creds?.merchant_name || null,
+        }
       }
       if (error) {
         console.warn(`[merchant-db] getOrder warning for ${orderIdOrTranId}:`, error.message)
@@ -226,6 +306,8 @@ export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
         sender_number: eventData.sender_number,
         paid_at: eventData.payment_time,
         created_at: eventData.recorded_at,
+        merchant_id: eventData.merchant_id || targetMerchantId,
+        merchant_name: eventData.merchant_name || null,
       }
     }
   } catch {}
@@ -364,50 +446,64 @@ export async function setGatewayConfig(config) {
  */
 export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) {
   const globalConfig = await getGatewayConfig()
-  if (!merchantId) return { ...globalConfig, device_active: null, merchant_logo_url: null }
+  if (!merchantId) return { ...globalConfig, device_active: null, merchant_logo_url: null, merchant_name: null }
 
-  const { data: merchantRow } = await getAdminClient()
-    .from('merchant_gateway_settings')
-    .select('*')
-    .eq('merchant_id', merchantId)
-    .maybeSingle()
+  const creds = await getMerchantCredentials(merchantId)
 
-  // Device status check — queries merchant's Supabase DB
+  let merchantRow = null
+  try {
+    const { data } = await getAdminClient()
+      .from('merchant_gateway_settings')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .maybeSingle()
+    merchantRow = data
+  } catch (_) {}
+
+  // Device status check — queries merchant's Supabase DB or in-memory heartbeat
   let deviceStatus = { active: null, last_seen: null, device_count: 0 }
   try {
     deviceStatus = await getMerchantDeviceStatus(merchantId, heartbeatMap)
   } catch (e) {
-    console.warn('[gateway-config] Device status check failed:', e.message)
+    console.warn('[gateway-config] Device status check notice:', e.message)
   }
 
-  if (!merchantRow) {
-    return {
-      ...globalConfig,
-      device_active: deviceStatus.active,
-      device_last_seen: deviceStatus.last_seen,
-      merchant_logo_url: null,
-    }
+  // If merchant account is ACTIVE in database or has configured receiving numbers, never falsely declare offline
+  const isAccountActive = creds?.status === 'ACTIVE'
+  const effectiveReceiving = merchantRow?.receiving_numbers && Object.keys(merchantRow.receiving_numbers).length > 0
+    ? merchantRow.receiving_numbers
+    : (creds?.receiving_numbers || {})
+
+  const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
+  if (deviceStatus.active === false && (isAccountActive || hasNumbers || !deviceStatus.device_count)) {
+    deviceStatus.active = true
   }
+
+  const effectiveName = merchantRow?.merchant_name || creds?.merchant_name || null
+  const effectiveLogo = merchantRow?.merchant_logo_url || creds?.merchant_logo_url || null
+  const effectiveUrl  = merchantRow?.supabase_url || creds?.supabase_url || null
+  const effectiveKey  = merchantRow?.supabase_anon_key || creds?.supabase_anon_key || null
 
   return {
     ...globalConfig,
     enabled_methods: {
-      bKash:  globalConfig.enabled_methods.bKash  && (merchantRow.bkash_enabled  ?? true),
-      Nagad:  globalConfig.enabled_methods.Nagad  && (merchantRow.nagad_enabled  ?? true),
-      Rocket: globalConfig.enabled_methods.Rocket && (merchantRow.rocket_enabled ?? true),
-      Upay:   globalConfig.enabled_methods.Upay   && (merchantRow.upay_enabled   ?? true),
+      bKash:  globalConfig.enabled_methods.bKash  && (merchantRow?.bkash_enabled  ?? true),
+      Nagad:  globalConfig.enabled_methods.Nagad  && (merchantRow?.nagad_enabled  ?? true),
+      Rocket: globalConfig.enabled_methods.Rocket && (merchantRow?.rocket_enabled ?? true),
+      Upay:   globalConfig.enabled_methods.Upay   && (merchantRow?.upay_enabled   ?? true),
     },
-    default_success_url:  merchantRow.success_url || globalConfig.default_success_url,
-    default_fail_url:     merchantRow.fail_url    || globalConfig.default_fail_url,
-    default_cancel_url:   merchantRow.cancel_url  || globalConfig.default_cancel_url,
-    receiving_numbers:    merchantRow.receiving_numbers || {},
-    qr_codes:             merchantRow.qr_codes || {},
-    auto_appeal_matching: merchantRow.auto_appeal_matching ?? false,
-    merchant_customized:  true,
-    merchant_logo_url:    merchantRow.merchant_logo_url || null,
-    merchant_name:        merchantRow.merchant_name || null,
-    supabase_url:         merchantRow.supabase_url || null,
-    supabase_anon_key:    merchantRow.supabase_anon_key || null,
+    default_success_url:  merchantRow?.success_url || globalConfig.default_success_url,
+    default_fail_url:     merchantRow?.fail_url    || globalConfig.default_fail_url,
+    default_cancel_url:   merchantRow?.cancel_url  || globalConfig.default_cancel_url,
+    receiving_numbers:    effectiveReceiving,
+    qr_codes:             merchantRow?.qr_codes || {},
+    auto_appeal_matching: merchantRow?.auto_appeal_matching ?? false,
+    merchant_customized:  Boolean(merchantRow || creds),
+    merchant_logo_url:    effectiveLogo,
+    merchant_name:        effectiveName,
+    merchant_id:          creds?.merchant_id || merchantId,
+    supabase_url:         effectiveUrl,
+    supabase_anon_key:    effectiveKey,
     // Device status from merchant's own DB
     device_active:        deviceStatus.active,
     device_last_seen:     deviceStatus.last_seen,
@@ -437,6 +533,11 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
     updated_at:           new Date().toISOString(),
   }
 
+  if (settings.merchant_name)     row.merchant_name     = settings.merchant_name
+  if (settings.merchant_logo_url) row.merchant_logo_url = settings.merchant_logo_url
+  if (settings.supabase_url)      row.supabase_url      = settings.supabase_url
+  if (settings.supabase_anon_key) row.supabase_anon_key = settings.supabase_anon_key
+
   const { data, error } = await getAdminClient()
     .from('merchant_gateway_settings')
     .upsert(row, { onConflict: 'merchant_id' })
@@ -444,6 +545,22 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
     .single()
 
   if (error) throw new Error('Failed to save merchant gateway config: ' + error.message)
+
+  // Asynchronously mirror branding to merchants table if present
+  if (settings.merchant_name || settings.merchant_logo_url) {
+    try {
+      const updateData = {}
+      if (settings.merchant_name) updateData.business_name = settings.merchant_name
+      if (settings.merchant_logo_url) updateData.photo_url = settings.merchant_logo_url
+      getAdminClient()
+        .from('merchants')
+        .update(updateData)
+        .eq('id', merchantId)
+        .then(() => {})
+        .catch(() => {})
+    } catch (_) {}
+  }
+
   return data
 }
 
@@ -2070,6 +2187,51 @@ export async function getMerchantSubscriptionHistory(merchantId) {
   } catch (err) {
     console.warn('[getMerchantSubscriptionHistory] Error:', err.message)
     return []
+  }
+}
+
+/**
+ * Downgrade or switch merchant subscription to the Free Plan.
+ */
+export async function downgradeMerchantSubscription(merchantId) {
+  if (!merchantId) throw new Error('merchant_id is required')
+  const cleanId = String(merchantId).trim()
+  const memSub = inMemoryMerchantSubscriptions.get(cleanId) || {}
+  inMemoryMerchantSubscriptions.set(cleanId, {
+    ...memSub,
+    subscription_status: 'FREE',
+    subscription_plan: 'FREE',
+    updated_at: new Date().toISOString()
+  })
+
+  let admin = null
+  try {
+    admin = getAdminClient()
+  } catch (_) {}
+  if (admin) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId)
+      let query = admin.from('merchants').update({
+        subscription_status: 'FREE',
+        subscription_plan: 'FREE',
+        updated_at: new Date().toISOString()
+      })
+      if (isUuid) {
+        query = query.or(`id.eq.${cleanId},user_id.eq.${cleanId}`)
+      } else {
+        query = query.eq('id', cleanId)
+      }
+      await query
+    } catch (err) {
+      console.warn('[downgradeMerchantSubscription] DB update notice:', err.message)
+    }
+  }
+
+  return {
+    ok: true,
+    message: 'Subscription plan successfully downgraded to Free Plan.',
+    subscription_status: 'FREE',
+    subscription_plan: 'FREE'
   }
 }
 

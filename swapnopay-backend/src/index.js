@@ -255,15 +255,17 @@ io.on('connection', (socket) => {
     // Mark merchant offline after grace period if it was the last socket
     const merchant_id = socket.data.merchant_id
     if (merchant_id) {
-      // Give 30s grace before marking offline (handles page refreshes / brief reconnects)
+      // Give 5 minutes grace before deleting in-memory heartbeat (handles Android backgrounding, network handover, and quick reconnects)
       setTimeout(() => {
         const hb = merchantHeartbeatMap.get(merchant_id)
         if (hb && hb.socketId === socket.id) {
-          // No new socket reconnected for this merchant — mark stale
-          merchantHeartbeatMap.delete(merchant_id)
-          console.log(`[heartbeat] Merchant ${merchant_id} marked offline after disconnect`)
+          // Check if last recorded heartbeat is older than 5 minutes
+          if (Date.now() - (hb.lastSeen || 0) > 5 * 60 * 1000) {
+            merchantHeartbeatMap.delete(merchant_id)
+            console.log(`[heartbeat] Merchant ${merchant_id} marked offline after disconnect (5min grace elapsed)`)
+          }
         }
-      }, 30_000)
+      }, 5 * 60 * 1000)
     }
   })
 

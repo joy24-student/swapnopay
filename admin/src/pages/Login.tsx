@@ -29,6 +29,13 @@ DO $$ BEGIN
 END $$;
 
 -- 3. Methods: is_exist, is_admin, is_super_admin
+DROP FUNCTION IF EXISTS public.is_admin(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_super_admin(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.is_super_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.admin_is_exist(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.admin_is_exist() CASCADE;
+
 CREATE OR REPLACE FUNCTION public.admin_is_exist(p_email TEXT)
 RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
 BEGIN
@@ -48,6 +55,10 @@ BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
   RETURN EXISTS (SELECT 1 FROM public.admin_users WHERE id = p_user_id AND is_active = true AND role = 'super_admin');
 END; $$;
+
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.is_super_admin(UUID) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.admin_is_exist(TEXT) TO authenticated, service_role, anon;
 
 -- 4. RLS Configuration
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;

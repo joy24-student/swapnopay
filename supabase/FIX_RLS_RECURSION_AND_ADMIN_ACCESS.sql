@@ -33,6 +33,14 @@ END $$;
 -- PostgreSQL executes queries on admin_users with function owner privileges,
 -- entirely bypassing Row Level Security and breaking the recursion loop!
 
+-- Drop previous function signatures with CASCADE to prevent PostgreSQL 42P13 parameter rename conflicts
+DROP FUNCTION IF EXISTS public.is_admin(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_super_admin(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.is_super_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.admin_is_exist(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.admin_is_exist() CASCADE;
+
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id UUID DEFAULT auth.uid())
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -80,6 +88,11 @@ BEGIN
 END;
 $$;
 
+-- Grant execute privileges on helper functions
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.is_super_admin(UUID) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.admin_is_exist(TEXT) TO authenticated, service_role, anon;
+
 -- 4. Clean Up ALL Recursive Policies on public.admin_users
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 
@@ -125,6 +138,7 @@ DECLARE
 BEGIN
   FOREACH tbl IN ARRAY admin_tables LOOP
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = tbl) THEN
+      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl);
       EXECUTE format('DROP POLICY IF EXISTS "Admin full access on %I" ON public.%I;', tbl, tbl);
       EXECUTE format('CREATE POLICY "Admin full access on %I" ON public.%I FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));', tbl, tbl);
     END IF;
@@ -134,29 +148,40 @@ END $$;
 -- 6. Grant direct merchant access to their own data in merchants and merchant_kyc_submissions
 DROP POLICY IF EXISTS "Merchants self read" ON public.merchants;
 CREATE POLICY "Merchants self read" ON public.merchants FOR SELECT TO authenticated
-  USING (id = auth.uid() OR user_id = auth.uid()::text OR public.is_admin(auth.uid()));
+  USING (id::text = auth.uid()::text OR user_id::text = auth.uid()::text OR public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "Merchants self insert" ON public.merchants;
 CREATE POLICY "Merchants self insert" ON public.merchants FOR INSERT TO authenticated
-  WITH CHECK (id = auth.uid() OR user_id = auth.uid()::text OR public.is_admin(auth.uid()));
+  WITH CHECK (id::text = auth.uid()::text OR user_id::text = auth.uid()::text OR public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "Merchants self update" ON public.merchants;
 CREATE POLICY "Merchants self update" ON public.merchants FOR UPDATE TO authenticated
-  USING (id = auth.uid() OR user_id = auth.uid()::text OR public.is_admin(auth.uid()))
-  WITH CHECK (id = auth.uid() OR user_id = auth.uid()::text OR public.is_admin(auth.uid()));
+  USING (id::text = auth.uid()::text OR user_id::text = auth.uid()::text OR public.is_admin(auth.uid()))
+  WITH CHECK (id::text = auth.uid()::text OR user_id::text = auth.uid()::text OR public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "Merchant KYC self read" ON public.merchant_kyc_submissions;
 CREATE POLICY "Merchant KYC self read" ON public.merchant_kyc_submissions FOR SELECT TO authenticated
-  USING (merchant_id = auth.uid() OR public.is_admin(auth.uid()));
+  USING (
+    merchant_id::text = auth.uid()::text 
+    OR merchant_id IN (SELECT id FROM public.merchants WHERE user_id::text = auth.uid()::text) 
+    OR public.is_admin(auth.uid())
+  );
 
 DROP POLICY IF EXISTS "Merchant KYC self insert" ON public.merchant_kyc_submissions;
 CREATE POLICY "Merchant KYC self insert" ON public.merchant_kyc_submissions FOR INSERT TO authenticated
-  WITH CHECK (merchant_id = auth.uid() OR public.is_admin(auth.uid()));
+  WITH CHECK (
+    merchant_id::text = auth.uid()::text 
+    OR merchant_id IN (SELECT id FROM public.merchants WHERE user_id::text = auth.uid()::text) 
+    OR public.is_admin(auth.uid())
+  );
 
 DROP POLICY IF EXISTS "Merchant KYC self update" ON public.merchant_kyc_submissions;
 CREATE POLICY "Merchant KYC self update" ON public.merchant_kyc_submissions FOR UPDATE TO authenticated
-  USING (merchant_id = auth.uid() OR public.is_admin(auth.uid()))
-  WITH CHECK (merchant_id = auth.uid() OR public.is_admin(auth.uid()));
+  USING (
+    merchant_id::text = auth.uid()::text 
+    OR merchant_id IN (SELECT id FROM public.merchants WHERE user_id::text = auth.uid()::text) 
+    OR public.is_admin(auth.uid())
+  );
 
 -- 7. Ensure Default Super Admin is Active in admin_users
 DO $$

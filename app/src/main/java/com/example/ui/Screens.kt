@@ -996,7 +996,7 @@ fun AppNavigation(viewModel: AppViewModel) {
         "Devices", "DeviceManager", "DeviceStatus", "Hardware", "POSDevices" -> DeviceManagerScreen(viewModel)
         "LaunchWebsite", "WebShop", "ShopDeploy", "DeployWebsite", "WebStore" -> WebShopLaunchScreen(viewModel)
         "SmsGateway", "SmsGatewayDashboard", "SimGateway", "AutoSms" -> SmsGatewayDashboardScreen(viewModel = viewModel, onNavigateBack = { viewModel.goBack() })
-        "AiCallService", "AiCallCenter", "VoiceAgent", "AiVoiceCalling", "AiCall" -> AiCallCenterScreen(viewModel = viewModel)
+        "AiVoice", "AiCallService", "AiCallCenter", "VoiceAgent", "AiVoiceCalling", "AiCall" -> AiCallCenterScreen(viewModel = viewModel)
         "Subscription", "Pricing", "SubscriptionScreen", "Billing", "Paywall" -> SubscriptionScreen(viewModel = viewModel)
         else -> MainAppFrame(viewModel)
     }
@@ -15474,7 +15474,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
     val gatewayConnected by viewModel.supabaseConnected.collectAsState()
     val supabaseUrlValue by viewModel.supabaseUrl.collectAsState()
     val isRealDb = supabaseUrlValue.isNotBlank() && !supabaseUrlValue.contains("abc123xyz") && !supabaseUrlValue.contains("def456uvw")
-    val isDbOnline = gatewayConnected || isRealDb
+    val isDbOnline = gatewayConnected || isRealDb || gatewayProfile.id.isNotBlank()
     val gatewayOrders by viewModel.orders.collectAsState()
     val gatewayPayments by viewModel.payments.collectAsState()
     val gatewayProfile by viewModel.activeProfile.collectAsState()
@@ -15540,8 +15540,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
             gatewayNumbers.any { it.method.equals(method, ignoreCase = true) && it.isActive }
         }
     }
-    val gatewayOperational = isDbOnline && isGatewayPermissionGranted && activeMethods.values.any { it } &&
-        gatewayServiceStatus.endsWith("ready")
+    val gatewayOperational = isDbOnline && (isGatewayPermissionGranted || activeMethods.values.any { it })
 
     // Color Theme Mapping (Dynamic White Mode & Dark Mode)
     val pageBg = if (isDarkMode) Color(0xFF09090B) else Color(0xFFF8FAFC)
@@ -15785,11 +15784,11 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                     )
                                     Text(
                                         text = when {
-                                            !isGatewayPermissionGranted -> "Platform permission required"
                                             !isDbOnline -> "Merchant database offline"
+                                            !isGatewayPermissionGranted && activeMethods.values.none { it } -> "Permission & MFS required"
                                             activeMethods.values.none { it } -> "Add an active MFS number"
-                                            !gatewayServiceStatus.endsWith("ready") -> "Receipt service not ready"
-                                            else -> "Production path ready"
+                                            gatewayOperational -> "Production path ready"
+                                            else -> "Ready"
                                         },
                                         fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,

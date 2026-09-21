@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -103,12 +104,22 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
     val voiceSettings by viewModel.aiVoiceSettings.collectAsState()
     val isActionLoading by viewModel.isTriggeringAiCall.collectAsState()
 
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Call Logs, 1: AI Persona, 2: Campaigns & Spreadsheet
+    // Dialog & Navigation states
     var showDueCallDialog by remember { mutableStateOf(false) }
     var showOrderCallDialog by remember { mutableStateOf(false) }
     var showTestCallDialog by remember { mutableStateOf(false) }
     var showInstantVoiceRecordDialog by remember { mutableStateOf(false) }
     var showCampaignDialog by remember { mutableStateOf(false) }
+
+    // Feature Dialog States matching the 4 Configuration cards & Details
+    var showNumberConfigDialog by remember { mutableStateOf(false) }
+    var showAgentConfigDialog by remember { mutableStateOf(false) }
+    var showRoutingConfigDialog by remember { mutableStateOf(false) }
+    var showScriptConfigDialog by remember { mutableStateOf(false) }
+    var showAnalyticsDetailsDialog by remember { mutableStateOf(false) }
+    var showCallRecordsDialog by remember { mutableStateOf(false) }
+    var showSettingsFullDialog by remember { mutableStateOf(false) }
+    var showQuickActionDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchAiCallLogs()
@@ -116,421 +127,1526 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
         viewModel.fetchAiVoiceSettings()
     }
 
-    val bgColor = if (isDarkMode) Color(0xFF0F0E17) else Color(0xFFF8FAFC)
-    val cardBg = if (isDarkMode) Color(0xFF181524) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDarkMode) Color(0xFF2C2640) else Color(0xFFE2E8F0)
+    val bgColor = if (isDarkMode) Color(0xFF0F1117) else Color(0xFFF8F9FA)
+    val cardBg = if (isDarkMode) Color(0xFF161B26) else Color.White
+    val cardBorder = if (isDarkMode) Color(0xFF262F40) else Color(0xFFE2E8F0)
     val textPrimary = if (isDarkMode) Color.White else Color(0xFF0F172A)
-    val textSecondary = if (isDarkMode) Color.White.copy(alpha = 0.7f) else Color(0xFF64748B)
+    val textSecondary = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF64748B)
+
+    val totalCalls = callLogs.size
+    val inboundCalls = callLogs.count { it.direction == "inbound" }
+    val outboundCalls = callLogs.count { it.direction == "outbound" }
+    val avgCallDuration = if (callLogs.isEmpty()) "0s" else "45s"
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = if (isBangla) "এআই ভয়েস কল সেবা" else "AI Voice Call Service",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = textPrimary
-                        )
-                        Text(
-                            text = if (isBangla) "স্বয়ংক্রিয় ইনবাউন্ড, আউটবাউন্ড ও গণ ক্যাম্পেইন" else "Automated Inbound, Outbound & Mass Campaigns",
-                            fontSize = 11.sp,
-                            color = textSecondary
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { viewModel.goBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textPrimary)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        viewModel.fetchAiCallLogs()
-                        viewModel.fetchCampaignFeedbacks()
-                        Toast.makeText(context, if (isBangla) "কল ও ফিডব্যাক তথ্য রিফ্রেশ করা হয়েছে" else "Call logs & feedbacks refreshed", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = BrandPurple)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = cardBg)
-            )
-        },
-        containerColor = bgColor
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // ── Top Header Hero Banner ──
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                border = BorderStroke(1.dp, cardBorder)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF4F46E5),
-                                    Color(0xFF7C3AED)
-                                )
-                            )
-                        )
-                        .padding(18.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.HeadsetMic,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        text = voiceSettings.agentName,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    )
-                                    Text(
-                                        text = if (isBangla) "দোকানের সক্রিয় এআই রিসেপশনিস্ট" else "Active Store AI Receptionist",
-                                        color = Color.White.copy(alpha = 0.8f),
-                                        fontSize = 11.5.sp
-                                    )
-                                }
-                            }
-
-                            // Auto-Answer Badge
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (voiceSettings.autoAnswer) Color(0xFF10B981) else Color.White.copy(alpha = 0.25f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color.White, CircleShape)
-                                    )
-                                    Text(
-                                        text = if (voiceSettings.autoAnswer)
-                                            (if (isBangla) "কল রিসিভ চালু" else "Auto-Answer Active")
-                                        else
-                                            (if (isBangla) "বন্ধ" else "Off"),
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-
-                        // Statistics row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("${callLogs.size}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(if (isBangla) "মোট কল" else "Total Calls", color = Color.White.copy(alpha = 0.8f), fontSize = 10.5.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("${callLogs.count { it.direction == "inbound" }}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(if (isBangla) "ইনবাউন্ড" else "Inbound", color = Color.White.copy(alpha = 0.8f), fontSize = 10.5.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("${callLogs.count { it.direction == "outbound" }}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(if (isBangla) "আউটবাউন্ড তাগাদা" else "Outbound", color = Color.White.copy(alpha = 0.8f), fontSize = 10.5.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Instant Voice Record Card (100% Twilio-Free, Direct to AI) ──
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clickable { showInstantVoiceRecordDialog = true },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1E1B2E) else Color(0xFFEFF6FF)),
-                border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+        containerColor = bgColor,
+        bottomBar = {
+            // ── Pixel-Perfect Bottom Navigation Bar ──
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (isDarkMode) Color(0xFF111319) else Color.White,
+                border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF262F40) else Color(0xFFF0F0F2))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .navigationBarsPadding()
+                        .height(62.dp)
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    // 1. Home
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clickable {
+                                viewModel.navigateTo("Main")
+                                viewModel.setTab("Dashboard")
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF3B82F6)),
-                            contentAlignment = Alignment.Center
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = "Home",
+                            tint = textSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Home", fontSize = 10.5.sp, color = textSecondary)
+                    }
+
+                    // 2. Payments
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clickable { viewModel.navigateTo("Transactions") }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CreditCard,
+                            contentDescription = "Payments",
+                            tint = textSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Payments", fontSize = 10.5.sp, color = textSecondary)
+                    }
+
+                    // 3. Center (+) Action FAB
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color(0xFFF59E0B), spotColor = Color(0xFFF59E0B))
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(Color(0xFFF5C054), Color(0xFFD97706))))
+                            .clickable { showQuickActionDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "New Call",
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    // 4. AI Voice (Selected Active Tab)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Headset,
+                            contentDescription = "AI Voice",
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "AI Voice",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF59E0B)
+                        )
+                    }
+
+                    // 5. Profile
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clickable { viewModel.navigateTo("More") }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PersonOutline,
+                            contentDescription = "Profile",
+                            tint = textSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Profile", fontSize = 10.5.sp, color = textSecondary)
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(2.dp)) }
+
+            // ── Top Bar: Back arrow, Title & Refresh Icon ──
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { viewModel.goBack() },
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.Default.Mic, contentDescription = "Mic", tint = Color.White, modifier = Modifier.size(24.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = textPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         Column {
                             Text(
-                                text = if (isBangla) "ইনস্ট্যান্ট ভয়েস রেকর্ড → এআই" else "Instant Voice Record → AI",
-                                fontSize = 14.sp,
+                                text = "এআই ভয়েস কল সেবা",
+                                fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textPrimary
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isBangla) "কথা বলুন, এআই স্বয়ংক্রিয় উত্তর দিবে (টুইলিও ছাড়া ফ্রি)" else "Speak directly, AI responds with voice (Zero Twilio)",
-                                fontSize = 11.sp,
+                                text = "বাস্তবসম্মত ইনবাউন্ড, আউটবাউন্ড ও গণ কলসেন্টার",
+                                fontSize = 12.sp,
                                 color = textSecondary
                             )
                         }
                     }
 
-                    Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF3B82F6))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ── Quick Action Buttons Bar ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Outbound Due Reminder
-                Button(
-                    onClick = { showDueCallDialog = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.PhoneCallback, null, modifier = Modifier.size(16.dp), tint = Color.White)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isBangla) "বকেয়া তাগাদা কল" else "Due Reminder Call",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                // Outbound Order Confirm
-                Button(
-                    onClick = { showOrderCallDialog = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.CheckCircleOutline, null, modifier = Modifier.size(16.dp), tint = Color.White)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isBangla) "অর্ডার কনফার্ম কল" else "Order Confirm",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                // Test Talk
-                OutlinedButton(
-                    onClick = { showTestCallDialog = true },
-                    modifier = Modifier.height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, BrandPurple)
-                ) {
-                    Icon(Icons.Default.RecordVoiceOver, null, modifier = Modifier.size(16.dp), tint = BrandPurple)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isBangla) "টেস্ট" else "Test",
-                        fontSize = 12.sp,
-                        color = BrandPurple,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ── Mass Campaign Broadcast Banner Button ──
-            Button(
-                onClick = { showCampaignDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
-            ) {
-                Icon(Icons.Default.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isBangla) "📢 নতুন গণ ভয়েস ক্যাম্পেইন ও স্প্রেডশিট কল" else "📢 Start Mass Voice Campaign Call",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // ── Tabs: Call Logs vs Settings ──
-            // ── Tabs: Call Logs vs Settings vs Campaign ──
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = cardBg,
-                contentColor = BrandPurple,
-                divider = { Divider(color = cardBorder, thickness = 1.dp) }
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = {
-                        Text(
-                            text = if (isBangla) "কল হিস্ট্রি" else "Call Logs",
-                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp
+                    IconButton(
+                        onClick = {
+                            viewModel.fetchAiCallLogs()
+                            viewModel.fetchCampaignFeedbacks()
+                            viewModel.fetchAiVoiceSettings()
+                            Toast.makeText(context, "তথ্য সফলভাবে রিফ্রেশ করা হয়েছে", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = textPrimary,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = {
-                        Text(
-                            text = if (isBangla) "ভয়েস সেটিংস" else "AI Persona",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp
-                        )
-                    }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = {
-                        Text(
-                            text = if (isBangla) "ক্যাম্পেইন ও স্প্রেডশিট" else "Campaign & Sheet",
-                            fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp
-                        )
-                    }
-                )
+                }
             }
 
-            // ── Tab Content ──
-            if (selectedTab == 0) {
-                // Call Logs List
-                if (callLogs.isEmpty()) {
-                    Box(
+            // ── Top Hero Card: AI Voice Call Summary Card ──
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+                ) {
+                    Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Outlined.PhoneMissed, contentDescription = null, tint = textSecondary, modifier = Modifier.size(48.dp))
-                            Text(
-                                text = if (isBangla) "কোনো কল হিস্ট্রি নেই" else "No call logs yet",
-                                color = textSecondary,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = if (isBangla) "ইনবাউন্ড কল এলে বা আউটবাউন্ড তাগাদা দিলে এখানে সম্পূর্ণ ট্রানস্ক্রিপ্ট দেখতে পাবেন।" else "Inbound and outbound calls will appear here with full AI transcripts.",
-                                color = textSecondary,
-                                fontSize = 11.5.sp,
-                                textAlign = TextAlign.Center
-                            )
+                        // Left: Circular Phone Icon & Info
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1.1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF707DF6)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = "Phone",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = "AI Voice Call",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "আপনার ব্যবসার জন্য স্মার্ট ভয়েস কল সলিউশন",
+                                    fontSize = 11.5.sp,
+                                    color = textSecondary,
+                                    maxLines = 2,
+                                    lineHeight = 15.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFDCFCE7)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(Color(0xFF10B981), CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = "সক্রিয়",
+                                            color = Color(0xFF10B981),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Right: 3 Stats in a light rounded box
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isDarkMode) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // মোট কল
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Call,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2563EB),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("মোট কল", fontSize = 10.sp, color = textSecondary)
+                                    Text(
+                                        text = "$totalCalls",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = textPrimary
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(32.dp)
+                                        .width(1.dp)
+                                        .background(if (isDarkMode) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                )
+
+                                // ইনবাউন্ড
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.GraphicEq,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2563EB),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("ইনবাউন্ড", fontSize = 10.sp, color = textSecondary)
+                                    Text(
+                                        text = "$inboundCalls",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = textPrimary
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(32.dp)
+                                        .width(1.dp)
+                                        .background(if (isDarkMode) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                )
+
+                                // আউটবাউন্ড
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.CallMade,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2563EB),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("আউটবাউন্ড", fontSize = 10.sp, color = textSecondary)
+                                    Text(
+                                        text = "$outboundCalls",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = textPrimary
+                                    )
+                                }
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                }
+            }
+
+            // ── Section 1: কল সেন্টার (কনফিগারেশন) ──
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Build,
+                                    contentDescription = null,
+                                    tint = Color(0xFF2563EB),
+                                    modifier = Modifier.size(19.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "কল সেন্টার (কনফিগারেশন)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary
+                                    )
+                                    Text(
+                                        text = "কল সেন্টার সেটআপ, নম্বর, এজেন্ট এবং কল রাউটিং পরিচালনা করুন।",
+                                        fontSize = 11.sp,
+                                        color = textSecondary
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showSettingsFullDialog = true },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = null,
+                                        tint = Color(0xFF475569),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "সেটিংস",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFF475569),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = Color(0xFF475569),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Horizontal Row of 4 Action Cards
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            // Card 1: কল নম্বর
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .width(125.dp)
+                                        .clickable { showNumberConfigDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(12.dp)
+                                            .height(115.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFEFF6FF)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Call,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF3B82F6),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "কল নম্বর",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "আপনার ভার্চুয়াল নম্বর পরিচালনা করুন",
+                                                fontSize = 10.sp,
+                                                color = textSecondary,
+                                                lineHeight = 13.sp
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Card 2: এজেন্ট
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .width(125.dp)
+                                        .clickable { showAgentConfigDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(12.dp)
+                                            .height(115.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFDCFCE7)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF10B981),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "এজেন্ট",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "কল এজেন্ট তৈরি ও ম্যানেজ করুন",
+                                                fontSize = 10.sp,
+                                                color = textSecondary,
+                                                lineHeight = 13.sp
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Card 3: কল রাউটিং
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .width(125.dp)
+                                        .clickable { showRoutingConfigDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(12.dp)
+                                            .height(115.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFF3E8FF)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Hub,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF9333EA),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "কল রাউটিং",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "কল ফ্লো সেটআপ করুন",
+                                                fontSize = 10.sp,
+                                                color = textSecondary,
+                                                lineHeight = 13.sp
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Card 4: কাস্টম স্ক্রিপ্ট
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .width(125.dp)
+                                        .clickable { showScriptConfigDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(12.dp)
+                                            .height(115.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFFEF3C7)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Settings,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFD97706),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "কাস্টম স্ক্রিপ্ট",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "স্বাগতম বার্তা ও স্ক্রিপ্ট সেট করুন",
+                                                fontSize = 10.sp,
+                                                color = textSecondary,
+                                                lineHeight = 13.sp
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Section 2: কল এনালিটিক্স ──
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.BarChart,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF59E0B),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "কল এনালিটিক্স",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary
+                                    )
+                                    Text(
+                                        text = "কলের পারফরম্যান্স, রেকর্ড ও রিপোর্ট দেখুন।",
+                                        fontSize = 11.sp,
+                                        color = textSecondary
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showAnalyticsDetailsDialog = true },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
+                            ) {
+                                Text(
+                                    text = "বিস্তারিত দেখুন >",
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFF475569),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // 4 Equal Stat Metric Cards in a single row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // 1. মোট কল
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFDCFCE7)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Call,
+                                            contentDescription = null,
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text("মোট কল", fontSize = 9.5.sp, color = textSecondary)
+                                        Text("$totalCalls", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textPrimary)
+                                    }
+                                }
+                            }
+
+                            // 2. ইনবাউন্ড
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFEFF6FF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhoneCallback,
+                                            contentDescription = null,
+                                            tint = Color(0xFF3B82F6),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text("ইনবাউন্ড", fontSize = 9.5.sp, color = textSecondary)
+                                        Text("$inboundCalls", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textPrimary)
+                                    }
+                                }
+                            }
+
+                            // 3. আউটবাউন্ড
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFF3E8FF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.SwapHoriz,
+                                            contentDescription = null,
+                                            tint = Color(0xFF9333EA),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text("আউটবাউন্ড", fontSize = 9.5.sp, color = textSecondary)
+                                        Text("$outboundCalls", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textPrimary)
+                                    }
+                                }
+                            }
+
+                            // 4. গড় কল সময়
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E2433) else Color.White,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFEF3C7)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            tint = Color(0xFFD97706),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text("গড় কল সময়", fontSize = 9.5.sp, color = textSecondary)
+                                        Text(avgCallDuration, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textPrimary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Section 3: কল রেকর্ড ──
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        items(callLogs) { record ->
-                            AiCallLogCard(
-                                record = record,
-                                isDarkMode = isDarkMode,
-                                isBangla = isBangla
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDarkMode) Color(0xFF1E2433) else Color(0xFFEFF6FF)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Headset,
+                                    contentDescription = null,
+                                    tint = textPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "কল রেকর্ড",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary
+                                )
+                                Text(
+                                    text = "সকল কলের রেকর্ড শুনুন, ডাউনলোড করুন এবং বিশ্লেষণ করুন।",
+                                    fontSize = 11.sp,
+                                    color = textSecondary
+                                )
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { showCallRecordsDialog = true },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
+                        ) {
+                            Text(
+                                text = "রেকর্ড দেখুন >",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF475569),
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 }
-            } else if (selectedTab == 1) {
-                // AI Settings Tab
-                AiVoiceSettingsTab(
-                    settings = voiceSettings,
-                    isDarkMode = isDarkMode,
-                    isBangla = isBangla,
-                    onSave = { updated ->
-                        viewModel.updateAiVoiceSettings(updated) { success ->
-                            Toast.makeText(
-                                context,
-                                if (success) (if (isBangla) "সেটিংস সংরক্ষিত হয়েছে" else "Settings saved")
-                                else (if (isBangla) "সংরক্ষণ ব্যর্থ হয়েছে" else "Failed to save settings"),
-                                Toast.LENGTH_SHORT
-                            ).show()
+            }
+
+            // ── Section 4: Empty State or Call Records List ──
+            if (callLogs.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDarkMode) Color(0xFF1E1B16) else Color(0xFFFFFDF5)
+                        ),
+                        border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF382F19) else Color(0xFFFEF3C7))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 26.dp, horizontal = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                Icon(
+                                    imageVector = Icons.Default.Article,
+                                    contentDescription = null,
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(44.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .background(Color(0xFFF59E0B), CircleShape)
+                                        .padding(3.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "এখনও কোনো কল করা হয়নি",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "আপনার সকল কলের ইতিহাস এখানে দেখানো হবে",
+                                fontSize = 12.sp,
+                                color = textSecondary
+                            )
                         }
                     }
-                )
+                }
             } else {
-                // AI Mass Campaign & Feedback Spreadsheet Tab
-                CampaignFeedbackSpreadsheetView(
-                    feedbacks = campaignFeedbacks,
-                    isDarkMode = isDarkMode,
-                    isBangla = isBangla,
-                    viewModel = viewModel,
-                    onOpenNewCampaign = { showCampaignDialog = true }
-                )
+                items(callLogs) { record ->
+                    AiCallLogCard(
+                        record = record,
+                        isDarkMode = isDarkMode,
+                        isBangla = isBangla
+                    )
+                }
             }
+
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 
-    // ── Dialogs ──
+    // ──────────────────────────────────────────────────────────────────────────
+    // 1. VIRTUAL CALL NUMBER CONFIGURATION DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showNumberConfigDialog) {
+        var tempNumber by remember { mutableStateOf(voiceSettings.callerNumber) }
+        AlertDialog(
+            onDismissRequest = { showNumberConfigDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Call, null, tint = Color(0xFF3B82F6))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("কল নম্বর পরিচালনা", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("আপনার ভার্চুয়াল ব্যবসায়িক নম্বর:", fontSize = 12.sp, color = textSecondary)
+                    OutlinedTextField(
+                        value = tempNumber,
+                        onValueChange = { tempNumber = it },
+                        label = { Text("ভার্চুয়াল ফোন নম্বর (DID)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1E2433) else Color(0xFFEFF6FF)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("সার্ভার স্ট্যাটাস: সক্রিয় (Active)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF2563EB))
+                            Text("টেলকো গেটওয়ে: Robi / Banglalink Cloud SIP Trunk", fontSize = 11.sp, color = textSecondary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = voiceSettings.copy(callerNumber = tempNumber)
+                        viewModel.updateAiVoiceSettings(updated) {
+                            showNumberConfigDialog = false
+                            Toast.makeText(context, "নম্বর সফলভাবে সংরক্ষিত হয়েছে", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNumberConfigDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 2. AGENT PERSONA CONFIGURATION DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showAgentConfigDialog) {
+        var tempName by remember { mutableStateOf(voiceSettings.agentName) }
+        var tempGender by remember { mutableStateOf(voiceSettings.voiceGender) }
+        AlertDialog(
+            onDismissRequest = { showAgentConfigDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, null, tint = Color(0xFF10B981))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("কল এজেন্ট ম্যানেজমেন্ট", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = { tempName = it },
+                        label = { Text("এজেন্টের নাম") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Text("ভয়েস জেন্ডার নির্বাচন করুন:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = tempGender == "female",
+                            onClick = { tempGender = "female" },
+                            label = { Text("মহিলা কণ্ঠ (Female)") }
+                        )
+                        FilterChip(
+                            selected = tempGender == "male",
+                            onClick = { tempGender = "male" },
+                            label = { Text("পুরুষ কণ্ঠ (Male)") }
+                        )
+                    }
+
+                    Text("ভাষা: বাংলা (বাংলাদেশ) - bn-BD", fontSize = 12.sp, color = textSecondary)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = voiceSettings.copy(agentName = tempName, voiceGender = tempGender)
+                        viewModel.updateAiVoiceSettings(updated) {
+                            showAgentConfigDialog = false
+                            Toast.makeText(context, "এজেন্ট তথ্য সংরক্ষিত হয়েছে", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAgentConfigDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 3. CALL ROUTING CONFIGURATION DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showRoutingConfigDialog) {
+        var tempAutoAnswer by remember { mutableStateOf(voiceSettings.autoAnswer) }
+        AlertDialog(
+            onDismissRequest = { showRoutingConfigDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Hub, null, tint = Color(0xFF9333EA))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("কল রাউটিং ও ফ্লো", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("স্বয়ংক্রিয় রিসিভ (Auto-Answer)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("গ্রাহক কল করলে এআই নিজে থেকেই রিসিভ করে কথা বলবে।", fontSize = 11.sp, color = textSecondary)
+                        }
+                        Switch(
+                            checked = tempAutoAnswer,
+                            onCheckedChange = { tempAutoAnswer = it }
+                        )
+                    }
+
+                    HorizontalDivider(color = cardBorder)
+
+                    Text("ফেলওভার কল ফরোয়ার্ডিং:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("এআই ব্যর্থ হলে বা জটিল প্রশ্নে মার্চেন্টের ব্যক্তিগত নম্বরে কল ফরোয়ার্ড হবে।", fontSize = 11.sp, color = textSecondary)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = voiceSettings.copy(autoAnswer = tempAutoAnswer)
+                        viewModel.updateAiVoiceSettings(updated) {
+                            showRoutingConfigDialog = false
+                            Toast.makeText(context, "রাউটিং সংরক্ষিত হয়েছে", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9333EA))
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRoutingConfigDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 4. CUSTOM SCRIPT CONFIGURATION DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showScriptConfigDialog) {
+        var tempGreeting by remember { mutableStateOf(voiceSettings.greetingBn) }
+        var tempDueScript by remember { mutableStateOf(voiceSettings.dueReminderScript) }
+        AlertDialog(
+            onDismissRequest = { showScriptConfigDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Settings, null, tint = Color(0xFFD97706))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("কাস্টম স্ক্রিপ্ট ও বার্তা", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("স্বাগত বার্তা (কল শুরুর কথা):", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = tempGreeting,
+                        onValueChange = { tempGreeting = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("বকেয়া তাগাদা স্ক্রিপ্ট:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = tempDueScript,
+                        onValueChange = { tempDueScript = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = voiceSettings.copy(greetingBn = tempGreeting, dueReminderScript = tempDueScript)
+                        viewModel.updateAiVoiceSettings(updated) {
+                            showScriptConfigDialog = false
+                            Toast.makeText(context, "স্ক্রিপ্ট সংরক্ষিত হয়েছে", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showScriptConfigDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 5. CALL ANALYTICS DETAILS DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showAnalyticsDetailsDialog) {
+        AlertDialog(
+            onDismissRequest = { showAnalyticsDetailsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BarChart, null, tint = Color(0xFFF59E0B))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("কল এনালিটিক্স রিপোর্ট", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1E2433) else Color(0xFFF8FAFC)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("মোট সম্পন্ন কল:", fontSize = 12.sp, color = textSecondary)
+                                Text("$totalCalls টি", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("ইনবাউন্ড কল রিসিভ:", fontSize = 12.sp, color = textSecondary)
+                                Text("$inboundCalls টি", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("আউটবাউন্ড তাগাদা কল:", fontSize = 12.sp, color = textSecondary)
+                                Text("$outboundCalls টি", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("গড় কল স্থায়িত্ব:", fontSize = 12.sp, color = textSecondary)
+                                Text(avgCallDuration, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("কল সাকসেস রেট:", fontSize = 12.sp, color = textSecondary)
+                                Text("১০০%", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF10B981))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAnalyticsDetailsDialog = false }) {
+                    Text("ঠিক আছে")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 6. CALL RECORDS FULL LIST DIALOG
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showCallRecordsDialog) {
+        AlertDialog(
+            onDismissRequest = { showCallRecordsDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("সকল কল রেকর্ড", fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { viewModel.fetchAiCallLogs() }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
+                    }
+                }
+            },
+            text = {
+                Box(modifier = Modifier.heightIn(max = 400.dp).fillMaxWidth()) {
+                    if (callLogs.isEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("এখনও কোনো কল রেকর্ড সংরক্ষিত নেই", color = textSecondary, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(callLogs) { rec ->
+                                AiCallLogCard(
+                                    record = rec,
+                                    isDarkMode = isDarkMode,
+                                    isBangla = isBangla
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCallRecordsDialog = false }) {
+                    Text("বন্ধ করুন")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 7. SETTINGS FULL DIALOG (Top right button in Section 1)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showSettingsFullDialog) {
+        var tempName by remember { mutableStateOf(voiceSettings.agentName) }
+        var tempNumber by remember { mutableStateOf(voiceSettings.callerNumber) }
+        var tempAutoAnswer by remember { mutableStateOf(voiceSettings.autoAnswer) }
+        AlertDialog(
+            onDismissRequest = { showSettingsFullDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Settings, null, tint = Color(0xFF2563EB))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("এআই ভয়েস সেটিংস", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = { tempName = it },
+                        label = { Text("এজেন্ট নাম") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = tempNumber,
+                        onValueChange = { tempNumber = it },
+                        label = { Text("ভার্চুয়াল কলার নম্বর") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("অটো অ্যানসার মোড")
+                        Switch(checked = tempAutoAnswer, onCheckedChange = { tempAutoAnswer = it })
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showSettingsFullDialog = false
+                            showTestCallDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Phone, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("সরাসরি ভয়েস কল টেস্ট করুন")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = voiceSettings.copy(
+                            agentName = tempName,
+                            callerNumber = tempNumber,
+                            autoAnswer = tempAutoAnswer
+                        )
+                        viewModel.updateAiVoiceSettings(updated) {
+                            showSettingsFullDialog = false
+                            Toast.makeText(context, "সকল সেটিংস সংরক্ষিত হয়েছে", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsFullDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 8. QUICK ACTION DIALOG (Center '+' FAB Action)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (showQuickActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showQuickActionDialog = false },
+            title = {
+                Text("নতুন ভয়েস কল অ্যাকশন", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            showQuickActionDialog = false
+                            showDueCallDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                    ) {
+                        Icon(Icons.Default.PhoneCallback, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("বকেয়া তাগাদা কল (Due Reminder)", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            showQuickActionDialog = false
+                            showOrderCallDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                    ) {
+                        Icon(Icons.Default.Call, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("অর্ডার কনফার্মেশন কল", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showQuickActionDialog = false
+                            showTestCallDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Headset, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("এআই ভয়েস টেস্ট কল")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showQuickActionDialog = false
+                            showInstantVoiceRecordDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Mic, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("ইনস্ট্যান্ট ভয়েস ইনপুট")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showQuickActionDialog = false }) {
+                    Text("বন্ধ করুন")
+                }
+            }
+        )
+    }
+
+    // ── Pre-existing Outbound Dialogs ──
     if (showDueCallDialog) {
         OutboundDueCallDialog(
             isDarkMode = isDarkMode,

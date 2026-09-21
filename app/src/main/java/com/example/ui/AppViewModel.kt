@@ -571,6 +571,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val backendPayload = org.json.JSONObject().apply {
                     put("merchant_id", _activeProfile.value.id)
+                    val mProfile = _activeProfile.value
+                    if (mProfile.name.isNotBlank()) {
+                        put("merchant_name", mProfile.name)
+                    }
+                    if (mProfile.photoUrl.isNotBlank()) {
+                        put("merchant_logo_url", mProfile.photoUrl)
+                    }
+                    if (active.supabaseUrl.isNotBlank()) {
+                        put("supabase_url", active.supabaseUrl)
+                    }
+                    if (active.anonKey.isNotBlank()) {
+                        put("supabase_anon_key", active.anonKey)
+                    }
                     put("bkash_enabled", safeConfig.activeMethods["bKash"] ?: true)
                     put("nagad_enabled", safeConfig.activeMethods["Nagad"] ?: true)
                     put("rocket_enabled", safeConfig.activeMethods["Rocket"] ?: true)
@@ -13133,6 +13146,55 @@ function executePayment() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     onResult(false, e.message ?: "পেমেন্ট যাচাইয়ের সময় সমস্যা হয়েছে")
+                }
+            }
+        }
+    }
+
+    private val _isAutoRenewEnabled = MutableStateFlow(true)
+    val isAutoRenewEnabled: StateFlow<Boolean> = _isAutoRenewEnabled.asStateFlow()
+
+    fun toggleAutoRenew(enabled: Boolean, onResult: (Boolean, String?) -> Unit) {
+        _isAutoRenewEnabled.value = enabled
+        try {
+            val prefs = getApplication<Application>().getSharedPreferences("swapnopay_sub", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("auto_renew", enabled).apply()
+        } catch (_: Exception) {}
+        onResult(true, if (enabled) "Auto-renewal enabled" else "Auto-renewal disabled")
+    }
+
+    fun downgradeSubscription(onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val profile = _activeProfile.value
+                val merchantId = profile.id.ifBlank { profile.email.ifBlank { installationId.ifBlank { "default" } } }
+                val payload = JSONObject().apply {
+                    put("merchant_id", merchantId)
+                    put("email", profile.email)
+                    put("plan_type", "FREE")
+                }
+                val request = Request.Builder()
+                    .url("https://api.swapnopay.top/v1/subscription/downgrade")
+                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                try {
+                    client.newCall(request).execute().close()
+                } catch (_: Exception) {}
+
+                _subscriptionStatus.value = _subscriptionStatus.value.copy(
+                    subscriptionPlan = "FREE",
+                    isSubscriptionActive = false
+                )
+                withContext(Dispatchers.Main) {
+                    onResult(true, "Plan changed to Free Plan successfully.")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, e.message ?: "Failed to downgrade plan.")
                 }
             }
         }

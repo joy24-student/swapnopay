@@ -198,24 +198,22 @@ window.onload = function () {
   selectMFS(initialMethod, methodColorMap[initialMethod] || "#E2125A");
   goToStep(1);
 
-  // ── Step 1: Load gateway config (includes device_active + merchant_logo_url)
-  //    Pass merchant_id from URL if available, otherwise fetch order first
+  // ── Step 1: Connect Socket.io immediately if real order ──
+  if (backendUrl && orderId && orderId !== "demo_order_id") {
+    connectSwapnoPaySocket(backendUrl, orderId);
+  }
+
+  // ── Step 2: Load gateway config (fetches branding, Supabase DB credentials, receiving numbers, and status) ──
   loadGatewayConfig(merchantId || null);
 
-  // ── Step 2: If real order, fetch from merchant's Supabase
+  // ── Step 3: If real order credentials were in URL, fetch from merchant's Supabase immediately ──
   const isRealOrder = orderId !== "demo_order_id"
     && /^https:\/\/[a-z0-9.-]+$/i.test(supabaseUrl)
     && supabaseAnonKey !== "demo_anon_key";
 
   if (isRealOrder) {
+    window._orderDataLoaded = true;
     fetchOrderFromMerchantDB();
-
-    // ── Step 3: Connect Socket.io to backend
-    if (backendUrl) {
-      connectSwapnoPaySocket(backendUrl, orderId);
-    }
-
-    // ── Step 4: Connect Supabase Realtime as fallback
     connectSupabaseRealtime(supabaseUrl, supabaseAnonKey, orderId);
   }
 };
@@ -224,7 +222,15 @@ window.onload = function () {
 // Fetch order + merchant data from merchant's own Supabase DB
 // ──────────────────────────────────────────────────────────────────────────────
 function fetchOrderFromMerchantDB() {
-  fetch(`${supabaseUrl}/rest/v1/orders?id=eq.${orderId}&select=*,merchants(*),form_submissions(form_id,payment_forms(logo_url,description))`, {
+  if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === "demo_anon_key") {
+    fetchOrderFromBackendAPI();
+    return;
+  }
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+  const filter = isUuid ? `or=(id.eq.${orderId},tran_id.eq.${orderId})` : `tran_id=eq.${orderId}`;
+
+  fetch(`${supabaseUrl}/rest/v1/orders?${filter}&select=*,merchants(*),form_submissions(form_id,payment_forms(logo_url,description))`, {
     headers: {
       "apikey": supabaseAnonKey,
       "Authorization": `Bearer ${supabaseAnonKey}`
@@ -232,7 +238,11 @@ function fetchOrderFromMerchantDB() {
   })
     .then(res => res.json())
     .then(orders => {
-      if (!orders || orders.length === 0) return;
+      if (!orders || orders.length === 0) {
+        // Fallback to backend API if not found via direct Supabase REST
+        fetchOrderFromBackendAPI();
+        return;
+      }
       const order = orders[0];
 
       if (order.amount) {
@@ -251,32 +261,80 @@ function fetchOrderFromMerchantDB() {
             setMerchantLogo(sub.payment_forms.logo_url);
           }
           if (sub.payment_forms.description) {
-            document.getElementById("summary-desc").innerText = sub.payment_forms.description;
+            const descEl = document.getElementById("summary-desc");
+            if (descEl) descEl.innerText = sub.payment_forms.description;
           }
         }
       }
 
       const merchant = order.merchants;
       if (merchant) {
-        merchantId = merchant.id;
+        if (merchant.id) merchantId = merchant.id;
         const businessName  = merchant.business_name || "Merchant";
         const defaultNumber = merchant.default_number || merchantDefaultNumber;
         merchantDefaultNumber = defaultNumber;
 
         setMerchantNameDisplay(businessName);
+        if (merchant.photo_url && !merchantLogoUrl) {
+          setMerchantLogo(merchant.photo_url);
+        }
         document.getElementById("merchant-num-display").value = defaultNumber;
         updateQrCode(defaultNumber);
 
-        // Re-load gateway config with resolved merchant_id (device check + logo)
-        loadGatewayConfig(merchant.id);
+        // Re-load gateway config with resolved merchant_id if needed
+        if (merchant.id) {
+          loadGatewayConfig(merchant.id);
+        }
       }
     })
-    .catch(err => console.error("[widget] Error fetching order from merchant DB:", err));
+    .catch(err => {
+      console.warn("[widget] Direct merchant DB fetch error, falling back to backend:", err.message);
+      fetchOrderFromBackendAPI();
+    });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Fallback: Fetch order details from SwapnoPay Backend API
+// ──────────────────────────────────────────────────────────────────────────────
+function fetchOrderFromBackendAPI() {
+  if (!backendUrl || !orderId || orderId === "demo_order_id") return;
+  const qMid = merchantId || new URLSearchParams(window.location.search).get("merchant_id") || "";
+  const targetUrl = `${backendUrl}/v1/payment/order/${encodeURIComponent(orderId)}?merchant_id=${encodeURIComponent(qMid)}`;
+
+  fetch(targetUrl, { signal: AbortSignal.timeout(6000) })
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.ok) return;
+      if (data.amount) {
+        const formatted = parseFloat(data.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+        setAmountDisplay(formatted);
+      }
+      if (data.tran_id) {
+        document.getElementById("summary-order-id").innerText = data.tran_id;
+      }
+      if (data.product_name) {
+        const descEl = document.getElementById("summary-desc");
+        if (descEl) descEl.innerText = data.product_name;
+      }
+      if (data.merchant_name) {
+        setMerchantNameDisplay(data.merchant_name);
+      }
+      if (data.merchant_id && !merchantId) {
+        merchantId = data.merchant_id;
+        loadGatewayConfig(merchantId);
+      }
+      if (data.status === 'PAID' && !paymentResolved) {
+        paymentResolved = true;
+        showSuccessScreen(data);
+      }
+    })
+    .catch(err => console.warn('[widget] Backend order status fallback error:', err.message));
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Load gateway config from SwapnoPay backend
-// Includes: enabled_methods, timeouts, device_active, merchant_logo_url
+// Includes: enabled_methods, timeouts, device_active, merchant_logo_url,
+//           supabase_url, supabase_anon_key, receiving_numbers
 // ──────────────────────────────────────────────────────────────────────────────
 function loadGatewayConfig(merchantIdParam) {
   if (!backendUrl) return;
@@ -308,12 +366,23 @@ function loadGatewayConfig(merchantIdParam) {
         return;
       }
 
-      // ── Merchant logo from admin DB ──
+      // ── Merchant ID & DB credentials from backend config ──
+      if (config.merchant_id && !merchantId) {
+        merchantId = config.merchant_id;
+      }
+      if (config.supabase_url) {
+        supabaseUrl = config.supabase_url;
+      }
+      if (config.supabase_anon_key && config.supabase_anon_key !== "demo_anon_key") {
+        supabaseAnonKey = config.supabase_anon_key;
+      }
+
+      // ── Merchant logo from admin DB / merchant settings ──
       if (config.merchant_logo_url && !merchantLogoUrl) {
         setMerchantLogo(config.merchant_logo_url);
       }
 
-      // ── Merchant name from admin DB ──
+      // ── Merchant name from admin DB / merchant settings ──
       if (config.merchant_name) {
         setMerchantNameDisplay(config.merchant_name);
       }
@@ -321,6 +390,10 @@ function loadGatewayConfig(merchantIdParam) {
       // ── Receiving numbers per MFS method ──
       if (config.receiving_numbers) {
         merchantReceivingNumbers = config.receiving_numbers;
+        if (merchantReceivingNumbers[selectedMethod]) {
+          document.getElementById("merchant-num-display").value = merchantReceivingNumbers[selectedMethod];
+          updateQrCode(merchantReceivingNumbers[selectedMethod]);
+        }
       }
 
       // ── Redirect URLs ──
@@ -352,6 +425,17 @@ function loadGatewayConfig(merchantIdParam) {
         selectMFS(methodToSelect, colors[methodToSelect] || colors[firstEnabled]);
       }
 
+      // ── Dynamically connect to Merchant DB / order info if not already loaded ──
+      if (orderId && orderId !== "demo_order_id" && !window._orderDataLoaded) {
+        window._orderDataLoaded = true;
+        if (supabaseUrl && supabaseAnonKey && supabaseAnonKey !== "demo_anon_key") {
+          fetchOrderFromMerchantDB();
+          connectSupabaseRealtime(supabaseUrl, supabaseAnonKey, orderId);
+        } else {
+          fetchOrderFromBackendAPI();
+        }
+      }
+
       // ── Device active gate ──
       // device_active: true = proceed | false = show offline | null = skip check
       handleDeviceStatus(config.device_active, config.device_last_seen, config.device_count);
@@ -363,18 +447,27 @@ function loadGatewayConfig(merchantIdParam) {
 // Device Active Gate — controls whether payment gateway is accessible
 // ──────────────────────────────────────────────────────────────────────────────
 function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
-  if (deviceActive === false) {
-    // Show offline overlay
-    showMerchantOfflineView(lastSeen);
+  const hasReceivingNumbers = Boolean(
+    (merchantReceivingNumbers && Object.values(merchantReceivingNumbers).some(v => v && String(v).trim().length > 0)) ||
+    (merchantDefaultNumber && merchantDefaultNumber !== "017XXXXXXXX")
+  );
 
-    // Also show the inline banner in left panel
-    const banner      = document.getElementById("merchant-offline-banner");
+  if (deviceActive === false) {
+    if (hasReceivingNumbers) {
+      // Merchant has configured receiving numbers: do NOT block payment with full curtain!
+      // Only display the non-blocking inline warning banner
+      hideMerchantOfflineView();
+      const banner = document.getElementById("merchant-offline-banner");
+      if (banner) banner.classList.remove("hidden");
+    } else {
+      // Only show full blocking overlay if merchant has NO receiving numbers to pay to
+      showMerchantOfflineView(lastSeen);
+      const banner = document.getElementById("merchant-offline-banner");
+      if (banner) banner.classList.remove("hidden");
+    }
+
     const contactBtn  = document.getElementById("merchant-contact-btn");
     const offlineContactBtn = document.getElementById("offline-contact-btn");
-
-    if (banner) {
-      banner.classList.remove("hidden");
-    }
     if (contactBtn) {
       contactBtn.href = `tel:${merchantDefaultNumber}`;
       contactBtn.innerText = `Call Merchant (${merchantDefaultNumber})`;
@@ -383,7 +476,7 @@ function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
       offlineContactBtn.href = `tel:${merchantDefaultNumber}`;
     }
   } else {
-    // Device is active or unknown — hide offline overlay/banner
+    // Device is active or unknown — hide offline overlay and banner
     hideMerchantOfflineView();
     const banner = document.getElementById("merchant-offline-banner");
     if (banner) banner.classList.add("hidden");

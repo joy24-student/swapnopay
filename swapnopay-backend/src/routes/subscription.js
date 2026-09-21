@@ -9,6 +9,7 @@ import {
   createSubscriptionOrder,
   verifyAndActivateSubscription,
   getMerchantSubscriptionHistory,
+  downgradeMerchantSubscription,
 } from '../services/adminSupabase.js'
 import { requirePlatformUser } from '../services/merchantAccount.js'
 
@@ -215,6 +216,23 @@ router.get('/history', async (req, res) => {
   } catch (err) {
     console.error('[subscription/history GET]', err.message)
     return res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// 6. POST /v1/subscription/downgrade — Switch Account to Free Plan
+// ────────────────────────────────────────────────────────────────────────────
+router.post('/downgrade', async (req, res) => {
+  try {
+    const { merchant_id = 'default' } = req.body || {}
+    const result = await downgradeMerchantSubscription(merchant_id)
+    if (req.io) {
+      req.io.to(`merchant:${merchant_id}`).emit('merchant:subscription_updated', result)
+    }
+    return res.json(result)
+  } catch (err) {
+    console.error('[subscription/downgrade POST]', err.message)
+    return res.status(400).json({ ok: false, error: err.message })
   }
 })
 

@@ -409,7 +409,7 @@ class AppRepository(private val context: Context) {
 
     suspend fun sendDeviceHeartbeat(context: android.content.Context, batteryLevel: Int = 100): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.id.isBlank()) return@withContext false
 
         val deviceId = installationId.ifBlank {
             android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "device_unknown"
@@ -418,46 +418,51 @@ class AppRepository(private val context: Context) {
         val osVer = "Android ${android.os.Build.VERSION.RELEASE}"
 
         var success = false
+
+        // 1. Always ping SwapnoPay backend heartbeat so gateway immediately marks merchant active
         try {
-            com.example.data.remote.SupabaseClient.registerOrUpdateDevice(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
-                token = active.authSessionToken,
-                deviceId = deviceId,
-                model = model,
-                osVersion = osVer,
-                batteryLevel = batteryLevel,
-                online = true,
-                merchantId = active.id,
-                onSuccess = {
-                    try {
-                        val backendPayload = org.json.JSONObject().apply {
-                            put("merchant_id", active.id)
-                            put("device_id", deviceId)
-                            put("battery_level", batteryLevel)
-                            put("status", "ONLINE")
-                        }
-                        val conn = (java.net.URL("https://api.swapnopay.top/v1/payment/heartbeat").openConnection() as java.net.HttpURLConnection).apply {
-                            requestMethod = "POST"
-                            setRequestProperty("Content-Type", "application/json")
-                            doOutput = true
-                            connectTimeout = 3000
-                            readTimeout = 3000
-                        }
-                        conn.outputStream.use { os ->
-                            os.write(backendPayload.toString().toByteArray(Charsets.UTF_8))
-                        }
-                        conn.responseCode
-                    } catch (_: Exception) {}
-                    success = true
-                },
-                onFailure = {
-                    success = false
-                }
-            )
-        } catch (e: Exception) {
-            success = false
+            val backendPayload = org.json.JSONObject().apply {
+                put("merchant_id", active.id)
+                put("device_id", deviceId)
+                put("battery_level", batteryLevel)
+                put("status", "ONLINE")
+            }
+            val conn = (java.net.URL("https://api.swapnopay.top/v1/payment/heartbeat").openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json")
+                doOutput = true
+                connectTimeout = 4000
+                readTimeout = 4000
+            }
+            conn.outputStream.use { os ->
+                os.write(backendPayload.toString().toByteArray(Charsets.UTF_8))
+            }
+            if (conn.responseCode in 200..299) {
+                success = true
+            }
+            conn.disconnect()
+        } catch (_: Exception) {}
+
+        // 2. Also register/update device on merchant Supabase if credentials present
+        if (active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+            val token = active.authSessionToken.ifBlank { active.anonKey }
+            try {
+                com.example.data.remote.SupabaseClient.registerOrUpdateDevice(
+                    url = active.supabaseUrl,
+                    anonKey = active.anonKey,
+                    token = token,
+                    deviceId = deviceId,
+                    model = model,
+                    osVersion = osVer,
+                    batteryLevel = batteryLevel,
+                    online = true,
+                    merchantId = active.id,
+                    onSuccess = { success = true },
+                    onFailure = { /* non-fatal if backend heartbeat succeeded */ }
+                )
+            } catch (_: Exception) {}
         }
+
         success
     }
 

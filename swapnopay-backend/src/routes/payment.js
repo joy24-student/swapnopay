@@ -50,7 +50,26 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   // ──────────────────────────────────────────────────────────────────────────
   router.get('/config', async (req, res) => {
     try {
-      const merchantId = req.query.merchant_id || null
+      let merchantId = req.query.merchant_id || null
+      const orderId = req.query.order_id || null
+
+      // If merchant_id is missing but order_id is present, resolve merchant_id from order/events
+      if (!merchantId && orderId && orderId !== 'demo_order_id') {
+        try {
+          const { getAdminClient } = await import('../services/adminSupabase.js')
+          const admin = getAdminClient()
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
+          let q = admin.from('payment_events').select('merchant_id').limit(1)
+          if (isUuid) {
+            q = q.or(`order_id.eq.${orderId},tran_id.eq.${orderId}`)
+          } else {
+            q = q.eq('tran_id', orderId)
+          }
+          const { data: ev } = await q.maybeSingle()
+          if (ev?.merchant_id) merchantId = ev.merchant_id
+        } catch (_) {}
+      }
+
       const config = await getMerchantGatewayConfig(merchantId, heartbeatMap)
 
       res.json({
@@ -71,6 +90,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         maintenance_message:        config.maintenance_message,
         merchant_customized:        config.merchant_customized || false,
         // Merchant branding
+        merchant_id:                config.merchant_id || merchantId || null,
         merchant_name:              config.merchant_name || null,
         merchant_logo_url:          config.merchant_logo_url || null,
         // Merchant Supabase connection (for client app initialization)
@@ -273,6 +293,10 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     try {
       const {
         merchant_id,
+        merchant_name,
+        merchant_logo_url,
+        supabase_url,
+        supabase_anon_key,
         bkash_enabled,
         nagad_enabled,
         rocket_enabled,
@@ -281,6 +305,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         fail_url,
         cancel_url,
         receiving_numbers,
+        qr_codes,
         auto_appeal_matching,
       } = req.body || {}
 
@@ -289,6 +314,10 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       }
 
       const saved = await setMerchantGatewayConfig(merchant_id, {
+        merchant_name,
+        merchant_logo_url,
+        supabase_url,
+        supabase_anon_key,
         bkash_enabled,
         nagad_enabled,
         rocket_enabled,
@@ -297,6 +326,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         fail_url,
         cancel_url,
         receiving_numbers,
+        qr_codes,
         auto_appeal_matching,
       })
 
@@ -592,6 +622,8 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         paid_at: order.paid_at || null,
         expires_at: order.expires_at || null,
         product_name: order.product_name || null,
+        merchant_id: order.merchant_id || merchantId || null,
+        merchant_name: order.merchant_name || null,
         redirect_url: redirectUrl,
       })
     } catch (err) {
