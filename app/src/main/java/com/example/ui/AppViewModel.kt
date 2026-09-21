@@ -6119,6 +6119,8 @@ function executePayment() {
     }
 
     val aiFormPromptInput = MutableStateFlow("")
+    val isAiFormGenerating = MutableStateFlow(false)
+    val aiFormError = MutableStateFlow<String?>(null)
     val formBuilderStep = MutableStateFlow(0)
 
     fun testPaymentWebhook(urlStr: String, onResult: (String) -> Unit) {
@@ -6841,6 +6843,277 @@ function executePayment() {
 
     fun generateFormFromAiPrompt(prompt: String) {
         generateFormWithAI(prompt)
+    }
+
+    fun applyGeminiGeneratedForm(formObj: org.json.JSONObject, originalPrompt: String) {
+        val titleStr = formObj.optString("title").ifBlank { "AI Form: ${originalPrompt.take(40)}" }
+        formTitle.value = titleStr
+        formDescription.value = formObj.optString("description")
+        val tKey = formObj.optString("template_key", "SINGLE_PRODUCT")
+        formTemplateKey.value = tKey
+
+        // Parse Theme
+        val themeObj = formObj.optJSONObject("theme")
+        if (themeObj != null) {
+            val currentTheme = formThemeConfig.value
+            val newTheme = currentTheme.copy(
+                primaryColorHex = themeObj.optString("primaryColorHex", currentTheme.primaryColorHex),
+                backgroundColorHex = themeObj.optString("backgroundColorHex", currentTheme.backgroundColorHex),
+                buttonShape = themeObj.optString("buttonShape", currentTheme.buttonShape),
+                fontFamily = themeObj.optString("fontFamily", currentTheme.fontFamily),
+                isDarkMode = themeObj.optBoolean("isDarkMode", currentTheme.isDarkMode),
+                showHeader = themeObj.optBoolean("showHeader", currentTheme.showHeader),
+                backgroundStyle = themeObj.optString("backgroundStyle", currentTheme.backgroundStyle),
+                gradientColorStart = themeObj.optString("gradientColorStart", currentTheme.gradientColorStart),
+                gradientColorEnd = themeObj.optString("gradientColorEnd", currentTheme.gradientColorEnd),
+                enablePayment = themeObj.optBoolean("enablePayment", currentTheme.enablePayment),
+                currencyCode = themeObj.optString("currencyCode", currentTheme.currencyCode),
+                redirectType = themeObj.optString("redirectType", currentTheme.redirectType),
+                closedMessage = themeObj.optString("successMessage", currentTheme.closedMessage),
+                enableAntiSpam = themeObj.optBoolean("enableAntiSpam", currentTheme.enableAntiSpam),
+                isMultiPageForm = themeObj.optBoolean("isMultiPageForm", currentTheme.isMultiPageForm),
+                progressTrackerStyle = themeObj.optString("progressTrackerStyle", currentTheme.progressTrackerStyle),
+                customCss = themeObj.optString("customCss", currentTheme.customCss),
+                customJs = themeObj.optString("customJs", currentTheme.customJs),
+                enableCustomJs = themeObj.optBoolean("enableCustomJs", currentTheme.enableCustomJs)
+            )
+            formThemeConfig.value = newTheme
+        }
+
+        // Parse Custom Variables
+        val customVarsArr = formObj.optJSONArray("custom_variables")
+        if (customVarsArr != null && customVarsArr.length() > 0) {
+            val varsList = mutableListOf<CustomVariable>()
+            for (i in 0 until customVarsArr.length()) {
+                val vObj = customVarsArr.optJSONObject(i) ?: continue
+                val k = vObj.optString("key").trim().removePrefix("{{").removeSuffix("}}")
+                if (k.isNotBlank()) {
+                    varsList.add(
+                        CustomVariable(
+                            key = k,
+                            exampleValue = vObj.optString("exampleValue", ""),
+                            source = vObj.optString("source", "field")
+                        )
+                    )
+                }
+            }
+            if (varsList.isNotEmpty()) {
+                formThemeConfig.value = formThemeConfig.value.copy(customVariables = varsList)
+            }
+        }
+
+        // Parse Pages and Fields
+        val pagesArr = formObj.optJSONArray("pages")
+        if (pagesArr != null && pagesArr.length() > 0) {
+            val parsedPages = mutableListOf<FormPageItem>()
+            val parsedFields = mutableListOf<FormFieldItem>()
+
+            for (pIdx in 0 until pagesArr.length()) {
+                val pObj = pagesArr.optJSONObject(pIdx) ?: continue
+                val pageTitle = pObj.optString("title", "Page ${pIdx + 1}")
+                val pageSubtitle = pObj.optString("subtitle", "")
+                val isCustomHtml = pObj.optBoolean("isCustomHtml", false)
+                val customHtml = pObj.optString("customHtmlContent", "")
+                val customCss = pObj.optString("customCssContent", "")
+
+                parsedPages.add(
+                    FormPageItem(
+                        id = "page_$pIdx",
+                        title = pageTitle,
+                        subtitle = pageSubtitle,
+                        isCustomHtml = isCustomHtml,
+                        customHtmlContent = customHtml,
+                        customCssContent = customCss
+                    )
+                )
+
+                if (!isCustomHtml) {
+                    val fieldsArr = pObj.optJSONArray("fields")
+                    if (fieldsArr != null) {
+                        for (fIdx in 0 until fieldsArr.length()) {
+                            val fObj = fieldsArr.optJSONObject(fIdx) ?: continue
+                            val typeStr = fObj.optString("type", "NAME").uppercase()
+                            val fieldType = runCatching { FormFieldType.valueOf(typeStr) }.getOrDefault(FormFieldType.NAME)
+                            val label = fObj.optString("label", fieldType.displayName)
+                            val placeholder = fObj.optString("placeholder", "")
+                            val helperText = fObj.optString("helperText", "")
+                            val isReq = fObj.optBoolean("isRequired", true)
+                            val defVal = fObj.optString("defaultValue", "")
+
+                            val optList = mutableListOf<String>()
+                            val optArr = fObj.optJSONArray("options")
+                            if (optArr != null) {
+                                for (o in 0 until optArr.length()) {
+                                    optList.add(optArr.optString(o))
+                                }
+                            }
+
+                            parsedFields.add(
+                                FormFieldItem(
+                                    type = fieldType,
+                                    label = label,
+                                    placeholder = placeholder,
+                                    helperText = helperText,
+                                    isRequired = isReq,
+                                    defaultValue = defVal,
+                                    options = if (optList.isNotEmpty()) optList else when (fieldType) {
+                                        FormFieldType.RADIO, FormFieldType.DROPDOWN -> listOf("Option 1", "Option 2")
+                                        else -> emptyList()
+                                    },
+                                    pageIndex = pIdx
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (parsedPages.isNotEmpty()) {
+                formPagesList.value = parsedPages
+                activePageIndex.value = 0
+            }
+            if (parsedFields.isNotEmpty()) {
+                formFieldsList.value = parsedFields
+            }
+        }
+    }
+
+    fun generateFormWithGemini(
+        prompt: String,
+        feedback: String? = null,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            isAiFormGenerating.value = true
+            aiFormError.value = null
+            pushFormStateToUndo()
+            aiFormPromptInput.value = prompt
+
+            var success = false
+            try {
+                val merchantId = _activeProfile.value.id.ifEmpty { "default" }
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(35, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+
+                val payload = org.json.JSONObject().apply {
+                    put("prompt", prompt)
+                    if (!feedback.isNullOrBlank()) {
+                        put("feedback", feedback)
+                        val currentFormJson = org.json.JSONObject().apply {
+                            put("title", formTitle.value)
+                            put("description", formDescription.value)
+                            put("template_key", formTemplateKey.value)
+                            val pagesArr = org.json.JSONArray()
+                            formPagesList.value.forEach { page ->
+                                val pageObj = org.json.JSONObject().apply {
+                                    put("title", page.title)
+                                    put("subtitle", page.subtitle)
+                                    put("isCustomHtml", page.isCustomHtml)
+                                    put("customHtmlContent", page.customHtmlContent)
+                                    put("customCssContent", page.customCssContent)
+                                }
+                                pagesArr.put(pageObj)
+                            }
+                            put("pages", pagesArr)
+                        }
+                        put("current_form", currentFormJson)
+                    }
+                    put("merchant_id", merchantId)
+                }
+
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                val body = payload.toString().toRequestBody(mediaType)
+
+                val candidateBases = listOf("https://api.swapnopay.top", "https://swapnopay.top", "https://pay.swapnopay.top")
+                var responseStr: String? = null
+
+                for (base in candidateBases) {
+                    try {
+                        val request = okhttp3.Request.Builder()
+                            .url("$base/v1/ai/generate-form")
+                            .post(body)
+                            .build()
+                        val res = withContext(Dispatchers.IO) {
+                            client.newCall(request).execute().use { resp ->
+                                if (resp.isSuccessful) resp.body?.string() else null
+                            }
+                        }
+                        if (!res.isNullOrBlank()) {
+                            responseStr = res
+                            break
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (!responseStr.isNullOrBlank()) {
+                    val json = runCatching { org.json.JSONObject(responseStr) }.getOrNull()
+                    if (json != null && json.optBoolean("success")) {
+                        val formObj = json.optJSONObject("form")
+                        if (formObj != null) {
+                            applyGeminiGeneratedForm(formObj, prompt)
+                            success = true
+                            logFirebaseStatus("Gemini AI Form Builder generated full custom form from prompt: '$prompt'")
+                        }
+                    }
+                }
+
+                if (!success) {
+                    // Fallback to client Gemini / OpenRouter if configured, or template keyword matching
+                    val clientGeminiKey = _geminiApiKey.value
+                    if (clientGeminiKey.isNotBlank()) {
+                        val systemPrompt = "You are an expert form designer for SwapnoPay. Respond ONLY with valid JSON conforming to the requested form schema (title, description, template_key, theme, pages with fields or isCustomHtml, custom_variables). No code fences, no commentary."
+                        val userMsg = if (!feedback.isNullOrBlank()) {
+                            "Update this form based on prompt '$prompt' and feedback '$feedback'."
+                        } else {
+                            "Create a complete form for: '$prompt'."
+                        }
+                        val messages = JSONArray().apply {
+                            put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                            put(JSONObject().apply { put("role", "user"); put("content", userMsg) })
+                        }
+                        val model = getAutoSelectedGeminiModel()
+                        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
+                            viewModelScope.launch {
+                                GeminiClient.getChatCompletion(
+                                    apiKey = clientGeminiKey,
+                                    model = model,
+                                    messages = messages,
+                                    onSuccess = { rawResp ->
+                                        val clean = rawResp.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                                        val formObj = runCatching { org.json.JSONObject(clean) }.getOrNull()
+                                        if (formObj != null) {
+                                            applyGeminiGeneratedForm(formObj, prompt)
+                                            success = true
+                                        } else {
+                                            generateFormWithAI(prompt)
+                                        }
+                                        if (cont.isActive) cont.resume(Unit) {}
+                                    },
+                                    onFailure = {
+                                        generateFormWithAI(prompt)
+                                        if (cont.isActive) cont.resume(Unit) {}
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        generateFormWithAI(prompt)
+                        success = true
+                    }
+                }
+
+                saveActiveFormToHostedList()
+            } catch (e: Exception) {
+                aiFormError.value = e.message
+                generateFormWithAI(prompt)
+                saveActiveFormToHostedList()
+            } finally {
+                isAiFormGenerating.value = false
+                onDone(true)
+            }
+        }
     }
 
     // Field Operations

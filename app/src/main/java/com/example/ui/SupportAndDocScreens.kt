@@ -2439,14 +2439,14 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                             return@Button
                         }
                         isGeneratingAi = true
-                        // 1. Create a fresh form so we land on a new one (not an existing active form)
+                        // 1. Create a fresh form so we land on a new one
                         viewModel.createNewHostedForm("AI: ${prompt.take(40)}")
-                        // 2. Actually call the AI generator with the user's prompt (was missing!)
-                        viewModel.generateFormWithAI(prompt)
-                        // 3. Navigate to the studio to show the generated result
-                        viewModel.navigateTo("FormBuilderStudio")
-                        showAiGeneratorModal = false
-                        isGeneratingAi = false
+                        // 2. Call real Gemini LLM generator with cascade fallback
+                        viewModel.generateFormWithGemini(prompt) {
+                            isGeneratingAi = false
+                            showAiGeneratorModal = false
+                            viewModel.navigateTo("FormBuilderStudio")
+                        }
                     },
                     enabled = !isGeneratingAi,
                     colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black),
@@ -2460,9 +2460,9 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generating...", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Gemini AI Building Form...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     } else {
-                        Text("Generate with AI ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Generate with Gemini AI ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }

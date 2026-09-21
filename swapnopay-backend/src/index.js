@@ -31,6 +31,7 @@ import { aiVoiceRouter } from './routes/aiVoice.js'
 import { subscriptionRouter } from './routes/subscription.js'
 import employeeRouter from './routes/employee.js'
 import { pinRouter } from './routes/pin.js'
+import { aiFormRouter } from './routes/aiForm.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -417,6 +418,9 @@ app.use('/v1/employee', employeeRouter)
 
 // Merchant App PIN management (cloud-synced, hash-only)
 app.use('/v1/pin', pinRouter)
+
+// AI Form Generator (Gemini LLM) API
+app.use('/v1/ai', aiFormRouter)
 
 // 404
 app.use((_req, res) => {

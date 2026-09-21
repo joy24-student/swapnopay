@@ -73,6 +73,9 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
     var showResetFieldsDialog by remember { mutableStateOf(false) }
     var showDeleteFormDialog by remember { mutableStateOf(false) }
     var showWebAppPreviewModal by remember { mutableStateOf(false) }
+    var showAiRefineModal by remember { mutableStateOf(false) }
+    var aiRefineFeedbackText by remember { mutableStateOf("") }
+    val isAiGenerating by viewModel.isAiFormGenerating.collectAsState()
 
     fun duplicateCurrentForm() {
         try {
@@ -220,6 +223,34 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                                 )
                             }
 
+                            // AI Refine Button
+                            Surface(
+                                onClick = { showAiRefineModal = true },
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (isDark) Color(0xFF2E1065) else Color(0xFFF3E8FF),
+                                border = BorderStroke(1.dp, Color(0xFF8B5CF6))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = "AI Refine",
+                                        tint = Color(0xFF8B5CF6),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "AI Refine",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color(0xFFD8B4FE) else Color(0xFF6B21A8),
+                                        softWrap = false
+                                    )
+                                }
+                            }
+
                             // Publish Rocket Icon Button
                             Surface(
                                 onClick = { showPublishModal = true },
@@ -269,6 +300,14 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                                         .background(cardBg)
                                         .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
                                 ) {
+                                    DropdownMenuItem(
+                                        text = { Text("✨ Refine with Gemini AI", color = textPrimary, fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(18.dp)) },
+                                        onClick = {
+                                            showMoreDropdown = false
+                                            showAiRefineModal = true
+                                        }
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("Edit Form Name & Info", color = textPrimary, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp)) },
@@ -475,6 +514,105 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                     "Responses" -> FormResponsesTab(
                         viewModel = viewModel
                     )
+                }
+            }
+        }
+    }
+
+    // ── AI REFINE WITH USER FEEDBACK MODAL ────────────────────────────────
+    if (showAiRefineModal) {
+        EnterpriseGestureModal(
+            onDismissRequest = { if (!isAiGenerating) showAiRefineModal = false },
+            title = "Refine with Gemini AI ✨",
+            subtitle = "Tell AI what changes to make (fields, pages, themes, variables)",
+            icon = Icons.Default.AutoAwesome
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Describe changes in plain natural language (e.g. 'Add a promo coupon field and delivery notes', 'Change theme to dark green with pill buttons', 'Add a 2nd page for shipping details', 'Add thank-you HTML banner with {{customer_name}}'):",
+                    fontSize = 12.sp,
+                    color = textSecondary
+                )
+
+                OutlinedTextField(
+                    value = aiRefineFeedbackText,
+                    onValueChange = { aiRefineFeedbackText = it },
+                    placeholder = { Text("e.g. Add a coupon code field and change primary color to emerald green") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = goldPrimary,
+                        unfocusedBorderColor = cardBorder,
+                        focusedTextColor = textPrimary,
+                        unfocusedTextColor = textPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Text("Quick Suggestions:", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
+
+                val suggestions = listOf(
+                    "Add Promo / Coupon Code field",
+                    "Add Delivery Address & Shipping Speed",
+                    "Change to Dark Mode Theme",
+                    "Add 2nd Page for Shipping Info",
+                    "Add Styled Thank-You Banner HTML Page"
+                )
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    suggestions.forEach { suggestion ->
+                        Surface(
+                            onClick = { aiRefineFeedbackText = suggestion },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isDark) Color(0xFF1E1E2E) else Color(0xFFF1F5F9),
+                            border = BorderStroke(1.dp, cardBorder)
+                        ) {
+                            Text(
+                                text = suggestion,
+                                fontSize = 11.sp,
+                                color = textPrimary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Button(
+                    onClick = {
+                        val fb = aiRefineFeedbackText.trim()
+                        if (fb.isBlank()) {
+                            Toast.makeText(context, "Please describe the changes you want", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        val basePrompt = viewModel.formTitle.value.ifBlank { "Checkout Payment Form" }
+                        viewModel.generateFormWithGemini(prompt = basePrompt, feedback = fb) {
+                            showAiRefineModal = false
+                            aiRefineFeedbackText = ""
+                            Toast.makeText(context, "Form updated with Gemini AI!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !isAiGenerating,
+                    colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    if (isAiGenerating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.Black,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Gemini AI Updating Form...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    } else {
+                        Text("Apply AI Changes ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
                 }
             }
         }
