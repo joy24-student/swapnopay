@@ -1,8 +1,7 @@
-// Unit and Integration Tests for Form Router
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
-import { formRouter } from './form.js'
+import { formRouter, handleFormPaymentPaid, parseAmountFromText, orderToFormSubmissionMap } from './form.js'
 
 function createTestApp() {
   const app = express()
@@ -211,6 +210,91 @@ test('Form Router: Registration, Resolution, and Submissions', async (t) => {
     assert.ok(data.url)
     assert.ok(data.filename)
     assert.ok(data.url.includes('/uploads/products/'))
+  })
+
+  await t.test('9. Option price parsing & form submission with radio/donation tiers', async () => {
+    // Verify parseAmountFromText unit tests
+    assert.equal(parseAmountFromText('VIP Pass (৳1500)'), 1500)
+    assert.equal(parseAmountFromText('Batch 12 (৳4,500)'), 4500)
+    assert.equal(parseAmountFromText('৳500 (Generous)'), 500)
+    assert.equal(parseAmountFromText('1000 Tk'), 1000)
+    assert.equal(parseAmountFromText('250 BDT'), 250)
+    assert.equal(parseAmountFromText('Standard Free Option'), 0)
+
+    // Register a form with radio options containing prices
+    const regRes = await fetch(`${baseUrl}/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        form_id: 'pricing-form-uuid-004',
+        slug: 'workshop-event',
+        merchant_id: 'merchant-test-123',
+        payload: {
+          id: 'pricing-form-uuid-004',
+          title: 'Full Stack Workshop',
+          slug: 'workshop-event',
+          status: 'PUBLISHED',
+          amount: 0,
+          fields: [
+            {
+              id: 'f_tier',
+              type: 'RADIO',
+              label: 'Ticket Tier',
+              options: ['Standard Pass (৳1500)', 'VIP Pass (৳3500)'],
+              required: true
+            }
+          ],
+          products: [],
+          theme: {
+            enable_payment: true
+          }
+        }
+      })
+    })
+    assert.equal(regRes.status, 200)
+
+    // Submit with selected radio tier
+    const subRes = await fetch(`${baseUrl}/forms/workshop-event/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_name: 'Sadia Rahman',
+        customer_phone: '01700000000',
+        answers: {
+          'f_tier': 'VIP Pass (৳3500)'
+        },
+        payment_method: 'Nagad'
+      })
+    })
+
+    assert.equal(subRes.status, 200)
+    const subData = await subRes.json()
+    assert.equal(subData.ok, true)
+    assert.equal(subData.payment_required, true)
+    assert.equal(subData.amount, 3500)
+    assert.ok(subData.order_id)
+    assert.ok(subData.redirect_url.includes('amount=3500'))
+    assert.ok(subData.redirect_url.includes('merchant_id=merchant-test-123'))
+    assert.ok(subData.redirect_url.includes('success_url='))
+  })
+
+  await t.test('10. handleFormPaymentPaid marks submission PAID and records trx_id', async () => {
+    // Grab the order mapping created from test 9
+    let targetOrderId = null
+    for (const [oId, mapping] of orderToFormSubmissionMap.entries()) {
+      if (mapping.form_id === 'pricing-form-uuid-004') {
+        targetOrderId = oId
+        break
+      }
+    }
+    assert.ok(targetOrderId, 'Expected orderId in orderToFormSubmissionMap')
+
+    // Trigger payment paid handler
+    const mockTrxId = 'TRX99887766'
+    const updated = await handleFormPaymentPaid(targetOrderId, mockTrxId, 3500, null)
+    assert.ok(updated)
+    assert.equal(updated.payment_status, 'PAID')
+    assert.equal(updated.trx_id, mockTrxId)
   })
 })
 

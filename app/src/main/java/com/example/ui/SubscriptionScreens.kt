@@ -318,7 +318,7 @@ fun SubscriptionScreen(
                 ) {
                     // Left: Business Avatar & Title
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val initial = (activeProfile.businessName.ifBlank { activeProfile.fullName.ifBlank { "aerospacehub26" } })
+                        val initial = (activeProfile.businessName.ifBlank { activeProfile.accountHolder.ifBlank { "aerospacehub26" } })
                             .firstOrNull()?.uppercaseChar()?.toString() ?: "A"
 
                         Box(
@@ -889,7 +889,7 @@ fun SubscriptionScreen(
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                imageVector = Icons.Default.KeyboardArrowRight,
                                 contentDescription = null,
                                 tint = if (isDark) Color.White else Color(0xFF334155),
                                 modifier = Modifier.size(14.dp)
@@ -995,7 +995,7 @@ fun SubscriptionScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
 
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        imageVector = Icons.Default.KeyboardArrowRight,
                                         contentDescription = "Details",
                                         tint = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
                                         modifier = Modifier.size(18.dp)

@@ -48,6 +48,7 @@ if (isset($_POST['form1'])) {
 <!DOCTYPE html>
 <html>
 <head>
+	<base href="<?php echo htmlspecialchars(BASE_URL . 'admin/', ENT_QUOTES, 'UTF-8'); ?>">
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<title>Login</title>

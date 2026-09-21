@@ -1,6 +1,17 @@
 <?php
 // Shared clean-URL routing for Caddy and the PHP development server.
 $routePath=rawurldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/',PHP_URL_PATH));
+
+// Handle path-based storefront slug prefix (e.g. /my-shop/product/item -> /product/item)
+$trimmed = trim($routePath, '/');
+$segments = explode('/', $trimmed);
+$firstSegment = !empty($segments[0]) ? strtolower($segments[0]) : '';
+$reserved = ['product', 'category', 'search', 'page', 'admin', 'assets', 'api', 'payment', 'customer', 'vendor', 'uploads'];
+if ($firstSegment && !in_array($firstSegment, $reserved, true) && preg_match('/\A[a-z0-9](?:[a-z0-9-]{1,46})[a-z0-9]\z/', $firstSegment)) {
+    $remainder = substr($trimmed, strlen($firstSegment));
+    $routePath = '/' . ltrim($remainder, '/');
+}
+
 if (PHP_SAPI === 'cli-server') {
     $file=realpath(__DIR__ . $routePath);
     if($file && str_starts_with($file,__DIR__ . DIRECTORY_SEPARATOR) && is_file($file)) return false;

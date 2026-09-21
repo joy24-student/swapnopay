@@ -396,10 +396,11 @@ function loadGatewayConfig(merchantIdParam) {
         }
       }
 
-      // ── Redirect URLs ──
-      if (config.default_success_url) successUrl = config.default_success_url;
-      if (config.default_fail_url)    failUrl    = config.default_fail_url;
-      if (config.default_cancel_url)  cancelUrl  = config.default_cancel_url;
+      // ── Redirect URLs (respect query parameters if provided) ──
+      const urlRedirectParams = new URLSearchParams(window.location.search);
+      if (config.default_success_url && (!urlRedirectParams.get("success_url") || successUrl === "/")) successUrl = config.default_success_url;
+      if (config.default_fail_url && (!urlRedirectParams.get("fail_url") && !urlRedirectParams.get("failure_url") || failUrl === "/")) failUrl = config.default_fail_url;
+      if (config.default_cancel_url && (!urlRedirectParams.get("cancel_url") || cancelUrl === "/")) cancelUrl = config.default_cancel_url;
 
       // ── Countdown timer ──
       if (config.payment_timeout_seconds) {
@@ -1418,7 +1419,15 @@ function submitAppeal() {
 
 function closeWidget() {
   const params = new URLSearchParams(window.location.search);
-  window.location.href = params.get("success_url") || successUrl || "/";
+  let target = params.get("success_url") || successUrl || "/";
+  const trxEl = document.getElementById("receipt-trx");
+  const trxVal = trxEl ? trxEl.innerText.trim() : "";
+  if (trxVal && trxVal !== "MFS Transfer Direct" && target.includes("trx_id=")) {
+    target = target.replace(/trx_id=[^&]*/, "trx_id=" + encodeURIComponent(trxVal));
+  } else if (trxVal && trxVal !== "MFS Transfer Direct" && target !== "/" && !target.includes("trx_id=")) {
+    target += (target.includes("?") ? "&" : "?") + "trx_id=" + encodeURIComponent(trxVal);
+  }
+  window.location.href = target;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

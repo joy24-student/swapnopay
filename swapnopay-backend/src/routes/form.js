@@ -24,6 +24,52 @@ const ROUTES_FILE = path.join(DATA_DIR, 'form_routes.json')
 const routeBySlug = new Map()
 const routeById = new Map()
 const formSubmissionsMemory = new Map() // formId -> array of submissions
+export const orderToFormSubmissionMap = new Map() // orderId -> { form_id, submission_id, merchant_id, form_slug }
+
+/**
+ * Robust currency and price parser for option labels
+ * Handles formats like: 'VIP Pass (৳1500)', '৳500 (Generous)', 'Batch 12 (৳4,500)', '1000 Tk', '500 BDT'
+ */
+export function parseAmountFromText(val) {
+  if (typeof val === 'number' && !isNaN(val)) return val
+  if (!val) return 0
+  if (typeof val === 'object') {
+    if (val.price !== undefined) return Number(val.price || 0)
+    if (val.amount !== undefined) return Number(val.amount || 0)
+    if (val.total_bdt !== undefined) return Number(val.total_bdt || 0)
+  }
+  const str = String(val).trim()
+  if (!str) return 0
+
+  // 1. Currency prefix: ৳, BDT, Tk, TK, Tk.
+  const prefixMatch = str.match(/(?:৳|BDT|TK\.?|Tk\.?)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i)
+  if (prefixMatch) {
+    const num = parseFloat(prefixMatch[1].replace(/,/g, ''))
+    if (!isNaN(num) && num > 0) return num
+  }
+
+  // 2. Currency suffix: 500৳, 500 BDT, 500 Tk, 500Tk
+  const suffixMatch = str.match(/([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:৳|BDT|TK\.?|Tk\.?)/i)
+  if (suffixMatch) {
+    const num = parseFloat(suffixMatch[1].replace(/,/g, ''))
+    if (!isNaN(num) && num > 0) return num
+  }
+
+  // 3. Standalone number in parentheses: (1500)
+  const parenMatch = str.match(/\(\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*\)/)
+  if (parenMatch) {
+    const num = parseFloat(parenMatch[1].replace(/,/g, ''))
+    if (!isNaN(num) && num > 0) return num
+  }
+
+  // 4. Pure number
+  const clean = str.replace(/,/g, '')
+  if (/^[0-9]+(?:\.[0-9]{1,2})?$/.test(clean)) {
+    const num = parseFloat(clean)
+    if (!isNaN(num) && num > 0) return num
+  }
+  return 0
+}
 
 // Ensure data directory and persistent file exist
 function initPersistence() {
@@ -131,8 +177,9 @@ export function formRouter(io = null) {
       }
 
       const formSnapshot = payload || form_data || null
-      if (formSnapshot && typeof formSnapshot === 'object' && merchant_id && !formSnapshot.merchant_id) {
-        formSnapshot.merchant_id = merchant_id
+      const effectiveMerchantId = merchant_id || (formSnapshot && typeof formSnapshot === 'object' ? formSnapshot.merchant_id : null) || null
+      if (formSnapshot && typeof formSnapshot === 'object' && effectiveMerchantId && !formSnapshot.merchant_id) {
+        formSnapshot.merchant_id = effectiveMerchantId
       }
 
       const routeRecord = {
@@ -140,7 +187,7 @@ export function formRouter(io = null) {
         slug: normalizedSlug,
         project_url: project_url || null,
         publishable_key: publishable_key || null,
-        merchant_id: merchant_id || null,
+        merchant_id: effectiveMerchantId,
         payload: formSnapshot,
         updated_at: new Date().toISOString()
       }
@@ -514,13 +561,14 @@ export function formRouter(io = null) {
           }
         }
 
-        // Check product component in fields
+        // Check product component and priced options in fields
         if (form.fields) {
           const fields = Array.isArray(form.fields) ? form.fields : []
           for (const f of fields) {
             const fType = String(f.type || '').toUpperCase()
+            const ansVal = answers[f.id]
+
             if (fType === 'PRODUCT' || fType === 'PRODUCT_LIST') {
-              const ansVal = answers[f.id]
               if (ansVal && typeof ansVal === 'object') {
                 const pPrice = Number(ansVal.price || ansVal.unit_price || f.minValue || f.defaultValue || 0)
                 const pQty = Number(ansVal.quantity || ansVal.qty || 1)
@@ -528,15 +576,31 @@ export function formRouter(io = null) {
               } else if (f.minValue && Number(f.minValue) > 0 && calculatedAmount === 0) {
                 calculatedAmount += Number(f.minValue)
               }
-            } else if (fType === 'CUSTOM_AMOUNT' && answers[f.id]) {
-              const custVal = parseFloat(answers[f.id])
+            } else if (fType === 'CUSTOM_AMOUNT' && ansVal) {
+              const custVal = parseFloat(ansVal)
               if (!isNaN(custVal) && custVal > 0) calculatedAmount += custVal
+            } else if (fType === 'DONATION' && ansVal) {
+              const donationAmt = parseAmountFromText(ansVal)
+              if (donationAmt > 0) calculatedAmount += donationAmt
+            } else if ((fType === 'RADIO' || fType === 'DROPDOWN' || fType === 'MCQ') && ansVal) {
+              const optAmt = parseAmountFromText(ansVal)
+              if (optAmt > 0) {
+                const qMultiplier = Math.max(1, Number(quantity || answers['quantity'] || 1))
+                calculatedAmount += (optAmt * qMultiplier)
+              }
+            } else if ((fType === 'CHECKBOX' || fType === 'CHECKLIST' || fType === 'MULTI_SELECT') && Array.isArray(ansVal)) {
+              for (const item of ansVal) {
+                const optAmt = parseAmountFromText(item)
+                if (optAmt > 0) calculatedAmount += optAmt
+              }
             }
           }
         }
 
-        // Fallback to form-level amount
-        if (calculatedAmount === 0 && Number(form.amount) > 0) {
+        // Fallback to submitted amount or form-level amount
+        if (calculatedAmount === 0 && Number(req.body.amount || req.body.calculated_amount) > 0) {
+          calculatedAmount = Number(req.body.amount || req.body.calculated_amount)
+        } else if (calculatedAmount === 0 && Number(form.amount) > 0) {
           calculatedAmount = Number(form.amount)
         }
 
@@ -775,10 +839,34 @@ export function formRouter(io = null) {
           console.warn('[form-router] Merchant DB order mirror notice:', mOrdErr.message)
         }
 
-        const publicOrigin = process.env.PAYMENT_ROUTER_ORIGIN || 'https://pay.swapnopay.top'
+        orderToFormSubmissionMap.set(orderUuid, {
+          form_id: form.id,
+          submission_id: submissionId,
+          merchant_id: form.merchant_id,
+          form_slug: form.slug,
+          amount: calculatedAmount
+        })
+        orderToFormSubmissionMap.set(tranId, {
+          form_id: form.id,
+          submission_id: submissionId,
+          merchant_id: form.merchant_id,
+          form_slug: form.slug,
+          amount: calculatedAmount
+        })
+
+        const reqOrigin = req.get('host') ? `${req.protocol}://${req.get('host')}` : null
+        const publicOrigin = process.env.PAYMENT_ROUTER_ORIGIN || reqOrigin || 'https://pay.swapnopay.top'
         const merchantParam = form.merchant_id ? `&merchant_id=${encodeURIComponent(form.merchant_id)}` : ''
         const methodParam = payment_method ? `&method=${encodeURIComponent(payment_method)}` : ''
-        const redirectUrl = `/widget.html?order_id=${encodeURIComponent(orderUuid)}&amount=${calculatedAmount}&merchant_name=${encodeURIComponent(form.title || 'SwapnoPay')}&cus_name=${encodeURIComponent(clientName)}&cus_phone=${encodeURIComponent(clientPhone)}${merchantParam}${methodParam}`
+
+        // Build return URLs so customer returns to the form on success or cancel
+        const defaultSuccessUrl = (theme.redirect_type === 'REDIRECT_URL' && theme.redirect_url)
+          ? theme.redirect_url
+          : `${publicOrigin}/f/${form.slug || form.id}?status=paid&order_id=${encodeURIComponent(orderUuid)}&amount=${calculatedAmount}&trx_id=${encodeURIComponent(tranId)}`
+        const defaultCancelUrl = `${publicOrigin}/f/${form.slug || form.id}?status=cancelled`
+        const successParam = `&success_url=${encodeURIComponent(defaultSuccessUrl)}`
+        const cancelParam = `&cancel_url=${encodeURIComponent(defaultCancelUrl)}`
+        const redirectUrl = `/widget.html?order_id=${encodeURIComponent(orderUuid)}&amount=${calculatedAmount}&merchant_name=${encodeURIComponent(form.title || 'SwapnoPay')}&cus_name=${encodeURIComponent(clientName)}&cus_phone=${encodeURIComponent(clientPhone)}${merchantParam}${methodParam}${successParam}${cancelParam}`
 
         return res.json({
           ok: true,
@@ -788,7 +876,8 @@ export function formRouter(io = null) {
           transaction_id: tranId,
           amount: calculatedAmount,
           merchant_name: form.title,
-          redirect_url: redirectUrl
+          redirect_url: redirectUrl,
+          gateway_url: redirectUrl
         })
       }
 
@@ -901,4 +990,134 @@ export function formRouter(io = null) {
   })
 
   return router
+}
+
+/**
+ * Updates form submission and payment_forms stats when an order is verified as PAID
+ */
+export async function handleFormPaymentPaid(orderId, trxId, amount, io = null) {
+  if (!orderId) return false
+  const cleanId = String(orderId).trim()
+  const mapping = orderToFormSubmissionMap.get(cleanId) || orderToFormSubmissionMap.get(cleanId.toLowerCase())
+  if (!mapping) return false
+
+  const { form_id, submission_id, merchant_id, form_slug } = mapping
+  console.log(`[form-router] 💳 Processing form payment completion for order ${cleanId} (Form: ${form_id}, Sub: ${submission_id})`)
+
+  // 0. Update in-memory submission record
+  let updatedRecord = null
+  const memList = formSubmissionsMemory.get(form_id) || []
+  for (const item of memList) {
+    if (item.id === submission_id || item.order_id === cleanId) {
+      item.payment_status = 'PAID'
+      item.trx_id = trxId || 'PAID_GATEWAY'
+      item.updated_at = new Date().toISOString()
+      updatedRecord = item
+      break
+    }
+  }
+  if (!updatedRecord) {
+    updatedRecord = {
+      id: submission_id,
+      form_id,
+      order_id: cleanId,
+      payment_status: 'PAID',
+      trx_id: trxId || 'PAID_GATEWAY',
+      amount: Number(amount || 0),
+      updated_at: new Date().toISOString()
+    }
+    if (!formSubmissionsMemory.has(form_id)) {
+      formSubmissionsMemory.set(form_id, [])
+    }
+    formSubmissionsMemory.get(form_id).unshift(updatedRecord)
+  }
+
+  // 1. Update form_submissions and payment_forms in admin DB
+  try {
+    const admin = getAdminClient()
+    if (admin) {
+      const parsedSubUuid = normalizeUuid(submission_id)
+      const parsedOrderUuid = normalizeUuid(cleanId)
+      let q = admin.from('form_submissions').update({
+        payment_status: 'PAID',
+        trx_id: trxId || 'PAID_GATEWAY',
+        updated_at: new Date().toISOString()
+      })
+      if (parsedSubUuid && parsedOrderUuid) {
+        q = q.or(`id.eq.${parsedSubUuid},request_id.eq.${parsedOrderUuid}`)
+      } else if (parsedSubUuid) {
+        q = q.eq('id', parsedSubUuid)
+      } else if (parsedOrderUuid) {
+        q = q.eq('request_id', parsedOrderUuid)
+      }
+      await q
+
+      // Increment total_revenue on payment_forms
+      const parsedFormUuid = normalizeUuid(form_id) || deterministicUuid(form_id || form_slug)
+      const { data: currentForm } = await admin.from('payment_forms')
+        .select('total_revenue, submissions_count')
+        .eq('id', parsedFormUuid)
+        .maybeSingle()
+
+      if (currentForm) {
+        const newRevenue = Number(currentForm.total_revenue || 0) + Number(amount || 0)
+        await admin.from('payment_forms')
+          .update({
+            total_revenue: newRevenue,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', parsedFormUuid)
+      }
+    }
+  } catch (adminErr) {
+    console.warn('[form-router] Admin DB payment update notice:', adminErr.message)
+  }
+
+  // 2. Mirror update to merchant's own Supabase DB
+  if (merchant_id) {
+    try {
+      const creds = await getMerchantCredentials(merchant_id)
+      if (creds?.supabase_url && creds?.supabase_anon_key) {
+        const { createClient } = await import('@supabase/supabase-js')
+        const mClient = createClient(creds.supabase_url, creds.supabase_anon_key, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        })
+        const parsedSubUuid = normalizeUuid(submission_id)
+        const parsedOrderUuid = normalizeUuid(cleanId)
+        let mq = mClient.from('form_submissions').update({
+          payment_status: 'PAID',
+          trx_id: trxId || 'PAID_GATEWAY',
+          updated_at: new Date().toISOString()
+        })
+        if (parsedSubUuid && parsedOrderUuid) {
+          mq = mq.or(`id.eq.${parsedSubUuid},request_id.eq.${parsedOrderUuid}`)
+        } else if (parsedSubUuid) {
+          mq = mq.eq('id', parsedSubUuid)
+        } else if (parsedOrderUuid) {
+          mq = mq.eq('request_id', parsedOrderUuid)
+        }
+        await mq
+      }
+    } catch (mErr) {
+      console.warn('[form-router] Merchant DB submission payment update notice:', mErr.message)
+    }
+
+    // 3. Emit realtime event to merchant dashboard & app
+    if (io) {
+      try {
+        io.to(`merchant:${merchant_id}`).emit('form_submission_paid', {
+          order_id: cleanId,
+          form_id,
+          submission_id,
+          amount: Number(amount || 0),
+          trx_id: trxId,
+          timestamp: new Date().toISOString()
+        })
+      } catch (ioErr) {
+        console.warn('[form-router] Realtime emit notice:', ioErr.message)
+      }
+    }
+  }
+
+  return updatedRecord
 }

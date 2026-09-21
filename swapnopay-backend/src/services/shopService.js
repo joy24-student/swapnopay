@@ -147,22 +147,31 @@ export class ShopService {
       const url = `https://${this.config.baseDomain}`
       return {
         ok: true, deployed: false, status: 'NOT_DEPLOYED',
-        shop_url: url, admin_url: `${url}/admin`, admin_login_url: `${url}/admin/login.php`,
+        shop_url: url, platform_url: url, admin_url: `${url}/admin`, admin_login_url: `${url}/admin/login.php`,
         base_domain: this.config.baseDomain, ssl_active: false,
         message: 'Set up your store and launch when ready.'
       }
     }
-    const domain = row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
-    const url = `https://${domain}`
+    const platformUrl = `https://${this.config.baseDomain}/${row.shop_slug}`
+    const customUrl = row.custom_domain ? `https://${row.custom_domain}` : null
+    const url = customUrl || platformUrl
+    const effectiveAdminUrl = customUrl ? `${customUrl}/admin` : `${platformUrl}/admin`
+    const effectiveLoginUrl = customUrl ? `${customUrl}/admin/login.php` : `${platformUrl}/admin/login.php`
     return {
       ok: true, merchant_id: row.merchant_id, deployed: row.status === 'LIVE', status: row.status,
-      job_id: row.job_id, message: row.message, shop_url: url, shop_slug: row.shop_slug,
-      admin_url: `${url}/admin`, admin_login_url: `${url}/admin/login.php`,
-      admin_credentials: { email: row.admin_email, login_url: `${url}/admin/login.php`, role: 'Top Admin', has_custom_password: true },
-      store_name: row.store_name, custom_domain: row.custom_domain, currency: row.currency, theme_color: row.theme_color,
+      job_id: row.job_id, message: row.message,
+      shop_url: url,
+      platform_url: platformUrl,
+      shop_slug: row.shop_slug,
+      admin_url: effectiveAdminUrl, admin_login_url: effectiveLoginUrl,
+      admin_credentials: { email: row.admin_email, login_url: effectiveLoginUrl, role: 'Top Admin', has_custom_password: true },
+      store_name: row.store_name, custom_domain: row.custom_domain || null, currency: row.currency, theme_color: row.theme_color,
       base_domain: this.config.baseDomain, ssl_active: row.status === 'LIVE',
       vps_status: row.status === 'LIVE' ? 'VERIFIED' : 'UNVERIFIED', gateway_connected: false,
-      dns_records: { a_record: { type: 'A', host: domain, target: this.config.addresses[0] } },
+      dns_records: {
+        a_record: { type: 'A', host: row.custom_domain || '@', target: this.config.addresses[0] },
+        cname_record: { type: 'CNAME', host: 'www', target: this.config.baseDomain }
+      },
       last_updated: row.updated_at, products_count: 0, orders_count: 0, total_revenue: 0, ...counts,
     }
   }
@@ -170,8 +179,9 @@ export class ShopService {
     if (!this.pool) return this.publicStatus(null)
     const row = await this.row(id)
     if (row && ['LIVE','DEGRADED'].includes(row.status) && Date.now()-new Date(row.updated_at).getTime()>60000) {
-      const host=row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
-      const ready=await this.dns(host,this.config.addresses) && (await this.probe(host,this.config.addresses[0],id)).ready
+      const host = row.custom_domain || this.config.baseDomain
+      const checkPath = row.custom_domain ? '/health.php' : `/${row.shop_slug}/health.php`
+      const ready = await this.dns(host, this.config.addresses) && (await this.probe(host, this.config.addresses[0], id, checkPath)).ready
       row.status=ready ? 'LIVE' : 'DEGRADED'
       row.message=ready ? 'Your storefront and admin login are ready over HTTPS.' : 'The storefront could not be reached over HTTPS. Check your domain and hosting, then refresh.'
       const saved=await this.pool.query("UPDATE shop_control.launches SET status=$2,message=$3,updated_at=now() WHERE merchant_id=$1 AND job_id=$4 AND status IN ('LIVE','DEGRADED') RETURNING updated_at",[id,row.status,row.message,row.job_id])
@@ -222,7 +232,7 @@ export class ShopService {
         ON CONFLICT(merchant_id) DO UPDATE SET store_name=$2,custom_domain=$4,currency=$5,theme_color=$6,admin_email=$7,
           job_id=$8,secret_config=$9,status='QUEUED',message='Preparing your storefront.',tls_allowed=false,attempts=0,next_attempt=now(),updated_at=now()
         RETURNING ${publicFields}`, values)
-      for (const host of new Set([`${input.shop_slug}.${this.config.baseDomain}`,input.custom_domain].filter(Boolean))) {
+      for (const host of new Set([input.shop_slug, input.custom_domain].filter(Boolean))) {
         await client.query('INSERT INTO shop_control.domains(hostname,merchant_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[host,id])
         const owner=(await client.query('SELECT merchant_id FROM shop_control.domains WHERE hostname=$1',[host])).rows[0]
         if(owner.merchant_id !== id) throw new ShopError(409,'ADDRESS_TAKEN','This domain already belongs to another store.')
@@ -264,26 +274,48 @@ export class ShopService {
       // An incomplete staging directory never becomes the public document root.
       await fs.rename(stage, tenantDir)
     }
-    const domain = row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
     const schema = schemaName(row.merchant_id)
     const runtime = {
-      merchant_id: row.merchant_id, base_url: `https://${domain}/`, store_name: row.store_name,
+      merchant_id: row.merchant_id,
+      base_url: row.custom_domain ? `https://${row.custom_domain}/` : `https://${this.config.baseDomain}/${row.shop_slug}/`,
+      store_name: row.store_name,
       db: { host: this.config.dbHost, port: this.config.dbPort, database: this.config.dbName, user: schema, password: secrets.dbPassword, sslmode: this.config.sslmode },
       backend_url: this.config.backendUrl,
     }
-    // The permanent platform URL keeps working while a custom domain is being verified.
-    for (const host of new Set([`${row.shop_slug}.${this.config.baseDomain}`, domain])) {
-      const link = path.join(this.config.sites,'hosts',host)
-      await fs.mkdir(path.dirname(link), { recursive: true })
-      try { await fs.symlink(tenantDir,link,process.platform === 'win32' ? 'junction' : 'dir') } catch (error) {
-        if (error.code !== 'EEXIST' || await fs.realpath(link) !== await fs.realpath(tenantDir)) throw error
-      }
-      await this.writePrivate(path.join(this.config.runtime,'hosts',`${host}.json`), JSON.stringify({...runtime,base_url:`https://${host}/`}))
+
+    await fs.mkdir(path.join(this.config.runtime, 'hosts'), { recursive: true })
+    await fs.mkdir(path.join(this.config.runtime, 'slugs'), { recursive: true })
+    await fs.mkdir(path.join(this.config.sites, 'hosts'), { recursive: true })
+    await fs.mkdir(path.join(this.config.sites, 'slugs'), { recursive: true })
+
+    // 1. Path-based platform URL: shop.swapnopay.top/<slug>
+    const pathRuntime = { ...runtime, base_url: `https://${this.config.baseDomain}/${row.shop_slug}/` }
+    await this.writePrivate(path.join(this.config.runtime, 'hosts', `${row.shop_slug}.json`), JSON.stringify(pathRuntime))
+    await this.writePrivate(path.join(this.config.runtime, 'slugs', `${row.shop_slug}.json`), JSON.stringify(pathRuntime))
+
+    const slugLink = path.join(this.config.sites, 'slugs', row.shop_slug)
+    try { await fs.symlink(tenantDir, slugLink, process.platform === 'win32' ? 'junction' : 'dir') } catch (error) {
+      if (error.code !== 'EEXIST' || await fs.realpath(slugLink) !== await fs.realpath(tenantDir)) throw error
     }
-    const priorHosts=(await this.pool.query('SELECT hostname FROM shop_control.domains WHERE merchant_id=$1',[row.merchant_id])).rows
-    for(const {hostname:host} of priorHosts) if(![`${row.shop_slug}.${this.config.baseDomain}`,domain].includes(host)) {
-      await fs.unlink(path.join(this.config.sites,'hosts',host)).catch(error=>{if(error.code!=='ENOENT') throw error})
-      await fs.unlink(path.join(this.config.runtime,'hosts',`${host}.json`)).catch(error=>{if(error.code!=='ENOENT') throw error})
+
+    // 2. Custom domain (if configured)
+    if (row.custom_domain) {
+      const customRuntime = { ...runtime, base_url: `https://${row.custom_domain}/` }
+      await this.writePrivate(path.join(this.config.runtime, 'hosts', `${row.custom_domain}.json`), JSON.stringify(customRuntime))
+      const customLink = path.join(this.config.sites, 'hosts', row.custom_domain)
+      try { await fs.symlink(tenantDir, customLink, process.platform === 'win32' ? 'junction' : 'dir') } catch (error) {
+        if (error.code !== 'EEXIST' || await fs.realpath(customLink) !== await fs.realpath(tenantDir)) throw error
+      }
+    }
+
+    // Cleanup decommissioned host records
+    const activeHosts = new Set([row.shop_slug, row.custom_domain].filter(Boolean))
+    const priorHosts = (await this.pool.query('SELECT hostname FROM shop_control.domains WHERE merchant_id=$1', [row.merchant_id])).rows
+    for (const { hostname: host } of priorHosts) {
+      if (!activeHosts.has(host)) {
+        await fs.unlink(path.join(this.config.sites, 'hosts', host)).catch(error => { if (error.code !== 'ENOENT') throw error })
+        await fs.unlink(path.join(this.config.runtime, 'hosts', `${host}.json`)).catch(error => { if (error.code !== 'ENOENT') throw error })
+      }
     }
   }
   async provision(client, row) {
@@ -307,8 +339,11 @@ export class ShopService {
         }
       }
       await client.query(`SET LOCAL search_path TO ${quoted},pg_catalog`)
+      const storeBaseUrl = row.custom_domain
+        ? `https://${row.custom_domain}/`
+        : `https://${this.config.baseDomain}/${row.shop_slug}/`
       await client.query(`UPDATE tbl_settings SET meta_title_home=$1,meta_description_home=$2,contact_email=$3,receive_email=$3,"BASE_URL"=$4,theme_color=$5,currency_code=$6 WHERE id=1`,
-        [row.store_name,`Shop online with ${row.store_name}.`,row.admin_email,`https://${row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`}/`,row.theme_color,row.currency])
+        [row.store_name,`Shop online with ${row.store_name}.`,row.admin_email,storeBaseUrl,row.theme_color,row.currency])
       if (!row.schema_ready || row.status === 'QUEUED' && secrets.resetAdminPassword) await client.query(`INSERT INTO tbl_user(id,full_name,email,phone,password,role,status) VALUES(1,$1,$2,'',$3,'Top Admin','Active')
         ON CONFLICT(id) DO UPDATE SET full_name=$1,email=$2,password=$3,role='Top Admin',status='Active'`,[`${row.store_name} Administrator`,row.admin_email,secrets.adminHash])
       else await client.query('UPDATE tbl_user SET email=$1 WHERE id=1',[row.admin_email])
@@ -322,7 +357,9 @@ export class ShopService {
       const { getAdminClient } = await import('./adminSupabase.js')
       const adminClient = getAdminClient()
       if (adminClient) {
-        const storeUrl = `https://${row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`}`
+        const storeUrl = row.custom_domain
+          ? `https://${row.custom_domain}`
+          : `https://${this.config.baseDomain}/${row.shop_slug}`
         await adminClient
           .from('merchants')
           .update({ website: storeUrl })
@@ -353,16 +390,17 @@ export class ShopService {
         try {
           await this.provision(client,row)
           const isPlatform = !row.custom_domain || row.custom_domain === this.config.baseDomain || row.custom_domain.endsWith('.' + this.config.baseDomain) || row.custom_domain.endsWith('.swapnopay.top')
-          const host = row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
+          const host = row.custom_domain || this.config.baseDomain
+          const checkPath = row.custom_domain ? '/health.php' : `/${row.shop_slug}/health.php`
           let status='WAITING_DNS', message=isPlatform
-            ? `Store instance ready! Securing SSL certificate for https://${host}...`
+            ? `Store instance ready! Securing SSL certificate for https://${this.config.baseDomain}/${row.shop_slug}...`
             : `Point ${host} A-record to ${this.config.addresses[0]}. We will check again automatically.`
           const dnsReady = await this.dns(host,this.config.addresses)
           await client.query('UPDATE shop_control.launches SET tls_allowed=$2 WHERE merchant_id=$1',[row.merchant_id, Boolean(dnsReady || isPlatform)])
           if (dnsReady) {
-            const health = await this.probe(host,this.config.addresses[0],row.merchant_id)
+            const health = await this.probe(host,this.config.addresses[0],row.merchant_id,checkPath)
             status=health.ready ? 'LIVE' : 'WAITING_TLS'
-            message=health.ready ? 'Your storefront and admin login are ready over HTTPS.' : (isPlatform ? `Storefront provisioned! Securing SSL certificate for https://${host}...` : health.message)
+            message=health.ready ? 'Your storefront and admin login are ready over HTTPS.' : (isPlatform ? `Storefront provisioned! Ready at https://${this.config.baseDomain}/${row.shop_slug}` : health.message)
           }
           await client.query(`UPDATE shop_control.launches SET status=$2,message=$3,attempts=attempts+1,next_attempt=now()+interval '30 seconds',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id,status,message])
         } catch (error) {
@@ -408,8 +446,10 @@ export class ShopService {
       await fs.chmod(path.dirname(file),0o2770)
       await fs.chown(file,-1,this.config.group)
     }
-    const domain=row.custom_domain || `${row.shop_slug}.${this.config.baseDomain}`
-    return {...result,url:`https://${domain}/assets/uploads/${result.relative_path}`}
+    const storeBase = row.custom_domain
+      ? `https://${row.custom_domain}`
+      : `https://${this.config.baseDomain}/${row.shop_slug}`
+    return {...result,url:`${storeBase}/assets/uploads/${result.relative_path}`}
   }
 }
 

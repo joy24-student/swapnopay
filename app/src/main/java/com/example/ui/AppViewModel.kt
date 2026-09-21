@@ -572,8 +572,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val backendPayload = org.json.JSONObject().apply {
                     put("merchant_id", _activeProfile.value.id)
                     val mProfile = _activeProfile.value
-                    if (mProfile.name.isNotBlank()) {
-                        put("merchant_name", mProfile.name)
+                    val mName = mProfile.businessName.ifBlank { mProfile.accountHolder }
+                    if (mName.isNotBlank()) {
+                        put("merchant_name", mName)
                     }
                     if (mProfile.photoUrl.isNotBlank()) {
                         put("merchant_logo_url", mProfile.photoUrl)
@@ -5054,6 +5055,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     token = token,
                     formId = form.id,
                     formSlug = form.slug,
+                    merchantId = activeProfile.value.id,
                     payloadJson = payloadJson,
                     onSuccess = { publicUrl -> completion.complete(true to publicUrl) },
                     onFailure = { message -> completion.complete(false to message) }
@@ -5099,6 +5101,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 token = "",
                                 formId = fId,
                                 formSlug = fSlug,
+                                merchantId = activeProfile.value.id,
                                 payloadJson = json,
                                 onSuccess = { publicUrl -> completion.complete(true to publicUrl) },
                                 onFailure = { message -> completion.complete(false to message) }
@@ -12226,7 +12229,7 @@ function executePayment() {
                             if (isSuccess) {
                                 val isLive = json.optBoolean("deployed", false) || response.code == 200
                                 val respStatus = json.optString("status", if (isLive) "LIVE" else "QUEUED")
-                                val targetUrl = json.optString("shop_url", "https://${cleanSlug}.shop.swapnopay.top")
+                                val targetUrl = json.optString("shop_url", "https://shop.swapnopay.top/${cleanSlug}")
                                 val adminUrl = json.optString("admin_url", "$targetUrl/admin")
                                 val adminLoginUrl = json.optString("admin_login_url", "$adminUrl/login.php")
                                 val adminCreds = json.optJSONObject("admin_credentials")

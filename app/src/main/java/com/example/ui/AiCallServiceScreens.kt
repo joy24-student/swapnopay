@@ -471,7 +471,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                     modifier = Modifier.width(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.CallMade,
+                                        imageVector = Icons.Default.CallMade,
                                         contentDescription = null,
                                         tint = Color(0xFF2563EB),
                                         modifier = Modifier.size(15.dp)
@@ -552,7 +552,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                     )
                                     Spacer(modifier = Modifier.width(2.dp))
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        imageVector = Icons.Default.KeyboardArrowRight,
                                         contentDescription = null,
                                         tint = Color(0xFF475569),
                                         modifier = Modifier.size(13.dp)
@@ -620,7 +620,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                             horizontalArrangement = Arrangement.End
                                         ) {
                                             Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                imageVector = Icons.Default.KeyboardArrowRight,
                                                 contentDescription = null,
                                                 tint = Color(0xFF94A3B8),
                                                 modifier = Modifier.size(14.dp)
@@ -682,7 +682,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                             horizontalArrangement = Arrangement.End
                                         ) {
                                             Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                imageVector = Icons.Default.KeyboardArrowRight,
                                                 contentDescription = null,
                                                 tint = Color(0xFF94A3B8),
                                                 modifier = Modifier.size(14.dp)
@@ -744,7 +744,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                             horizontalArrangement = Arrangement.End
                                         ) {
                                             Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                imageVector = Icons.Default.KeyboardArrowRight,
                                                 contentDescription = null,
                                                 tint = Color(0xFF94A3B8),
                                                 modifier = Modifier.size(14.dp)
@@ -806,7 +806,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
                                             horizontalArrangement = Arrangement.End
                                         ) {
                                             Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                imageVector = Icons.Default.KeyboardArrowRight,
                                                 contentDescription = null,
                                                 tint = Color(0xFF94A3B8),
                                                 modifier = Modifier.size(14.dp)

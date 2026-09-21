@@ -1610,16 +1610,23 @@ object SupabaseClient {
         token: String,
         formId: String,
         formSlug: String,
+        merchantId: String? = null,
         payloadJson: JSONObject? = null,
         onSuccess: (String) -> Unit,
         onFailure: (String) -> Unit
     ) {
         val endpoint = "${routerBaseUrl.trimEnd('/')}/v1/routes"
+        val effectiveMerchantId = merchantId?.ifBlank { null }
+            ?: payloadJson?.optString("merchant_id")?.ifBlank { null }
+            ?: payloadJson?.optString("userId")?.ifBlank { null }
         val bodyJson = JSONObject().apply {
             put("project_url", projectUrl.trimEnd('/'))
             put("publishable_key", publishableKey)
             put("form_id", formId)
             put("slug", formSlug)
+            if (!effectiveMerchantId.isNullOrBlank()) {
+                put("merchant_id", effectiveMerchantId)
+            }
             if (payloadJson != null) {
                 put("payload", payloadJson)
             }

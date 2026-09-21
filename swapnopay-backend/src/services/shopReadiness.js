@@ -32,10 +32,10 @@ export async function checkShopDns(host, expectedAddresses, lookup = dns.lookup,
   return false
 }
 
-export function probeStore(host, address, merchant) {
+export function probeStore(host, address, merchant, reqPath = '/health.php') {
   return new Promise(resolve => {
     const request = https.get({
-      hostname: host, port: 443, path: '/health.php', servername: host,
+      hostname: host, port: 443, path: reqPath, servername: host,
       lookup: (_host, options, cb) => {
         if (address && net.isIP(address)) {
           return options?.all ? cb(null, [{ address, family: net.isIP(address) }]) : cb(null, address, net.isIP(address))

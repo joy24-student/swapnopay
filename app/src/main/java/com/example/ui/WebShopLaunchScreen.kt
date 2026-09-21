@@ -85,7 +85,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
         }
     }
 
-    val freePlatformUrl = "https://${storeSubdomain.ifBlank { "store" }}.shop.swapnopay.top"
+    val freePlatformUrl = "https://shop.swapnopay.top/${storeSubdomain.ifBlank { "store" }}"
     val isPlatformDomain = customDomain.isBlank() || customDomain.contains("swapnopay.top")
     val effectiveUrl = when {
         customDomain.isNotBlank() && !customDomain.contains("swapnopay.top") -> "https://${customDomain.trim()}"
@@ -510,7 +510,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                         )
 
                         Text(
-                            text = "💡 1-Click Free Hosting is included automatically at https://${storeSubdomain.ifBlank { "store" }}.shop.swapnopay.top. Connect a custom domain only if you purchased your own domain (e.g. yourbrand.com).",
+                            text = "💡 1-Click Free Hosting is included automatically at https://shop.swapnopay.top/${storeSubdomain.ifBlank { "store" }}. Connect a custom domain only if you purchased your own domain (e.g. yourbrand.com).",
                             fontSize = 11.5.sp,
                             color = secondaryText
                         )
@@ -596,7 +596,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                         color = if (isDarkMode) Color(0xFF6EE7B7) else Color(0xFF065F46)
                                     )
                                     Text(
-                                        text = "1. CNAME Record: Host 'shop' or '@' points to 'vps.swapnopay.top'",
+                                        text = "1. CNAME Record: Host '@' or 'www' points to 'shop.swapnopay.top'",
                                         fontSize = 11.5.sp,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         color = primaryText

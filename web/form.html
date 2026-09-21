@@ -379,6 +379,84 @@
       line-height: 1.5;
     }
 
+    /* Receipt Card */
+    .receipt-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 16px;
+      padding: 16px 8px;
+    }
+    .receipt-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
+    .receipt-details-table {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #f8fafc;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .receipt-row:last-child {
+      border-bottom: none;
+    }
+    .receipt-row .label {
+      color: var(--text-light);
+      font-weight: 500;
+    }
+    .receipt-row .val {
+      color: var(--text-dark);
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .btn-receipt-action {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-print {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-back {
+      background: #f1f5f9;
+      color: var(--text-dark);
+      border: 1px solid var(--border);
+    }
+    .tier-chip.selected {
+      border-color: var(--primary) !important;
+      background: rgba(93, 69, 255, 0.08) !important;
+      color: var(--primary) !important;
+    }
+
     /* Multi-Page Stepper */
     .step-progress-wrap {
       display: flex;
@@ -675,8 +753,84 @@
       }
     }
 
+    function renderPaymentReceipt(params) {
+      const orderId = params.get("order_id") || "N/A";
+      const trxId = params.get("trx_id") || params.get("trxId") || params.get("tran_id") || "";
+      const amountVal = parseFloat(params.get("amount") || 0);
+      const amountFormatted = !isNaN(amountVal) && amountVal > 0
+        ? `৳${amountVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+        : "Paid";
+      const formWrap = document.getElementById("form-wrap");
+      if (!formWrap) return;
+
+      const currentPath = window.location.pathname;
+
+      formWrap.innerHTML = `
+        <div class="receipt-card">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #ecfdf5; border: 3px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #10b981; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);">
+            ✓
+          </div>
+          <div class="receipt-badge">PAYMENT VERIFIED • PAID</div>
+          <h2 style="font-size: 22px; font-weight: 700; color: var(--text-dark); margin-top: 4px;">Payment Received!</h2>
+          <p style="font-size: 14px; color: var(--text-light); max-width: 400px; margin: 0 auto;">
+            Thank you! Your payment of <strong>${amountFormatted}</strong> has been confirmed and your form response is now registered.
+          </p>
+
+          <div class="receipt-details-table">
+            <div class="receipt-row">
+              <span class="label">Status</span>
+              <span class="val" style="color: #10b981;">COMPLETED / PAID</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Amount Paid</span>
+              <span class="val" style="color: var(--primary); font-size: 15px;">${amountFormatted}</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Order / Reference</span>
+              <span class="val">#${orderId}</span>
+            </div>
+            ${trxId ? `
+            <div class="receipt-row">
+              <span class="label">Transaction Ref ID</span>
+              <span class="val" style="font-family: monospace;">${trxId}</span>
+            </div>` : ''}
+            <div class="receipt-row">
+              <span class="label">Date & Time</span>
+              <span class="val">${new Date().toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 14px;">
+            <button type="button" class="btn-receipt-action btn-print" onclick="window.print()">
+              🖨️ Print Receipt
+            </button>
+            <a href="${currentPath}" class="btn-receipt-action btn-back">
+              Submit Another Response
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
     window.onload = function() {
       const params = new URLSearchParams(window.location.search);
+      const status = (params.get("status") || params.get("payment") || "").toLowerCase();
+      if (status === "paid" || status === "success") {
+        renderPaymentReceipt(params);
+        return;
+      }
+
+      if (status === "cancelled" || status === "cancel") {
+        const holder = document.getElementById("countdown-banner-holder");
+        if (holder) {
+          holder.innerHTML = `
+            <div style="background:#FEF2F2; color:#B91C1C; border:1.5px solid #F87171; border-radius:12px; padding:10px 14px; font-size:13px; font-weight:600; margin-bottom:12px;">
+              ⚠️ Payment was cancelled. You can review your details and submit again.
+            </div>
+          `;
+        }
+      }
+
       const pathParts = window.location.pathname.split('/').filter(Boolean);
       const routeIdentifier = (pathParts[0] === 'f' || pathParts[0] === 'form' || pathParts[0] === 'forms') ? pathParts[1] : '';
 
@@ -1216,7 +1370,7 @@
           if (fType === "DATE") {
             group.innerHTML += `<input type="date" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'YYYY-MM-DD'}" />`;
           } else if (fType === "DROPDOWN") {
-            let selHtml = `<select class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''}>`;
+            let selHtml = `<select class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} onchange="recalculateTotalAmount()">`;
             selHtml += `<option value="">${f.placeholder || 'Select an option'}</option>`;
             (f.options || []).forEach(o => {
               selHtml += `<option value="${o}">${o}</option>`;
@@ -1232,7 +1386,24 @@
           } else if (fType === "CUSTOM_AMOUNT") {
             group.innerHTML += `<input type="number" step="0.01" class="input-text" data-field-id="${f.id}" id="custom-amount-input" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '0.00'}" oninput="recalculateTotalAmount()" />`;
           } else if (fType === "QUANTITY") {
-            group.innerHTML += `<input type="number" step="1" min="1" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '1'}" value="1" oninput="recalculateTotalAmount()" />`;
+            group.innerHTML += `<input type="number" step="1" min="1" data-field-type="QUANTITY" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '1'}" value="1" oninput="recalculateTotalAmount()" />`;
+          } else if (fType === "DONATION" || fType === "DONATION_TIER") {
+            const tiers = (f.options && f.options.length > 0) ? f.options : ["৳100", "৳500", "৳1,000", "৳5,000"];
+            let tiersHtml = `<div class="donation-tier-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">`;
+            tiers.forEach((tier, tIdx) => {
+              const pVal = extractOptionPrice(tier);
+              tiersHtml += `
+                <button type="button" class="tier-chip ${tIdx === 0 ? 'selected' : ''}" 
+                  style="padding:8px 14px; border:1.5px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; font-weight:600; font-size:13px; color:var(--text-dark); transition:all 0.2s;"
+                  onclick="selectDonationTier('${f.id}', ${pVal}, this)">
+                  ${tier}
+                </button>
+              `;
+            });
+            tiersHtml += `</div>`;
+            const firstPrice = extractOptionPrice(tiers[0]) || '';
+            tiersHtml += `<input type="number" step="1" min="1" class="input-text" data-field-id="${f.id}" id="donation-custom-${f.id}" value="${firstPrice}" placeholder="Or enter custom amount in ৳" oninput="onCustomDonationInput('${f.id}')" />`;
+            group.innerHTML += tiersHtml;
           } else if (fType === "ADDRESS" || fType === "NOTES") {
             group.innerHTML += `<textarea class="input-area" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'Enter details...'}"></textarea>`;
           } else if (fType === "MCQ" || fType === "RADIO") {
@@ -1240,7 +1411,7 @@
             (f.options || []).forEach((o, index) => {
               listHtml += `
                 <label class="option-row">
-                  <input type="radio" name="field_${f.id}" value="${o}" ${(f.required || f.isRequired) && index === 0 ? 'checked' : ''} />
+                  <input type="radio" name="field_${f.id}" value="${o}" ${(f.required || f.isRequired) && index === 0 ? 'checked' : ''} onchange="recalculateTotalAmount()" />
                   <span>${o}</span>
                 </label>
               `;
@@ -1252,7 +1423,7 @@
             (f.options || []).forEach(o => {
               listHtml += `
                 <label class="option-row">
-                  <input type="checkbox" name="field_${f.id}" value="${o}" />
+                  <input type="checkbox" name="field_${f.id}" value="${o}" onchange="recalculateTotalAmount()" />
                   <span>${o}</span>
                 </label>
               `;
@@ -1290,6 +1461,72 @@
       }
     }
 
+    function selectDonationTier(fId, price, btnEl) {
+      const inp = document.getElementById(`donation-custom-${fId}`);
+      if (inp) {
+        inp.value = price > 0 ? price : '';
+      }
+      if (btnEl && btnEl.parentElement) {
+        btnEl.parentElement.querySelectorAll('.tier-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.style.borderColor = 'var(--border)';
+          c.style.background = '#fff';
+          c.style.color = 'var(--text-dark)';
+        });
+        btnEl.classList.add('selected');
+        btnEl.style.borderColor = 'var(--primary)';
+        btnEl.style.background = 'rgba(93, 69, 255, 0.08)';
+        btnEl.style.color = 'var(--primary)';
+      }
+      recalculateTotalAmount();
+    }
+
+    function onCustomDonationInput(fId) {
+      const inp = document.getElementById(`donation-custom-${fId}`);
+      const chipsParent = inp?.parentElement?.querySelector('.donation-tier-chips');
+      if (chipsParent) {
+        chipsParent.querySelectorAll('.tier-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.style.borderColor = 'var(--border)';
+          c.style.background = '#fff';
+          c.style.color = 'var(--text-dark)';
+        });
+      }
+      recalculateTotalAmount();
+    }
+
+    function extractOptionPrice(val) {
+      if (!val) return 0;
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      const str = String(val).trim();
+      if (!str) return 0;
+      // Match prefix: ৳500, BDT 1500, Tk. 2000
+      let m = str.match(/(?:৳|BDT|TK\.?|Tk\.?)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Match suffix: 500৳, 1500 BDT, 2000 Tk
+      m = str.match(/([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:৳|BDT|TK\.?|Tk\.?)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Match parentheses: (৳1500) or (1500)
+      m = str.match(/\(\s*(?:৳|BDT|TK\.?|Tk\.?)?\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:৳|BDT|TK\.?|Tk\.?)?\s*\)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Standalone number
+      const clean = str.replace(/,/g, '');
+      if (/^[0-9]+(?:\.[0-9]{1,2})?$/.test(clean)) {
+        const n = parseFloat(clean);
+        if (!isNaN(n) && n > 0) return n;
+      }
+      return 0;
+    }
+
     function toggleProductSelection(id, isSelected) {
       if (selectedProductsMap[id]) {
         selectedProductsMap[id].selected = isSelected;
@@ -1311,34 +1548,72 @@
     function recalculateTotalAmount() {
       let total = 0;
 
-      // Sum selected product blocks
+      // 1. Sum selected product blocks
       Object.values(selectedProductsMap).forEach(prod => {
         if (prod.selected) {
-          total += (prod.price * prod.qty);
+          total += (prod.price * (prod.qty || 1));
         }
       });
 
-      // Add custom amount if filled
+      // 2. Add custom amount if filled
       const customAmountInp = document.getElementById("custom-amount-input");
       if (customAmountInp && customAmountInp.value) {
         const cVal = parseFloat(customAmountInp.value);
         if (!isNaN(cVal) && cVal > 0) total += cVal;
       }
 
-      // If neither product blocks nor custom amount is present, use baseFormAmount
+      // 3. Add donation amounts if present
+      document.querySelectorAll('input[id^="donation-custom-"]').forEach(inp => {
+        if (inp && inp.value) {
+          const dVal = parseFloat(inp.value);
+          if (!isNaN(dVal) && dVal > 0) total += dVal;
+        }
+      });
+
+      // 4. Add selected radio button prices
+      document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+        const optVal = radio.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // 5. Add select dropdown option prices
+      document.querySelectorAll('select[data-field-id]').forEach(select => {
+        const optVal = select.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // 6. Add selected checkboxes prices
+      document.querySelectorAll('input[type="checkbox"][name^="field_"]:checked').forEach(chk => {
+        const optVal = chk.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // Fallback to baseFormAmount if neither products nor options nor custom amount had prices
       if (total === 0 && Object.keys(selectedProductsMap).length === 0 && !customAmountInp) {
         total = baseFormAmount;
+      }
+
+      // Quantity multiplier if present
+      const qtyInp = document.querySelector('input[data-field-type="QUANTITY"]');
+      if (qtyInp && qtyInp.value && total > 0) {
+        const q = parseInt(qtyInp.value, 10);
+        if (!isNaN(q) && q > 1 && Object.keys(selectedProductsMap).length === 0) {
+          total = total * q;
+        }
       }
 
       const methodSec = document.getElementById("method-section");
       const btnText = document.getElementById("btn-text");
 
       if (isPaymentEnabled && total > 0) {
-        methodSec.style.display = "flex";
-        btnText.innerText = `Proceed to Pay • BDT ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        if (methodSec) methodSec.style.display = "flex";
+        if (btnText) btnText.innerText = `Proceed to Pay • BDT ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
       } else {
-        methodSec.style.display = "none";
-        btnText.innerText = "Submit Response";
+        if (methodSec) methodSec.style.display = "none";
+        if (btnText) btnText.innerText = "Submit Response";
       }
 
       return total;
@@ -1517,10 +1792,13 @@
 
       // 1. Submit to Backend /v1/forms/:slugOrId/submit
       try {
+        const calculatedTotal = recalculateTotalAmount();
         const submitPayload = {
           customer_name: cusName,
           customer_phone: cusPhone,
           customer_email: cusEmail,
+          amount: calculatedTotal,
+          calculated_amount: calculatedTotal,
           selected_product_id: selectedProdId,
           quantity: selectedQty,
           selected_products: selectedProductsList,

@@ -53,21 +53,40 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       let merchantId = req.query.merchant_id || null
       const orderId = req.query.order_id || null
 
-      // If merchant_id is missing but order_id is present, resolve merchant_id from order/events
+      // If merchant_id is missing but order_id is present, resolve merchant_id from order/events/forms
       if (!merchantId && orderId && orderId !== 'demo_order_id') {
         try {
-          const { getAdminClient } = await import('../services/adminSupabase.js')
-          const admin = getAdminClient()
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
-          let q = admin.from('payment_events').select('merchant_id').limit(1)
-          if (isUuid) {
-            q = q.or(`order_id.eq.${orderId},tran_id.eq.${orderId}`)
-          } else {
-            q = q.eq('tran_id', orderId)
-          }
-          const { data: ev } = await q.maybeSingle()
-          if (ev?.merchant_id) merchantId = ev.merchant_id
+          const { orderToFormSubmissionMap } = await import('./form.js')
+          const mapEntry = orderToFormSubmissionMap.get(orderId) || orderToFormSubmissionMap.get(String(orderId).toLowerCase())
+          if (mapEntry?.merchant_id) merchantId = mapEntry.merchant_id
         } catch (_) {}
+
+        if (!merchantId) {
+          try {
+            const { getAdminClient } = await import('../services/adminSupabase.js')
+            const admin = getAdminClient()
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
+            let q = admin.from('payment_events').select('merchant_id').limit(1)
+            if (isUuid) {
+              q = q.or(`order_id.eq.${orderId},tran_id.eq.${orderId}`)
+            } else {
+              q = q.eq('tran_id', orderId)
+            }
+            const { data: ev } = await q.maybeSingle()
+            if (ev?.merchant_id) merchantId = ev.merchant_id
+
+            if (!merchantId) {
+              let oq = admin.from('orders').select('merchant_id').limit(1)
+              if (isUuid) {
+                oq = oq.or(`id.eq.${orderId},tran_id.eq.${orderId}`)
+              } else {
+                oq = oq.eq('tran_id', orderId)
+              }
+              const { data: ord } = await oq.maybeSingle()
+              if (ord?.merchant_id) merchantId = ord.merchant_id
+            }
+          } catch (_) {}
+        }
       }
 
       const config = await getMerchantGatewayConfig(merchantId, heartbeatMap)
@@ -403,6 +422,10 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
             payment_method: payment_method || matchedEvents[0].payment_method,
             amount: matchedEvents[0].amount
           })
+          try {
+            const { handleFormPaymentPaid } = await import('./form.js')
+            await handleFormPaymentPaid(order_id, cleanTrx, matchedEvents[0].amount, io)
+          } catch (_) {}
           io.to(`order:${order_id}`).emit('payment_status', {
             order_id,
             status: 'PAID',
@@ -512,6 +535,16 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         console.log(`[payment/verify] 🌟 Platform subscription auto-activated for merchant ${merchant_id} (order: ${order_id})`, subResult?.subscription_plan)
       } catch (subErr) {
         console.warn(`[payment/verify] Subscription auto-activation notice:`, subErr.message)
+      }
+    }
+
+    // ── Auto-update Form Submission if this was a hosted form order ──
+    if (status === 'PAID') {
+      try {
+        const { handleFormPaymentPaid } = await import('./form.js')
+        await handleFormPaymentPaid(order_id || tran_id, trx_id || tran_id, amount, io)
+      } catch (formPaidErr) {
+        console.warn('[payment/verify] Form submission update notice:', formPaidErr.message)
       }
     }
 

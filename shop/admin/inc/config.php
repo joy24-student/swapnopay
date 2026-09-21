@@ -18,18 +18,49 @@ if ($runtimeRoot) {
     // Hosted checkout supports COD until provider verification and reconciliation
     // are integrated. Legacy callback URLs must not create or mark payments.
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-    if (preg_match('~^/payment/(?!cod/)[^/]+/~i', $requestPath)) {
+    if (preg_match('~/(?:^|[a-z0-9-]+/)payment/(?!cod/)[^/]+/~i', $requestPath)) {
         http_response_code(503); exit('Online payments are not configured for this store. Please use cash on delivery.');
     }
-    if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     $host = strtolower($_SERVER['HTTP_HOST'] ?? '');
+    if (str_contains($host, ':')) {
+        $host = explode(':', $host, 2)[0];
+    }
     if (!preg_match('/\A[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\z/', $host)) {
         http_response_code(404); exit('Store not found.');
     }
     $file = rtrim($runtimeRoot, '/\\') . '/hosts/' . $host . '.json';
     $runtime = is_file($file) ? json_decode(file_get_contents($file), true) : null;
+
+    // Fallback: path-based tenant lookup (e.g. https://shop.swapnopay.top/<slug>/...)
+    if (!$runtime) {
+        $pathTrimmed = trim($requestPath, '/');
+        $segments = explode('/', $pathTrimmed);
+        $candidateSlug = !empty($segments[0]) ? strtolower($segments[0]) : '';
+        if ($candidateSlug && preg_match('/\A[a-z0-9](?:[a-z0-9-]{1,46})[a-z0-9]\z/', $candidateSlug)) {
+            $slugFile = rtrim($runtimeRoot, '/\\') . '/hosts/' . $candidateSlug . '.json';
+            if (!is_file($slugFile)) {
+                $slugFile = rtrim($runtimeRoot, '/\\') . '/slugs/' . $candidateSlug . '.json';
+            }
+            if (is_file($slugFile)) {
+                $runtime = json_decode(file_get_contents($slugFile), true);
+                if ($runtime) {
+                    $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $port = (!empty($_SERVER['SERVER_PORT']) && !in_array((int)$_SERVER['SERVER_PORT'], [80, 443], true)) ? ':' . $_SERVER['SERVER_PORT'] : '';
+                    $runtime['base_url'] = $proto . '://' . $host . $port . '/' . $candidateSlug . '/';
+                }
+            }
+        }
+    }
+
     if (!$runtime || empty($runtime['merchant_id']) || empty($runtime['db'])) {
         http_response_code(404); exit('Store not found.');
+    }
+
+    // Tenant-isolated session
+    $sessionCookieName = 'SP_SESS_' . substr(md5($runtime['merchant_id']), 0, 12);
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_name($sessionCookieName);
+        session_start();
     }
     // Bind authentication to the store even if someone supplies a session ID
     // originally created on a different tenant's hostname.
