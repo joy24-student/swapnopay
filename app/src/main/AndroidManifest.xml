@@ -66,6 +66,10 @@
                 <data android:scheme="swapnopay" android:host="auth-callback" />
                 <data android:scheme="swapnopay" android:host="supabase-oauth-callback" />
                 <data android:scheme="swapnopay" android:host="supabase-connected" />
+                <!-- Hosted subscription checkout returns here if Android restores
+                     the app from a payment callback. In-WebView callbacks are
+                     intercepted before an external app/browser is invoked. -->
+                <data android:scheme="swapnopay" android:host="subscription-callback" />
                 <data android:scheme="lenden23" android:host="auth-callback" />
             </intent-filter>
 

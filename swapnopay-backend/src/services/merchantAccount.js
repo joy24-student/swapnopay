@@ -51,6 +51,25 @@ export async function lookupMerchantInAdminDb(email, userId, admin = getAdminCli
   const name = merchant?.business_name || gateway?.merchant_name || ''
   const placeholder = /^(my store|my business|google user|facebook user|demo store|business setup required)$/i.test(name.trim())
   const onboarded = Boolean(merchant?.onboarded_at || own || (name.trim() && !placeholder && merchant?.phone))
+  const hasValidName = Boolean(name.trim() && !placeholder)
+  const onboarded = Boolean(
+    merchant?.onboarded_at ||
+    own ||
+    (merchant?.status === 'ACTIVE' && hasValidName) ||
+    (hasValidName && (merchant?.phone || merchant?.email))
+  )
+  if (onboarded && merchant && !merchant.onboarded_at) {
+    try {
+      const query = admin.from('merchants')
+      if (typeof query.update === 'function') {
+        const chain = query.update({ onboarded_at: new Date().toISOString() })
+        if (chain && typeof chain.eq === 'function') {
+          const req = chain.eq('id', merchant.id)
+          if (req && typeof req.catch === 'function') req.catch(() => {})
+        }
+      }
+    } catch (_) {}
+  }
 
   let kycStatus = merchant?.kyc_status || 'UNVERIFIED'
   let nidNumber = merchant?.nid_number || ''

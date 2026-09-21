@@ -947,6 +947,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (account != null) {
                     applyRestoredMerchantSetup(account)
                     setOnboarded(account.isOnboarded)
+                    val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
+                    setOnboarded(isEffectivelyOnboarded)
                     syncPinFromCloud()
                 } else {
                     // Fallback to local profile if offline or server temporarily unavailable
@@ -2431,9 +2433,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 setOnboarded(account.isOnboarded)
+                val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
+                setOnboarded(isEffectivelyOnboarded)
                 // Sync PIN hash from Supabase (cloud-synced PIN system)
                 syncPinFromCloud()
                 navigateTo(if (!account.isOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
+                navigateTo(if (!isEffectivelyOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
                 onSuccess()
             } catch (error: Exception) {
                 _authError.value = error.message
@@ -2656,6 +2661,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         val host = uri.host
         val path = uri.path ?: ""
+        if (host == "subscription-callback") {
+            // This is normally intercepted by the in-app checkout WebView. Keep
+            // a deep-link fallback for process recreation or a gateway redirect
+            // that reaches Android directly.
+            fetchSubscriptionStatus()
+            fetchSubscriptionHistory()
+            navigateTo("Subscription")
+            return
+        }
         if (host == "supabase-connected" || path.contains("supabase-connected")) {
             val txId = uri.getQueryParameter("tx_id")
             if (!txId.isNullOrBlank()) {
@@ -2827,10 +2841,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 saveEncryptedSessionToken(userEmail, authUserId, "Supabase OAuth")
                 securityPrefs.edit().remove("supabase_pkce_verifier").apply()
                 setOnboarded(account.isOnboarded)
+                val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
+                setOnboarded(isEffectivelyOnboarded)
                 syncPinFromCloud()
                 _isAuthenticating.value = false
                 _authError.value = null
                 navigateTo(if (!account.isOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
+                navigateTo(if (!isEffectivelyOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
 
             }
         } else {
@@ -9792,6 +9809,7 @@ function executePayment() {
             try {
                 repository.checkoutPosSale(sale, movements, creditEntry)
             } catch (e: Exception) {
+                onError(e.message
                 onError(e.message ?: "Checkout failed; no partial stock change was committed")
                 return@launch
             }

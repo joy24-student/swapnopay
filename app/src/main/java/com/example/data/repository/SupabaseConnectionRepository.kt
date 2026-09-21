@@ -60,6 +60,8 @@ object SupabaseConnectionRepository {
 
         // Direct Supabase OAuth 2.0 PKCE Authorize fallback URL
         val directAuthorizeUrl = "https://api.supabase.com/v1/oauth/authorize?client_id=5d3dcd9b-1acf-4e31-96d2-d673af42a18b&redirect_uri=https://api.swapnopay.top/v1/oauth/callback&response_type=code"
+        val fallbackState = java.util.UUID.randomUUID().toString().replace("-", "")
+        val directAuthorizeUrl = "https://api.supabase.com/v1/oauth/authorize?client_id=5d3dcd9b-1acf-4e31-96d2-d673af42a18b&redirect_uri=https://api.swapnopay.top/v1/oauth/callback&response_type=code&state=$fallbackState"
         onSuccess(directAuthorizeUrl)
     }
 

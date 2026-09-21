@@ -21,6 +21,10 @@ function getOAuthCredentials() {
   return { clientId, clientSecret, redirectUri }
 }
 
+// In-memory fallback caches (ensure reliability if RLS policy limits DB direct writes)
+const oauthTxCache = new Map()
+const connectionsCache = new Map()
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers: PKCE & State
 // ──────────────────────────────────────────────────────────────────────────────
@@ -56,6 +60,16 @@ async function getValidAccessToken(userId, txId) {
 
   // 1. Lookup by user_id
   if (userId) {
+  // 1. Lookup in-memory cache
+  if (userId && connectionsCache.has(userId)) {
+    conn = connectionsCache.get(userId)
+  }
+  if (!conn && txId && connectionsCache.has(txId)) {
+    conn = connectionsCache.get(txId)
+  }
+
+  // 2. Lookup by user_id in DB
+  if (!conn && userId) {
     const { data } = await admin
       .from('supabase_connections')
       .select('*')
@@ -65,6 +79,7 @@ async function getValidAccessToken(userId, txId) {
   }
 
   // 2. Lookup by tx_id via control_oauth_transactions
+  // 3. Lookup by tx_id via control_oauth_transactions
   if (!conn && (txId || (userId && userId.includes('-')))) {
     const lookupId = txId || userId
     const { data: tx } = await admin
@@ -77,8 +92,27 @@ async function getValidAccessToken(userId, txId) {
         .from('supabase_connections')
         .select('*')
         .eq('user_id', tx.user_id)
+    const cachedTx = oauthTxCache.get(lookupId)
+    const matchedUserId = cachedTx?.user_id
+    if (matchedUserId && connectionsCache.has(matchedUserId)) {
+      conn = connectionsCache.get(matchedUserId)
+    }
+
+    if (!conn) {
+      const { data: tx } = await admin
+        .from('control_oauth_transactions')
+        .select('user_id')
+        .eq('id', lookupId)
         .maybeSingle()
       if (data) conn = data
+      if (tx?.user_id) {
+        const { data } = await admin
+          .from('supabase_connections')
+          .select('*')
+          .eq('user_id', tx.user_id)
+          .maybeSingle()
+        if (data) conn = data
+      }
     }
   }
 
@@ -146,10 +180,14 @@ async function handleOAuthStart(req, res) {
     const stateHash = hashState(rawState)
 
     // 2. Save into control_oauth_transactions
+    // 2. Save into cache & control_oauth_transactions
     const admin = getAdminClient()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 mins
 
     const { error: dbError } = await admin.from('control_oauth_transactions').insert({
+    const txId = crypto.randomUUID()
+    const txData = {
+      id: txId,
       user_id: userId,
       state_hash: stateHash,
       pkce_verifier_encrypted: codeVerifier,
@@ -157,10 +195,29 @@ async function handleOAuthStart(req, res) {
       consumed: false,
       expires_at: expiresAt,
     })
+      created_at: new Date().toISOString()
+    }
+    oauthTxCache.set(stateHash, txData)
+    oauthTxCache.set(txId, txData)
 
     if (dbError) {
       console.error('[oauth-start] DB Save Error:', dbError)
       return res.status(500).json({ error: 'Failed to initialize OAuth transaction' })
+    try {
+      const { error: dbError } = await admin.from('control_oauth_transactions').insert({
+        id: txData.id,
+        user_id: userId,
+        state_hash: stateHash,
+        pkce_verifier_encrypted: codeVerifier,
+        redirect_back: redirectBack || null,
+        consumed: false,
+        expires_at: expiresAt,
+      })
+      if (dbError) {
+        console.warn('[oauth-start] DB Save Warning (continuing with in-memory transaction):', dbError.message)
+      }
+    } catch (dbErr) {
+      console.warn('[oauth-start] DB Exception (continuing with in-memory transaction):', dbErr.message)
     }
 
     // 3. Construct Supabase Authorization URL
@@ -207,13 +264,53 @@ async function handleOAuthCallback(req, res) {
   }
 
   if (!code || !rawState) {
+  if (!code) {
     return res.status(400).send(`
       <!DOCTYPE html><html><body style="font-family:system-ui;text-align:center;padding:50px;background:#0f172a;color:#f8fafc;">
         <div style="background:#1e293b;max-width:440px;margin:0 auto;padding:32px;border-radius:16px;border:1px solid #eab308;">
           <h2 style="color:#eab308;">Authorization Incomplete</h2>
           <p style="color:#94a3b8;">Missing authorization code or state parameter.</p>
+          <p style="color:#94a3b8;">Missing authorization code from Supabase.</p>
         </div>
       </body></html>
+    `)
+  }
+
+  // If code is present but state parameter was omitted by client/fallback, deep link directly into the app
+  if (code && !rawState) {
+    console.warn('[oauth-callback] Code received without state parameter. Forwarding to app deep link directly.')
+    const directAppDeepLink = `swapnopay://supabase-oauth-callback?code=${encodeURIComponent(code)}`
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="utf-8">
+          <title>Authorization Approved | SwapnoPay</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+              body { font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #0b0f19; color: #f8fafc; }
+              .card { background: #111827; max-width: 440px; margin: 40px auto; padding: 36px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border: 1px solid #1f2937; }
+              .icon { font-size: 52px; margin-bottom: 16px; }
+              .title { color: #10b981; font-size: 22px; font-weight: 700; margin: 0 0 10px 0; }
+              .desc { color: #94a3b8; font-size: 14px; line-height: 1.5; margin-bottom: 24px; }
+              .btn { display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(16,185,129,0.4); }
+          </style>
+      </head>
+      <body>
+          <div class="card">
+              <div class="icon">⚡</div>
+              <h2 class="title">Supabase Authorized!</h2>
+              <p class="desc">Your authorization has been granted. Returning to SwapnoPay application...</p>
+              <a class="btn" href="${directAppDeepLink}">Return to Application</a>
+          </div>
+          <script>
+              window.location.href = "${directAppDeepLink}";
+              setTimeout(function() {
+                  window.location.href = "${directAppDeepLink}";
+              }, 400);
+          </script>
+      </body>
+      </html>
     `)
   }
 
@@ -228,9 +325,24 @@ async function handleOAuthCallback(req, res) {
       .eq('state_hash', stateHash)
       .eq('consumed', false)
       .single()
+    // 1. Lookup transaction in memory first, then DB
+    let tx = oauthTxCache.get(stateHash) || null
+    if (!tx) {
+      try {
+        const { data: dbTx } = await admin
+          .from('control_oauth_transactions')
+          .select('*')
+          .eq('state_hash', stateHash)
+          .eq('consumed', false)
+          .maybeSingle()
+        if (dbTx) tx = dbTx
+      } catch (_) {}
+    }
 
     if (txError || !tx) {
       console.warn('[oauth-callback] Transaction not matched in DB. Forwarding code to app deep link:', rawState)
+    if (!tx) {
+      console.warn('[oauth-callback] Transaction not matched in cache or DB. Forwarding code to app deep link:', rawState)
       if (code) {
         const directAppDeepLink = `swapnopay://supabase-oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(rawState || '')}`
         return res.send(`
@@ -292,6 +404,14 @@ async function handleOAuthCallback(req, res) {
       .from('control_oauth_transactions')
       .update({ consumed: true })
       .eq('id', tx.id)
+    // 2. Mark consumed in memory and DB
+    tx.consumed = true
+    try {
+      await admin
+        .from('control_oauth_transactions')
+        .update({ consumed: true })
+        .eq('id', tx.id)
+    } catch (_) {}
 
     // 3. Server-to-Server Token Exchange
     const { clientId, clientSecret, redirectUri } = getOAuthCredentials()
@@ -302,6 +422,9 @@ async function handleOAuthCallback(req, res) {
     tokenParams.append('code', code)
     tokenParams.append('redirect_uri', redirectUri)
     tokenParams.append('code_verifier', tx.pkce_verifier_encrypted)
+    if (tx.pkce_verifier_encrypted) {
+      tokenParams.append('code_verifier', tx.pkce_verifier_encrypted)
+    }
 
     const tokenResponse = await fetch('https://api.supabase.com/v1/oauth/token', {
       method: 'POST',
@@ -326,6 +449,7 @@ async function handleOAuthCallback(req, res) {
     }
 
     // 4. Save tokens to supabase_connections table
+    // 4. Save tokens to memory cache and supabase_connections table
     const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString()
     await admin.from('supabase_connections').upsert(
       {
@@ -339,6 +463,23 @@ async function handleOAuthCallback(req, res) {
       },
       { onConflict: 'user_id' }
     )
+    const connRecord = {
+      user_id: tx.user_id,
+      encrypted_access_token: tokenData.access_token,
+      encrypted_refresh_token: tokenData.refresh_token || '',
+      access_token_expires_at: expiresAt,
+      connection_status: 'CONNECTED',
+      provisioning_status: 'ACCOUNT_CONNECTED',
+      updated_at: new Date().toISOString(),
+    }
+    connectionsCache.set(tx.user_id, connRecord)
+    connectionsCache.set(tx.id, connRecord)
+
+    try {
+      await admin.from('supabase_connections').upsert(connRecord, { onConflict: 'user_id' })
+    } catch (connErr) {
+      console.warn('[oauth-callback] Connection DB upsert notice (persisted in-memory):', connErr.message)
+    }
 
     // 5. Determine Redirect Target
     const deepLink = `swapnopay://supabase-connected?tx_id=${tx.id}`
@@ -587,6 +728,8 @@ async function handleSyncMerchantSetup(req, res) {
         business_type: business_type || 'Retail Store',
         website: website || '',
         photo_url: photo_url || '',
+        status: 'ACTIVE',
+        onboarded_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
       if (req.body?.pin_hash) {

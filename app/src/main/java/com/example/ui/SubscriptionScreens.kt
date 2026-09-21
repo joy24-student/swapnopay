@@ -34,9 +34,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import android.widget.Toast
-import android.content.Intent
-import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
 // ── Models for Subscription, Dynamic Pricing & Billing ──
 
@@ -131,18 +133,13 @@ fun SubscriptionScreen(
 
     // Modals and dialog states
     var showManagePlanSheet by remember { mutableStateOf(false) }
-    var showCheckoutDialog by remember { mutableStateOf(false) }
     var showFullHistorySheet by remember { mutableStateOf(false) }
     var showReceiptDialog by remember { mutableStateOf(false) }
     var showDowngradeConfirmDialog by remember { mutableStateOf(false) }
 
-    var selectedPlanForCheckout by remember { mutableStateOf<SubscriptionPlanUi?>(null) }
     var activeCheckoutOrder by remember { mutableStateOf<SubscriptionCheckoutState?>(null) }
     var selectedReceiptItem by remember { mutableStateOf<SubscriptionPaymentHistoryItem?>(null) }
 
-    var isVerifyingTrx by remember { mutableStateOf(false) }
-    var userEnteredTrxId by remember { mutableStateOf("") }
-    var selectedMethod by remember { mutableStateOf("bKash") }
     var successCelebrationMsg by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -150,9 +147,11 @@ fun SubscriptionScreen(
         viewModel.fetchSubscriptionHistory()
     }
 
-    // Dynamic Plans List matching the reference design: Free Plan, Pro Plan (Most Popular), Business Plan
+    // Gateway plan values must match the backend's immutable price catalog.
+    // Do not label a quarterly charge as a monthly "Business" subscription.
     val proPrice = if (subStatus.monthlyPrice > 0) subStatus.monthlyPrice.toInt() else 299
-    val plans = remember(proPrice) {
+    val quarterlyPrice = if (subStatus.quarterlyPrice > 0) subStatus.quarterlyPrice.toInt() else 799
+    val plans = remember(proPrice, quarterlyPrice) {
         listOf(
             SubscriptionPlanUi(
                 planKey = "FREE",
@@ -168,8 +167,8 @@ fun SubscriptionScreen(
                 iconType = "crown"
             ),
             SubscriptionPlanUi(
-                planKey = "PRO",
-                title = "Pro Plan",
+                planKey = "MONTHLY",
+                title = "Monthly Plan",
                 priceBdt = proPrice,
                 billingCycle = "/ month",
                 features = listOf(
@@ -182,12 +181,12 @@ fun SubscriptionScreen(
                 iconType = "crown"
             ),
             SubscriptionPlanUi(
-                planKey = "BUSINESS",
-                title = "Business Plan",
-                priceBdt = 799,
-                billingCycle = "/ month",
+                planKey = "QUARTERLY",
+                title = "Quarterly Plan",
+                priceBdt = quarterlyPrice,
+                billingCycle = "/ 3 months",
                 features = listOf(
-                    "All Pro features",
+                    "All Monthly features",
                     "Team collaboration",
                     "API access",
                     "Dedicated support"
@@ -292,6 +291,33 @@ fun SubscriptionScreen(
         } else {
             "Renews on Apr 15, 2026"
         }
+    }
+
+    // The gateway is a real hosted checkout, not an instructional payment dialog.
+    // Keep it inside the app and only update local subscription state after the
+    // gateway redirects to the app callback with its final status.
+    activeCheckoutOrder?.let { order ->
+        SubscriptionGatewayCheckoutScreen(
+            checkoutUrl = order.checkoutUrl.orEmpty(),
+            onClose = { activeCheckoutOrder = null },
+            onPaymentReturn = { status ->
+                activeCheckoutOrder = null
+                viewModel.fetchSubscriptionStatus()
+                viewModel.fetchSubscriptionHistory()
+                when (status.uppercase()) {
+                    "PAID", "SUCCESS", "COMPLETED" -> {
+                        successCelebrationMsg = "Payment confirmed. Your subscription has been updated."
+                    }
+                    "CANCELLED", "CANCELED" -> {
+                        Toast.makeText(context, "Payment was cancelled.", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        Toast.makeText(context, "Payment was not completed. You can try again.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        )
+        return
     }
 
     // Standalone scaffold without bottom navigation bar
@@ -685,7 +711,7 @@ fun SubscriptionScreen(
                                             color = if (isDark) Color.White else Color(0xFF0F172A)
                                         )
                                         Text(
-                                            text = " / month",
+                                            text = " ${plan.billingCycle}",
                                             fontSize = 12.5.sp,
                                             color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
                                             modifier = Modifier.padding(bottom = 2.dp)
@@ -741,17 +767,16 @@ fun SubscriptionScreen(
                                                 }
                                             }
                                         }
-                                        plan.planKey == "PRO" -> {
+                                        plan.planKey == "MONTHLY" -> {
                                             Button(
                                                 onClick = {
-                                                    selectedPlanForCheckout = plan
                                                     viewModel.checkoutSubscription(
-                                                        planType = "PRO",
-                                                        paymentMethod = selectedMethod
+                                                        // Gateway plan keys are deliberately server-side values; a
+                                                        // merchant cannot change the billed amount in the WebView URL.
+                                                        planType = "MONTHLY"
                                                     ) { success, checkoutState, err ->
                                                         if (success && checkoutState != null) {
                                                             activeCheckoutOrder = checkoutState
-                                                            showCheckoutDialog = true
                                                         } else {
                                                             Toast.makeText(context, err ?: "চেকআউট শুরু করতে ব্যর্থ হয়েছে", Toast.LENGTH_LONG).show()
                                                         }
@@ -778,14 +803,11 @@ fun SubscriptionScreen(
                                             // Business Plan
                                             OutlinedButton(
                                                 onClick = {
-                                                    selectedPlanForCheckout = plan
                                                     viewModel.checkoutSubscription(
-                                                        planType = "BUSINESS",
-                                                        paymentMethod = selectedMethod
+                                                        planType = "QUARTERLY"
                                                     ) { success, checkoutState, err ->
                                                         if (success && checkoutState != null) {
                                                             activeCheckoutOrder = checkoutState
-                                                            showCheckoutDialog = true
                                                         } else {
                                                             Toast.makeText(context, err ?: "চেকআউট শুরু করতে ব্যর্থ হয়েছে", Toast.LENGTH_LONG).show()
                                                         }
@@ -1169,6 +1191,9 @@ fun SubscriptionScreen(
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    /* Removed manual checkout modal. Hosted checkout is rendered by
+       SubscriptionGatewayCheckoutScreen above, inside this app. */
+    /*
     // 3. UPGRADE / CHECKOUT MODAL DIALOG
     // ──────────────────────────────────────────────────────────────────────────
     if (showCheckoutDialog && activeCheckoutOrder != null) {
@@ -1393,6 +1418,7 @@ fun SubscriptionScreen(
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    */
     // 4. VIEW ALL HISTORY SHEET MODAL
     // ──────────────────────────────────────────────────────────────────────────
     if (showFullHistorySheet) {
@@ -1611,6 +1637,96 @@ fun SubscriptionScreen(
                     Text("Awesome", fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
                 }
             }
+        )
+    }
+}
+
+/**
+ * SwapnoPay hosted checkout in an app-owned WebView.
+ *
+ * Merchant credentials and price calculation stay on the backend. The app only
+ * receives the signed/order-bound checkout URL and intercepts its own callback;
+ * regular HTTPS gateway pages never leave the app for a browser.
+ */
+@Composable
+private fun SubscriptionGatewayCheckoutScreen(
+    checkoutUrl: String,
+    onClose: () -> Unit,
+    onPaymentReturn: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var canGoBack by remember { mutableStateOf(false) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+
+    androidx.activity.compose.BackHandler(enabled = canGoBack) {
+        webView?.goBack()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webView?.stopLoading()
+            webView?.destroy()
+        }
+    }
+
+    Scaffold(
+        containerColor = Color.White,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("SwapnoPay secure payment", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text("Complete payment without leaving the app", fontSize = 11.sp, color = Color(0xFF64748B))
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel payment")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (checkoutUrl.isBlank()) {
+            LaunchedEffect(Unit) {
+                Toast.makeText(context, "Secure checkout link was unavailable. Please try again.", Toast.LENGTH_LONG).show()
+                onClose()
+            }
+            return@Scaffold
+        }
+
+        AndroidView(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    webView = this
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.javaScriptCanOpenWindowsAutomatically = false
+                    settings.setSupportMultipleWindows(false)
+                    settings.allowFileAccess = false
+                    settings.allowContentAccess = false
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                            val target = request.url
+                            if (request.isForMainFrame && target.scheme == "swapnopay" && target.host == "subscription-callback") {
+                                onPaymentReturn(target.getQueryParameter("status") ?: "UNKNOWN")
+                                return true
+                            }
+                            // Hosted checkout may navigate between HTTPS pages. Do not hand it to an external browser.
+                            return target.scheme != "https" && target.scheme != "http"
+                        }
+
+                        override fun onPageFinished(view: WebView, url: String) {
+                            canGoBack = view.canGoBack()
+                            super.onPageFinished(view, url)
+                        }
+                    }
+                    loadUrl(checkoutUrl)
+                }
+            },
+            update = { webView = it }
         )
     }
 }

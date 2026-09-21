@@ -711,8 +711,12 @@ function connectSwapnoPaySocket(url, orderIdParam) {
       if (status === 'PAID') {
         paymentResolved = true;
         showSuccessScreen(data);
-        if (redirect_url) {
-          setTimeout(() => { window.location.href = redirect_url; }, 4000);
+        // Subscription orders receive their app callback in the checkout URL.
+        // The normal payment verifier may not have a merchant-store order from
+        // which to reconstruct redirect_url, so preserve that supplied callback.
+        const target = redirect_url || successUrl;
+        if (target && target !== '/') {
+          setTimeout(() => { window.location.href = target; }, 4000);
         }
       } else if (status === 'FAILED') {
         paymentResolved = true;
@@ -791,8 +795,9 @@ function startStatusPolling() {
           clearInterval(pollingInterval);
           pollingInterval = null;
           showSuccessScreen(data.order || data);
-          if (data.redirect_url) {
-            setTimeout(() => { window.location.href = data.redirect_url; }, 3000);
+          const target = data.redirect_url || successUrl;
+          if (target && target !== '/') {
+            setTimeout(() => { window.location.href = target; }, 3000);
           }
         } else if (data.status === 'CANCELLED') {
           paymentResolved = true;
@@ -1185,8 +1190,9 @@ function handleTransferred() {
           paymentResolved = true;
           if (pollingInterval) clearInterval(pollingInterval);
           showSuccessScreen(data);
-          if (data.redirect_url) {
-            setTimeout(() => { window.location.href = data.redirect_url; }, 3000);
+          const target = data.redirect_url || successUrl;
+          if (target && target !== '/') {
+            setTimeout(() => { window.location.href = target; }, 3000);
           }
         }
       })
