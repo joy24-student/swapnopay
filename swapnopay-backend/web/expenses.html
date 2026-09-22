@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expenditure & Expense Ledger — SwapnoPay</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              purple: '#5030E5',
+              lightPurple: '#F0EDFF',
+              green: '#22C55E',
+              lightGreen: '#DCFCE7',
+              red: '#EF4444',
+              orange: '#F97316',
+              blue: '#3B82F6',
+              gray: {
+                50: '#F9FAFB',
+                100: '#F3F4F6',
+                200: '#E5E7EB',
+                300: '#D1D5DB',
+                400: '#9CA3AF',
+                500: '#6B7280',
+                600: '#4B5563',
+                700: '#374151',
+                800: '#1F2937',
+                900: '#111827',
+              }
+            }
+          },
+          boxShadow: {
+            'custom-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            'custom': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    
+    progress::-webkit-progress-bar {
+      background-color: #E5E7EB;
+      border-radius: 9999px;
+    }
+    progress::-webkit-progress-value {
+      border-radius: 9999px;
+    }
+    progress.progress-green::-webkit-progress-value { background-color: #22C55E; }
+    progress.progress-blue::-webkit-progress-value { background-color: #3B82F6; }
+    progress.progress-orange::-webkit-progress-value { background-color: #F97316; }
+    progress.progress-purple::-webkit-progress-value { background-color: #8B5CF6; }
+
+    /* Bottom Sheet Slide Up Animations & Gestures */
+    .bottom-sheet {
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bottom-sheet.closed {
+      transform: translateY(100%);
+    }
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased max-w-md mx-auto relative min-h-screen pb-24 flex justify-center">
+
+  <!-- Outer wrapper for mobile simulator layout on desktop -->
+  <div class="w-full max-w-md bg-gray-50 min-h-screen shadow-2xl relative flex flex-col overflow-hidden pb-20">
+
+    <!-- BEGIN: Header -->
+    <header class="bg-white sticky top-0 z-10 pt-10 pb-4 px-4 shadow-custom-sm shrink-0">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <button onclick="window.location.href='portal.html'" class="p-2.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900 leading-tight">Expenditure</h1>
+            <p class="text-xs text-gray-500 font-medium">খরচ ও পরিচালনা হিসাব</p>
+          </div>
+        </div>
+        <button onclick="openAnalyticsModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-brand-lightPurple bg-brand-lightPurple text-brand-purple font-medium text-sm hover:bg-brand-purple hover:text-white transition-colors">
+          <i class="fa-solid fa-chart-simple"></i>
+          Analytics
+        </button>
+      </div>
+
+      <!-- Time Range Tabs -->
+      <div class="flex gap-2 overflow-x-auto hide-scrollbar py-1">
+        <button id="tab-today" onclick="selectTimeFilter('Today')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-purple text-white font-medium text-sm shrink-0 shadow-sm transition-all">
+          <i class="fa-regular fa-calendar-days"></i>
+          Today
+        </button>
+        <button id="tab-7days" onclick="selectTimeFilter('7 Days')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm shrink-0 hover:bg-gray-50 transition-all">
+          <i class="fa-regular fa-calendar-days text-gray-400"></i>
+          7 Days
+        </button>
+        <button id="tab-month" onclick="selectTimeFilter('This Month')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm shrink-0 hover:bg-gray-50 transition-all">
+          <i class="fa-regular fa-calendar-days text-gray-400"></i>
+          This Month
+        </button>
+        <button id="tab-custom" onclick="selectTimeFilter('Custom')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm shrink-0 hover:bg-gray-50 transition-all">
+          <i class="fa-solid fa-gear text-gray-400"></i>
+          Custom
+        </button>
+      </div>
+    </header>
+    <!-- END: Header -->
+
+    <!-- BEGIN: Main Content -->
+    <main class="p-4 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+
+      <!-- BEGIN: Summary Cards -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-brand-lightPurple rounded-2xl p-4 border border-[#E5E0FF] shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-brand-purple shadow-sm">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <span class="text-xs font-medium text-gray-600">Total Expenditure</span>
+          </div>
+          <div id="total-exp-value" class="text-xl font-bold text-brand-purple mb-1">৳ 14,850.00</div>
+          <div id="total-exp-count" class="text-xs text-gray-500">12 Transactions</div>
+        </div>
+
+        <div class="bg-brand-lightGreen rounded-2xl p-4 border border-[#BBF7D0] shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-brand-green shadow-sm">
+              <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+            <span class="text-xs font-medium text-gray-600">Expense-to-Revenue</span>
+          </div>
+          <div class="text-xl font-bold text-brand-green mb-1">12.4%</div>
+          <div class="text-xs text-gray-600 flex items-center gap-1">
+            Healthy Margin <div class="w-2 h-2 rounded-full bg-brand-green"></div>
+          </div>
+        </div>
+      </div>
+      <!-- END: Summary Cards -->
+
+      <!-- BEGIN: Monthly Budget Consumption -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-sm font-semibold text-gray-800">Monthly Budget Consumption</h3>
+          <button onclick="openBudgetModal()" class="text-xs font-medium text-brand-purple hover:bg-brand-lightPurple px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+            <i class="fa-solid fa-gear text-[10px]"></i> Edit
+          </button>
+        </div>
+        <div class="flex justify-between text-xs mb-2">
+          <span class="text-gray-500">Cap: <span id="budget-cap-text" class="font-semibold text-gray-800">৳ 50,000.00</span></span>
+          <span class="text-gray-500">Spent: <span id="budget-spent-text" class="font-semibold text-gray-800">৳ 14,850.00</span> (29.7%)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <progress id="budget-progress-bar" class="w-full h-2 progress-green" max="100" value="29.7"></progress>
+          <span id="budget-percentage-text" class="text-xs font-bold text-brand-green">29.7%</span>
+        </div>
+      </div>
+      <!-- END: Monthly Budget Consumption -->
+
+      <!-- BEGIN: Category Split -->
+      <section>
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-base font-semibold text-gray-800">Category Split</h3>
+          <button onclick="openCategoryModal()" class="text-xs font-medium text-brand-purple hover:bg-brand-lightPurple px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+            <i class="fa-solid fa-gear text-[10px]"></i> Edit
+          </button>
+        </div>
+        
+        <div id="category-split-container" class="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+          <!-- Category Card 1 -->
+          <div class="bg-white rounded-xl border border-gray-200 p-3 min-w-[140px] shadow-sm flex flex-col items-center shrink-0">
+            <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-2">
+              <i class="fa-solid fa-bolt text-lg"></i>
+            </div>
+            <span class="text-xs text-gray-600 mb-1">Utilities & Rent</span>
+            <span class="text-sm font-bold text-brand-purple mb-3">৳ 8,500.00</span>
+            <div class="w-full flex items-center gap-2">
+              <progress class="w-full h-1 progress-blue" max="100" value="57.2"></progress>
+              <span class="text-[10px] text-gray-500">57.2%</span>
+            </div>
+          </div>
+          <!-- Category Card 2 -->
+          <div class="bg-white rounded-xl border border-gray-200 p-3 min-w-[140px] shadow-sm flex flex-col items-center shrink-0">
+            <div class="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-2">
+              <i class="fa-solid fa-burger text-lg"></i>
+            </div>
+            <span class="text-xs text-gray-600 mb-1">Food & Refreshments</span>
+            <span class="text-sm font-bold text-gray-800 mb-3">৳ 3,200.00</span>
+            <div class="w-full flex items-center gap-2">
+              <progress class="w-full h-1 progress-orange" max="100" value="21.5"></progress>
+              <span class="text-[10px] text-gray-500">21.5%</span>
+            </div>
+          </div>
+          <!-- Category Card 3 -->
+          <div class="bg-white rounded-xl border border-gray-200 p-3 min-w-[140px] shadow-sm flex flex-col items-center shrink-0">
+            <div class="w-10 h-10 rounded-full bg-green-50 text-green-500 flex items-center justify-center mb-2">
+              <i class="fa-solid fa-car text-lg"></i>
+            </div>
+            <span class="text-xs text-gray-600 mb-1">Transportation</span>
+            <span class="text-sm font-bold text-gray-800 mb-3">৳ 1,800.00</span>
+            <div class="w-full flex items-center gap-2">
+              <progress class="w-full h-1 progress-green" max="100" value="12.1"></progress>
+              <span class="text-[10px] text-gray-500">12.1%</span>
+            </div>
+          </div>
+          <!-- Category Card 4 -->
+          <div class="bg-white rounded-xl border border-gray-200 p-3 min-w-[140px] shadow-sm flex flex-col items-center shrink-0">
+            <div class="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-2">
+              <i class="fa-solid fa-wrench text-lg"></i>
+            </div>
+            <span class="text-xs text-gray-600 mb-1">Maintenance & Misc</span>
+            <span class="text-sm font-bold text-gray-800 mb-3">৳ 1,350.00</span>
+            <div class="w-full flex items-center gap-2">
+              <progress class="w-full h-1 progress-purple" max="100" value="9.2"></progress>
+              <span class="text-[10px] text-gray-500">9.2%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- END: Category Split -->
+
+      <!-- BEGIN: Task List Section -->
+      <section class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-4">
+        <div class="flex justify-between items-center mb-2 items-end">
+          <h3 class="text-base font-semibold text-gray-800">Task List</h3>
+          <div class="flex flex-col gap-1 ml-3">
+            <span id="task-progress-label" class="text-[10px] font-medium text-gray-500">1/3 Tasks Completed</span>
+            <div class="w-16 bg-gray-100 rounded-full h-1">
+              <div id="task-progress-bar" class="bg-brand-green h-1 rounded-full transition-all duration-300" style="width: 33%"></div>
+            </div>
+          </div>
+          <button onclick="openAddTaskModal()" class="w-8 h-8 rounded-full bg-brand-lightPurple text-brand-purple flex items-center justify-center hover:bg-brand-purple hover:text-white transition-colors">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+        <div id="tasks-container" class="space-y-3">
+          <!-- Task 1 -->
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <div class="flex items-center gap-3">
+              <button onclick="toggleTask(1)" class="w-6 h-6 rounded-full border-2 border-brand-purple flex items-center justify-center bg-brand-purple">
+                <i class="fa-solid fa-check text-white text-[10px]"></i>
+              </button>
+              <div>
+                <p class="text-sm font-semibold text-gray-900 line-through text-gray-400">Inventory Audit</p>
+                <p class="text-[10px] text-gray-500">Warehouse A • <span class="text-brand-purple font-medium">09:00 AM - 10:00 AM</span></p>
+              </div>
+            </div>
+            <button onclick="openEditTaskModal(1)" class="text-gray-400 p-1 hover:text-gray-600">
+              <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+          </div>
+
+          <!-- Task 2 -->
+          <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+            <div class="flex items-center gap-3">
+              <button onclick="toggleTask(2)" class="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-brand-purple transition-colors"></button>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Supplier Payment</p>
+                <p class="text-[10px] text-gray-500">Due Today • <span class="text-gray-400">11:30 AM - 12:00 PM</span></p>
+              </div>
+            </div>
+            <button onclick="openEditTaskModal(2)" class="text-gray-400 p-1 hover:text-gray-600">
+              <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+          </div>
+
+          <!-- Task 3 -->
+          <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+            <div class="flex items-center gap-3">
+              <button onclick="toggleTask(3)" class="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-brand-purple transition-colors"></button>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Staff Briefing</p>
+                <p class="text-[10px] text-gray-500">Morning Shift • <span class="text-gray-400">08:00 AM - 08:30 AM</span></p>
+              </div>
+            </div>
+            <button onclick="openEditTaskModal(3)" class="text-gray-400 p-1 hover:text-gray-600">
+              <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+      <!-- END: Task List Section -->
+
+      <!-- BEGIN: Recent Expense Transactions -->
+      <section>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-semibold text-gray-800">Expenses</h3>
+          <button onclick="toggleExpenseSearch()" class="text-sm text-gray-500 flex items-center gap-1.5 hover:text-brand-purple">
+            Search <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </div>
+
+        <!-- Search Bar input -->
+        <div id="expense-search-input-wrap" class="mb-3 hidden">
+          <input id="expense-search-input" type="text" oninput="renderExpenses()" placeholder="Search description, category or amount..." class="w-full rounded-xl border-gray-300 text-xs p-2.5 focus:ring-brand-purple focus:border-brand-purple">
+        </div>
+
+        <div id="expenses-list-container" class="space-y-3">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+      <!-- END: Recent Expense Transactions -->
+
+    </main>
+    <!-- END: Main Content -->
+
+    <!-- Floating Action Button (FAB) -->
+    <button onclick="openAddExpenditureModal()" class="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand-purple text-white shadow-lg flex items-center justify-center z-40 hover:bg-brand-purple/90 transition-all active:scale-95" aria-label="Add Expenditure">
+      <i class="fa-solid fa-plus text-xl"></i>
+    </button>
+
+  </div>
+
+  <!-- GESTURE-CONTROLLED BOTTOM SHEET: ADD EXPENDITURE -->
+  <div id="add-exp-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity" onclick="closeAddExpenditureModal()"></div>
+  <div id="add-exp-sheet" class="bottom-sheet closed fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl p-5 z-50 shadow-2xl border-t border-gray-100 flex flex-col">
+    <!-- Drag Handle -->
+    <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 cursor-pointer"></div>
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-gray-900 text-base flex items-center gap-2">
+        <i class="fa-solid fa-circle-plus text-brand-purple"></i> নতুন খরচ যুক্ত করুন (Add Expenditure)
+      </h3>
+      <button onclick="closeAddExpenditureModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="space-y-3.5 text-xs overflow-y-auto max-h-[70vh] pb-4">
+      <div>
+        <label class="block font-semibold text-gray-700 mb-1">পরিমাণ (Amount in ৳)</label>
+        <input id="exp-modal-amount" type="number" placeholder="e.g. 850" class="w-full rounded-xl border-gray-300 text-sm p-3 focus:ring-brand-purple focus:border-brand-purple font-bold text-brand-purple">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-gray-700 mb-1">ক্যাটাগরি (Category)</label>
+        <select id="exp-modal-category" class="w-full rounded-xl border-gray-300 text-xs p-2.5 focus:ring-brand-purple focus:border-brand-purple">
+          <option value="Utilities & Rent">Utilities & Rent (বিদ্যুৎ, গ্যাস ও ঘর ভাড়া)</option>
+          <option value="Food & Refreshments">Food & Refreshments (খাবার ও নাস্তা)</option>
+          <option value="Transportation">Transportation (যাতায়াত ও পরিবহন)</option>
+          <option value="Maintenance & Misc">Maintenance & Misc (মেরামত ও অন্যান্য)</option>
+          <option value="Payroll">Payroll (কর্মচারী বেতন)</option>
+          <option value="Others">Others (অন্যান্য খরচ)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-gray-700 mb-1">পেমেন্ট মাধ্যম (Payment Method)</label>
+        <select id="exp-modal-method" class="w-full rounded-xl border-gray-300 text-xs p-2.5">
+          <option value="Petty Cash">Petty Cash (ক্যাশ)</option>
+          <option value="bKash">bKash (বিকাশ)</option>
+          <option value="Nagad">Nagad (নগদ)</option>
+          <option value="Bank">Bank Transfer (ব্যাংক)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-gray-700 mb-1">বিবরণ / নোট (Description)</label>
+        <input id="exp-modal-desc" type="text" placeholder="e.g. Staff afternoon lunch & tea" class="w-full rounded-xl border-gray-300 text-xs p-2.5">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-gray-700 mb-1">রসিদ নম্বর (Receipt # Optional)</label>
+        <input id="exp-modal-receipt" type="text" placeholder="e.g. Receipt #091" class="w-full rounded-xl border-gray-300 text-xs p-2.5">
+      </div>
+    </div>
+
+    <button onclick="saveExpenditure()" class="mt-4 w-full py-3 bg-brand-purple text-white rounded-xl text-xs font-bold shadow-md hover:bg-brand-purple/90 transition-colors">
+      খরচ সংরক্ষণ করুন (Save Expense)
+    </button>
+  </div>
+
+  <!-- GESTURE-CONTROLLED EDIT BUDGET CAP MODAL -->
+  <div id="budget-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity" onclick="closeBudgetModal()"></div>
+  <div id="budget-sheet" class="bottom-sheet closed fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl p-5 z-50 shadow-2xl border-t border-gray-100">
+    <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4"></div>
+    <h3 class="font-bold text-gray-900 text-base mb-2">মাসিক বাজেট লিমিট সেট করুন (Edit Budget Cap)</h3>
+    <p class="text-xs text-gray-500 mb-4">দোকানের সর্বমোট মাসিক খরচের বাজেট নির্ধারণ করুন</p>
+    
+    <input id="budget-input-val" type="number" value="50000" class="w-full rounded-xl border-gray-300 text-sm p-3 font-bold text-gray-800 mb-4">
+
+    <button onclick="saveBudgetCap()" class="w-full py-3 bg-brand-purple text-white rounded-xl text-xs font-bold shadow-md">
+      বাজেট সীমা আপডেট করুন
+    </button>
+  </div>
+
+  <!-- GESTURE-CONTROLLED TASK MODAL -->
+  <div id="task-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden" onclick="closeAddTaskModal()"></div>
+  <div id="task-sheet" class="bottom-sheet closed fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl p-5 z-50 shadow-2xl">
+    <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4"></div>
+    <h3 class="font-bold text-gray-900 text-base mb-2">নতুন টাস্ক যুক্ত করুন (Add Task)</h3>
+    <input id="task-input-title" type="text" placeholder="Task Title (e.g. Stock Inspection)" class="w-full rounded-xl border-gray-300 text-xs p-2.5 mb-3">
+    <input id="task-input-sub" type="text" placeholder="Subtitle & Time (e.g. Warehouse B • 02:00 PM)" class="w-full rounded-xl border-gray-300 text-xs p-2.5 mb-4">
+    <button onclick="saveNewTask()" class="w-full py-3 bg-brand-purple text-white rounded-xl text-xs font-bold shadow-md">
+      টাস্ক যুক্ত করুন
+    </button>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let currentCategoryFilter = "All";
+    let currentTimeFilter = "Today";
+
+    let mockExpenses = [
+      { id: "e1", category: "Utilities & Rent", title: "Monthly Shop Rent (July 2026)", amount: 8500.0, date: "25 Jul, 10:00 AM", method: "Bank", receipt: "Receipt #088", icon: "fa-building", color: "red" },
+      { id: "e2", category: "Food & Refreshments", title: "Staff Afternoon Lunch & Tea", amount: 650.0, date: "24 Jul, 01:15 PM", method: "Petty Cash", receipt: "Receipt #091", icon: "fa-burger", color: "orange" },
+      { id: "e3", category: "Maintenance & Misc", title: "Emergency Shop Light Repair", amount: 450.0, date: "23 Jul, 04:00 PM", method: "Petty Cash", receipt: null, icon: "fa-wrench", color: "purple" }
+    ];
+
+    let mockTasks = [
+      { id: 1, title: "Inventory Audit", sub: "Warehouse A • 09:00 AM - 10:00 AM", completed: true },
+      { id: 2, title: "Supplier Payment", sub: "Due Today • 11:30 AM - 12:00 PM", completed: false },
+      { id: 3, title: "Staff Briefing", sub: "Morning Shift • 08:00 AM - 08:30 AM", completed: false }
+    ];
+
+    let budgetCap = 50000.0;
+
+    function renderExpenses() {
+      const container = document.getElementById('expenses-list-container');
+      const searchVal = document.getElementById('expense-search-input')?.value.toLowerCase().trim() || "";
+
+      let filtered = mockExpenses.filter(exp => {
+        if (searchVal) {
+          const matchTitle = exp.title.toLowerCase().includes(searchVal);
+          const matchCat = exp.category.toLowerCase().includes(searchVal);
+          const matchAmt = exp.amount.toString().includes(searchVal);
+          if (!matchTitle && !matchCat && !matchAmt) return false;
+        }
+        return true;
+      });
+
+      container.innerHTML = filtered.map(exp => `
+        <div class="bg-white rounded-xl p-3 border border-gray-100 shadow-sm flex items-start justify-between gap-3 relative hover:shadow-md transition-all">
+          <div class="w-11 h-11 rounded-full bg-${exp.color}-50 text-${exp.color}-500 flex items-center justify-center shrink-0">
+            <i class="fa-solid ${exp.icon} text-lg"></i>
+          </div>
+          <div class="flex-1">
+            <h4 class="text-xs font-semibold text-gray-800 leading-snug">${exp.title}</h4>
+            <div class="flex items-center gap-1 text-[10px] text-${exp.color}-600 font-medium mt-0.5 mb-1">
+              <div class="w-1.5 h-1.5 rounded-full bg-${exp.color}-600"></div> ${exp.category}
+            </div>
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-gray-500">
+              <span class="flex items-center gap-1"><i class="fa-regular fa-calendar text-[9px]"></i> ${exp.date}</span>
+              <span class="flex items-center gap-1"><i class="fa-solid fa-money-bill text-[9px]"></i> ${exp.method}</span>
+              ${exp.receipt ? `<span class="flex items-center gap-1 text-brand-purple"><i class="fa-solid fa-paperclip text-[9px]"></i> ${exp.receipt}</span>` : ''}
+            </div>
+          </div>
+          <div class="text-right shrink-0 relative pr-3">
+            <div class="text-xs font-bold text-red-600 mb-1">৳ ${exp.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+            <button onclick="deleteExpense('${exp.id}')" class="absolute top-0 -right-1 text-gray-300 hover:text-red-500 p-1 text-xs">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      // Recalculate Total & Budget
+      const totalSpent = mockExpenses.reduce((sum, e) => sum + e.amount, 0);
+      document.getElementById('total-exp-value').innerText = "৳ " + totalSpent.toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('total-exp-count').innerText = mockExpenses.length + " Transactions";
+      document.getElementById('budget-spent-text').innerText = "৳ " + totalSpent.toLocaleString('en-US', {minimumFractionDigits: 2});
+      
+      const pct = Math.min(100, (totalSpent / budgetCap) * 100).toFixed(1);
+      document.getElementById('budget-percentage-text').innerText = pct + "%";
+      document.getElementById('budget-progress-bar').value = pct;
+    }
+
+    function renderTasks() {
+      const container = document.getElementById('tasks-container');
+      const completedCount = mockTasks.filter(t => t.completed).length;
+      document.getElementById('task-progress-label').innerText = `${completedCount}/${mockTasks.length} Tasks Completed`;
+      const pct = (completedCount / mockTasks.length) * 100;
+      document.getElementById('task-progress-bar').style.width = pct + "%";
+
+      container.innerHTML = mockTasks.map(t => `
+        <div class="flex items-center justify-between p-3 ${t.completed ? 'bg-gray-50' : 'bg-white'} rounded-xl border border-gray-100">
+          <div class="flex items-center gap-3">
+            <button onclick="toggleTask(${t.id})" class="w-6 h-6 rounded-full border-2 ${t.completed ? 'border-brand-purple bg-brand-purple' : 'border-gray-300'} flex items-center justify-center transition-colors">
+              ${t.completed ? '<i class="fa-solid fa-check text-white text-[10px]"></i>' : ''}
+            </button>
+            <div>
+              <p class="text-xs font-semibold ${t.completed ? 'line-through text-gray-400' : 'text-gray-900'}">${t.title}</p>
+              <p class="text-[10px] text-gray-500">${t.sub}</p>
+            </div>
+          </div>
+          <button onclick="deleteTask(${t.id})" class="text-gray-300 hover:text-red-500 p-1 text-xs">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function toggleTask(id) {
+      const task = mockTasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        renderTasks();
+      }
+    }
+
+    function deleteTask(id) {
+      mockTasks = mockTasks.filter(t => t.id !== id);
+      renderTasks();
+    }
+
+    function deleteExpense(id) {
+      if (confirm('এই খরচটি মুছে ফেলতে চান?')) {
+        mockExpenses = mockExpenses.filter(e => e.id !== id);
+        renderExpenses();
+      }
+    }
+
+    // Modal Sheet Handlers (Gesture Slide Controls)
+    function openAddExpenditureModal() {
+      document.getElementById('add-exp-backdrop').classList.remove('hidden');
+      const sheet = document.getElementById('add-exp-sheet');
+      sheet.classList.remove('closed');
+      sheet.classList.add('open');
+    }
+
+    function closeAddExpenditureModal() {
+      const sheet = document.getElementById('add-exp-sheet');
+      sheet.classList.remove('open');
+      sheet.classList.add('closed');
+      setTimeout(() => { document.getElementById('add-exp-backdrop').classList.add('hidden'); }, 300);
+    }
+
+    function saveExpenditure() {
+      const amt = parseFloat(document.getElementById('exp-modal-amount').value);
+      if (!amt || amt <= 0) {
+        alert('অনুগ্রহ করে সঠিক খরচ পরিমাণ লিখুন!');
+        return;
+      }
+
+      const cat = document.getElementById('exp-modal-category').value;
+      const method = document.getElementById('exp-modal-method').value;
+      const desc = document.getElementById('exp-modal-desc').value || cat;
+      const receipt = document.getElementById('exp-modal-receipt').value || null;
+
+      const icon = cat.includes('Utilities') ? 'fa-building' : cat.includes('Food') ? 'fa-burger' : cat.includes('Transportation') ? 'fa-car' : 'fa-wrench';
+      const color = cat.includes('Utilities') ? 'red' : cat.includes('Food') ? 'orange' : cat.includes('Transportation') ? 'green' : 'purple';
+
+      mockExpenses.unshift({
+        id: "e_" + Date.now(),
+        category: cat,
+        title: desc,
+        amount: amt,
+        date: "Just now",
+        method: method,
+        receipt: receipt,
+        icon: icon,
+        color: color
+      });
+
+      closeAddExpenditureModal();
+      renderExpenses();
+    }
+
+    function openBudgetModal() {
+      document.getElementById('budget-backdrop').classList.remove('hidden');
+      const sheet = document.getElementById('budget-sheet');
+      sheet.classList.remove('closed');
+      sheet.classList.add('open');
+    }
+
+    function closeBudgetModal() {
+      const sheet = document.getElementById('budget-sheet');
+      sheet.classList.remove('open');
+      sheet.classList.add('closed');
+      setTimeout(() => { document.getElementById('budget-backdrop').classList.add('hidden'); }, 300);
+    }
+
+    function saveBudgetCap() {
+      const val = parseFloat(document.getElementById('budget-input-val').value);
+      if (val && val > 0) {
+        budgetCap = val;
+        document.getElementById('budget-cap-text').innerText = "৳ " + val.toLocaleString('en-US', {minimumFractionDigits: 2});
+        renderExpenses();
+        closeBudgetModal();
+      }
+    }
+
+    function openAddTaskModal() {
+      document.getElementById('task-backdrop').classList.remove('hidden');
+      const sheet = document.getElementById('task-sheet');
+      sheet.classList.remove('closed');
+      sheet.classList.add('open');
+    }
+
+    function closeAddTaskModal() {
+      const sheet = document.getElementById('task-sheet');
+      sheet.classList.remove('open');
+      sheet.classList.add('closed');
+      setTimeout(() => { document.getElementById('task-backdrop').classList.add('hidden'); }, 300);
+    }
+
+    function saveNewTask() {
+      const title = document.getElementById('task-input-title').value;
+      const sub = document.getElementById('task-input-sub').value || "Daily Operations";
+      if (title) {
+        mockTasks.push({ id: Date.now(), title: title, sub: sub, completed: false });
+        renderTasks();
+        closeAddTaskModal();
+      }
+    }
+
+    function selectTimeFilter(filter) {
+      currentTimeFilter = filter;
+      ["today", "7days", "month", "custom"].forEach(f => {
+        const btn = document.getElementById(`tab-${f}`);
+        if ((f === 'today' && filter === 'Today') ||
+            (f === '7days' && filter === '7 Days') ||
+            (f === 'month' && filter === 'This Month') ||
+            (f === 'custom' && filter === 'Custom')) {
+          btn.className = "flex-1 items-center gap-2 px-4 py-2 rounded-xl bg-brand-purple text-white font-medium text-sm shrink-0 shadow-sm transition-all";
+        } else {
+          btn.className = "flex-1 items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm shrink-0 hover:bg-gray-50 transition-all";
+        }
+      });
+      renderExpenses();
+    }
+
+    function toggleExpenseSearch() {
+      const wrap = document.getElementById('expense-search-input-wrap');
+      wrap.classList.toggle('hidden');
+      if (!wrap.classList.contains('hidden')) {
+        document.getElementById('expense-search-input').focus();
+      }
+    }
+
+    function openCategoryModal() {
+      alert('ক্যাটাগরি স্প্লিট তালিকা এডিটর মোড অন করা হয়েছে।');
+    }
+
+    function openAnalyticsModal() {
+      alert('Expenditure Analytics: আপনার খরচের ৬০% ইউটিলিটি ও দোকান ভাড়ায় ব্যায় হয়েছে।');
+    }
+
+    // Initial Renders
+    renderExpenses();
+    renderTasks();
+  </script>
+</body>
+</html>

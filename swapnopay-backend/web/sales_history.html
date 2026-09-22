@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales & Dues Tracker — My Shop BD</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F8F9FE;
+    }
+  </style>
+</head>
+<body class="text-gray-900 pb-20 max-w-md mx-auto bg-white min-h-screen relative shadow-xl">
+
+  <!-- HEADER -->
+  <header class="px-4 pt-10 pb-3 flex items-center justify-between bg-white sticky top-0 z-10 border-b border-gray-100">
+    <div class="flex items-center gap-3">
+      <a href="pos_new_sale.html" class="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-indigo-600 bg-white">
+        <i class="fa-solid fa-arrow-left"></i>
+      </a>
+      <h1 class="text-xl font-bold text-gray-900">Sales History</h1>
+    </div>
+    <button class="bg-indigo-600 text-white px-3.5 py-2 rounded-lg flex items-center gap-2 text-xs font-semibold shadow-sm">
+      <i class="fa-solid fa-arrow-up-from-bracket"></i>
+      Export
+    </button>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="p-4 space-y-5">
+    <!-- TIME RANGE -->
+    <section>
+      <h2 class="text-xxs font-bold text-gray-400 tracking-wider uppercase mb-2">Time Range</h2>
+      <div class="flex gap-2 overflow-x-auto pb-1">
+        <button class="px-4 py-2 rounded-lg border border-indigo-600 bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center gap-1.5 whitespace-nowrap">
+          <i class="fa-regular fa-calendar"></i> Today
+        </button>
+        <button class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-600 font-medium text-xs flex items-center gap-1.5 whitespace-nowrap">
+          <i class="fa-regular fa-calendar"></i> 7 Days
+        </button>
+        <button class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-600 font-medium text-xs flex items-center gap-1.5 whitespace-nowrap">
+          <i class="fa-regular fa-calendar"></i> This Month
+        </button>
+      </div>
+      <div class="flex items-center justify-between mt-2.5 text-xs text-gray-500">
+        <span>Active Range: <span class="font-bold text-gray-800">24 Jul 2026 – 24 Jul 2026</span></span>
+        <button class="text-indigo-600 font-bold">Change ></button>
+      </div>
+    </section>
+
+    <!-- SUMMARY CARDS -->
+    <section class="grid grid-cols-2 gap-3">
+      <div class="bg-indigo-50/60 rounded-2xl border border-indigo-100 p-3">
+        <div class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2">
+          <i class="fa-solid fa-dollar-sign text-sm"></i>
+        </div>
+        <p class="text-xs text-gray-500 font-medium mb-0.5">Total Revenue</p>
+        <p class="text-lg font-bold text-gray-900">৳ 24,500.00</p>
+        <p class="text-xxs text-gray-400 mt-0.5">(18 Items)</p>
+      </div>
+
+      <div class="bg-emerald-50/60 rounded-2xl border border-emerald-100 p-3">
+        <div class="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-2">
+          <i class="fa-solid fa-check text-sm"></i>
+        </div>
+        <p class="text-xs text-gray-500 font-medium mb-0.5">Cash Received</p>
+        <p class="text-lg font-bold text-emerald-600">৳ 19,500.00</p>
+        <p class="text-xxs text-gray-400 mt-0.5">(Paid Amount)</p>
+      </div>
+    </section>
+
+    <!-- SALE ITEMS LIST -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Sale Items</h2>
+        <div class="text-xs text-gray-500 flex items-center gap-1 border border-gray-200 rounded-lg px-2.5 py-1 bg-white">
+          Sort: <span class="font-bold text-gray-800">Latest</span> <i class="fa-solid fa-chevron-down text-xxs"></i>
+        </div>
+      </div>
+
+      <!-- Item 1 -->
+      <article class="bg-white border border-gray-100 rounded-2xl shadow-sm p-3.5 space-y-3">
+        <div class="flex gap-3">
+          <div class="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-indigo-600 text-xl font-bold flex-shrink-0">
+            <i class="fa-solid fa-shirt"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="font-bold text-sm text-gray-900 leading-tight">1. Premium Denim Shirt (Size: L)</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Qty Sold: 5 pcs × ৳ 1,200.00</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">Total: <span>৳ 6,000.00</span></p>
+          </div>
+          <div class="text-right">
+            <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-1 rounded-md text-xs font-bold block">
+              <i class="fa-solid fa-check text-xxs"></i> Paid
+            </span>
+            <span class="text-xxs text-emerald-600 block mt-0.5">(bKash)</span>
+          </div>
+        </div>
+        <div class="pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+          <span><i class="fa-regular fa-calendar"></i> 24 Jul, 02:15 PM</span>
+          <a href="#" class="text-indigo-600 font-bold">Invoice #1084 ></a>
+        </div>
+      </article>
+
+      <!-- Item 2 -->
+      <article class="bg-white border border-gray-100 rounded-2xl shadow-sm p-3.5 space-y-3">
+        <div class="flex gap-3">
+          <div class="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-indigo-600 text-xl font-bold flex-shrink-0">
+            <i class="fa-solid fa-rug"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="font-bold text-sm text-gray-900 leading-tight">2. Men's Leather Belt (Black)</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Qty Sold: 10 pcs × ৳ 250.00</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">Total: <span>৳ 2,500.00</span></p>
+          </div>
+          <div class="text-right">
+            <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-1 rounded-md text-xs font-bold block">
+              <i class="fa-solid fa-check text-xxs"></i> Paid
+            </span>
+            <span class="text-xxs text-emerald-600 block mt-0.5">(Cash)</span>
+          </div>
+        </div>
+        <div class="pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+          <span><i class="fa-regular fa-calendar"></i> 24 Jul, 11:30 AM</span>
+          <a href="#" class="text-indigo-600 font-bold">Invoice #1081 ></a>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

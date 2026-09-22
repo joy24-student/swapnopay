@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwapnoPay SMS Gateway API | Cellular SIM-Powered OTP &amp; Notifications</title>
+  <meta name="description" content="Official developer documentation for the SwapnoPay Enterprise Cellular SMS Gateway. Send high-speed OTP verification and transactional SMS directly through Android SIM cards with zero aggregator fees.">
+  
+  <link rel="stylesheet" href="assets/site.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    code, pre { font-family: 'Fira Code', monospace; }
+    
+    .hero-mesh-dark {
+      background: radial-gradient(circle at 85% 15%, rgba(245,158,11,0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 15% 75%, rgba(59,130,246,0.04) 0%, transparent 45%),
+                  #f8fafc;
+    }
+
+    .gold-gradient-text {
+      background: linear-gradient(135deg, #facc15 0%, #ca8a04 50%, #854d0e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .gold-gradient-btn {
+      background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);
+      box-shadow: 0 10px 25px -5px rgba(202, 138, 4, 0.4);
+    }
+    .gold-gradient-btn:hover {
+      background: linear-gradient(135deg, #fde047 0%, #eab308 100%);
+    }
+
+    .glass-card {
+      background: rgba(18, 20, 29, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(234, 179, 8, 0.2);
+    }
+
+    .w3-sidebar { width: 280px; position: fixed; top: 0; bottom: 0; left: 0; overflow-y: auto; z-index: 40; }
+    .main-content { margin-left: 280px; }
+    @media (max-width: 768px) {
+      .w3-sidebar { display: none; }
+      .main-content { margin-left: 0; }
+    }
+    
+    /* Toast notification */
+    #copy-toast {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="enterprise.css">
+  <script src="workspace.js" defer></script>
+  <link rel="canonical" href="https://swapnopay.top/sms-docs.html">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SwapnoPay">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="SwapnoPay SMS Gateway API | Cellular SIM-Powered OTP &amp; Notifications">
+  <meta property="og:description" content="Integrate SwapnoPay Cellular SMS Gateway. Send high-speed OTPs and transactional notifications using your Android SIM hardware at ৳0.00 aggregator cost.">
+  <meta property="og:url" content="https://swapnopay.top/sms-docs.html">
+  <meta property="og:image" content="https://swapnopay.top/logo_branding.png">
+  <meta property="og:image:alt" content="SwapnoPay — SMS Gateway and Payment Platform">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="SwapnoPay SMS Gateway API Documentation">
+  <meta name="twitter:description" content="Zero aggregator markup. Ultra-fast OTP and transactional SMS dispatch via merchant Android cellular SIM.">
+  <meta name="twitter:image" content="https://swapnopay.top/logo_branding.png">
+  <meta name="theme-color" content="#101c30">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://swapnopay.top/#organization","name":"SwapnoPay","alternateName":"স্বপ্নপে","url":"https://swapnopay.top/","logo":{"@type":"ImageObject","url":"https://swapnopay.top/logo_branding.png"}},{"@type":"WebSite","@id":"https://swapnopay.top/#website","url":"https://swapnopay.top/","name":"SwapnoPay","alternateName":"স্বপ্নপে","publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en"},{"@type":"WebPage","@id":"https://swapnopay.top/sms-docs.html#webpage","url":"https://swapnopay.top/sms-docs.html","name":"SwapnoPay SMS Gateway API Documentation","description":"Explore SwapnoPay Cellular SMS Gateway API documentation, OTP verification, custom transactional SMS, and multi-language SDK examples.","isPartOf":{"@id":"https://swapnopay.top/#website"},"publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en","breadcrumb":{"@id":"https://swapnopay.top/sms-docs.html#breadcrumbs"}},{"@type":"BreadcrumbList","@id":"https://swapnopay.top/sms-docs.html#breadcrumbs","itemListElement":[{"@type":"ListItem","position":1,"name":"SwapnoPay","item":"https://swapnopay.top/"},{"@type":"ListItem","position":2,"name":"SMS Gateway Documentation","item":"https://swapnopay.top/sms-docs.html"}]},{"@type":"TechArticle","@id":"https://swapnopay.top/sms-docs.html#article","headline":"SwapnoPay Cellular SMS Gateway API Documentation","description":"Comprehensive developer specification for automated OTP verification, custom transactional SMS broadcasting, device background synchronization, and webhook callbacks.","mainEntityOfPage":{"@id":"https://swapnopay.top/sms-docs.html#webpage"},"author":{"@id":"https://swapnopay.top/#organization"},"publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en"}]}</script>
+</head>
+<body class="enterprise-page docs-page min-h-screen antialiased">
+  <a href="#docs-content" class="skip-link">Skip to documentation</a>
+  <button type="button" class="workspace-backdrop" aria-label="Close navigation" tabindex="-1" hidden></button>
+
+  <!-- Toast Notification -->
+  <div id="copy-toast" role="status" aria-live="polite" class="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2 opacity-0 pointer-events-none transform translate-y-3">
+    <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+    <span id="toast-text">Documentation copied to clipboard!</span>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside id="workspace-sidebar" aria-label="Documentation navigation" class="workspace-sidebar w3-sidebar bg-[#0b0f19]/90 border-r border-amber-500/20 p-5 backdrop-blur-xl">
+    <a href="index.html" class="flex items-center gap-3 mb-8 group">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
+        <img src="logo_branding.png" alt="SwapnoPay" class="w-full h-full object-contain rounded-xl bg-black" onError="this.style.display='none'">
+      </div>
+      <div>
+        <div class="font-extrabold text-white text-base tracking-wider uppercase">SWAPNOPAY</div>
+        <div class="text-[9.5px] text-amber-400 font-bold uppercase tracking-widest">SMS GATEWAY v2.0</div>
+      </div>
+    </a>
+
+    <label class="docs-search"><span class="material-symbols-outlined" aria-hidden="true">search</span><input id="docs-search" type="search" placeholder="Find an SMS topic…" aria-label="Filter documentation topics" autocomplete="off"></label>
+    <p id="docs-search-status" class="docs-search-status" role="status" hidden>No matching topics. Try “OTP” or “send”.</p>
+
+    <nav class="space-y-6 text-xs font-medium">
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Getting Started</div>
+        <ul class="space-y-1">
+          <li><a href="#overview" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">1. Overview &amp; Architecture</a></li>
+          <li><a href="#flowchart" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">2. Sequence &amp; Flowchart</a></li>
+          <li><a href="#comparison" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">3. Zero Cost vs. Aggregators</a></li>
+          <li><a href="#auth" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">4. Authentication &amp; Headers</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">API Reference</div>
+        <ul class="space-y-1">
+          <li><a href="#send-otp" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/sms-gateway/send-otp</a></li>
+          <li><a href="#verify-otp" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/sms-gateway/verify-otp</a></li>
+          <li><a href="#send-sms" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/sms-gateway/send</a></li>
+          <li><a href="#stats" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">GET /v1/sms-gateway/stats</a></li>
+          <li><a href="#device-api" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Device Polling &amp; Status Sync</a></li>
+          <li><a href="#error-codes" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Error Codes Table</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Webhooks &amp; Receipts</div>
+        <ul class="space-y-1">
+          <li><a href="#webhooks" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Delivery Status Webhook</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Multi-Language SDKs</div>
+        <ul class="space-y-1">
+          <li><a href="#sdks" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">cURL, Node.js, Python, PHP, Kotlin</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Android Handset Guide</div>
+        <ul class="space-y-1">
+          <li><a href="#android-worker" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Background Worker &amp; Dual-SIM</a></li>
+        </ul>
+      </div>
+
+      <div class="pt-4 border-t border-slate-800 space-y-2">
+        <a href="docs.html" class="block p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-amber-400 hover:border-amber-500/30 transition text-center font-bold">
+          <span class="material-symbols-outlined align-middle text-sm mr-1">payments</span> Payment Gateway Docs
+        </a>
+        <a href="portal.html" class="block p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-center hover:bg-amber-500/20 transition">
+          <span class="material-symbols-outlined align-middle text-sm mr-1">terminal</span> Developer Console ↗
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="main-content min-h-screen pb-20">
+    <!-- Top Navbar -->
+    <header class="workspace-header">
+      <button type="button" class="workspace-toggle" aria-label="Open documentation navigation" aria-expanded="false" aria-controls="workspace-sidebar"><span class="material-symbols-outlined" aria-hidden="true">menu</span></button>
+      <div class="docs-header-label"><span class="material-symbols-outlined" aria-hidden="true">sms</span><span>SMS Gateway Documentation</span><span class="version-label">Cellular v2.0</span></div>
+      <div class="docs-header-actions">
+        <button type="button" onclick="copyFullApiDocumentation()" class="btn btn-secondary">Copy SMS docs</button>
+        <a class="btn" href="docs.html">Payment docs <span aria-hidden="true">→</span></a>
+        <a class="btn" href="portal.html">Open console <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <!-- Broadcast Banner (dynamically synced from Admin CMS) -->
+    <div id="admin-broadcast-banner" class="hidden bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 text-xs text-amber-300 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined">campaign</span>
+        <span id="broadcast-message"></span>
+      </div>
+      <span class="text-[10px] opacity-75 font-mono">Live Admin Sync</span>
+    </div>
+
+    <div class="docs-body" id="docs-content" tabindex="-1">
+      <nav class="workspace-breadcrumb" aria-label="Breadcrumb">
+        <a href="/">SwapnoPay</a><span aria-hidden="true">/</span>
+        <span aria-current="page">SMS Gateway Documentation</span>
+      </nav>
+
+      <!-- Hero Section -->
+      <section class="docs-hero glass-card" aria-labelledby="docs-title">
+        <div class="workspace-eyebrow">Enterprise Cellular SMS Gateway</div>
+        <h1 id="docs-title">SIM-Powered OTP &amp;<br>Transactional SMS Engine.</h1>
+        <p>Eliminate expensive 3rd-party aggregator markups (৳0.35 - ৳0.50 per SMS). SwapnoPay turns your Android device and carrier SIM cards (GP, Banglalink, Robi, Teletalk) into a secure, ultra-low-latency, zero-cost cellular SMS dispatch engine for websites, e-commerce, and mobile apps.</p>
+        <div class="docs-hero-actions">
+          <a href="#send-otp" class="btn">Start integrating <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a>
+          <button type="button" onclick="copyFullApiDocumentation()" class="btn btn-secondary"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy full SMS reference</button>
+        </div>
+        <div class="docs-quicklinks">
+          <a href="#send-otp"><span class="material-symbols-outlined" aria-hidden="true">key</span><strong>OTP verification</strong><small>Crypto generation, expiry &amp; anti-bruteforce</small></a>
+          <a href="#send-sms"><span class="material-symbols-outlined" aria-hidden="true">send</span><strong>Transactional SMS</strong><small>Order updates, receipts &amp; alert notifications</small></a>
+          <a href="#comparison"><span class="material-symbols-outlined" aria-hidden="true">savings</span><strong>Zero-cost architecture</strong><small>Flat SIM bundles vs aggregator surcharges</small></a>
+          <a href="#sdks"><span class="material-symbols-outlined" aria-hidden="true">code_blocks</span><strong>Client SDKs</strong><small>Node.js, Python, PHP, Kotlin &amp; cURL</small></a>
+        </div>
+      </section>
+
+      <!-- Section 1: Overview & Mechanism -->
+      <section id="overview" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Platform Mechanism &amp; Architecture</h2>
+          <p class="text-xs text-slate-400 mt-1">SwapnoPay's cellular gateway bridges cloud HTTP REST APIs with physical Android handset SIM hardware over resilient WebSockets and background polling.</p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">sim_card</span> <span>Zero Aggregator Surcharges</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Unlike SMS aggregators that charge ৳0.30 to ৳0.55 per message, SwapnoPay dispatches via your Android phone's unlimited carrier SMS bundles (e.g. 1000 SMS for ৳25), slashing communication costs by 95%+.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">sync_alt</span> <span>Dual-Channel Push Bridge</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Incoming API requests immediately fire real-time WebSocket events (<code class="text-amber-300">sms_gateway_dispatch</code>) to your connected Android phone. If connectivity flutters, the device polls <code class="text-amber-300">/device/pending</code> automatically.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">security</span> <span>Cryptographic OTP Lifecycle</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Built-in CSPRNG 4-8 digit numeric code generation, configurable TTL expiry (default 5 mins), automatic background garbage cleanup, and 5-attempt anti-brute-force lockout protection.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Flowchart -->
+      <section id="flowchart" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">System Sequence &amp; Flowchart</h2>
+          <p class="text-xs text-slate-400 mt-1">End-to-end cellular dispatch pipeline from external website request to Android SIM transmission and delivery receipt.</p>
+        </div>
+
+        <div class="bg-black/90 p-6 rounded-3xl border border-amber-500/30 shadow-2xl overflow-x-auto">
+          <pre class="text-xs leading-relaxed text-amber-300 font-mono">
+┌────────────────────┐          ┌──────────────────────┐          ┌────────────────────────┐          ┌────────────────────┐
+│  Client Website /  │          │   SwapnoPay Backend  │          │ Merchant Android Phone │          │  Customer Mobile   │
+│   E-Commerce App   │          │ (REST API + WS Core) │          │  (Cellular SIM Worker) │          │  (End-User Device) │
+└─────────┬──────────┘          └──────────┬───────────┘          └───────────┬────────────┘          └─────────┬──────────┘
+          │                                │                                  │                                 │
+          │ 1. POST /send-otp or /send     │                                  │                                 │
+          │    (x-api-key: sp_gw_m_...)    │                                  │                                 │
+          ├───────────────────────────────>│                                  │                                 │
+          │                                │ 2. Cryptographic Code Gen        │                                 │
+          │                                │    Enqueue Job (QUEUED)          │                                 │
+          │                                │                                  │                                 │
+          │ 3. 200 OK (otp_id, job_id)     │                                  │                                 │
+          │<───────────────────────────────┤                                  │                                 │
+          │                                │ 4. WS 'sms_gateway_dispatch'     │                                 │
+          │                                ├─────────────────────────────────>│                                 │
+          │                                │    (Fallback: GET /pending)      │                                 │
+          │                                │                                  │ 5. SmsManager.sendTextMessage() │
+          │                                │                                  ├────────────────────────────────>│
+          │                                │                                  │    via Carrier SIM (GP/Robi/BL) │
+          │                                │                                  │                                 │
+          │                                │ 6. POST /device/status (SENT)    │                                 │
+          │                                │<─────────────────────────────────┤                                 │
+          │                                │                                  │                                 │
+          │ 7. Webhook: 'sms.status_update'│                                  │                                 │
+          │<───────────────────────────────┤                                  │                                 │
+          │                                │                                  │                                 │
+          │ 8. POST /verify-otp (phone,code)                                  │                                 │
+          ├───────────────────────────────>│                                  │                                 │
+          │                                │ 9. Check single-use, TTL,        │                                 │
+          │                                │    &amp; attempts (&lt;=5)              │                                 │
+          │ 10. 200 OK (verified: true)    │                                  │                                 │
+          │<───────────────────────────────┤                                  │                                 │
+          │                                │                                  │                                 │
+          </pre>
+        </div>
+      </section>
+
+      <!-- Section 3: Cost & Capability Comparison -->
+      <section id="comparison" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Aggregators vs. SwapnoPay Cellular SIM</h2>
+          <p class="text-xs text-slate-400 mt-1">Why modern Bangladeshi businesses are shifting from predatory aggregator markups to in-house cellular SIM dispatch.</p>
+        </div>
+
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/20">
+          <div class="docs-table-scroll" role="region" aria-label="Comparison table" tabindex="0">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-black/60 text-amber-400 border-b border-amber-500/20 font-mono">
+                  <th class="p-3.5">Feature Metric</th>
+                  <th class="p-3.5">Traditional SMS Aggregators</th>
+                  <th class="p-3.5 text-emerald-400">SwapnoPay Cellular Gateway</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr>
+                  <td class="p-3.5 font-bold text-white">Cost Per SMS</td>
+                  <td class="p-3.5 text-red-400 font-mono">৳0.35 – ৳0.65 per SMS</td>
+                  <td class="p-3.5 text-emerald-400 font-mono font-bold">৳0.00 (Flat Carrier Bundle: ~৳0.02)</td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-bold text-white">Regulatory Bureaucracy</td>
+                  <td class="p-3.5 text-slate-400">Requires trade license, BTRC approvals &amp; weeks of verification</td>
+                  <td class="p-3.5 text-emerald-400 font-semibold">Zero approval waiting. Plug-and-play in 30 seconds.</td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-bold text-white">Carrier Coverage</td>
+                  <td class="p-3.5 text-slate-400">Restricted by gateway routing filters</td>
+                  <td class="p-3.5 text-emerald-400 font-semibold">All BD networks: Grameenphone, Robi, Banglalink, Teletalk</td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-bold text-white">Delivery Latency</td>
+                  <td class="p-3.5 font-mono text-slate-400">3 – 15 seconds (queued via aggregators)</td>
+                  <td class="p-3.5 text-emerald-400 font-mono font-bold">1 – 3 seconds direct cellular transmission</td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-bold text-white">Data Privacy</td>
+                  <td class="p-3.5 text-slate-400">Customer phone numbers stored on third-party aggregator clouds</td>
+                  <td class="p-3.5 text-emerald-400 font-semibold">100% self-hosted merchant privacy &amp; direct SIM dispatch</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Authentication & Headers -->
+      <section id="auth" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Authentication &amp; Request Headers</h2>
+          <p class="text-xs text-slate-400 mt-1">Authenticate all external requests with your dedicated Merchant Gateway API Key.</p>
+        </div>
+
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/20">
+          <div class="docs-table-scroll" role="region" aria-label="Headers table" tabindex="0">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-black/60 text-amber-400 border-b border-amber-500/20 font-mono">
+                  <th class="p-3.5">Header Name</th>
+                  <th class="p-3.5">Type</th>
+                  <th class="p-3.5">Description</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr>
+                  <td class="p-3.5 font-mono text-amber-300 font-bold">x-api-key</td>
+                  <td class="p-3.5 font-mono">string</td>
+                  <td class="p-3.5">Your unique gateway key starting with <code class="text-amber-400">sp_gw_m_&lt;merchant_id&gt;_...</code></td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-mono text-amber-300 font-bold">Authorization</td>
+                  <td class="p-3.5 font-mono">string</td>
+                  <td class="p-3.5">Alternative bearer token format: <code class="text-amber-400">Bearer &lt;API_KEY&gt;</code></td>
+                </tr>
+                <tr>
+                  <td class="p-3.5 font-mono text-amber-300 font-bold">Content-Type</td>
+                  <td class="p-3.5 font-mono">string</td>
+                  <td class="p-3.5">Must be set to <code class="text-amber-400">application/json</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: API Endpoints Reference -->
+      <section id="endpoints" class="space-y-6">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Core API Endpoints Reference</h2>
+          <p class="text-xs text-slate-400 mt-1">RESTful endpoints for OTP generation, verification, arbitrary notification broadcasts, and device telemetry.</p>
+        </div>
+
+        <!-- 5.1 Send OTP -->
+        <div id="send-otp" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+              <code class="text-sm font-bold text-amber-400">/v1/sms-gateway/send-otp</code>
+            </div>
+            <button onclick="copySnippet('snippet-otp-request')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700">Copy Payload</button>
+          </div>
+          <p class="text-xs text-slate-300">Generates a cryptographically random numeric OTP, configures expiration TTL, saves it to the memory registry, and dispatches the SMS to the connected Android device via WebSockets.</p>
+
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Request Body Parameters:</span>
+            <div class="docs-table-scroll"><table class="w-full text-left text-xs border-collapse my-2">
+              <thead><tr class="text-amber-400 font-mono border-b border-slate-800"><th class="pb-2">Field</th><th class="pb-2">Type</th><th class="pb-2">Default</th><th class="pb-2">Description</th></tr></thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr><td class="py-2 font-mono text-amber-300">phone</td><td class="font-mono">string</td><td class="text-slate-500">Required</td><td>Recipient Bangladeshi phone number (e.g. 01712963652).</td></tr>
+                <tr><td class="py-2 font-mono text-amber-300">purpose</td><td class="font-mono">string</td><td class="font-mono text-slate-400">"Verification"</td><td>Action context (e.g. "Login", "Order #1029", "Withdrawal").</td></tr>
+                <tr><td class="py-2 font-mono text-amber-300">expiryMinutes</td><td class="font-mono">number</td><td class="font-mono text-slate-400">5</td><td>OTP validity duration in minutes.</td></tr>
+                <tr><td class="py-2 font-mono text-amber-300">length</td><td class="font-mono">number</td><td class="font-mono text-slate-400">6</td><td>Digit length for the code (between 4 and 8).</td></tr>
+                <tr><td class="py-2 font-mono text-amber-300">template</td><td class="font-mono">string</td><td class="font-mono text-slate-400">Bengali Default</td><td>Custom template string. Replaces <code class="text-amber-400">{code}</code> or <code class="text-amber-400">{otp}</code>.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <pre id="snippet-otp-request" class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto leading-relaxed">{
+  "phone": "01712963652",
+  "purpose": "Customer Login Verification",
+  "expiryMinutes": 5,
+  "length": 6,
+  "template": "Your SwapnoPay verification code is: {code}. Valid for 5 minutes. Never share this."
+}</pre>
+
+          <div class="text-xs text-slate-400">
+            <strong class="text-white">Response (200 OK):</strong>
+            <pre class="mt-2 p-3 bg-black/60 rounded-xl text-emerald-400 font-mono leading-relaxed">{
+  "ok": true,
+  "otp_id": "otp_a4f891b2c3d4e5f6",
+  "job_id": "job_99812e4f01bc4a77",
+  "phone": "01712963652",
+  "purpose": "Customer Login Verification",
+  "expires_in_seconds": 300,
+  "message": "OTP queued for SIM dispatch"
+}</pre>
+          </div>
+        </div>
+
+        <!-- 5.2 Verify OTP -->
+        <div id="verify-otp" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+              <code class="text-sm font-bold text-amber-400">/v1/sms-gateway/verify-otp</code>
+            </div>
+            <button onclick="copySnippet('snippet-verify-request')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700">Copy Payload</button>
+          </div>
+          <p class="text-xs text-slate-300">Validates the code entered by the user. Enforces strict single-use consumption and automatic invalidation after 5 unsuccessful attempts.</p>
+
+          <pre id="snippet-verify-request" class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto leading-relaxed">{
+  "phone": "01712963652",
+  "code": "582914",
+  "purpose": "Customer Login Verification"
+}</pre>
+
+          <div class="text-xs text-slate-400">
+            <strong class="text-white">Success Response (200 OK):</strong>
+            <pre class="mt-2 p-3 bg-black/60 rounded-xl text-emerald-400 font-mono leading-relaxed">{
+  "ok": true,
+  "verified": true,
+  "phone": "01712963652",
+  "purpose": "Customer Login Verification",
+  "message": "OTP verified successfully"
+}</pre>
+          </div>
+
+          <div class="text-xs text-slate-400">
+            <strong class="text-red-400">Incorrect Code Response (400 Bad Request):</strong>
+            <pre class="mt-2 p-3 bg-black/60 rounded-xl text-red-400 font-mono leading-relaxed">{
+  "ok": false,
+  "verified": false,
+  "error": "Incorrect OTP code",
+  "remaining_attempts": 4
+}</pre>
+          </div>
+        </div>
+
+        <!-- 5.3 Send Arbitrary Transactional SMS -->
+        <div id="send-sms" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+              <code class="text-sm font-bold text-amber-400">/v1/sms-gateway/send</code>
+            </div>
+            <button onclick="copySnippet('snippet-custom-sms')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700">Copy Payload</button>
+          </div>
+          <p class="text-xs text-slate-300">Broadcasts custom transactional notifications such as order shipping tracking, receipt confirmations, and account security alerts via your phone's SIM.</p>
+
+          <pre id="snippet-custom-sms" class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto leading-relaxed">{
+  "phone": "01712963652",
+  "message": "Dear Tanvir, your order #ORD-9812 has been packed and handed to Pathao Courier. Tracking: https://track.example.com/9812",
+  "priority": "HIGH",
+  "webhook_url": "https://merchant.example.com/webhooks/sms-delivery"
+}</pre>
+
+          <div class="text-xs text-slate-400">
+            <strong class="text-white">Response (200 OK):</strong>
+            <pre class="mt-2 p-3 bg-black/60 rounded-xl text-emerald-400 font-mono leading-relaxed">{
+  "ok": true,
+  "job_id": "job_c18091ab42ef7a",
+  "phone": "01712963652",
+  "status": "QUEUED",
+  "message": "Message queued for SIM cellular dispatch"
+}</pre>
+          </div>
+        </div>
+
+        <!-- 5.4 Gateway Stats -->
+        <div id="stats" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-black text-xs">GET</span>
+            <code class="text-sm font-bold text-amber-400">/v1/sms-gateway/stats</code>
+          </div>
+          <p class="text-xs text-slate-300">Inspect real-time gateway throughput, check if your Android handset is online via live heartbeat telemetry, and monitor queue depth.</p>
+
+          <pre class="p-4 text-xs bg-black/90 text-emerald-400 rounded-xl overflow-x-auto leading-relaxed">{
+  "ok": true,
+  "merchant_id": "00000000-0000-0000-0000-000000000001",
+  "device_online": true,
+  "stats": {
+    "queued": 0,
+    "sent": 1420,
+    "failed": 2,
+    "total_handled": 1422,
+    "active_otps": 3
+  }
+}</pre>
+        </div>
+
+        <!-- 5.5 Device Polling & Status Sync -->
+        <div id="device-api" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <h3 class="font-extrabold text-white text-base flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400">phone_android</span> Android Handset Protocol Endpoints
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">These endpoints are utilized by the SwapnoPay Android background service when operating in polling mode or reporting carrier transmission status.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono text-[11px] font-bold">GET</span>
+                <code class="text-xs font-mono text-amber-300">/v1/sms-gateway/device/pending?merchant_id={id}</code>
+              </div>
+              <p class="text-xs text-slate-400">Fetches up to 20 queued SMS jobs and atomically sets their status to <code class="text-amber-400">IN_PROGRESS</code>.</p>
+            </div>
+
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[11px] font-bold">POST</span>
+                <code class="text-xs font-mono text-amber-300">/v1/sms-gateway/device/status</code>
+              </div>
+              <p class="text-xs text-slate-400">Reports transmission outcome (<code class="text-emerald-400">SENT</code> or <code class="text-red-400">FAILED</code>). Automatically invokes developer <code class="text-amber-300">webhook_url</code> if specified.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5.6 Error Codes Table -->
+        <div id="error-codes" class="glass-card rounded-2xl overflow-hidden border border-amber-500/20">
+          <div class="p-4 bg-black/60 border-b border-amber-500/20 font-bold text-sm text-white">
+            ⚠️ Gateway Error Codes Reference
+          </div>
+          <div class="docs-table-scroll" role="region" aria-label="Scrollable API reference table" tabindex="0">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-black/40 text-amber-400 border-b border-slate-800 font-mono">
+                  <th class="p-3">Error Code</th>
+                  <th class="p-3">HTTP Status</th>
+                  <th class="p-3">Description &amp; Suggested Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300 font-mono text-[11px]">
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">Unauthorized</td>
+                  <td class="p-3">401</td>
+                  <td class="p-3 text-slate-300 font-sans">Missing or invalid <code class="text-amber-400">x-api-key</code> header. Check your merchant portal settings.</td>
+                </tr>
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">Valid phone number is required</td>
+                  <td class="p-3">400</td>
+                  <td class="p-3 text-slate-300 font-sans">Recipient phone number must be a valid 11-digit Bangladeshi mobile format.</td>
+                </tr>
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">No active OTP request found</td>
+                  <td class="p-3">404</td>
+                  <td class="p-3 text-slate-300 font-sans">No pending OTP code exists for this number, or it was already verified.</td>
+                </tr>
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">OTP has expired</td>
+                  <td class="p-3">410</td>
+                  <td class="p-3 text-slate-300 font-sans">The OTP TTL window elapsed. Prompt user to request a fresh OTP code.</td>
+                </tr>
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">Incorrect OTP code</td>
+                  <td class="p-3">400</td>
+                  <td class="p-3 text-slate-300 font-sans">Supplied code does not match. Displays remaining attempts (out of 5).</td>
+                </tr>
+                <tr>
+                  <td class="p-3 text-red-400 font-bold">Too many incorrect attempts</td>
+                  <td class="p-3">429</td>
+                  <td class="p-3 text-slate-300 font-sans">Anti-bruteforce trigger. Maximum 5 attempts exceeded; OTP code immediately invalidated.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 6: Webhooks & Delivery Receipts -->
+      <section id="webhooks" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Delivery Status Webhook Callbacks</h2>
+          <p class="text-xs text-slate-400 mt-1">Receive asynchronous HTTP delivery receipts directly to your server once the Android cellular SIM transmits the message.</p>
+        </div>
+
+        <div class="glass-card rounded-2xl p-5 space-y-4 border border-amber-500/20">
+          <p class="text-xs text-slate-300 leading-relaxed">
+            When dispatching messages with a <code class="text-amber-400">webhook_url</code> specified, SwapnoPay immediately delivers an HTTP POST callback to your endpoint when the Android carrier network confirms dispatch:
+          </p>
+
+          <pre class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto font-mono leading-relaxed">{
+  "event": "sms.status_update",
+  "job_id": "job_c18091ab42ef7a",
+  "phone": "01712963652",
+  "status": "SENT",
+  "sent_at": 1773919283120,
+  "error": null
+}</pre>
+
+          <h3 class="font-bold text-white text-sm pt-2">Webhook Handler Example (Node.js Express):</h3>
+          <pre class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto font-mono leading-relaxed">app.post('/webhooks/sms-delivery', (req, res) => {
+  const { event, job_id, phone, status, sent_at, error } = req.body;
+
+  if (event === 'sms.status_update') {
+    if (status === 'SENT') {
+      console.log(`[SMS Delivered] Job: ${job_id} to ${phone} at ${new Date(sent_at).toISOString()}`);
+    } else {
+      console.error(`[SMS Failed] Job: ${job_id} failed with error: ${error}`);
+    }
+  }
+
+  // Acknowledge receipt to avoid retries
+  res.status(200).json({ received: true });
+});</pre>
+        </div>
+      </section>
+
+      <!-- Section 7: Multi-Language Code Examples -->
+      <section id="sdks" class="space-y-6">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Production SDK Code Examples</h2>
+          <p class="text-xs text-slate-400 mt-1">Copy-paste production integrations in cURL, Node.js, Python, PHP, and Kotlin.</p>
+        </div>
+
+        <!-- 1. cURL -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined align-middle mr-1 text-sm">terminal</span> cURL (Shell / Terminal)</span>
+            <button onclick="copySnippet('snippet-curl')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-curl" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed"># 1. Request OTP Dispatch
+curl -X POST https://pay.swapnopay.top/v1/sms-gateway/send-otp \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: sp_gw_m_000000000001_live_secret" \
+  -d '{
+    "phone": "01712963652",
+    "purpose": "Website Login",
+    "expiryMinutes": 5,
+    "length": 6
+  }'
+
+# 2. Verify User OTP
+curl -X POST https://pay.swapnopay.top/v1/sms-gateway/verify-otp \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: sp_gw_m_000000000001_live_secret" \
+  -d '{
+    "phone": "01712963652",
+    "code": "582914"
+  }'</pre>
+        </div>
+
+        <!-- 2. Node.js -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span>🟢 Node.js (Axios / Fetch)</span>
+            <button onclick="copySnippet('snippet-node')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-node" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">const axios = require('axios');
+
+const SMS_API = axios.create({
+  baseURL: 'https://pay.swapnopay.top/v1/sms-gateway',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': 'sp_gw_m_000000000001_live_secret'
+  }
+});
+
+// 1. Dispatch OTP
+async function sendUserOtp(phone) {
+  const { data } = await SMS_API.post('/send-otp', {
+    phone,
+    purpose: 'Password Reset',
+    expiryMinutes: 5,
+    length: 6,
+    template: 'Your verification code is {code}. Never share it with anyone.'
+  });
+  return data;
+}
+
+// 2. Verify OTP
+async function verifyUserOtp(phone, code) {
+  try {
+    const { data } = await SMS_API.post('/verify-otp', { phone, code });
+    return data.verified === true;
+  } catch (err) {
+    console.error('OTP Check failed:', err.response?.data?.error);
+    return false;
+  }
+}</pre>
+        </div>
+
+        <!-- 3. Python -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined align-middle mr-1 text-sm">code</span> Python (Requests / FastAPI)</span>
+            <button onclick="copySnippet('snippet-python')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-python" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">import requests
+
+BASE_URL = "https://pay.swapnopay.top/v1/sms-gateway"
+HEADERS = {
+    "Content-Type": "application/json",
+    "x-api-key": "sp_gw_m_000000000001_live_secret"
+}
+
+def send_otp(phone: str) -> dict:
+    resp = requests.post(f"{BASE_URL}/send-otp", headers=HEADERS, json={
+        "phone": phone,
+        "purpose": "Account Activation",
+        "expiryMinutes": 5,
+        "length": 6
+    })
+    return resp.json()
+
+def verify_otp(phone: str, code: str) -> bool:
+    resp = requests.post(f"{BASE_URL}/verify-otp", headers=HEADERS, json={
+        "phone": phone,
+        "code": code
+    })
+    return resp.json().get("verified", False)</pre>
+        </div>
+
+        <!-- 4. PHP -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined align-middle mr-1 text-sm">code</span> PHP (cURL / Laravel)</span>
+            <button onclick="copySnippet('snippet-php')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-php" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">&lt;?php
+function sendSwapnoPayOtp($phone) {
+    $ch = curl_init('https://pay.swapnopay.top/v1/sms-gateway/send-otp');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'x-api-key: sp_gw_m_000000000001_live_secret'
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'phone' => $phone,
+        'purpose' => 'Checkout Verification',
+        'expiryMinutes' => 5,
+        'length' => 6
+    ]));
+    $res = curl_exec($ch);
+    curl_close($ch);
+    return json_decode($res, true);
+}
+?&gt;</pre>
+        </div>
+
+        <!-- 5. Kotlin Android -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined align-middle mr-1 text-sm">phone_android</span> Kotlin (Android OkHttp)</span>
+            <button onclick="copySnippet('snippet-kotlin')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-kotlin" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">val client = OkHttpClient()
+val payload = JSONObject().apply {
+    put("phone", "01712963652")
+    put("purpose", "App Security Pin Reset")
+    put("expiryMinutes", 5)
+    put("length", 6)
+}
+
+val request = Request.Builder()
+    .url("https://pay.swapnopay.top/v1/sms-gateway/send-otp")
+    .addHeader("Content-Type", "application/json")
+    .addHeader("x-api-key", "sp_gw_m_000000000001_live_secret")
+    .post(payload.toString().toRequestBody("application/json".toMediaType()))
+    .build()
+
+client.newCall(request).execute().use { response ->
+    val responseBody = response.body?.string()
+    println("Gateway Response: $responseBody")
+}</pre>
+        </div>
+      </section>
+
+      <!-- Section 8: Android Handset Guide -->
+      <section id="android-worker" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Android Background Service &amp; Dual-SIM Setup</h2>
+          <p class="text-xs text-slate-400 mt-1">Configuring your dedicated Android dispatch device for 24/7 autonomous transmission and battery optimization bypass.</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-3">
+            <h4 class="text-white font-bold text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400">battery_saver</span> Battery Optimization Whitelist
+            </h4>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              To prevent Android OS (specifically Samsung OneUI, Xiaomi MIUI, and Android 14+ Doze Mode) from freezing background sockets, navigate to:
+            </p>
+            <div class="bg-black/60 p-3 rounded-xl text-[11px] font-mono text-amber-300">
+              Settings &gt; Apps &gt; SwapnoPay &gt; Battery &gt; Unrestricted
+            </div>
+            <p class="text-xs text-slate-400">
+              The app also requests <code class="text-amber-400">REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code> upon device pairing.
+            </p>
+          </div>
+
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-3">
+            <h4 class="text-white font-bold text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400">sim_card_download</span> Dual-SIM Subscription Selection
+            </h4>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              The cellular gateway leverages Android's <code class="text-amber-300">SubscriptionManager</code> to dynamically route through SIM 1 or SIM 2 based on carrier bundle balance:
+            </p>
+            <div class="bg-black/60 p-3 rounded-xl text-[11px] font-mono text-amber-300">
+              val smsManager = SmsManager.getSmsManagerForSubscriptionId(subId)
+            </div>
+            <p class="text-xs text-slate-400">
+              Set your preferred default SIM slot inside the SwapnoPay Android app settings.
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="workspace-footer">
+      <span>© 2026 SwapnoPay. Enterprise Cellular SMS &amp; Payment Gateway.</span>
+      <div>
+        <a href="/">Home</a>
+        <a href="docs.html">Payment Docs</a>
+        <a href="sms-docs.html">SMS Docs</a>
+        <a href="privacy-policy.html">Privacy</a>
+        <a href="terms-and-conditions.html">Terms</a>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    // Complete Markdown documentation for 1-click clipboard copy
+    const DEFAULT_SMS_FULL_DOCS = `# SwapnoPay Enterprise Cellular SMS Gateway API Specification (v2.0 Production)
+
+SwapnoPay Cellular SMS Gateway turns merchant Android smartphones into zero-cost cellular OTP and transactional notification engines, bridging external websites directly to carrier SIM hardware.
+
+---
+
+## 1. Base URL & Environments
+- Production Gateway: \`https://pay.swapnopay.top/v1/sms-gateway\`
+- WebSocket Push: \`wss://pay.swapnopay.top\`
+- Header: \`x-api-key: sp_gw_m_<merchant_id>_<secret>\`
+
+---
+
+## 2. API Reference
+
+### 2.1 POST /v1/sms-gateway/send-otp
+Generate a cryptographic OTP code and dispatch it via phone SIM.
+- Request Body:
+\`\`\`json
+{
+  "phone": "01712963652",
+  "purpose": "Verification",
+  "expiryMinutes": 5,
+  "length": 6,
+  "template": "Your code is: {code}"
+}
+\`\`\`
+- Response (200 OK):
+\`\`\`json
+{
+  "ok": true,
+  "otp_id": "otp_a4f891b2c3d4e5f6",
+  "job_id": "job_99812e4f01bc4a77",
+  "phone": "01712963652",
+  "purpose": "Verification",
+  "expires_in_seconds": 300,
+  "message": "OTP queued for SIM dispatch"
+}
+\`\`\`
+
+### 2.2 POST /v1/sms-gateway/verify-otp
+Verify code submitted by user. 5 attempts maximum before lockout. Single-use consumption.
+- Request Body:
+\`\`\`json
+{
+  "phone": "01712963652",
+  "code": "582914"
+}
+\`\`\`
+- Response (200 OK):
+\`\`\`json
+{
+  "ok": true,
+  "verified": true,
+  "phone": "01712963652",
+  "message": "OTP verified successfully"
+}
+\`\`\`
+
+### 2.3 POST /v1/sms-gateway/send
+Send arbitrary transactional SMS notification (orders, receipts, alerts).
+- Request Body:
+\`\`\`json
+{
+  "phone": "01712963652",
+  "message": "Order #9812 has shipped!",
+  "priority": "HIGH",
+  "webhook_url": "https://merchant.example.com/webhooks/sms"
+}
+\`\`\`
+
+### 2.4 GET /v1/sms-gateway/stats
+Inspect throughput and Android device online heartbeat.
+
+---
+
+## 3. Webhook Delivery Receipt (POST to your webhook_url)
+\`\`\`json
+{
+  "event": "sms.status_update",
+  "job_id": "job_c18091ab42ef7a",
+  "phone": "01712963652",
+  "status": "SENT",
+  "sent_at": 1773919283120,
+  "error": null
+}
+\`\`\`
+
+---
+*SwapnoPay Cellular SMS Gateway • Version 2.0*
+`;
+
+    let currentApiDocumentation = DEFAULT_SMS_FULL_DOCS;
+
+    function showToast(msg) {
+      const toast = document.getElementById('copy-toast');
+      const text = document.getElementById('toast-text');
+      if (text) text.innerText = msg;
+      if (toast) {
+        toast.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
+        }, 3000);
+      }
+    }
+
+    function copyFullApiDocumentation() {
+      copyDocumentationText(currentApiDocumentation, 'Full SMS Gateway API documentation copied to clipboard!');
+    }
+
+    async function copyDocumentationText(text, message) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(message);
+      } catch (_) {
+        showToast('Clipboard unavailable. Select and copy the documentation text manually.');
+      }
+    }
+
+    function copySnippet(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        copyDocumentationText(el.innerText, 'Code snippet copied to clipboard.');
+      }
+    }
+
+    // Live Supabase Sync for Broadcast Announcements
+    (async function initSupabaseSync() {
+      try {
+        const supaUrl = localStorage.getItem('swapnopay_admin_url') || 'https://swapnopay.supabase.co';
+        const supaKey = localStorage.getItem('swapnopay_admin_anon') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
+        if (window.supabase && supaUrl && supaKey && !supaUrl.includes('placeholder') && !supaKey.includes('placeholder')) {
+          const client = window.supabase.createClient(supaUrl, supaKey);
+          const { data } = await client.from('showcase_config').select('value').eq('key', 'system_config').single();
+          if (data && data.value && data.value.system_notice) {
+            const banner = document.getElementById('admin-broadcast-banner');
+            const msg = document.getElementById('broadcast-message');
+            if (banner && msg) {
+              msg.innerText = data.value.system_notice;
+              banner.classList.remove('hidden');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[SmsDocsPortal] Remote config notice fallback:', err.message);
+      }
+    })();
+  </script>
+</body>
+</html>

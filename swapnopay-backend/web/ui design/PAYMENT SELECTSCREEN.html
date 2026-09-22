@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" style="">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Payment Selection - DreamMart</title>
+  <!-- Tailwind CSS v3 with Plugins -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <style data-purpose="custom-styling">
+    /* Custom font-family for a cleaner look if default sans-serif is too basic */
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8fafc;
+    }
+
+    /* Specific radio button styling to match the reference look */
+    .custom-radio:checked {
+      background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='8' cy='8' r='3'/%3e%3c/svg%3e");
+      border-color: #3b82f6;
+      background-color: #3b82f6;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+  <!-- BEGIN: MainContainer -->
+  <main
+    class="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-[850px] relative">
+    <!-- BEGIN: HeaderSection -->
+    <header class="p-6 border-b border-gray-50" data-purpose="brand-header">
+      <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center gap-2">
+          <!-- DreamMart Logo Placeholder -->
+          <div class="w-10 h-10 bg-black flex items-center justify-center rounded-lg">
+            <span class="text-yellow-500 font-bold text-2xl">D</span>
+          </div>
+          <div>
+            <h1 class="font-bold text-gray-900 flex items-center gap-1">
+              DreamMart
+              <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path clip-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  fill-rule="evenodd"></path>
+              </svg>
+            </h1>
+            <p class="text-xs text-gray-500">Your Trusted Online Store</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <!-- SwapnoPay Brand Placeholder -->
+          <span class="text-blue-900 font-bold italic tracking-tighter">Swapno<span
+              class="text-green-500">Pay</span></span>
+          <svg class="w-6 h-6 text-blue-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" stroke-linecap="round" stroke-linejoin="round"
+              stroke-width="2"></path>
+          </svg>
+        </div>
+      </div>
+      <!-- BEGIN: ProgressBar -->
+      <div data-purpose="checkout-progress">
+        <p class="text-sm font-medium text-blue-600 mb-2">Step 1 of 3</p>
+        <div class="flex gap-2 h-1">
+          <div class="flex-1 bg-blue-600 rounded-full"></div>
+          <div class="flex-1 bg-gray-200 rounded-full"></div>
+          <div class="flex-1 bg-gray-200 rounded-full"></div>
+        </div>
+      </div>
+      <!-- END: ProgressBar -->
+    </header>
+    <!-- END: HeaderSection -->
+    <!-- BEGIN: ContentBody -->
+    <div class="flex-1 p-6" data-purpose="payment-options-selection">
+      <h2 class="text-lg font-bold text-gray-900 mb-1">Choose Payment Method</h2>
+      <p class="text-sm text-gray-500 mb-6">Select your preferred payment option</p>
+      <!-- BEGIN: PaymentOptionsList -->
+      <div class="space-y-3">
+        <!-- Option: bKash -->
+        <label
+          class="flex items-center p-4 border border-gray-100 rounded-xl hover:border-blue-100 hover:bg-blue-50/30 cursor-pointer transition-colors group">
+          <div class="w-12 h-12 flex items-center justify-center mr-4">
+            <!-- Using color blocks to simulate logo icons as seen in ref -->
+            <img alt="bKash" class="w-10 h-10 object-contain"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCT3oRqaCa1B0NTo0NpIcyysssZT6SBR8haYXoX5kV1-GnD1Pup7IylrsaBoAZWCPi78CS6mPYXVcLxphdPuE0pImID2ULx-P0dN2h-DXktUxxEdvq9C9zLeUcnOQ0W0Sur0787NJbI69pE4zpWETs3jWum6YUBl_iDuSM9Kh8JzRHdsfet8j5f5AkS_u4mW9GcJtttql_ZrsylQafZDFXWtOnDK5xqA9ZMBQ0sBST3kFjUDySLXZxK8cYrZKhr2bzvoiNt9yHho5JZCME">
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-gray-800">bKash</p>
+            <p class="text-xs text-gray-400">Pay easily with bKash</p>
+          </div>
+          <input checked="" class="w-5 h-5 text-blue-600 border-gray-300 custom-radio focus:ring-blue-500"
+            name="payment_method" type="radio">
+        </label>
+        <!-- Option: Nagad -->
+        <label
+          class="flex items-center p-4 border border-gray-100 rounded-xl hover:border-blue-100 hover:bg-blue-50/30 cursor-pointer transition-colors group">
+          <div class="w-12 h-12 flex items-center justify-center mr-4">
+            <img alt="Nagad" class="w-10 h-10 object-contain"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAh3JgU-yGpS945aG5j3vaxIEESoDC7Z7U62fvOhPkBH3mW6yyqCxFCqQVYxs3RQ6epuDPnbpkIu88-CUCXj-ByIBoxcmNbUevILfAxG_VXElrNOxuvF-XwZe3DEOvKVQ-4LJMHPaJp3MnP-1YRqmNk_K4ZXoqL54fTYFV2bXzE5IqjXrQ6js0Qjg7MRwaKqRYAmB7_axQsrpSO07aQ4VSQEd2XQ_UCRSmLk26yZPK5pG2qiyko-mN6wdntVxLoyIrSz_gpPOWQnBRAgNc">
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-gray-800">Nagad</p>
+            <p class="text-xs text-gray-400">Pay easily with Nagad</p>
+          </div>
+          <input class="w-5 h-5 text-blue-600 border-gray-300 custom-radio focus:ring-blue-500" name="payment_method"
+            type="radio">
+        </label>
+        <!-- Option: Rocket -->
+        <label
+          class="flex items-center p-4 border border-gray-100 rounded-xl hover:border-blue-100 hover:bg-blue-50/30 cursor-pointer transition-colors group">
+          <div class="w-12 h-12 flex items-center justify-center mr-4">
+            <img alt="Rocket" class="w-10 h-10 object-contain"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfNOmOw5KOFFclck_q0uv4PfwdUCXaMR2Ju__hOt9Ad3mafhkyOap3HR9R2GAmsgALWfAMU_kNYduK6RuMq9KJv3VDllCENVElOZs7SCXK0HTbiFE8M-4-iQhsR1QVX_cLF0u7-j7HHuxijIcIgGAfMTBuJOqMIzcsguDCsXuc3G9VHKodegKiHB0mlgJ6Ec-kbPXJVVUPFqlUckzYiNDUMBPSSGthgrmCiNyaGB-KuxmIvu8_RVg4BpFHCKH40oTdXhO5xZSNbO8WIc4">
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-gray-800">Rocket</p>
+            <p class="text-xs text-gray-400">Pay easily with Rocket</p>
+          </div>
+          <input class="w-5 h-5 text-blue-600 border-gray-300 custom-radio focus:ring-blue-500" name="payment_method"
+            type="radio">
+        </label>
+        <!-- Option: Upay -->
+        <label
+          class="flex items-center p-4 border border-gray-100 rounded-xl hover:border-blue-100 hover:bg-blue-50/30 cursor-pointer transition-colors group">
+          <div class="w-12 h-12 flex items-center justify-center mr-4">
+            <img alt="Upay" class="w-10 h-10 object-contain"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBO5fdz7gNnWgdCuVP9Tgzkuj622I3s3uDAytimNEKodjaiS_inu0BbMe-U0xEbJJHaapzMwXeA4LqZ0g_rwet5nzW2nRWRqxFRt_C14QssCSIUIXopJzbORrK7pDlOr1TWWSi-Hlo4WYKdy-VKCyDJVr4R1sqBftk5E-ddLTdajpas3iKrHxNR2_W5Z8XVrqJwmoww7qv_Uu-YaIInlAv3PVX1ZkZTmjO2w1iZOJ9o74fkLmzT6Z8P8iY4RoWTvZw4JiA6PuoLcoSRc30">
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-gray-800">Upay</p>
+            <p class="text-xs text-gray-400">Pay easily with Upay</p>
+          </div>
+          <input class="w-5 h-5 text-blue-600 border-gray-300 custom-radio focus:ring-blue-500" name="payment_method"
+            type="radio">
+        </label>
+      </div>
+      <!-- END: PaymentOptionsList -->
+    </div>
+    <!-- END: ContentBody -->
+    <!-- BEGIN: FloatingHelpButton -->
+    <button
+      class="absolute bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full flex flex-col items-center justify-center shadow-lg hover:bg-blue-700 transition-all z-10"
+      data-purpose="support-button">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
+          stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+      <span class="text-[10px] font-medium">Help</span>
+    </button>
+    <!-- END: FloatingHelpButton -->
+    <!-- BEGIN: FooterSection -->
+    <footer class="p-6 border-t border-gray-100 bg-white" data-purpose="summary-footer">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total Amount</p>
+          <p class="text-2xl font-bold text-blue-700">৳1,500.00</p>
+        </div>
+        <div class="text-right">
+          <div class="flex items-center justify-end gap-1 text-green-600 mb-0.5">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path clip-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                fill-rule="evenodd"></path>
+            </svg>
+            <span class="text-xs font-bold">Secure Payment</span>
+          </div>
+          <p class="text-[10px] text-gray-400">256-bit SSL Encrypted</p>
+        </div>
+      </div>
+    </footer>
+    <!-- END: FooterSection -->
+  </main>
+  <!-- END: MainContainer -->
+
+
+</body>
+
+</html>

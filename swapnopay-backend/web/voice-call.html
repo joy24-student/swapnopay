@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwapnoPay AI Voice Assistant | স্বপ্নপে এআই কল সেবা</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 24px rgba(79, 70, 229, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    }
+    .calling-pulse {
+      animation: pulse-ring 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-between p-4 sm:p-6 font-sans">
+
+  <!-- Header -->
+  <header class="w-full max-w-md flex items-center justify-between py-3 border-b border-slate-800">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-sm">SP</div>
+      <span class="font-bold tracking-wider text-sm">SWAPNOPAY VOICE AI</span>
+    </div>
+    <span id="call-timer" class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-400 font-mono">00:00</span>
+  </header>
+
+  <!-- Main Calling Interface -->
+  <main class="w-full max-w-md flex flex-col items-center my-auto py-6">
+    
+    <!-- AI Avatar & Waveform -->
+    <div class="relative flex items-center justify-center mb-6">
+      <div id="ring-container" class="w-32 h-32 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center calling-pulse shadow-2xl">
+        <i id="ai-icon" class="fa-solid fa-headset text-4xl text-white"></i>
+      </div>
+    </div>
+
+    <!-- Agent Identity -->
+    <h1 id="agent-name" class="text-2xl font-black text-white">তানিয়া (Tania)</h1>
+    <p id="agent-sub" class="text-xs text-indigo-400 font-semibold tracking-wide uppercase mt-1">স্বপ্নপে কাস্টমার কেয়ার এআই প্রতিনিধি</p>
+    <p id="call-status" class="text-sm text-slate-400 mt-2 text-center">কথা বলতে নিচে মাইক্রোফোন বাটনে ট্যাপ করুন...</p>
+
+    <!-- Interactive Transcript Live Box -->
+    <div id="transcript-box" class="w-full mt-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 h-60 overflow-y-auto space-y-3 shadow-inner">
+      <div class="flex gap-2.5 items-start">
+        <div class="w-6 h-6 rounded-full bg-indigo-600/30 flex items-center justify-center text-[10px] text-indigo-400 font-bold shrink-0 mt-0.5">AI</div>
+        <div class="bg-indigo-950/60 border border-indigo-500/20 rounded-2xl rounded-tl-none p-3 text-xs leading-relaxed text-slate-200">
+          আসসালামু আলাইকুম! স্বপ্নপে স্টোরে আপনাকে স্বাগতম। আমি আপনার এআই প্রতিনিধি। আজ আপনাকে কীভাবে সাহায্য করতে পারি?
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Call Controls (100% Free - Zero Twilio) -->
+  <footer class="w-full max-w-md flex flex-col items-center gap-3 pb-4">
+    <div class="flex items-center justify-center gap-6">
+      <!-- Mute/Unmute -->
+      <button id="btn-mute" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition">
+        <i class="fa-solid fa-volume-high text-lg"></i>
+      </button>
+
+      <!-- Main Hold-to-Talk / Tap-to-Speak Mic Button -->
+      <button id="btn-mic" class="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 flex items-center justify-center text-white shadow-lg transition active:scale-95">
+        <i class="fa-solid fa-microphone text-2xl"></i>
+      </button>
+
+      <!-- End Call Button -->
+      <button id="btn-hangup" onclick="endCall()" class="w-12 h-12 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center text-white transition">
+        <i class="fa-solid fa-phone-slash text-lg"></i>
+      </button>
+    </div>
+
+    <p class="text-[11px] text-slate-500 text-center">
+      Google Gemini দ্বারা চালিত • ১০০% ব্রাউজার নির্ভর • কোনো অতিরিক্ত কল চার্জ নেই
+    </p>
+  </footer>
+
+  <script>
+    let isSpeaking = false;
+    let isCallEnded = false;
+    let seconds = 0;
+    let timerInterval = null;
+    const transcriptBox = document.getElementById('transcript-box');
+    const callStatus = document.getElementById('call-status');
+    const btnMic = document.getElementById('btn-mic');
+    const ringContainer = document.getElementById('ring-container');
+
+    // Parse URL params for Due Reminders or Order Confirmations
+    const urlParams = new URLSearchParams(window.location.search);
+    const dueAmount = urlParams.get('due');
+    const orderId = urlParams.get('order');
+    const customerName = urlParams.get('name') || 'সম্মানিত গ্রাহক';
+
+    // Timer
+    timerInterval = setInterval(() => {
+      if (isCallEnded) return;
+      seconds++;
+      const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const secs = String(seconds % 60).padStart(2, '0');
+      document.getElementById('call-timer').textContent = `${mins}:${secs}`;
+    }, 1000);
+
+    // Initial greeting aloud
+    window.addEventListener('DOMContentLoaded', () => {
+      if (dueAmount) {
+        setTimeout(() => {
+          const dueMsg = `আসসালামু আলাইকুম ${customerName}! স্বপ্নপে শপ থেকে বলছি। আপনার ${dueAmount} টাকা বকেয়া রয়েছে। আপনি কি বিকাশ বা নগদে পরিশোধ করতে পারবেন ভাইয়া?`;
+          appendMessage('assistant', dueMsg);
+          speakText(dueMsg, () => startAutoListening());
+        }, 800);
+      } else if (orderId) {
+        setTimeout(() => {
+          const ordMsg = `আসসালামু আলাইকুম ${customerName}! আপনার অর্ডার নং ${orderId} কনফার্ম করতে কল করেছি। আপনি কি অর্ডারটি নিশ্চিত করছেন ভাইয়া?`;
+          appendMessage('assistant', ordMsg);
+          speakText(ordMsg, () => startAutoListening());
+        }, 800);
+      } else {
+        setTimeout(() => {
+          const welcome = 'আসসালামু আলাইকুম ভাইয়া! স্বপ্নপে কাস্টমার কেয়ারে স্বাগতম। আমি আপনার এআই সহকারী তানিয়া। আজ আপনাকে কীভাবে সাহায্য করতে পারি?';
+          appendMessage('assistant', welcome);
+          speakText(welcome, () => startAutoListening());
+        }, 800);
+      }
+    });
+
+    // ── Ultra-Fast Client-Side Intent Matcher (<10ms) ──
+    function matchFastClientIntent(text) {
+      const q = (text || '').trim().toLowerCase();
+      if (!q) return null;
+
+      if (/(খোলা|বন্ধ|সময়|কখন|কয়টা|টাইম|খোলে|ছুটি|open|close|time|hours)/i.test(q)) {
+        return 'জি ভাইয়া! আমাদের দোকান প্রতিদিন সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা থাকে। ছুটির দিনেও খোলা পাবেন। আর কিছু কি জানার ছিল ভাইয়া?';
+      }
+      if (/(বাকি|বাকী|বকেয়া|টাকা|হিসাব|পাওনা|ব্যালেন্স|due|balance|debt)/i.test(q)) {
+        return 'জি ভাইয়া, আপনার বকেয়ার তথ্য দেখছি। আপনি চাইলে এখনই বিকাশ বা নগদে সরাসরি পরিশোধ করে দিতে পারেন। বিকাশ নম্বরটা কি বলে দেব?';
+      }
+      if (/(পেমেন্ট|বিকাশ|নগদ|রকেট|টাকা দেব|টাকা পাঠাব|বিল|payment|bkash|nagad|rocket|cash)/i.test(q)) {
+        return 'জি ভাইয়া, আমাদের শপে বিকাশ, নগদ, রকেট এবং ক্যাশে পেমেন্ট নেওয়া হয়। আপনি কোন মাধ্যমে দিতে চান ভাইয়া?';
+      }
+      if (/(অর্ডার|ডেলিভারি|পার্সেল|কুরিয়ার|পাঠাইছেন|কবে পাব|ট্র্যাকিং|order|delivery|courier|parcel)/i.test(q)) {
+        return 'জি ভাইয়া, আপনার অর্ডারটি আমরা প্রস্তুত করে রেখেছি। খুব দ্রুত ডেলিভারি প্রতিনিধি আপনার সাথে ফোনে যোগাযোগ করবে। কোনো চিন্তা করবেন না ভাইয়া!';
+      }
+      if (/(ঠিকানা|কোথায়|লোকেশন|জায়গা|দোকান কোন|address|location|where)/i.test(q)) {
+        return 'জি ভাইয়া, আমাদের শপ বাজারের প্রধান মোড়েই অবস্থিত। আপনি সহজে আসার জন্য চাইলে আপনার মোবাইলে লোকেশন লিঙ্ক পাঠিয়ে দিচ্ছি ভাইয়া!';
+      }
+      if (/(মালিক|দোকানদার|ম্যানেজার|কথা বলব|মানুষের সাথে|owner|manager|human)/i.test(q)) {
+        return 'জি ভাইয়া, অবশ্যই! আমি আমাদের শপ ওনারকে এখনই বিষয়টি জানাচ্ছি, এক মিনিট লাইনে থাকুন ভাইয়া।';
+      }
+      if (/(অফার|ছাড়|ডিসকাউন্ট|কম|কমাবেন|offer|discount|promo)/i.test(q)) {
+        return 'জি ভাইয়া, আমাদের চলতি স্পেশাল অফারে সব কেনাকাটায় বিশেষ ক্যাশব্যাক ও মূল্যছাড় চলছে!';
+      }
+      if (/(সালাম|আসসালামু|নমস্কার|হ্যালো|হাই|hello|hi|hey|salam)/i.test(q)) {
+        return 'আসসালামু আলাইকুম ভাইয়া! জি ভাইয়া, বলুন আপনাকে কীভাবে সহযোগিতা করতে পারি?';
+      }
+      if (/(ধন্যবাদ|থ্যাঙ্ক|বাই|ভালো|বিদায়|thanks|thank you|bye)/i.test(q)) {
+        return 'আপনাকেও অনেক অনেক ধন্যবাদ ভাইয়া! ভালো থাকবেন, শুভদিন!';
+      }
+      if (/^(হ্যাঁ|হাঁ|জি|ঠিক আছে|আচ্ছা|ok|okay|yes)$/i.test(q)) {
+        return 'জি ভাইয়া, বুঝতে পেরেছি। সবকিছু নোট করে রাখা হয়েছে। আর কোনো বিষয়ে সাহায্য লাগবে ভাইয়া?';
+      }
+      return null;
+    }
+
+    // Browser Speech Recognition (Web Speech API - Zero Twilio)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'bn-BD';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        callStatus.textContent = 'শুনছি... আপনার কথা বলুন';
+        btnMic.classList.add('ring-4', 'ring-emerald-400');
+        if (ringContainer) ringContainer.classList.add('calling-pulse');
+      };
+
+      recognition.onresult = async (event) => {
+        if (isCallEnded) return;
+        const spoken = event.results[0][0].transcript;
+        appendMessage('customer', spoken);
+        btnMic.classList.remove('ring-4', 'ring-emerald-400');
+        if (ringContainer) ringContainer.classList.remove('calling-pulse');
+
+        // Check Sub-10ms ultra-fast local human intent
+        const fastReply = matchFastClientIntent(spoken);
+        if (fastReply) {
+          callStatus.textContent = 'এআই কথা বলছে...';
+          appendMessage('assistant', fastReply);
+          speakText(fastReply, () => startAutoListening());
+
+          // Asynchronously record turn to backend without blocking audio
+          try {
+            const activeMerchantId = urlParams.get('merchant_id') || localStorage.getItem('swapnopay_merchant_id') || 'default';
+            fetch('/v1/voice/record-to-ai', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ merchant_id: activeMerchantId, speech_text: spoken })
+            }).catch(() => {});
+          } catch (_) {}
+          return;
+        }
+
+        // Open-ended query: provide immediate verbal acknowledgment
+        callStatus.textContent = 'এআই উত্তর প্রস্তুত করছে...';
+        
+        try {
+          const activeMerchantId = urlParams.get('merchant_id') || localStorage.getItem('swapnopay_merchant_id') || 'default';
+          const res = await fetch('/v1/voice/record-to-ai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              merchant_id: activeMerchantId,
+              speech_text: spoken
+            })
+          });
+          const data = await res.json();
+          const reply = (data.ok && data.ai_reply) ? data.ai_reply : 'জি ভাইয়া, বুঝতে পেরেছি। আপনার প্রশ্নের সকল তথ্য নোট করে রাখা হয়েছে। আর কিছু বলবেন ভাইয়া?';
+          appendMessage('assistant', reply);
+          speakText(reply, () => startAutoListening());
+        } catch (e) {
+          const fallback = 'জি ভাইয়া, আমাদের শপ সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা থাকে। আপনার আর কিছু জানার আছে ভাইয়া?';
+          appendMessage('assistant', fallback);
+          speakText(fallback, () => startAutoListening());
+        }
+      };
+
+      recognition.onerror = () => {
+        btnMic.classList.remove('ring-4', 'ring-emerald-400');
+        if (!isSpeaking && !isCallEnded) {
+          callStatus.textContent = 'শুনতে সমস্যা হয়েছে, আবার বলুন বা মাইকে ট্যাপ করুন';
+          setTimeout(() => startAutoListening(), 1000);
+        }
+      };
+
+      recognition.onend = () => {
+        btnMic.classList.remove('ring-4', 'ring-emerald-400');
+        if (!isSpeaking && !isCallEnded) {
+          callStatus.textContent = 'আপনার কথা বলুন... (লাইভ কল চলছে)';
+        }
+      };
+    }
+
+    function startAutoListening() {
+      if (isCallEnded || isSpeaking || !recognition) return;
+      try {
+        recognition.start();
+      } catch (_) {}
+    }
+
+    btnMic.addEventListener('click', () => {
+      if (recognition) {
+        try {
+          if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            isSpeaking = false;
+          }
+          recognition.start();
+        } catch (e) {
+          recognition.stop();
+        }
+      } else {
+        alert('আপনার ব্রাউজারে স্পিচ রিকগনিশন সাপোর্ট করে না। ক্রোম ব্রাউজার ব্যবহার করুন।');
+      }
+    });
+
+    // Native Speech Synthesis (Text-to-Speech) with Human Cadence
+    function speakText(text, onComplete) {
+      if (!('speechSynthesis' in window) || isCallEnded) {
+        if (onComplete) onComplete();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'bn-BD';
+      utterance.rate = 1.06; // Human conversational speed
+      utterance.pitch = 1.02; // Warm friendly tone
+
+      // Try selecting Bengali voice
+      const voices = window.speechSynthesis.getVoices();
+      const bnVoice = voices.find(v => v.lang.startsWith('bn')) || voices.find(v => v.name.includes('Bangla') || v.name.includes('Bengali'));
+      if (bnVoice) utterance.voice = bnVoice;
+
+      utterance.onstart = () => {
+        isSpeaking = true;
+        callStatus.textContent = 'এআই কথা বলছে...';
+        if (ringContainer) ringContainer.classList.add('calling-pulse');
+      };
+
+      utterance.onend = () => {
+        isSpeaking = false;
+        callStatus.textContent = 'শুনছি... আপনার উত্তর বলুন';
+        if (ringContainer) ringContainer.classList.remove('calling-pulse');
+        if (onComplete) onComplete();
+      };
+
+      utterance.onerror = () => {
+        isSpeaking = false;
+        if (onComplete) onComplete();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function appendMessage(role, text) {
+      const isAi = role === 'assistant';
+      const row = document.createElement('div');
+      row.className = `flex gap-2.5 items-start ${isAi ? '' : 'justify-end'}`;
+
+      if (isAi) {
+        row.innerHTML = `
+          <div class="w-6 h-6 rounded-full bg-indigo-600/30 flex items-center justify-center text-[10px] text-indigo-400 font-bold shrink-0 mt-0.5">AI</div>
+          <div class="bg-indigo-950/60 border border-indigo-500/20 rounded-2xl rounded-tl-none p-3 text-xs leading-relaxed text-slate-200">
+            ${text}
+          </div>
+        `;
+      } else {
+        row.innerHTML = `
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tr-none p-3 text-xs leading-relaxed text-white">
+            ${text}
+          </div>
+          <div class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-slate-300 font-bold shrink-0 mt-0.5">YOU</div>
+        `;
+      }
+
+      transcriptBox.appendChild(row);
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function endCall() {
+      isCallEnded = true;
+      if (timerInterval) clearInterval(timerInterval);
+      if (recognition) {
+        try { recognition.stop(); } catch (_) {}
+      }
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      callStatus.textContent = 'কল সমাপ্ত হয়েছে';
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,295 @@
+openapi: 3.0.3
+info:
+  title: SwapnoPay Payment Gateway API
+  description: Self-hosted payment gateway automated validation and matching endpoints for bKash, Nagad, Rocket, and Upay.
+  version: 1.0.0
+servers:
+  - url: https://{project-ref}.supabase.co
+    description: Supabase Gateway Hosting Production Server
+    variables:
+      project-ref:
+        default: abc123xyz
+        description: Your Supabase Project Reference ID
+paths:
+  /functions/v1/hosted-form:
+    get:
+      summary: Render a hosted form, read payment status, or request a private attachment URL
+      parameters:
+        - in: query
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: action
+          schema: { type: string, enum: [status, attachment] }
+        - in: query
+          name: order_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: submission_id
+          description: Required with action=attachment.
+          schema: { type: string, format: uuid }
+        - in: query
+          name: field_id
+          description: Required with action=attachment. A merchant bearer token is also required.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Hosted HTML or payment status JSON
+        '401':
+          description: Merchant authentication is required for private attachments
+        '403':
+          description: The authenticated user does not own this form
+        '404':
+          description: Published form or order not found
+    post:
+      summary: Submit a published form, or upload a private form attachment
+      parameters:
+        - in: query
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: action
+          description: Set to upload for multipart attachment requests; omit for JSON submissions.
+          schema: { type: string, enum: [upload] }
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostedFormSubmissionRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              required: [request_id, field_id, file]
+              properties:
+                request_id: { type: string, format: uuid }
+                field_id: { type: string }
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Response stored transactionally; payment instructions are included when required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostedFormSubmissionResponse'
+        '409':
+          description: Response limit, duplicate response, or missing merchant payment route
+        '422':
+          description: Server-side field validation failed
+        '429':
+          description: Rate limit exceeded
+        '413':
+          description: Submission or attachment is too large
+        '415':
+          description: Attachment extension is not permitted
+
+  /functions/v1/create-order:
+    post:
+      summary: Register Payment Order
+      description: Merchant server-side endpoint to register transaction checkpoints before redirecting customer browser to widget portals.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: false
+          description: Unique transaction idempotency key to prevent double charging on retry connections.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: Order registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+        '400':
+          description: Bad request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized merchant secrets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request frequency rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /functions/v1/resolve-appeal:
+    post:
+      summary: Resolve Dispute Appeal
+      description: Admin dashboard utility endpoint to approve or reject unmatched transaction disputes manually.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveAppealRequest'
+      responses:
+        '200':
+          description: Appeal successfully updated and settled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveAppealResponse'
+        '400':
+          description: Missing appeal parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target appeal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    HostedFormSubmissionRequest:
+      type: object
+      required: [request_id, answers]
+      properties:
+        request_id: { type: string, format: uuid }
+        answers:
+          type: object
+          additionalProperties:
+            oneOf:
+              - { type: string }
+              - { type: object, additionalProperties: true }
+              - { type: array, items: { type: string } }
+        product_id: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        payment_method: { type: string, enum: [bKash, Nagad, Rocket, Upay] }
+    HostedFormSubmissionResponse:
+      type: object
+      properties:
+        submission_id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid, nullable: true }
+        transaction_id: { type: string, nullable: true }
+        payment_status: { type: string, enum: [PENDING, PAID, NOT_REQUIRED] }
+        payment_required: { type: boolean }
+        amount: { type: number }
+        payment_number: { type: string, nullable: true }
+        payment_method: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+    CreateOrderRequest:
+      type: object
+      required:
+        - merchantSecret
+        - tran_id
+        - amount
+        - cus_phone
+      properties:
+        merchantSecret:
+          type: string
+          description: Live webhook merchant secret key
+          example: sk_live_abc123
+        tran_id:
+          type: string
+          description: Unique WooCommerce/System order ID
+          example: ORD-7845
+        amount:
+          type: number
+          format: float
+          description: BDT billing amount
+          example: 1500.00
+        cus_phone:
+          type: string
+          description: Customer mobile wallet phone number
+          example: '01712345678'
+        cus_email:
+          type: string
+          format: email
+          description: Payer email address
+          example: customer@email.com
+        callback_url:
+          type: string
+          format: url
+          description: Callback redirect url to receive webhook PAID event notifications
+          example: https://mystore.com/webhook
+        payment_method:
+          type: string
+          enum: [bKash, Nagad, Rocket, Upay]
+          description: Target payment provider override
+          example: bKash
+    CreateOrderResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: SUCCESS
+        order_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        merchantNumber:
+          type: string
+          example: '01712345678'
+        expiresAt:
+          type: string
+          format: date-time
+          example: '2026-07-17T20:30:00Z'
+    ResolveAppealRequest:
+      type: object
+      required:
+        - appeal_id
+        - action
+      properties:
+        appeal_id:
+          type: string
+          format: uuid
+          example: a4b1a134-8be0-449e-8c33-f549c4dbbc81
+        action:
+          type: string
+          enum: [APPROVED, REJECTED]
+          example: APPROVED
+        order_id:
+          type: string
+          format: uuid
+          description: Target order ID mapping (if manual override is needed)
+          example: 550e8400-e29b-41d4-a716-446655440000
+    ResolveAppealResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: SUCCESS
+        message:
+          type: string
+          example: Appeal successfully resolved as APPROVED
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid merchant credentials
+        details:
+          type: string
+          example: Failed database mapping lookup checks

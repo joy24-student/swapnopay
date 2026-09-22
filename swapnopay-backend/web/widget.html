@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Checkout - SwapnoPay</title>
+  <meta name="description" content="SwapnoPay Secure Checkout — Fast and safe mobile payment gateway for Bangladesh">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .dashed-border {
+      border: 2px dashed #cbd5e1;
+    }
+    .flow-stage-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(248, 250, 252, 0.9);
+      color: #475569;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: all 0.25s ease;
+    }
+    .flow-stage-pill.active {
+      background: linear-gradient(135deg, rgba(59,130,246,.15), rgba(37,99,235,.12));
+      border-color: rgba(59,130,246,.4);
+      color: #1d4ed8;
+      box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+    }
+    .flow-stage-pill.complete {
+      background: linear-gradient(135deg, rgba(16,185,129,.12), rgba(5,150,105,.08));
+      border-color: rgba(16,185,129,.35);
+      color: #047857;
+    }
+    .flow-stage-pill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.7;
+      animation: flowPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes flowPulse {
+      0%, 100% { transform: scale(1); opacity: 0.7; }
+      50% { transform: scale(1.3); opacity: 1; }
+    }
+    .merchant-avatar-img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    .avatar-fallback {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      color: #fff;
+    }
+    @keyframes offlinePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .offline-pulse {
+      animation: offlinePulse 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+  <!-- Main Container (Responsive Grid layout) -->
+  <main class="w-full max-w-md md:max-w-4xl bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden relative grid grid-cols-1 md:grid-cols-12 min-h-[850px] md:min-h-[600px] md:max-h-[850px]">
+    
+    <!-- LEFT PANEL: Summary & Brand (Cols 1-5) -->
+    <section class="col-span-1 md:col-span-5 bg-gray-50/70 border-b md:border-b-0 md:border-r border-gray-100 p-6 md:p-8 flex flex-col justify-between">
+      <div>
+        
+        <!-- Header Brand Info -->
+        <!-- Merchant Offline Banner (shown when device_active=false) -->
+        <div id="merchant-offline-banner" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="flex items-start gap-2.5">
+            <span class="text-amber-500 text-lg offline-pulse">⚠️</span>
+            <div class="flex-grow">
+              <p class="text-[11px] font-bold text-amber-900 mb-0.5">Merchant Device Offline</p>
+              <p class="text-[10px] text-amber-700 mb-2">The merchant's device is currently offline. Payments may not be verified automatically.</p>
+              <div class="flex gap-2">
+                <button onclick="retryDeviceCheck()" class="text-[10px] font-bold bg-amber-500 text-white px-2.5 py-1 rounded-lg hover:bg-amber-600 transition-colors">Retry</button>
+                <a id="merchant-contact-btn" href="#" class="text-[10px] font-bold bg-white border border-amber-300 text-amber-700 px-2.5 py-1 rounded-lg hover:bg-amber-50 transition-colors">Call Merchant</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-6">
+          <div class="flex items-center gap-2">
+            <div id="avatar" class="avatar-fallback bg-[#3D2C1A]">D</div>
+            <div>
+              <div class="flex items-center gap-1">
+                <h1 class="font-bold text-gray-900 text-sm md:text-base" id="merchant-name">DreamMart</h1>
+                <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>
+              </div>
+              <p class="text-[10px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
+            </div>
+          </div>
+
+          <!-- Language Selector -->
+          <div class="flex gap-1">
+            <button class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-blue-600 text-white border-blue-600" id="lang-en" onclick="setLanguage('en')">EN</button>
+            <button class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-white text-gray-500 border-gray-200" id="lang-bn" onclick="setLanguage('bn')">বাংলা</button>
+          </div>
+        </div>
+
+        <!-- Total Amount -->
+        <div class="mb-5 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+          <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1" data-translate="amtPaid">Total Amount</p>
+          <p class="text-2xl md:text-3xl font-black text-blue-600" id="amount-text">৳1,500.00</p>
+        </div>
+
+        <!-- Mobile Toggle Button -->
+        <button class="md:hidden w-full flex justify-between items-center py-2 px-3.5 bg-gray-100 hover:bg-gray-200/70 transition-colors rounded-xl text-[11px] font-bold text-gray-600 mb-4" onclick="toggleSummaryMobile()">
+          <span id="summary-toggle-text" data-translate="orderInfo">Order Details & Instructions</span>
+          <span class="material-symbols-outlined text-[16px]" id="summary-toggle-icon">expand_more</span>
+        </button>
+
+        <!-- Collapsible Content (Details & Instructions) -->
+        <div id="collapsible-summary" class="hidden md:block space-y-4">
+          <!-- Order Information -->
+          <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm text-xs">
+            <h4 class="font-bold text-gray-700 mb-2 border-b border-gray-100 pb-1.5" data-translate="orderInfo">Order Details</h4>
+            <div class="space-y-2">
+              <div class="flex justify-between">
+                <span class="text-gray-400" data-translate="orderIdLabel">Order ID</span>
+                <span class="font-bold text-gray-800" id="summary-order-id">ORD-XXXX</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-400 mb-0.5" data-translate="descLabel">Description</span>
+                <span class="text-gray-600 font-medium leading-relaxed" id="summary-desc">Fill in details to proceed with order payment.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Instructions Card -->
+          <div class="bg-blue-50/50 border border-blue-50 p-4 rounded-2xl text-xs">
+            <h4 class="font-bold text-blue-900 mb-2" data-translate="scanPay">Scan & Pay Instructions</h4>
+            <ol class="space-y-1.5 text-blue-800 font-medium" id="instructions-list">
+              <li>1. Open your bKash App</li>
+              <li>2. Go to Send Money or Scan</li>
+              <li>3. Enter the Merchant Wallet Number</li>
+              <li>4. Input the exact Amount and confirm</li>
+            </ol>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Left Panel Brand Footer -->
+      <div class="hidden md:flex flex-col items-center gap-3 pt-6 border-t border-gray-100">
+        <img alt="SwapnoPay Logo" class="h-14 object-contain w-auto max-w-[200px]" src="logo_branding.png"/>
+        <div class="flex items-center gap-1.5 text-gray-400">
+          <span class="material-symbols-outlined text-[16px] text-green-500">verified</span>
+          <span class="text-[9px] uppercase tracking-wider font-bold" data-translate="sslEncrypt">256-bit SSL Encrypted</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Step Forms & Dialog Views (Cols 6-12) -->
+    <section class="col-span-1 md:col-span-7 p-4 md:p-5 flex flex-col justify-between relative bg-white min-h-[600px] md:min-h-0">
+      
+      <!-- STEP INDICATOR TRACKER -->
+      <div id="step-indicator" class="mb-4">
+        <div class="flex justify-between items-center mb-2 gap-2">
+          <p class="text-blue-600 text-[11px] font-bold" id="step-title" data-translate="stepOf">Step 1 of 3</p>
+          <div class="flex items-center gap-2 flex-wrap justify-end" id="flow-stage-strip">
+            <div class="flow-stage-pill active"><span class="dot"></span> Checkout</div>
+            <div class="flow-stage-pill"><span class="dot"></span> Verify</div>
+            <div class="flow-stage-pill"><span class="dot"></span> Callback</div>
+            <div class="flow-stage-pill"><span class="dot"></span> Success</div>
+          </div>
+          <img alt="SwapnoPay Logo" class="h-10 object-contain md:hidden" src="logo_branding.png"/>
+        </div>
+        <div class="flex gap-1.5 h-1">
+          <div class="flex-grow flex-1 bg-blue-600 rounded-full transition-all duration-300" id="dot1"></div>
+          <div class="flex-grow flex-1 bg-gray-200 rounded-full transition-all duration-300" id="dot2"></div>
+          <div class="flex-grow flex-1 bg-gray-200 rounded-full transition-all duration-300" id="dot3"></div>
+        </div>
+      </div>
+
+      <!-- MAIN INTERACTIVE SCREENS WRAPPER -->
+      <div class="flex-grow flex flex-col justify-between">
+        
+        <!-- STEP 1: CHOOSE PAYMENT METHOD -->
+        <div class="hidden" id="view1">
+          <div>
+            <h2 class="text-base font-bold text-gray-800 mb-0.5" data-translate="choosePay">Choose Payment Method</h2>
+            <p class="text-[11px] text-gray-400 mb-4" data-translate="selectPref">Select your preferred payment option</p>
+
+            <div class="grid grid-cols-2 gap-2 mb-4" id="mfs-options-container">
+              <!-- bKash option -->
+              <div class="border border-pink-500 bg-pink-50/10 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('bKash', '#E2125A')" id="opt-bkash">
+                <img src="BKash-Icon2-Logo.wine.svg" alt="bKash" class="w-9 h-9 object-contain" />
+                <span class="text-xs font-bold text-gray-700">bKash</span>
+              </div>
+              <!-- Nagad option -->
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Nagad', '#EC5A24')" id="opt-nagad">
+                <img src="Nagad-Logo.wine.svg" alt="Nagad" class="w-9 h-9 object-contain" />
+                <span class="text-xs font-bold text-gray-700">Nagad</span>
+              </div>
+              <!-- Rocket option -->
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Rocket', '#8C3494')" id="opt-rocket">
+                <img src="Rocket.png" alt="Rocket" class="w-9 h-9 object-contain" />
+                <span class="text-xs font-bold text-gray-700">Rocket</span>
+              </div>
+              <!-- Upay option -->
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Upay', '#10B981')" id="opt-upay">
+                <img src="upay-seeklogo.png" alt="Upay" class="w-9 h-9 object-contain" />
+                <span class="text-xs font-bold text-gray-700">Upay</span>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-[11px] font-bold text-gray-600 mb-1.5" id="phone-label" data-translate="payNumber">Payment Number (Your bKash Number) *</label>
+              <div class="flex border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors bg-white">
+                <span class="bg-gray-50 border-r border-gray-200 px-3 py-2 text-xs text-gray-500 flex items-center font-bold">+880</span>
+                <input type="tel" class="w-full px-3.5 py-2 outline-none text-xs text-gray-800 font-semibold" placeholder="Enter 11 digit mobile number" id="customer-phone">
+              </div>
+              <p class="text-rose-500 text-[10px] font-bold mt-1.5 hidden" id="phone-error-msg" data-translate="phoneError">Please enter a valid 11-digit mobile number.</p>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex gap-2.5 text-blue-700 mb-4">
+              <span class="material-symbols-outlined text-lg mt-0.5">info</span>
+              <p class="text-[11px] leading-relaxed font-medium" data-translate="payRequest">You will receive the transaction reference number and merchant wallet account details on the next step.</p>
+            </div>
+          </div>
+
+          <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-colors text-xs mt-4" onclick="goToStep(2)" data-translate="continuePay">
+            Continue to Pay
+          </button>
+        </div>
+
+        <!-- STEP 2: SCAN & PAY -->
+        <div class="hidden" id="view2">
+          <div>
+            <!-- Selected Payment Method Card -->
+            <div class="flex items-center justify-between p-2.5 border border-rose-100 bg-white rounded-xl shadow-sm mb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 flex items-center justify-center border border-gray-100 rounded-lg">
+                  <img alt="MFS Logo" class="w-7 h-7 object-contain" id="mfs-selected-logo" src="BKash-Icon2-Logo.wine.svg">
+                </div>
+                <span class="text-xs font-bold text-gray-800" id="mfs-selected-name">bKash</span>
+              </div>
+              <button class="text-rose-500 text-xs font-semibold border border-rose-200 px-3 py-1 rounded-lg hover:bg-rose-50 transition-colors" onclick="goToStep(1)">Change</button>
+            </div>
+
+            <!-- Mobile Countdown Timer -->
+            <div class="bg-rose-50 py-2 px-3 rounded-xl flex items-center justify-between mb-3 border border-rose-100 md:hidden" id="timer-box-mobile">
+              <div class="flex items-center gap-1.5 text-rose-600">
+                <span class="material-symbols-outlined text-[16px]">schedule</span>
+                <span class="text-[9px] font-bold" data-translate="timerHint">Complete the payment within</span>
+              </div>
+              <div class="flex gap-1 items-center font-bold text-rose-600 text-xs">
+                <span id="min-mobile">10</span>:<span id="sec-mobile">00</span>
+              </div>
+            </div>
+
+            <!-- QR & Inputs -->
+            <div class="space-y-2.5">
+              <!-- QR code card -->
+              <div class="p-2.5 border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center gap-2 relative">
+                <div class="w-32 h-32 rounded-lg overflow-hidden border border-gray-100 p-1.5 bg-white relative">
+                  <div class="absolute top-1 right-1 flex items-center gap-0.5 bg-white/95 px-1.5 py-0.5 rounded-full shadow-sm z-10 border border-rose-100">
+                    <span class="flex h-1.5 w-1.5 relative">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                    </span>
+                    <span class="text-[8px] font-black text-rose-600 uppercase">Live</span>
+                  </div>
+                  <img alt="QR Code" class="w-full h-full object-contain" id="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=demo">
+                  
+                  <div class="hidden absolute inset-0 bg-transparent flex flex-col justify-between pointer-events-none" id="qr-scanner">
+                    <div class="w-full h-0.5 bg-blue-500/60 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-[bounce_2.5s_infinite]"></div>
+                  </div>
+                </div>
+                <p class="text-[10px] text-gray-600 font-medium text-center" id="qr-hint-text" data-translate="scanHint">Scan this QR code with your app to pay instantly.</p>
+              </div>
+
+              <!-- Merchant Number -->
+              <div>
+                <label class="block text-[10px] font-bold text-gray-600 mb-0.5" id="merchant-num-label" data-translate="merchantNum">Merchant Number</label>
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-semibold outline-none" readonly id="merchant-num-display" value="017XXXXXXXX">
+                  <button class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors" onclick="copyNumber()">
+                    <span data-translate="copy">Copy</span>
+                    <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Amount -->
+              <div>
+                <label class="block text-[10px] font-bold text-gray-600 mb-0.5" data-translate="amount">Amount</label>
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-900 font-extrabold outline-none" readonly id="amount-text-input" value="৳1,500.00">
+                  <button class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors" onclick="copyAmount()">
+                    <span data-translate="copy">Copy</span>
+                    <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Transaction ID (TrxID) -->
+              <div>
+                <label class="block text-[10px] font-bold text-gray-600 mb-0.5">
+                  <span>Transaction ID (TrxID)</span> <span class="text-gray-400 font-normal">(পেমেন্ট পরবর্তী TrxID লিখুন)</span>
+                </label>
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-white">
+                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-semibold outline-none uppercase" id="step2-trx-input" placeholder="e.g. 9H8B7G6F5E" autocomplete="off" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 space-y-2">
+            <!-- Button Complete -->
+            <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2 text-xs" id="complete-payment-btn" onclick="handleTransferred()">
+              <span data-translate="btnTransferred">I Have Completed Payment</span>
+              <div class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" id="loading-spinner"></div>
+            </button>
+            
+            <!-- Cancel link -->
+            <button class="w-full py-1 text-[11px] text-rose-500 font-bold text-center hover:underline" onclick="showCancelCheck()" data-translate="cancelPay">
+              Cancel Payment
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: STATUS & APPEAL -->
+        <div class="hidden" id="view3">
+          <div>
+            <!-- Pending status alert -->
+            <div class="bg-orange-50 border border-orange-100 rounded-xl p-3.5 mb-3">
+              <div class="flex items-start gap-3">
+                <div class="bg-orange-400 p-1 rounded-full mt-0.5 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-white text-[16px]">hourglass_empty</span>
+                </div>
+                <div class="flex-grow">
+                  <h2 class="font-bold text-orange-900 text-xs mb-0.5" data-translate="pendingTitle">Payment is Pending</h2>
+                  <p class="text-xs text-orange-800 leading-relaxed" data-translate="pendingMsg">
+                    We are still trying to verify your payment. You can appeal below, and we will notify you if your payment is verified.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="relative flex items-center justify-center my-3">
+              <div class="flex-grow border-t border-gray-200"></div>
+              <span class="mx-3 text-[9px] font-bold text-gray-400 bg-white px-2 tracking-widest" data-translate="or">OR</span>
+              <div class="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <!-- Appeal form -->
+            <section class="bg-white border border-gray-100 rounded-2xl p-3.5 shadow-sm mb-4">
+              <h3 class="font-bold text-xs text-gray-800 mb-0.5" data-translate="payFailed">Payment Failed?</h3>
+              <p class="text-[10px] text-gray-500 mb-3 leading-relaxed" data-translate="appealDesc">Don't worry! You can appeal here. Please provide the transaction details and screenshot.</p>
+              
+              <div class="space-y-3">
+                <!-- Transaction ID -->
+                <div>
+                  <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                    <span data-translate="trxLabel">Transaction ID</span> <span class="text-red-500">*</span>
+                  </label>
+                  <input class="w-full border border-gray-200 rounded-xl py-2.5 px-3 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs text-gray-800 font-semibold" id="appeal-trx" placeholder="Enter your transaction ID" type="text"/>
+                  <p class="text-rose-500 text-[10px] font-bold mt-1.5 hidden" id="appeal-trx-error-msg" data-translate="appealTrxError">Transaction ID is required.</p>
+                </div>
+
+                <!-- Upload screenshot -->
+                <div>
+                  <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                    <span data-translate="uploadScreenshot">Upload Screenshot</span> <span class="text-red-500">*</span>
+                  </label>
+                  <div class="dashed-border rounded-xl p-3.5 flex flex-col items-center justify-center bg-blue-50/20 cursor-pointer hover:bg-blue-50/30 transition-colors" onclick="triggerFileInput()">
+                    <span class="material-symbols-outlined text-blue-500 text-2xl mb-1">upload_file</span>
+                    <p class="text-[10px] text-blue-600 font-bold mb-0.5" data-translate="uploadTitle">Click to upload screenshot</p>
+                    <p class="text-[9px] text-gray-400" data-translate="uploadSize">PNG, JPG up to 5MB</p>
+                    <input class="hidden" type="file" id="file-input" onchange="handleFileSelect(event)"/>
+                  </div>
+                  <div id="file-name" class="hidden text-[10px] text-green-600 font-bold mt-1.5"></div>
+                  <p class="text-rose-500 text-[10px] font-bold mt-1.5 hidden" id="appeal-file-error-msg" data-translate="appealFileError">Screenshot upload is required.</p>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                  <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                    <span data-translate="notesLabel">Additional Notes</span> <span class="text-gray-400 font-normal" data-translate="notesOpt">(Optional)</span>
+                  </label>
+                  <textarea class="w-full border border-gray-200 rounded-xl py-2 px-3 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs text-gray-800" id="appeal-note" placeholder="Describe your issue (optional)" rows="1"></textarea>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-colors text-xs mt-4" id="btn-appeal" onclick="submitAppeal()" data-translate="appealSubmit">
+            Submit Appeal
+          </button>
+        </div>
+
+      </div>
+
+      <!-- MOBILE FOOTER ONLY -->
+      <div class="flex items-center justify-between border-t border-gray-100 pt-4 mt-6 md:hidden w-full">
+        <div class="flex items-center gap-1.5 text-gray-400">
+          <span class="material-symbols-outlined text-[16px] text-green-500">verified</span>
+          <span class="text-[9px] uppercase tracking-wider font-bold" data-translate="sslEncrypt">256-bit SSL Encrypted</span>
+        </div>
+        <span class="text-xs font-bold text-gray-700">SwapnoPay Secured</span>
+      </div>
+
+      <!-- MERCHANT OFFLINE FULL OVERLAY -->
+      <div class="hidden absolute inset-0 bg-white flex flex-col z-50 p-5 md:p-6" id="merchant-offline-view">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 w-full mb-6">
+          <div class="flex items-center gap-2">
+            <div id="offline-avatar" class="avatar-fallback bg-gray-800 text-sm">M</div>
+            <div>
+              <h1 class="text-xs font-black text-gray-900" id="offline-merchant-name">Merchant</h1>
+              <p class="text-[9px] text-gray-400">SwapnoPay Payment Gateway</p>
+            </div>
+          </div>
+          <img alt="SwapnoPay" class="h-9 object-contain" src="logo_branding.png"/>
+        </div>
+
+        <div class="flex flex-col items-center justify-center text-center flex-grow py-4">
+          <div class="w-16 h-16 bg-amber-50 border-2 border-amber-200 rounded-full flex items-center justify-center mb-4 offline-pulse">
+            <span class="text-3xl">📵</span>
+          </div>
+          <h2 class="text-base font-black text-gray-900 mb-2">Merchant Device Offline</h2>
+          <p class="text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6">
+            The merchant's payment device is currently offline. Automatic payment verification is unavailable right now.
+          </p>
+
+          <div class="w-full bg-amber-50 border border-amber-100 rounded-xl p-4 text-left mb-4">
+            <h3 class="text-[11px] font-bold text-amber-900 mb-2">What you can do:</h3>
+            <ul class="space-y-1.5 text-[11px] text-amber-700">
+              <li class="flex items-center gap-1.5"><span>📞</span> Contact the merchant directly to confirm the payment</li>
+              <li class="flex items-center gap-1.5"><span>🔄</span> Try again in a few minutes when the device comes online</li>
+              <li class="flex items-center gap-1.5"><span>⚖️</span> Submit an appeal with your transaction screenshot</li>
+            </ul>
+          </div>
+
+          <!-- Interactive "Notify Me When Online" card -->
+          <div class="w-full bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 text-left mb-4 shadow-sm">
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <span class="text-blue-600 text-sm">🔔</span>
+              <h3 class="text-[11px] font-bold text-blue-900">Get Notified When Merchant is Back Online</h3>
+            </div>
+            <p class="text-[10px] text-blue-700 mb-2.5 leading-relaxed">
+              Enter your email below. We'll immediately send you a direct link to return and complete your payment the second the merchant's device reconnects.
+            </p>
+            <div id="device-alert-subscribe-box">
+              <div class="flex flex-col sm:flex-row gap-1.5">
+                <input type="email" id="device-alert-customer-email" placeholder="Enter your email (e.g. name@mail.com)" class="flex-grow text-[11px] px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-800" />
+                <button id="btn-subscribe-device-alert" onclick="subscribeForDeviceOnlineAlert()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-lg text-[11px] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shadow-sm">
+                  <span id="alert-sub-btn-text">🔔 Notify Me</span>
+                  <div id="alert-sub-spinner" class="hidden w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </button>
+              </div>
+              <p id="device-alert-error" class="hidden text-[10px] text-red-600 mt-1 font-medium"></p>
+            </div>
+            <div id="device-alert-success-box" class="hidden text-center py-1.5 bg-green-50 border border-green-200 rounded-lg mt-2">
+              <span class="text-green-700 font-bold text-[11px] flex items-center justify-center gap-1">
+                <span>✅</span> Subscribed! We will email you the moment the merchant is online.
+              </span>
+            </div>
+          </div>
+
+          <p class="text-[9px] text-gray-400 mb-4" id="offline-last-seen-text"></p>
+        </div>
+
+        <div class="space-y-2 w-full">
+          <button onclick="retryDeviceCheck()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors text-xs flex items-center justify-center gap-2">
+            <span id="retry-btn-text">🔄 Retry Connection</span>
+            <div class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" id="retry-spinner"></div>
+          </button>
+          <a id="offline-contact-btn" href="#" class="block w-full py-3 text-center text-amber-600 font-bold border border-amber-200 rounded-xl hover:bg-amber-50 transition-colors text-xs">
+            📞 Call Merchant
+          </a>
+          <button onclick="proceedDespiteOffline()" class="w-full py-2 text-[11px] text-gray-400 hover:text-gray-600 font-semibold transition-colors">
+            Proceed anyway (manual verification)
+          </button>
+        </div>
+      </div>
+
+      <!-- SUCCESS RECEIPT OVERLAY -->
+      <div class="hidden absolute inset-0 bg-white flex flex-col justify-between z-50 p-5 md:p-6" id="success-view">
+        
+        <!-- Top header success -->
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 w-full">
+          <div class="flex items-center gap-2">
+            <div id="success-avatar" class="avatar-fallback bg-gray-900 text-sm">D</div>
+            <div>
+              <h1 class="text-xs font-black text-gray-900" id="success-merchant-name">DreamMart</h1>
+              <p class="text-[9px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 text-green-600 font-bold text-[10px]">
+            <span class="material-symbols-outlined text-[14px]">verified_user</span>
+            <span data-translate="verifiedSecure">Verified Secure</span>
+          </div>
+        </div>
+
+        <!-- Success Hero Banner -->
+        <div class="flex flex-col items-center text-center py-4">
+          <div class="w-12 h-12 bg-green-50 border border-green-200 rounded-full flex items-center justify-center mb-3">
+            <span class="material-symbols-outlined text-green-600 text-2xl">check_circle</span>
+          </div>
+          <h2 class="text-base font-bold text-gray-900 mb-0.5" data-translate="successTitle">Payment Successful</h2>
+          <p class="text-[11px] text-gray-500 max-w-[260px]" data-translate="successDesc">Your transaction has been verified. Thank you for your purchase.</p>
+        </div>
+
+        <!-- Receipt Card -->
+        <div class="bg-gray-50/70 border border-gray-100 rounded-xl p-4 text-left mb-4">
+          <div class="flex justify-between items-center pb-2.5 border-b border-gray-200/50 mb-2.5">
+            <h3 class="text-[9px] uppercase font-bold tracking-wider text-gray-400" data-translate="receiptTitle">Transaction Receipt</h3>
+            <span class="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200" data-translate="paid">PAID</span>
+          </div>
+          
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-500" data-translate="receiptId">Receipt / Order ID</span>
+              <span class="font-bold text-gray-900" id="receipt-id">ORD-XXXX</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500" data-translate="receiptTrx">Transaction Ref ID</span>
+              <span class="font-bold text-gray-900" id="receipt-trx">BKXXXX</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500" data-translate="receiptDate">Date & Time</span>
+              <span class="font-medium text-gray-600" id="receipt-date">Just now</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500" data-translate="receiptGate">Payment Gateway</span>
+              <span class="font-semibold text-gray-800" id="receipt-gateway">bKash Mobile Wallet</span>
+            </div>
+            <div class="flex justify-between pt-2 border-t border-dashed border-gray-200 mt-2">
+              <span class="font-bold text-gray-800 text-xs" data-translate="amtPaid">Amount Paid</span>
+              <span class="font-extrabold text-blue-600 text-xs" id="receipt-amount">৳1,500.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 mt-auto text-xs" onclick="closeWidget()" data-translate="btnReturn">
+          Return to Store
+        </button>
+      </div>
+
+      <!-- CANCEL CONFIRMATION OVERLAY -->
+      <div class="hidden absolute inset-0 bg-white flex flex-col justify-between z-50 p-5 md:p-6" id="cancel-view">
+        
+        <!-- Top header cancel -->
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 w-full">
+          <div class="flex items-center gap-2">
+            <div id="cancel-avatar" class="avatar-fallback bg-gray-900 text-xs">D</div>
+            <div>
+              <h1 class="text-xs font-black text-gray-900" id="cancel-merchant-name">DreamMart</h1>
+              <p class="text-[9px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <img alt="SwapnoPay Logo" class="h-9 object-contain" src="logo_branding.png"/>
+            <span class="text-[10px] font-bold text-gray-500">SwapnoPay</span>
+          </div>
+        </div>
+
+        <!-- Main Cancel Content -->
+        <div class="flex-grow flex flex-col items-center justify-center text-center py-4">
+          <div class="w-12 h-12 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mb-3">
+            <span class="material-symbols-outlined text-rose-500 text-2xl">report</span>
+          </div>
+          <h2 class="text-base font-bold text-gray-900 mb-1" data-translate="cancelTitle">Cancel Payment?</h2>
+          <p class="text-xs text-gray-500 max-w-[260px] leading-relaxed mb-4" data-translate="cancelMsg">
+            Are you sure you want to cancel this payment? Stopping now will interrupt your purchase.
+          </p>
+
+          <!-- Warning Consequence Card -->
+          <div class="w-full bg-rose-50/50 border border-rose-100 rounded-xl p-3.5 text-left">
+            <h3 class="text-[11px] font-bold text-rose-900 mb-1.5" data-translate="cancelConseq">What happens if you cancel:</h3>
+            <ul class="space-y-1.5 text-[11px] text-rose-700">
+              <li class="flex items-start gap-1.5">
+                <span class="material-symbols-outlined text-[14px] text-rose-500 mt-0.5">cancel</span>
+                <span data-translate="cancelC1">The order will not be processed or shipped.</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="material-symbols-outlined text-[14px] text-rose-500 mt-0.5">block</span>
+                <span data-translate="cancelC2">Any pending transaction with SwapnoPay will be voided.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-2 w-full mt-auto">
+          <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors text-xs" onclick="hideCancelCheck()" data-translate="btnNoGoBack">
+            No, Go Back
+          </button>
+          <button class="w-full py-3 text-rose-500 font-bold hover:bg-rose-50 rounded-xl transition-colors border border-rose-200 text-xs" onclick="cancelOrder()" data-translate="btnYesCancel">
+            Yes, Cancel Order
+          </button>
+        </div>
+      </div>
+
+      <!-- CANCELLED SCREEN OVERLAY -->
+      <div class="hidden absolute inset-0 bg-white flex flex-col justify-between z-50 p-5 md:p-6" id="cancelled-view">
+        
+        <!-- Top header cancelled -->
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 w-full">
+          <div class="flex items-center gap-2">
+            <div id="cancelled-avatar" class="avatar-fallback bg-gray-900 text-xs">D</div>
+            <div>
+              <h1 class="text-xs font-black text-gray-900" id="cancelled-merchant-name">DreamMart</h1>
+              <p class="text-[9px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <img alt="SwapnoPay Logo" class="h-9 object-contain" src="logo_branding.png"/>
+            <span class="text-[10px] font-bold text-gray-500">SwapnoPay</span>
+          </div>
+        </div>
+
+        <!-- Cancelled Message Content -->
+        <div class="flex-grow flex flex-col items-center justify-center text-center py-4">
+          <div class="w-12 h-12 bg-gray-50 border border-gray-200 rounded-full flex items-center justify-center mb-3">
+            <span class="material-symbols-outlined text-gray-500 text-2xl">cancel</span>
+          </div>
+          <h2 class="text-base font-bold text-gray-900 mb-1" data-translate="cancelledTitle">Payment Cancelled</h2>
+          <p class="text-xs text-gray-500 max-w-[260px] leading-relaxed" data-translate="cancelledMsg">
+            The transaction has been successfully voided. You can now safely return to the merchant's online store.
+          </p>
+        </div>
+
+        <!-- Button -->
+        <button class="w-full bg-gray-600 text-white font-bold py-3 rounded-xl hover:bg-gray-700 transition-colors mt-auto text-xs" onclick="closeWidget()" data-translate="btnReturn">
+          Return to Store
+        </button>
+      </div>
+
+      <!-- NEW: AUTOMATIC PROCESS COUNTDOWN OVERLAY (Engaging processing state) -->
+      <div class="hidden absolute inset-0 bg-white flex flex-col z-50 p-5 md:p-6" id="processing-view">
+        
+        <!-- Top header processing -->
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 w-full mb-6">
+          <div class="flex items-center gap-2">
+            <div id="proc-avatar" class="avatar-fallback bg-gray-900 text-xs">D</div>
+            <div>
+              <h1 class="text-xs font-black text-gray-900" id="proc-merchant-name">DreamMart</h1>
+              <p class="text-[9px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <img alt="SwapnoPay Logo" class="h-9 object-contain" src="logo_branding.png"/>
+            <span class="text-[10px] font-bold text-gray-500">SwapnoPay</span>
+          </div>
+        </div>
+
+        <!-- Beautiful, colorful verification rotating loading animation -->
+        <div class="flex flex-col items-center text-center py-4 w-full">
+          
+          <div class="relative w-24 h-24 flex items-center justify-center mb-4">
+            <!-- Glowing dashed colorful rotating rings -->
+            <div class="absolute inset-0 rounded-full border-2 border-dashed border-pink-500 animate-[spin_12s_linear_infinite]"></div>
+            <div class="absolute inset-1.5 rounded-full border-2 border-dashed border-orange-500 animate-[spin_10s_linear_infinite_reverse]"></div>
+            <div class="absolute inset-3 rounded-full border-2 border-dashed border-teal-500 animate-[spin_8s_linear_infinite]"></div>
+            <!-- Pulse glow -->
+            <div class="absolute inset-4.5 rounded-full bg-blue-50 border border-blue-100 flex flex-col items-center justify-center shadow-inner animate-[pulse_2s_infinite]">
+              <span class="material-symbols-outlined text-blue-600 text-xl animate-[spin_4s_linear_infinite]">autorenew</span>
+            </div>
+          </div>
+
+          <h2 class="text-base font-black text-gray-900 mb-1" data-translate="processingTitle">Verifying Payment</h2>
+          <p class="text-xs text-gray-500 max-w-[260px] leading-relaxed mb-4" data-translate="processingMsg">
+            Verifying payment automatically... Please do not close this tab.
+          </p>
+
+          <!-- 5 Minute Countdown Timer for Automatic Matching -->
+          <div class="bg-blue-50/70 border border-blue-100 rounded-2xl py-2 px-4 inline-flex flex-col items-center mb-5">
+            <span class="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-0.5" data-translate="timeLeft">Time Remaining</span>
+            <span class="text-xl font-black text-blue-700" id="proc-countdown-timer">05:00</span>
+          </div>
+
+          <!-- Disabled Manual Appeal bypass button (becomes active after 3 mins) -->
+          <div class="w-full space-y-2">
+            <p class="text-[9px] text-gray-400 font-semibold text-center" id="proc-wait-text" data-translate="waitApprove">Please wait while we verify your transaction status.</p>
+            <button class="w-full py-2.5 bg-gray-100 text-gray-400 border border-gray-200 rounded-xl font-bold text-[11px] transition-colors cursor-not-allowed" id="btn-skip-processing" disabled onclick="skipProcessingAndAppeal()">
+              Verify Manually via Appeal
+            </button>
+            <button class="w-full py-2.5 bg-slate-900 text-white rounded-xl font-bold text-[11px] transition-colors hover:bg-slate-800" onclick="showCallbackPayloadPreview()">
+              Preview Callback Payload
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <div id="callback-preview-modal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+        <div>
+          <div class="text-[9px] font-black uppercase tracking-[0.18em] text-blue-600">SwapnoPay callback</div>
+          <h3 class="text-sm font-black text-slate-900 mt-1">Payload Preview</h3>
+        </div>
+        <button class="text-xs font-bold text-slate-500 hover:text-slate-700" onclick="closeCallbackPayloadPreview()">Close</button>
+      </div>
+      <div class="p-4">
+        <div class="mb-3 flex items-center justify-between gap-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2">
+          <div>
+            <div class="text-[9px] uppercase tracking-[0.14em] text-blue-600 font-black">Event</div>
+            <div class="text-xs font-bold text-slate-800" id="callback-event-label">payment.success</div>
+          </div>
+          <button class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-slate-800" onclick="copyCallbackPayload()">Copy JSON</button>
+        </div>
+        <pre id="callback-payload-content" class="max-h-[420px] overflow-auto rounded-xl bg-slate-950 text-slate-100 p-4 text-[11px] leading-6 whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Help Button -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <!-- Hidden Support Popup Panel -->
+    <div id="support-popup" class="hidden bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-60 mb-2 transition-all duration-300">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="material-symbols-outlined text-blue-600 text-lg">support_agent</span>
+        <div>
+          <h4 class="font-bold text-xs text-gray-800" data-translate="helplineTitle">Need Help?</h4>
+          <p class="text-[9px] text-gray-400" data-translate="helplineSub">24/7 Helpline Support</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <a href="tel:+8809612345678" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
+          <span class="material-symbols-outlined text-xs">phone</span>
+          <span>Call</span>
+        </a>
+        <a href="mailto:support@swapnopay.com" class="flex-1 bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
+          <span class="material-symbols-outlined text-xs">mail</span>
+          <span>Email</span>
+        </a>
+      </div>
+    </div>
+    <!-- Core Floating Circle Trigger -->
+    <button onclick="toggleSupportPopup()" class="w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all border border-blue-500/20 active:scale-95">
+      <span class="material-symbols-outlined text-2xl" id="support-icon-symbol">support_agent</span>
+    </button>
+  </div>
+
+  <!-- Socket.io client for real-time payment status from SwapnoPay backend -->
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
+  <script src="widget.js"></script>
+</body>
+</html>

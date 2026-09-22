@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Business Copilot — SwapnoPay</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Hanken Grotesk', sans-serif;
+      background-color: #F8F9FB;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-pulse-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#2D2779',
+              light: '#5343C9',
+              bg: '#F8F9FB'
+            },
+            tool: {
+              green: { bg: '#EBF6EC', text: '#219653', icon: '#27AE60', light: '#D8EFDE' },
+              orange: { bg: '#FFF5E6', text: '#E27D22', icon: '#F2994A', light: '#FEEADB' },
+              blue: { bg: '#E9F1FE', text: '#2D75DD', icon: '#2F80ED', light: '#D8E7FD' },
+              teal: { bg: '#E6F6F6', text: '#138B86', icon: '#1BBC9B', light: '#D6F0EF' },
+              yellow: { bg: '#FFF9E6', text: '#D89E1E', icon: '#F2C94C', light: '#FDF1CD' },
+              purple: { bg: '#F4EBFE', text: '#884DDF', icon: '#9B51E0', light: '#EAD8FC' }
+            }
+          },
+          boxShadow: {
+            'card': '0 4px 20px rgba(0, 0, 0, 0.05)',
+            'input': '0 -4px 20px rgba(0, 0, 0, 0.05)',
+            'sm': '0 2px 8px rgba(0, 0, 0, 0.02)'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="antialiased text-gray-800 bg-brand-bg relative pb-32 min-h-screen flex justify-center">
+
+  <!-- Mobile Container Wrapper for Desktop Centering -->
+  <div class="w-full max-w-md bg-white min-h-screen shadow-2xl relative flex flex-col overflow-hidden">
+    
+    <!-- BEGIN: Header -->
+    <header class="relative h-[160px] px-5 pt-3 text-white overflow-hidden shrink-0" style="background: linear-gradient(-135deg, rgb(45, 39, 121) 0%, rgb(83, 67, 201) 100%); border-top-left-radius: 0px; border-top-right-radius: 0px;">
+      <!-- Status Bar -->
+      <div class="flex justify-between items-center mb-4 text-xs font-semibold text-white/90">
+        <span id="current-time">9:41</span>
+        <div class="flex items-center gap-1.5">
+          <i class="fa-solid fa-signal text-[12px]"></i>
+          <i class="fa-solid fa-wifi text-[14px]"></i>
+          <i class="fa-solid fa-battery-full text-[16px]"></i>
+        </div>
+      </div>
+      
+      <!-- Navigation Bar -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <button onclick="window.history.back()" class="w-11 h-11 rounded-xl border border-white/20 flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all">
+            <i class="fa-solid fa-chevron-left text-lg"></i>
+          </button>
+          <div>
+            <h1 class="text-[20px] font-bold leading-tight">AI Business Copilot</h1>
+            <p class="text-[11px] text-white/80">স্মার্ট ব্যবসা সহকারী এআই</p>
+          </div>
+        </div>
+        <button onclick="openSettingsModal()" class="w-11 h-11 rounded-xl border border-white/20 flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all">
+          <i class="fa-solid fa-gear text-lg"></i>
+        </button>
+      </div>
+    </header>
+    <!-- END: Header -->
+
+    <!-- BEGIN: Main Content -->
+    <main class="px-5 relative z-20 rounded-t-[32px] bg-white -mt-6 pb-36 flex-1 overflow-y-auto custom-scrollbar" data-purpose="main-content">
+      
+      <!-- AI Tools Hub Section -->
+      <section class="mb-5 pt-4" data-purpose="tools-hub">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold flex items-center text-gray-900">
+            <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mr-2 text-sm shadow-sm">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </span>
+            <span style="font-size: 1.125rem;">AI টুলস হাব</span>
+          </h2>
+          <span class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">৬টি সক্রিয় টুল</span>
+        </div>
+
+        <!-- 6 AI Tool Cards Grid -->
+        <div class="grid grid-cols-3 gap-3">
+          
+          <!-- Card 1: Sales Forecast -->
+          <div onclick="triggerTool('sales')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-green-icon flex items-center justify-center text-[20px] mb-2 text-tool-green-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+            <h3 class="text-tool-green-text font-bold mb-1 text-[13.5px] leading-tight">বিক্রয় পূর্বাভাস</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">আগামী মাসের বিক্রি ও পূর্বাভাসের হিসাব</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-green-bg text-tool-green-icon flex items-center justify-center group-hover:bg-tool-green-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Card 2: Inventory Prediction -->
+          <div onclick="triggerTool('inventory')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-orange-icon flex items-center justify-center text-[20px] mb-2 text-tool-orange-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-box"></i>
+            </div>
+            <h3 class="text-tool-orange-text font-bold mb-1 text-[13.5px] leading-tight">ইনভেন্টরি প্রেডিকশন</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">স্টক শেষ হওয়ার পূর্বাভাস ও রিমাইন্ডার</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-orange-bg text-tool-orange-icon flex items-center justify-center group-hover:bg-tool-orange-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Card 3: Customer Analytics -->
+          <div onclick="triggerTool('customer')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-blue-icon flex items-center justify-center text-[20px] mb-2 text-tool-blue-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <h3 class="text-tool-blue-text font-bold mb-1 text-[13.5px] leading-tight">গ্রাহক বিশ্লেষণ</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">VIP ও ঝুঁকিপূর্ণ গ্রাহকদের তালিকা</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-blue-bg text-tool-blue-icon flex items-center justify-center group-hover:bg-tool-blue-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Card 4: Product Recommendation -->
+          <div onclick="triggerTool('product')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-teal-icon flex items-center justify-center text-[20px] mb-2 text-tool-teal-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-tags"></i>
+            </div>
+            <h3 class="text-tool-teal-text font-bold mb-1 text-[13.5px] leading-tight">পণ্য সুপারিশ</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">কোন মাল বেশি চলবে ও অফার পরামর্শ</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-teal-bg text-tool-teal-icon flex items-center justify-center group-hover:bg-tool-teal-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Card 5: Smart Operations -->
+          <div onclick="triggerTool('operations')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-yellow-icon flex items-center justify-center text-[20px] mb-2 text-tool-yellow-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-star"></i>
+            </div>
+            <h3 class="text-tool-yellow-text font-bold mb-1 text-[13.5px] leading-tight">স্মার্ট অপারেশন</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">দৈনিক আয়-ব্যয় ও শপ পরিচালনার টিপস</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-yellow-bg text-tool-yellow-icon flex items-center justify-center group-hover:bg-tool-yellow-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Card 6: Fraud Detection -->
+          <div onclick="triggerTool('fraud')" class="border border-gray-100 rounded-3xl flex flex-col items-start bg-white shadow-sm relative min-h-[170px] p-3.5 hover:shadow-md transition-all cursor-pointer group active:scale-95">
+            <div class="w-11 h-11 rounded-full border-[1.5px] border-tool-purple-icon flex items-center justify-center text-[20px] mb-2 text-tool-purple-icon bg-white shadow-sm group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3 class="text-tool-purple-text font-bold mb-1 text-[13.5px] leading-tight">ফ্রড ডিটেকশন</h3>
+            <p class="text-gray-400 text-[10.5px] leading-[1.3] mb-3">অস্বাভাবিক লেনদেন ও জাল মেসেজ সতর্কতা</p>
+            <button class="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-tool-purple-bg text-tool-purple-icon flex items-center justify-center group-hover:bg-tool-purple-icon group-hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- AI Assistant Greeting Section -->
+      <section class="bg-gradient-to-r from-indigo-50/70 to-purple-50/50 rounded-3xl p-5 shadow-sm border border-indigo-100/60 flex relative overflow-hidden mb-6" data-purpose="ai-greeting">
+        <div class="z-10 pr-2 w-[60%]">
+          <h2 class="text-[17px] font-bold mb-2 flex items-center gap-1.5 text-gray-900">
+            <i class="fa-solid fa-sparkles text-brand-light text-base"></i>
+            আসসালামু আলাইকুম!
+          </h2>
+          <p class="text-gray-600 text-[12.5px] leading-[1.6]">
+            আমি আপনার AI সহকারী। আপনার ব্যবসা সহজ করা, সঠিক সিদ্ধান্ত নিতে সাহায্য করা এবং যে কোনো প্রশ্নের উত্তর দিতে আমি সবসময় প্রস্তুত।
+          </p>
+        </div>
+        <div class="absolute right-0 bottom-0 w-[42%] h-full flex items-end justify-end pointer-events-none">
+          <img alt="3D Robot Assistant" class="object-contain h-[92%] drop-shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWh1V0PqVbcs_CE7aBWCWivf9VKLK65HWfkdJykmiV46PqjvfmOYOPY5vHKFUN9v-A2fFwQv0n1MlkhlPj-iQtThYuOwk3nuRBoSqKsph16OfaIPnNk9rFp1CAkiXQ7OgVWyXOOf96OQnuTmo9q5sl44mv7kNi7A_pLW21dFoc64kcb4u1eb6YDa_RbEeNFI7IW3ESVVRY7AeKvWUIOwcNqiU4cKU4pxznfaiYM2_zdMoH7mTGiuc4Mt_iWB8y_R3Qk4_OEl0dJ8HeFw">
+        </div>
+      </section>
+
+      <!-- Live Interactive Chat Feed -->
+      <section id="chat-feed-section" class="mb-4">
+        <div class="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-comments text-brand-light"></i> এআই কথোপকথন (Chat Feed)
+          </h3>
+          <button onclick="clearChatFeed()" class="text-[11px] text-gray-400 hover:text-red-500 transition-colors">
+            <i class="fa-solid fa-trash-can mr-1"></i>মুছে ফেলুন
+          </button>
+        </div>
+        
+        <div id="chat-messages-container" class="space-y-3">
+          <!-- Initial Welcome Message -->
+          <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-brand-light text-white flex items-center justify-center text-xs shrink-0 shadow-sm">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none p-3.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
+              <p class="font-semibold text-brand-dark mb-1">এআই সহকারি</p>
+              আপনার দোকানের বিক্রয়, বাকি খাতা, স্টক হিসাব বা যেকোনো ব্যবসায়িক প্রশ্নের উত্তর পেতে নিচের বক্সে টাইপ করুন অথবা মাইক্রোফোনে কথা বলুন।
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+    <!-- END: Main Content -->
+
+    <!-- BEGIN: Chat Input Footer -->
+    <footer class="absolute bottom-0 left-0 w-full bg-white p-4 pb-6 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] z-50 rounded-t-2xl border-t border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="flex-1 bg-gray-100 rounded-full px-4 py-2.5 flex items-center gap-3 border border-gray-200/60 focus-within:border-brand-light focus-within:bg-white transition-all">
+          <button onclick="openOcrModal()" title="রসিদ স্ক্যান (OCR)" class="text-gray-400 hover:text-brand-light transition-colors">
+            <i class="fa-solid fa-camera text-lg"></i>
+          </button>
+          <input id="user-chat-input" type="text" onkeydown="if(event.key==='Enter') sendMessage()" placeholder="Ask me anything..." class="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[14.5px] py-0.5 placeholder-gray-400 text-gray-800">
+          <button onclick="openVoiceModal()" title="ভয়েস ইনপুট" class="text-gray-400 hover:text-brand-light transition-colors">
+            <i class="fa-solid fa-microphone text-lg"></i>
+          </button>
+        </div>
+        <button onclick="sendMessage()" class="w-11 h-11 bg-brand-light text-white rounded-full flex items-center justify-center shadow-md hover:bg-brand-dark transition-all active:scale-95 shrink-0">
+          <i class="fa-solid fa-paper-plane text-base"></i>
+        </button>
+      </div>
+      <div class="w-full flex justify-center mt-3">
+        <div class="w-[100px] h-1 bg-gray-300 rounded-full"></div>
+      </div>
+    </footer>
+    <!-- END: Chat Input Footer -->
+
+  </div>
+
+  <!-- AI TOOL ANALYSIS MODAL -->
+  <div id="tool-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-100 relative animate-in fade-in zoom-in duration-200">
+      <button onclick="closeToolModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div id="modal-icon-container" class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl text-white shadow-md">
+          <i id="modal-icon" class="fa-solid fa-chart-line"></i>
+        </div>
+        <div>
+          <h3 id="modal-title" class="font-bold text-gray-900 text-base">এআই বিশ্লেষণ</h3>
+          <p id="modal-subtitle" class="text-xs text-gray-500">লাইভ ডেটা প্রসেসিং</p>
+        </div>
+      </div>
+
+      <div id="modal-content" class="bg-gray-50 rounded-2xl p-4 text-xs leading-relaxed text-gray-700 max-h-72 overflow-y-auto custom-scrollbar border border-gray-200/80 font-normal">
+        <div class="flex items-center justify-center py-6 text-indigo-600 gap-2">
+          <i class="fa-solid fa-circle-notch fa-spin text-xl"></i>
+          <span class="font-semibold text-xs">এআই বিশ্লেষণ চলছে...</span>
+        </div>
+      </div>
+
+      <div class="mt-4 flex justify-end gap-2">
+        <button onclick="copyModalResult()" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-semibold hover:bg-indigo-100 transition-colors flex items-center gap-1.5">
+          <i class="fa-solid fa-copy text-xs"></i> কপি করুন
+        </button>
+        <button onclick="closeToolModal()" class="px-4 py-2 bg-brand-light text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors">
+          ঠিক আছে
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-100 relative">
+      <button onclick="closeSettingsModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+      <h3 class="font-bold text-gray-900 text-base mb-1 flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-indigo-600"></i> AI Copilot কনফিগারেশন
+      </h3>
+      <p class="text-xs text-gray-500 mb-4">OpenRouter / Gemini API Keys সেটিংস</p>
+      
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">এআই প্রোভাইডার (AI Provider)</label>
+          <select id="setting-provider" class="w-full rounded-xl border-gray-300 text-xs py-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="gemini">Google Gemini AI Studio (Recommended)</option>
+            <option value="openrouter">OpenRouter Multi-Key Pool</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">OpenRouter / Gemini API Key</label>
+          <input id="setting-apikey" type="password" placeholder="sk-or-v1-..." value="sk-or-v1-demo-key-swapnopay" class="w-full rounded-xl border-gray-300 text-xs py-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+      </div>
+
+      <button onclick="saveSettings()" class="mt-5 w-full py-2.5 bg-brand-light text-white rounded-xl text-xs font-bold shadow-md hover:bg-brand-dark transition-colors">
+        সেটিংস সংরক্ষণ করুন
+      </button>
+    </div>
+  </div>
+
+  <!-- VOICE ASSISTANT MODAL -->
+  <div id="voice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center relative">
+      <button onclick="closeVoiceModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+      <div class="w-20 h-20 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse">
+        <i class="fa-solid fa-microphone"></i>
+      </div>
+      <h3 class="font-bold text-gray-900 text-base mb-1">ভয়েস সহকারী শুনছে...</h3>
+      <p class="text-xs text-gray-500 mb-4">যেমন বলুন: "রহিমের কাছে ৫০০ টাকা বাকি চাল বিক্রি করলাম"</p>
+      
+      <div id="voice-status" class="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 mb-4 font-mono">
+        "রহিম ৫০০ টাকা বাকি চাল ৫ কেজি"
+      </div>
+
+      <div class="flex gap-2 justify-center">
+        <button onclick="submitVoiceText()" class="px-5 py-2 bg-brand-light text-white rounded-xl text-xs font-semibold shadow-md">
+          খতিয়ানে এন্ট্রি করুন
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECEIPT OCR MODAL -->
+  <div id="ocr-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl relative">
+      <button onclick="closeOcrModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+      <h3 class="font-bold text-gray-900 text-base mb-1 flex items-center gap-2">
+        <i class="fa-solid fa-camera text-sky-600"></i> রসিদ স্ক্যানার (OCR Scanner)
+      </h3>
+      <p class="text-xs text-gray-500 mb-3">ইনভয়েস বা মেমোর ছবি থেকে এআই ক্রয় এন্ট্রি</p>
+
+      <textarea id="ocr-input-text" rows="5" class="w-full rounded-xl border-gray-300 text-xs p-3 focus:ring-sky-500 focus:border-sky-500 font-mono" placeholder="বিসমিল্লাহ ট্রেডার্স&#10;চাল ১০ কেজি @ ১২০ = ১২০০&#10;তেল ২ লিটার @ ২০০ = ৪০০&#10;মোট: ১৬০০ টাকা"></textarea>
+
+      <button onclick="processOcrText()" class="mt-3 w-full py-2.5 bg-sky-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-sky-700 transition-colors">
+        ক্রয় এন্ট্রি সম্পন্ন করুন
+      </button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // Live Clock Update
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes();
+      minutes = minutes < 10 ? '0' + minutes : minutes;
+      document.getElementById('current-time').innerText = hours + ':' + minutes;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // AI Tool Data Generators
+    const toolSimulations = {
+      sales: {
+        title: "বিক্রয় পূর্বাভাস (Sales Forecast)",
+        subtitle: "আগামী ৩০ দিনের এআই প্রজেকশন",
+        icon: "fa-arrow-trend-up",
+        color: "bg-emerald-500",
+        content: `
+          <div class="space-y-2">
+            <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+              <span class="text-gray-600">আগামী মাসের আনুমানিক বিক্রি:</span>
+              <span class="font-bold text-emerald-600 text-sm">৳ ১,৪৫,০০০</span>
+            </div>
+            <div class="bg-emerald-50 text-emerald-800 p-2.5 rounded-xl border border-emerald-100">
+              <p class="font-bold mb-1">📈 শীর্ষ সম্ভাব্য বিক্রিত পণ্য:</p>
+              <ul class="list-disc list-inside space-y-0.5 text-[11px]">
+                <li>মিনিকেট চাল ২৫ কেজি (প্রوقع চাহিদা: +১৮%)</li>
+                <li>সয়াবিন তেল ৫ লিটার (প্রوقع চাহিদা: +১২%)</li>
+              </ul>
+            </div>
+            <p class="text-[11px] text-gray-500">💡 <b>এআই টিপস:</b> আগামী সপ্তাহে উৎসবের কারণে অতিরিক্ত স্টক প্রস্তুত রাখুন।</p>
+          </div>
+        `
+      },
+      inventory: {
+        title: "ইনভেন্টরি প্রেডিকশন (Inventory Prediction)",
+        subtitle: "স্টক শেষ হওয়ার সতর্কতা",
+        icon: "fa-box",
+        color: "bg-orange-500",
+        content: `
+          <div class="space-y-2">
+            <div class="bg-amber-50 text-amber-800 p-2.5 rounded-xl border border-amber-200">
+              <p class="font-bold mb-1">⚠️ জরুরি রিকম্যান্ডেশন (Reorder Alerts):</p>
+              <ul class="space-y-1 text-[11px]">
+                <li class="flex justify-between"><span>• মিনিকেট চাল:</span> <span class="font-bold text-red-600">৩ দিন স্টক বাকি</span></li>
+                <li class="flex justify-between"><span>• মসুর ডাল ১ কেজি:</span> <span class="font-bold text-amber-600">৫ দিন স্টক বাকি</span></li>
+              </ul>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-gray-100">
+              <p class="font-semibold text-gray-700">পুনরায় অর্ডারের প্রস্তাবিত বাজেট:</p>
+              <p class="text-base font-bold text-orange-600">৳ ২৮,৫০০</p>
+            </div>
+          </div>
+        `
+      },
+      customer: {
+        title: "গ্রাহক বিশ্লেষণ (Customer Analytics)",
+        subtitle: "VIP ও ঋণ ঝুঁকি রিপোর্ট",
+        icon: "fa-users",
+        color: "bg-blue-500",
+        content: `
+          <div class="space-y-2">
+            <div class="bg-blue-50 text-blue-900 p-2.5 rounded-xl border border-blue-100">
+              <p class="font-bold mb-1">🌟 VIP গ্রাহক (Top Buyers):</p>
+              <p class="text-[11.5px]">১. আব্দুর রহিম (মাসিক ক্রয়: ৳ ১২,৪০০)</p>
+              <p class="text-[11.5px]">২. মো: করিম (মাসিক ক্রয়: ৳ ৯,৮০০)</p>
+            </div>
+            <div class="bg-red-50 text-red-900 p-2.5 rounded-xl border border-red-100">
+              <p class="font-bold mb-1">⚠️ বকেয়া তাগাদা রিমাইন্ডার:</p>
+              <p class="text-[11.5px]">সাহেব আলী — বকেয়া: ৳ ৩,৫০০ (৪৫ দিন অতিক্রান্ত)</p>
+            </div>
+          </div>
+        `
+      },
+      product: {
+        title: "পণ্য সুপারিশ (Product Recommendation)",
+        subtitle: "কম্বো অফার ও ডিসকাউন্ট",
+        icon: "fa-tags",
+        color: "bg-teal-500",
+        content: `
+          <div class="space-y-2">
+            <div class="bg-teal-50 text-teal-900 p-2.5 rounded-xl border border-teal-100">
+              <p class="font-bold mb-1">🛍️ সুপারিশকৃত সুপার কম্বো:</p>
+              <p class="text-[11.5px]">চাল ৫কেজি + তেল ২লিটার একসাথে কিনলে ৫০ টাকা ছাড় দিন। এতে বিক্রি ৩০% বৃদ্ধি পাবে।</p>
+            </div>
+            <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+              <p class="font-bold text-gray-800">ধীরগতির পণ্য (Slow-moving):</p>
+              <p class="text-[11px] text-gray-600">প্রিমিয়াম চা পাতা ১০০গ্রাম — স্টক ক্লিয়ারেন্স ডিসকাউন্ট দিন।</p>
+            </div>
+          </div>
+        `
+      },
+      operations: {
+        title: "স্মার্ট অপারেশন (Smart Operations)",
+        subtitle: "দৈনিক আয়-ব্যয় ও শপ গাইড",
+        icon: "fa-star",
+        color: "bg-amber-500",
+        content: `
+          <div class="space-y-2">
+            <div class="bg-amber-50 text-amber-900 p-2.5 rounded-xl border border-amber-100">
+              <p class="font-bold mb-1">📊 আজ বিক্রির ট্রেন্ড:</p>
+              <p class="text-[11.5px]">বিকাল ৫টা থেকে রাত ৯টার মধ্যে ৭০% বিক্রি সম্পন্ন হয়। এই সময় কাউন্টারে ২ জন লোক রাখা উত্তম।</p>
+            </div>
+            <div class="bg-emerald-50 text-emerald-900 p-2.5 rounded-xl border border-emerald-100">
+              <p class="font-bold mb-1">💡 খরচ কমানোর পরামর্শ:</p>
+              <p class="text-[11.5px]">পরিবহন খরচ গত মাসের চেয়ে ১২% বেড়েছে। একসাথে বাল্ক অর্ডারে পরিবহন ব্যয় বাঁচান।</p>
+            </div>
+          </div>
+        `
+      },
+      fraud: {
+        title: "ফ্রড ডিটেকশন (Fraud Detection)",
+        subtitle: "নিরাপত্তা ও অ্যানোমালি স্ক্যান",
+        icon: "fa-shield-halved",
+        color: "bg-purple-500",
+        content: `
+          <div class="space-y-2">
+            <div class="bg-emerald-50 text-emerald-900 p-2.5 rounded-xl border border-emerald-200">
+              <p class="font-bold text-emerald-700 mb-1">✅ নিরাপত্তা স্ট্যাটাস: নিরাপদ</p>
+              <p class="text-[11px]">সাম্প্রতিক লেনদেনে কোনো ভুয়া পেমেন্ট SMS বা অস্বাভাবিক বাকি রেকর্ড পাওয়া যায়নি।</p>
+            </div>
+            <div class="bg-purple-50 text-purple-900 p-2.5 rounded-xl border border-purple-100">
+              <p class="font-bold mb-1">🛡️ এআই রিকম্যান্ডেশন:</p>
+              <p class="text-[11.5px]">বিকাশ/নগদ পেমেন্টের ক্ষেত্রে ক্যাশআউট মেসেজ পাওয়ার পর পণ্য হস্তান্তর করুন।</p>
+            </div>
+          </div>
+        `
+      }
+    };
+
+    let activeModalText = "";
+
+    function triggerTool(toolKey) {
+      const tool = toolSimulations[toolKey];
+      if (!tool) return;
+
+      document.getElementById('modal-title').innerText = tool.title;
+      document.getElementById('modal-subtitle').innerText = tool.subtitle;
+      
+      const iconBox = document.getElementById('modal-icon-container');
+      iconBox.className = `w-12 h-12 rounded-2xl flex items-center justify-center text-xl text-white shadow-md ${tool.color}`;
+      document.getElementById('modal-icon').className = `fa-solid ${tool.icon}`;
+
+      const contentBox = document.getElementById('modal-content');
+      contentBox.innerHTML = `
+        <div class="flex items-center justify-center py-6 text-indigo-600 gap-2">
+          <i class="fa-solid fa-circle-notch fa-spin text-xl"></i>
+          <span class="font-semibold text-xs">এআই বিশ্লেষণ চলছে...</span>
+        </div>
+      `;
+
+      document.getElementById('tool-modal').classList.remove('hidden');
+
+      setTimeout(() => {
+        contentBox.innerHTML = tool.content;
+        activeModalText = tool.title + "\n" + contentBox.innerText;
+      }, 600);
+    }
+
+    function closeToolModal() {
+      document.getElementById('tool-modal').classList.add('hidden');
+    }
+
+    function copyModalResult() {
+      if (activeModalText) {
+        navigator.clipboard.writeText(activeModalText);
+        alert('বিশ্লেষণ কপি করা হয়েছে!');
+      }
+    }
+
+    // Chat Functionality
+    function sendMessage() {
+      const input = document.getElementById('user-chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const container = document.getElementById('chat-messages-container');
+      
+      // User Message Bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = "flex items-start justify-end gap-2.5";
+      userBubble.innerHTML = `
+        <div class="bg-brand-light text-white rounded-2xl rounded-tr-none p-3.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
+          ${text}
+        </div>
+        <div class="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs shrink-0">
+          <i class="fa-solid fa-user"></i>
+        </div>
+      `;
+      container.appendChild(userBubble);
+
+      input.value = '';
+      container.scrollTop = container.scrollHeight;
+
+      // Thinking Indicator
+      const thinkingBubble = document.createElement('div');
+      thinkingBubble.className = "flex items-start gap-2.5 id-thinking";
+      thinkingBubble.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-brand-light text-white flex items-center justify-center text-xs shrink-0">
+          <i class="fa-solid fa-robot"></i>
+        </div>
+        <div class="bg-gray-100 text-gray-500 rounded-2xl rounded-tl-none p-3.5 text-xs flex items-center gap-2">
+          <i class="fa-solid fa-circle-notch fa-spin text-indigo-600"></i> চিন্তা করা হচ্ছে...
+        </div>
+      `;
+      container.appendChild(thinkingBubble);
+      container.scrollTop = container.scrollHeight;
+
+      // AI Response Generation
+      setTimeout(() => {
+        thinkingBubble.remove();
+        
+        let aiReply = "ধন্যবাদ! আপনার প্রশ্নের ভিত্তিতে ব্যবসায়ের ডেটা পরীক্ষা করা হয়েছে। আপনার সিদ্ধান্ত সঠিক এবং লাভজনক হতে পারে।";
+        if (text.includes("বাকি") || text.includes("credit")) {
+          aiReply = "অবশ্যই, আমি কাস্টমারের বাকি এন্ট্রি খতিয়ানে যুক্ত করতে পারি। আপনি খতিয়ান অপশন থেকে চূড়ান্ত কনফার্ম করুন।";
+        } else if (text.includes("বিক্রি") || text.includes("sales")) {
+          aiReply = "আজকের বিক্রি গতদিনের তুলনায় ১৫% বৃদ্ধি পেয়েছে! সবচেয়ে বেশি বিক্রি হয়েছে মিনিকেট চাল ও সয়াবিন তেল।";
+        }
+
+        const aiBubble = document.createElement('div');
+        aiBubble.className = "flex items-start gap-2.5";
+        aiBubble.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-brand-light text-white flex items-center justify-center text-xs shrink-0 shadow-sm">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none p-3.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
+            <p class="font-semibold text-brand-dark mb-1">এআই সহকারি</p>
+            ${aiReply}
+          </div>
+        `;
+        container.appendChild(aiBubble);
+        container.scrollTop = container.scrollHeight;
+      }, 1000);
+    }
+
+    function clearChatFeed() {
+      const container = document.getElementById('chat-messages-container');
+      container.innerHTML = `
+        <div class="flex items-start gap-2.5">
+          <div class="w-8 h-8 rounded-full bg-brand-light text-white flex items-center justify-center text-xs shrink-0 shadow-sm">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none p-3.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
+            <p class="font-semibold text-brand-dark mb-1">এআই সহকারি</p>
+            চ্যাট ফিড পরিষ্কার করা হয়েছে। আপনার নতুন যেকোনো প্রশ্ন লিখুন।
+          </div>
+        </div>
+      `;
+    }
+
+    // Modal Triggers
+    function openSettingsModal() { document.getElementById('settings-modal').classList.remove('hidden'); }
+    function closeSettingsModal() { document.getElementById('settings-modal').classList.add('hidden'); }
+    function saveSettings() {
+      alert('এআই সেটিংস সফলভাবে সংরক্ষিত হয়েছে!');
+      closeSettingsModal();
+    }
+
+    function openVoiceModal() { document.getElementById('voice-modal').classList.remove('hidden'); }
+    function closeVoiceModal() { document.getElementById('voice-modal').classList.add('hidden'); }
+    function submitVoiceText() {
+      document.getElementById('user-chat-input').value = "রহিম ৫০০ টাকা বাকি চাল ৫ কেজি";
+      closeVoiceModal();
+      sendMessage();
+    }
+
+    function openOcrModal() { document.getElementById('ocr-modal').classList.remove('hidden'); }
+    function closeOcrModal() { document.getElementById('ocr-modal').classList.add('hidden'); }
+    function processOcrText() {
+      const text = document.getElementById('ocr-input-text').value;
+      alert('রসিদের ডেটা সফলভাবে প্রসেস করা হয়েছে!');
+      closeOcrModal();
+      document.getElementById('user-chat-input').value = "রসিদ এন্ট্রি প্রসেসড: " + text.split('\n')[0];
+      sendMessage();
+    }
+  </script>
+</body>
+</html>

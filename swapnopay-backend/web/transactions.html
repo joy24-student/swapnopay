@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction Ledger — SwapnoPay</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Hanken Grotesk"', 'sans-serif'],
+          },
+          colors: {
+            background: '#f9f9fb',
+            surface: '#ffffff',
+            primary: '#6366f1',
+            primaryHover: '#4f46e5',
+            textMain: '#111827',
+            textMuted: '#6b7280',
+            border: '#f3f4f6',
+            inputBg: '#f9fafb',
+          },
+          borderRadius: {
+            'xl': '1rem',
+            '2xl': '1.5rem',
+          },
+          boxShadow: {
+            'card': '0 2px 8px -2px rgba(0, 0, 0, 0.05)',
+            'nav': '0 -4px 12px -4px rgba(0, 0, 0, 0.05)',
+            'button': '0 4px 14px -4px rgba(99, 102, 241, 0.4)',
+            'fab': '0 8px 24px -4px rgba(99, 102, 241, 0.5)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #f9f9fb;
+      font-family: 'Hanken Grotesk', sans-serif;
+      color: #111827;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    
+    .nav-safe-area {
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+    
+    .top-safe-area {
+      padding-top: env(safe-area-inset-top, 44px);
+    }
+
+    .fab-container {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    
+    .fab-glow {
+      box-shadow: 0 0 0 6px #f9f9fb;
+    }
+  </style>
+</head>
+<body class="bg-background flex flex-col h-screen text-textMain top-safe-area items-center justify-center">
+
+  <!-- Outer wrapper for mobile simulator layout on desktop -->
+  <div class="w-full max-w-md bg-background flex flex-col h-full shadow-2xl relative overflow-hidden">
+
+    <!-- BEGIN: Header -->
+    <header class="px-5 pt-4 pb-4 flex items-center justify-between sticky top-0 bg-background z-10 shrink-0" data-purpose="top-header">
+      <div class="flex items-center gap-3">
+        <button aria-label="Menu" onclick="window.location.href='portal.html'" class="w-11 h-11 rounded-2xl border border-gray-200 bg-surface flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+        <div>
+          <h1 class="text-[22px] font-bold leading-tight tracking-tight text-gray-900">Transaction</h1>
+          <p class="text-[12px] text-gray-500 font-medium">রিয়েল-টাইম পেমেন্ট লেজার</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button aria-label="Filter" onclick="openFilterModal()" class="w-11 h-11 rounded-2xl border border-gray-200 bg-surface flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+        <button aria-label="Search" onclick="toggleSearchBar()" class="w-11 h-11 rounded-2xl border border-gray-200 bg-surface flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <!-- END: Header -->
+
+    <!-- Search Input Bar (Collapsible) -->
+    <div id="search-bar-wrap" class="px-5 mb-3 hidden">
+      <div class="bg-surface rounded-2xl p-2 border border-gray-200 shadow-sm flex items-center gap-2">
+        <i class="fa-solid fa-magnifying-glass text-gray-400 pl-2"></i>
+        <input id="search-input" type="text" oninput="filterTransactions()" placeholder="TrxID, Phone or Customer..." class="w-full bg-transparent border-none text-xs text-gray-800 focus:outline-none placeholder-gray-400">
+        <button onclick="clearSearch()" class="text-gray-400 hover:text-gray-600 px-2">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- BEGIN: Main Content -->
+    <main class="flex-1 flex flex-col px-5 pb-32 overflow-y-auto" data-purpose="main-content">
+      
+      <!-- Tabs -->
+      <div class="bg-surface rounded-2xl p-1 mb-5 flex border border-gray-100 shadow-sm h-13 shrink-0">
+        <button id="tab-all" onclick="selectTab('All')" aria-selected="true" class="flex-1 text-[14.5px] font-semibold text-primary relative h-full flex items-center justify-center transition-colors">
+          All
+          <div id="tab-indicator-all" class="absolute bottom-[-1px] left-[15%] right-[15%] h-[3px] bg-primary rounded-t-full"></div>
+        </button>
+        <button id="tab-matched" onclick="selectTab('Matched')" aria-selected="false" class="flex-1 text-[14.5px] font-semibold text-gray-500 hover:text-gray-900 transition-colors h-full flex items-center justify-center relative">
+          Matched
+          <div id="tab-indicator-matched" class="absolute bottom-[-1px] left-[15%] right-[15%] h-[3px] bg-primary rounded-t-full hidden"></div>
+        </button>
+        <button id="tab-unmatched" onclick="selectTab('Unmatched')" aria-selected="false" class="flex-1 text-[14.5px] font-semibold text-gray-500 hover:text-gray-900 transition-colors h-full flex items-center justify-center relative">
+          Unmatched
+          <div id="tab-indicator-unmatched" class="absolute bottom-[-1px] left-[15%] right-[15%] h-[3px] bg-primary rounded-t-full hidden"></div>
+        </button>
+      </div>
+
+      <!-- Filters Bar -->
+      <div class="flex gap-3 mb-6 shrink-0">
+        <!-- Date Filter -->
+        <button onclick="openDateModal()" class="flex-1 bg-surface rounded-[20px] p-3 flex items-center justify-between border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-600">
+              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+            <div class="flex flex-col items-start text-left">
+              <span id="date-filter-text" class="text-[12px] text-gray-500 font-medium">Date</span>
+            </div>
+          </div>
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+
+        <!-- Account Filter -->
+        <button onclick="openAccountModal()" class="flex-[1.2] bg-surface rounded-[20px] p-3 flex items-center justify-between border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-600">
+              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <path d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+            <div class="flex flex-col items-start text-left">
+              <span class="text-[12px] text-gray-500 font-medium">Account: <span id="account-filter-text" class="font-bold text-gray-900 block mt-0.5 text-[11.5px]">All Accounts</span></span>
+            </div>
+          </div>
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Transactions List Container -->
+      <div id="transactions-list-container" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Empty State Container (Shown when list is empty) -->
+      <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-center my-auto py-8">
+        <!-- Illustration Container -->
+        <div class="relative mb-6">
+          <div class="w-[130px] h-[130px] bg-[#f4f5f9] rounded-full flex items-center justify-center border border-white shadow-sm">
+            <svg fill="none" height="65" viewBox="0 0 60 70" width="55" xmlns="http://www.w3.org/2000/svg">
+              <rect fill="white" height="60" rx="8" stroke="#9ca3af" stroke-width="3" width="50" x="5" y="10"></rect>
+              <path d="M20 5H40V15H20V5Z" fill="white" stroke="#9ca3af" stroke-linejoin="round" stroke-width="3"></path>
+              <circle cx="30" cy="10" fill="#9ca3af" r="3"></circle>
+              <line stroke="#d1d5db" stroke-linecap="round" stroke-width="3" x1="15" x2="45" y1="30" y2="30"></line>
+              <line stroke="#d1d5db" stroke-linecap="round" stroke-width="3" x1="15" x2="35" y1="40" y2="40"></line>
+              <line stroke="#d1d5db" stroke-linecap="round" stroke-width="3" x1="15" x2="40" y1="50" y2="50"></line>
+              <circle cx="15" cy="30" fill="#9ca3af" r="3"></circle>
+              <circle cx="15" cy="40" fill="#9ca3af" r="3"></circle>
+              <circle cx="15" cy="50" fill="#9ca3af" r="3"></circle>
+            </svg>
+          </div>
+          <!-- Magnifying Glass Icon superimposed -->
+          <div class="absolute bottom-[-2px] right-[-2px] w-13 h-13 bg-primary rounded-full flex items-center justify-center shadow-lg border-[3px] border-white text-white p-3">
+            <svg class="w-6 h-6" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
+        </div>
+
+        <h2 class="text-[20px] font-bold text-gray-900 mb-2 tracking-tight">No transactions found</h2>
+        <p class="text-[14.5px] text-gray-500 max-w-[270px] leading-relaxed mb-8">
+          Your transaction list will appear here once payments are synced.
+        </p>
+
+        <button onclick="syncPayments()" id="sync-btn" class="bg-primary hover:bg-primaryHover text-white font-semibold py-3.5 px-7 rounded-[14px] flex items-center gap-2 shadow-button transition-colors w-[230px] justify-center text-[14.5px] active:scale-95">
+          <svg id="sync-icon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span id="sync-btn-text">Sync Payments</span>
+        </button>
+      </div>
+
+    </main>
+    <!-- END: Main Content -->
+
+    <!-- BEGIN: Bottom Navigation -->
+    <nav class="absolute bottom-0 w-full bg-surface border-t border-gray-100 rounded-t-[32px] pt-3 px-6 z-20 nav-safe-area shadow-[0_-10px_40px_rgba(0,0,0,0.03)]" data-purpose="bottom-nav">
+      <div class="flex justify-between items-end relative h-[56px]">
+        <!-- Dashboard -->
+        <button onclick="window.location.href='portal.html'" class="flex flex-col items-center gap-1.5 w-16 mb-2">
+          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span class="text-[11.5px] font-medium text-gray-400">Dashboard</span>
+        </button>
+
+        <!-- Transactions (Active) -->
+        <button class="flex flex-col items-center gap-1.5 w-16 mb-2">
+          <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
+            <path clip-rule="evenodd" d="M2.25 4.5A.75.75 0 013 3.75h14.25a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zm0 4.5A.75.75 0 013 8.25h9.75a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zm0 4.5a.75.75 0 01.75-.75h14.25a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zm0 4.5a.75.75 0 01.75-.75h9.75a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75z" fill-rule="evenodd"></path>
+          </svg>
+          <span class="text-[11.5px] font-bold text-primary">Transactions</span>
+        </button>
+
+        <!-- Center FAB (Floating Action Button) -->
+        <div class="fab-container z-30">
+          <button onclick="openAddTransactionModal()" class="w-15 h-15 bg-primary rounded-full flex items-center justify-center text-white shadow-fab fab-glow hover:bg-primaryHover transition-colors focus:outline-none">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="w-16"></div> <!-- Spacer for FAB -->
+
+        <!-- Setup -->
+        <button onclick="window.location.href='ai_copilot.html'" class="flex flex-col items-center gap-1.5 w-16 mb-2">
+          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span class="text-[11.5px] font-medium text-gray-400">Copilot</span>
+        </button>
+
+        <!-- More -->
+        <button onclick="alert('SwapnoPay v3.0 — Payment Engine Connected')" class="flex flex-col items-center gap-1.5 w-16 mb-2">
+          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span class="text-[11.5px] font-medium text-gray-400">More</span>
+        </button>
+      </div>
+
+      <!-- Home Indicator Area (iOS standard) -->
+      <div class="h-[18px] flex justify-center items-end pb-1">
+        <div class="w-[125px] h-[4px] bg-[#111827] rounded-full"></div>
+      </div>
+    </nav>
+    <!-- END: Bottom Navigation -->
+
+  </div>
+
+  <!-- ADD TRANSACTION MODAL -->
+  <div id="add-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl relative">
+      <button onclick="closeAddTransactionModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+      <h3 class="font-bold text-gray-900 text-base mb-1 flex items-center gap-2">
+        <i class="fa-solid fa-plus-circle text-primary"></i> নতুন লেনদেন যুক্ত করুন
+      </h3>
+      <p class="text-xs text-gray-500 mb-4">MFS লেনদেন এন্ট্রি বা SMS সিমুলেশন</p>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">MFS একাউন্ট</label>
+          <select id="modal-account" class="w-full rounded-xl border-gray-300 text-xs py-2">
+            <option value="bKash">bKash (01712345678)</option>
+            <option value="Nagad">Nagad (01823456789)</option>
+            <option value="Rocket">Rocket (01678901234)</option>
+            <option value="Upay">Upay (01934567890)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">TrxID (ট্রানজেকশন আইডি)</label>
+          <input id="modal-trxid" type="text" placeholder="e.g. 8C7X9A1B2" class="w-full rounded-xl border-gray-300 text-xs py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">গ্রাহকের নাম / ফোন</label>
+          <input id="modal-customer" type="text" placeholder="e.g. Rahim (01700000000)" class="w-full rounded-xl border-gray-300 text-xs py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">পরিমাণ (৳)</label>
+          <input id="modal-amount" type="number" placeholder="e.g. 850" class="w-full rounded-xl border-gray-300 text-xs py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700 mb-1">স্ট্যাটাস (Match Status)</label>
+          <select id="modal-status" class="w-full rounded-xl border-gray-300 text-xs py-2">
+            <option value="Matched">Matched (অর্ডার মেলানো হয়েছে)</option>
+            <option value="Unmatched">Unmatched (মেলানো হয়নি)</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="saveNewTransaction()" class="mt-5 w-full py-2.5 bg-primary text-white rounded-xl text-xs font-bold shadow-md hover:bg-primaryHover transition-colors">
+        লেনদেন সংরক্ষণ করুন
+      </button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // State Store
+    let currentTabState = "All";
+    let selectedAccountState = "All Accounts";
+    let selectedDateState = "All Time";
+    
+    let mockTransactions = [
+      { id: "tx_101", trxId: "9K8L7M6N5", customer: "Abdur Rahim", phone: "01711223344", amount: 1250.0, account: "bKash", status: "Matched", time: "10 mins ago" },
+      { id: "tx_102", trxId: "8C7X9A1B2", customer: "Bismillah Traders", phone: "01822334455", amount: 850.0, account: "Nagad", status: "Matched", time: "1 hour ago" },
+      { id: "tx_103", trxId: "7P6O5N4M3", customer: "Unknown Customer", phone: "01933445566", amount: 2400.0, account: "Rocket", status: "Unmatched", time: "3 hours ago" },
+      { id: "tx_104", trxId: "5A4B3C2D1", customer: "Kamal Hossain", phone: "01644556677", amount: 450.0, account: "Upay", status: "Matched", time: "Yesterday" }
+    ];
+
+    function renderTransactions() {
+      const container = document.getElementById('transactions-list-container');
+      const emptyState = document.getElementById('empty-state');
+      
+      const searchVal = document.getElementById('search-input')?.value.toLowerCase().trim() || "";
+
+      let filtered = mockTransactions.filter(tx => {
+        // Tab Filter
+        if (currentTabState === "Matched" && tx.status !== "Matched") return false;
+        if (currentTabState === "Unmatched" && tx.status !== "Unmatched") return false;
+
+        // Account Filter
+        if (selectedAccountState !== "All Accounts" && tx.account !== selectedAccountState) return false;
+
+        // Search Filter
+        if (searchVal) {
+          const matchId = tx.trxId.toLowerCase().includes(searchVal);
+          const matchCust = tx.customer.toLowerCase().includes(searchVal);
+          const matchPhone = tx.phone.includes(searchVal);
+          if (!matchId && !matchCust && !matchPhone) return false;
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = "";
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+        container.innerHTML = filtered.map(tx => `
+          <div class="bg-surface rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-xs text-white shadow-sm ${
+                tx.account === 'bKash' ? 'bg-pink-600' :
+                tx.account === 'Nagad' ? 'bg-red-600' :
+                tx.account === 'Rocket' ? 'bg-purple-700' : 'bg-teal-600'
+              }">
+                ${tx.account}
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-[14.5px] text-gray-900">${tx.customer}</span>
+                  <span class="text-[9.5px] font-bold px-2 py-0.5 rounded-full border ${
+                    tx.status === 'Matched' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }">${tx.status}</span>
+                </div>
+                <p class="text-[11.5px] text-gray-500 font-mono mt-0.5">TrxID: ${tx.trxId} • ${tx.time}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-[16px] font-bold text-gray-900 block">৳${tx.amount.toLocaleString()}</span>
+              <span class="text-[10px] text-gray-400 font-medium">Verified</span>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function selectTab(tab) {
+      currentTabState = tab;
+      ["all", "matched", "unmatched"].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const ind = document.getElementById(`tab-indicator-${t}`);
+        if (t === tab.toLowerCase()) {
+          btn.className = "flex-1 text-[14.5px] font-semibold text-primary relative h-full flex items-center justify-center transition-colors";
+          ind.classList.remove('hidden');
+        } else {
+          btn.className = "flex-1 text-[14.5px] font-semibold text-gray-500 hover:text-gray-900 transition-colors h-full flex items-center justify-center relative";
+          ind.classList.add('hidden');
+        }
+      });
+      renderTransactions();
+    }
+
+    function syncPayments() {
+      const icon = document.getElementById('sync-icon');
+      const text = document.getElementById('sync-btn-text');
+      
+      icon.classList.add('animate-spin');
+      text.innerText = "Syncing...";
+
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        text.innerText = "Synced ✓";
+
+        // Add dummy payment to list if empty
+        if (mockTransactions.length === 0) {
+          mockTransactions.push(
+            { id: "tx_105", trxId: "3X2Y1Z0W9", customer: "New Synced Customer", phone: "01755667788", amount: 1500.0, account: "bKash", status: "Matched", time: "Just now" }
+          );
+        }
+        renderTransactions();
+        
+        setTimeout(() => { text.innerText = "Sync Payments"; }, 2000);
+      }, 1200);
+    }
+
+    function toggleSearchBar() {
+      const wrap = document.getElementById('search-bar-wrap');
+      wrap.classList.toggle('hidden');
+      if (!wrap.classList.contains('hidden')) {
+        document.getElementById('search-input').focus();
+      }
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = "";
+      renderTransactions();
+    }
+
+    function filterTransactions() {
+      renderTransactions();
+    }
+
+    function openAccountModal() {
+      const acc = prompt("একাউন্ট ফিল্টার বেছে নিন (All Accounts, bKash, Nagad, Rocket, Upay):", selectedAccountState);
+      if (acc) {
+        selectedAccountState = acc;
+        document.getElementById('account-filter-text').innerText = acc;
+        renderTransactions();
+      }
+    }
+
+    function openDateModal() {
+      alert('তারিখ ফিল্টার: আজকের সকল লেনদেন প্রদর্শিত হচ্ছে।');
+    }
+
+    function openAddTransactionModal() {
+      document.getElementById('add-modal').classList.remove('hidden');
+    }
+
+    function closeAddTransactionModal() {
+      document.getElementById('add-modal').classList.add('hidden');
+    }
+
+    function saveNewTransaction() {
+      const acc = document.getElementById('modal-account').value;
+      const trx = document.getElementById('modal-trxid').value || "TX" + Math.floor(Math.random()*100000);
+      const cust = document.getElementById('modal-customer').value || "Walk-in Customer";
+      const amt = parseFloat(document.getElementById('modal-amount').value) || 500;
+      const status = document.getElementById('modal-status').value;
+
+      mockTransactions.unshift({
+        id: "tx_" + Date.now(),
+        trxId: trx,
+        customer: cust,
+        phone: "01700000000",
+        amount: amt,
+        account: acc,
+        status: status,
+        time: "Just now"
+      });
+
+      closeAddTransactionModal();
+      renderTransactions();
+    }
+
+    // Initial Render
+    renderTransactions();
+  </script>
+</body>
+</html>

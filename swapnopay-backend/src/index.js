@@ -312,7 +312,13 @@ app.get('/', (req, res, next) => {
 })
 
 // Serve web root (checkout widget, hosted forms runner, docs)
-const webDir = path.resolve(__dirname, '../../web')
+const webDirCandidates = [
+  path.resolve(__dirname, '../web'),
+  path.resolve(__dirname, '../../web'),
+  '/var/www/swapnopay/web',
+  path.resolve(process.cwd(), 'web')
+]
+const webDir = webDirCandidates.find(p => fs.existsSync(p)) || path.resolve(__dirname, '../web')
 app.use(express.static(webDir))
 
 // Friendly aliases for Documentation, Developer Console and Widget

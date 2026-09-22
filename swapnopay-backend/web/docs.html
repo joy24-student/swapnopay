@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwapnoPay API Documentation | Payments, Webhooks &amp; SDKs</title>
+  <meta name="description" content="Explore SwapnoPay payment API documentation, authentication, webhook signatures and SDK examples to integrate MFS payment workflows into your website or app.">
+  
+  <link rel="stylesheet" href="assets/site.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    code, pre { font-family: 'Fira Code', monospace; }
+    
+    .hero-mesh-dark {
+      background: radial-gradient(circle at 85% 15%, rgba(245,158,11,0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 15% 75%, rgba(59,130,246,0.04) 0%, transparent 45%),
+                  #f8fafc;
+    }
+
+    .gold-gradient-text {
+      background: linear-gradient(135deg, #facc15 0%, #ca8a04 50%, #854d0e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .gold-gradient-btn {
+      background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);
+      box-shadow: 0 10px 25px -5px rgba(202, 138, 4, 0.4);
+    }
+    .gold-gradient-btn:hover {
+      background: linear-gradient(135deg, #fde047 0%, #eab308 100%);
+    }
+
+    .glass-card {
+      background: rgba(18, 20, 29, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(234, 179, 8, 0.2);
+    }
+
+    .w3-sidebar { width: 280px; position: fixed; top: 0; bottom: 0; left: 0; overflow-y: auto; z-index: 40; }
+    .main-content { margin-left: 280px; }
+    @media (max-width: 768px) {
+      .w3-sidebar { display: none; }
+      .main-content { margin-left: 0; }
+    }
+    
+    /* Toast notification */
+    #copy-toast {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="enterprise.css">
+  <script src="workspace.js" defer></script>
+  <link rel="canonical" href="https://swapnopay.top/docs.html">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SwapnoPay">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="SwapnoPay API Documentation | Payments, Webhooks &amp; SDKs">
+  <meta property="og:description" content="Explore SwapnoPay payment API documentation, authentication, webhook signatures and SDK examples to integrate MFS payment workflows into your website or app.">
+  <meta property="og:url" content="https://swapnopay.top/docs.html">
+  <meta property="og:image" content="https://swapnopay.top/logo_branding.png">
+  <meta property="og:image:alt" content="SwapnoPay — payment and business management platform">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="SwapnoPay API Documentation | Payments, Webhooks &amp; SDKs">
+  <meta name="twitter:description" content="Explore SwapnoPay payment API documentation, authentication, webhook signatures and SDK examples to integrate MFS payment workflows into your website or app.">
+  <meta name="twitter:image" content="https://swapnopay.top/logo_branding.png">
+  <meta name="theme-color" content="#101c30">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://swapnopay.top/#organization","name":"SwapnoPay","alternateName":"স্বপ্নপে","url":"https://swapnopay.top/","logo":{"@type":"ImageObject","url":"https://swapnopay.top/logo_branding.png"}},{"@type":"WebSite","@id":"https://swapnopay.top/#website","url":"https://swapnopay.top/","name":"SwapnoPay","alternateName":"স্বপ্নপে","publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en"},{"@type":"WebPage","@id":"https://swapnopay.top/docs.html#webpage","url":"https://swapnopay.top/docs.html","name":"SwapnoPay API Documentation | Payments, Webhooks & SDKs","description":"Explore SwapnoPay payment API documentation, authentication, webhook signatures and SDK examples to integrate MFS payment workflows into your website or app.","isPartOf":{"@id":"https://swapnopay.top/#website"},"publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en","breadcrumb":{"@id":"https://swapnopay.top/docs.html#breadcrumbs"}},{"@type":"BreadcrumbList","@id":"https://swapnopay.top/docs.html#breadcrumbs","itemListElement":[{"@type":"ListItem","position":1,"name":"SwapnoPay","item":"https://swapnopay.top/"},{"@type":"ListItem","position":2,"name":"SwapnoPay API Documentation","item":"https://swapnopay.top/docs.html"}]},{"@type":"TechArticle","@id":"https://swapnopay.top/docs.html#article","headline":"SwapnoPay payment API documentation","description":"Explore SwapnoPay payment API documentation, authentication, webhook signatures and SDK examples to integrate MFS payment workflows into your website or app.","mainEntityOfPage":{"@id":"https://swapnopay.top/docs.html#webpage"},"author":{"@id":"https://swapnopay.top/#organization"},"publisher":{"@id":"https://swapnopay.top/#organization"},"inLanguage":"en"}]}</script>
+</head>
+<body class="enterprise-page docs-page min-h-screen antialiased">
+  <a href="#docs-content" class="skip-link">Skip to documentation</a>
+  <button type="button" class="workspace-backdrop" aria-label="Close navigation" tabindex="-1" hidden></button>
+
+  <!-- Toast Notification -->
+  <div id="copy-toast" role="status" aria-live="polite" class="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2 opacity-0 pointer-events-none transform translate-y-3">
+    <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+    <span id="toast-text">Full API Documentation copied to clipboard!</span>
+  </div>
+
+  <!-- Video Player Modal -->
+  <div id="video-modal" role="dialog" aria-modal="true" aria-labelledby="modal-video-title" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-[#12141d] border border-amber-500/30 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+        <h3 id="modal-video-title" class="font-extrabold text-white text-base">Video Integration Tutorial</h3>
+        <button onclick="closeVideoModal()" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+      <div class="aspect-video w-full rounded-2xl overflow-hidden bg-black flex items-center justify-center">
+        <iframe id="modal-video-iframe" title="SwapnoPay integration tutorial" class="w-full h-full" src="" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+      </div>
+      <div class="flex justify-between items-center pt-2 text-xs text-slate-400">
+        <span id="modal-video-desc">Step-by-step video guide</span>
+        <button onclick="closeVideoModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold">Close Player</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside id="workspace-sidebar" aria-label="Documentation navigation" class="workspace-sidebar w3-sidebar bg-[#0b0f19]/90 border-r border-amber-500/20 p-5 backdrop-blur-xl">
+    <a href="index.html" class="flex items-center gap-3 mb-8 group">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
+        <img src="logo_branding.png" alt="SwapnoPay" class="w-full h-full object-contain rounded-xl bg-black" onError="this.style.display='none'">
+      </div>
+      <div>
+        <div class="font-extrabold text-white text-base tracking-wider uppercase">SWAPNOPAY</div>
+        <div class="text-[9.5px] text-amber-400 font-bold uppercase tracking-widest">DEVELOPER PORTAL v2.0</div>
+      </div>
+    </a>
+
+    <label class="docs-search"><span class="material-symbols-outlined" aria-hidden="true">search</span><input id="docs-search" type="search" placeholder="Find a topic…" aria-label="Filter documentation topics" autocomplete="off"></label>
+    <p id="docs-search-status" class="docs-search-status" role="status" hidden>No matching topics. Try “webhook” or “SDK”.</p>
+
+    <nav class="space-y-6 text-xs font-medium">
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Getting Started</div>
+        <ul class="space-y-1">
+          <li><a href="#overview" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">1. Overview & Architecture</a></li>
+          <li><a href="#flowchart" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">2. Sequence & Flowchart</a></li>
+          <li><a href="#auth" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">3. Authentication & Headers</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">API Reference</div>
+        <ul class="space-y-1">
+          <li><a href="#create-payment" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/payment/create</a></li>
+          <li><a href="#verify-payment" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/payment/verify</a></li>
+          <li><a href="#payment-status" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">GET /v1/payment/status</a></li>
+          <li><a href="#hosted-forms" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">POST /v1/hosted-form/submit</a></li>
+          <li><a href="#error-codes" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Error Codes Table</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Webhooks & Security</div>
+        <ul class="space-y-1">
+          <li><a href="#webhooks" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">HMAC-SHA256 Signatures</a></li>
+          <li><a href="#webhook-events" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Webhook Event Payloads</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Multi-Language SDKs</div>
+        <ul class="space-y-1">
+          <li><a href="#sdks" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition">Node.js, Python, PHP, Kotlin</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="px-3 text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mb-2">Tutorials & Media</div>
+        <ul class="space-y-1">
+          <li><a href="#video-tutorials" class="block px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-amber-400 transition"><span class="material-symbols-outlined">videocam</span> Video Integration Guides</a></li>
+        </ul>
+      </div>
+
+      <div class="pt-4 border-t border-slate-800 space-y-2">
+        <a href="sms-docs.html" class="block p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-amber-400 hover:border-amber-500/30 transition text-center font-bold">
+          <span class="material-symbols-outlined align-middle text-sm mr-1">sms</span> SMS Gateway Docs
+        </a>
+        <a href="portal.html" class="block p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-center hover:bg-amber-500/20 transition">
+          <span class="material-symbols-outlined">computer</span> Developer Console ↗
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="main-content min-h-screen pb-20">
+    <!-- Top Navbar -->
+    <header class="workspace-header">
+      <button type="button" class="workspace-toggle" aria-label="Open documentation navigation" aria-expanded="false" aria-controls="workspace-sidebar"><span class="material-symbols-outlined" aria-hidden="true">menu</span></button>
+      <div class="docs-header-label"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span><span>Documentation</span><span class="version-label">v2.0</span></div>
+      <div class="docs-header-actions"><button type="button" onclick="copyFullApiDocumentation()" class="btn btn-secondary">Copy API docs</button><a class="btn" href="sms-docs.html">SMS docs <span aria-hidden="true">→</span></a><a class="btn" href="portal.html">Open console <span aria-hidden="true">↗</span></a></div>
+    </header>
+
+    <!-- Broadcast Banner (dynamically synced from Admin CMS) -->
+    <div id="admin-broadcast-banner" class="hidden bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 text-xs text-amber-300 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined">campaign</span>
+        <span id="broadcast-message"></span>
+      </div>
+      <span class="text-[10px] opacity-75 font-mono">Live Admin Sync</span>
+    </div>
+
+    <div class="docs-body" id="docs-content" tabindex="-1">
+      <nav class="workspace-breadcrumb" aria-label="Breadcrumb"><a href="/">SwapnoPay</a><span aria-hidden="true">/</span><span aria-current="page">API documentation</span></nav>
+
+      <section class="docs-hero glass-card" aria-labelledby="docs-title">
+        <div class="workspace-eyebrow">SwapnoPay for developers</div>
+        <h1 id="docs-title">Your guide to better<br>payment integrations.</h1>
+        <p>Integrate SwapnoPay payments into your website or app. Explore the payment API, understand webhook delivery, and get started with practical code examples for Bangladesh’s MFS ecosystem.</p>
+        <div class="docs-hero-actions"><a href="#auth" class="btn">Start integrating <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a><button type="button" onclick="copyFullApiDocumentation()" class="btn btn-secondary"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy full API reference</button></div>
+        <div class="docs-quicklinks">
+          <a href="#endpoints"><span class="material-symbols-outlined" aria-hidden="true">terminal</span><strong>API reference</strong><small>Requests, responses & error codes</small></a>
+          <a href="#webhooks"><span class="material-symbols-outlined" aria-hidden="true">webhook</span><strong>Webhook security</strong><small>Understand signature verification</small></a>
+          <a href="sms-docs.html"><span class="material-symbols-outlined" aria-hidden="true">sms</span><strong>SMS Gateway</strong><small>SIM-powered OTP & alerts</small></a>
+          <a href="#sdks"><span class="material-symbols-outlined" aria-hidden="true">code_blocks</span><strong>Code examples</strong><small>Find your preferred language</small></a>
+        </div>
+      </section>
+
+      <!-- Section 1: Overview & Mechanism -->
+      <section id="overview" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Platform Mechanism & Architecture</h2>
+          <p class="text-xs text-slate-400 mt-1">SwapnoPay unifies carrier MFS SMS verification on Android, merchant databases, and web checkouts into a high-speed settlement pipeline.</p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">bolt</span> <span>Atomic Pattern Matching</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Merchant Android workers intercept raw carrier MFS SMS (bKash, Nagad, Rocket, Upay) and perform atomic regex extraction of Transaction ID, amount, and sender phone.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">lock</span> <span>Central HMAC & Ledger</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Platform Owner Admin Supabase database manages API key peppered HMAC digests, platform fee accounting, idempotency guards, and centralized payment telemetry.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-amber-500/20 space-y-2">
+            <div class="text-amber-400 font-extrabold text-base flex items-center gap-1.5">
+              <span class="material-symbols-outlined">rss_feed</span> <span>Real-Time WebSockets</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Express.js + Socket.io server emits instant <code class="text-amber-300">payment_status</code> events (<code class="text-emerald-400">PAID</code>, <code class="text-red-400">FAILED</code>, <code class="text-amber-400">CANCELLED</code>) to listening web checkout widgets.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Flowchart -->
+      <section id="flowchart" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">System Sequence & Flowchart</h2>
+          <p class="text-xs text-slate-400 mt-1">End-to-end payment lifecycle from checkout initialization to carrier match and webhook dispatch.</p>
+        </div>
+
+        <div class="bg-black/90 p-6 rounded-3xl border border-amber-500/30 shadow-2xl overflow-x-auto">
+          <pre class="text-xs leading-relaxed text-amber-300 font-mono">
+┌─────────────────┐       ┌────────────────────┐       ┌────────────────────────┐
+│  Customer Web   │       │  SwapnoPay Backend │       │ Merchant Android Phone │
+│ Checkout Widget │       │ (Node + Socket.io) │       │ (Carrier SMS Receiver) │
+└────────┬────────┘       └─────────┬──────────┘       └───────────┬────────────┘
+         │                          │                              │
+ 1. Join Order Room                 │                              │
+         ├─────────────────────────>│                              │
+         │                          │                              │
+ 2. Customer Sends Money (bKash)    │                              │
+         │                          │                              │
+ 3. Android Worker Intercepts SMS   │                              │
+         │                          │       4. Regex Pattern Match │
+         │                          │          TxID, Amount, Phone │
+         │                          │<─────────────────────────────┤
+         │                          │ 5. POST /v1/payment/verify   │
+         │                          │                              │
+ 6. Socket.io 'payment_status'      │                              │
+    (Status = PAID, Redirect URL)   │                              │
+         │<─────────────────────────┤                              │
+         │                          │                              │
+ 7. Instant Redirect to Success Page│                              │
+         │                          │                              │
+          </pre>
+        </div>
+      </section>
+
+      <!-- Section 3: Authentication -->
+      <section id="auth" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Authentication & Headers</h2>
+          <p class="text-xs text-slate-400 mt-1">Authenticate API calls using your Secret Key and protect against duplicate transactions with idempotency.</p>
+        </div>
+
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/20">
+          <div class="docs-table-scroll" role="region" aria-label="Scrollable API reference table" tabindex="0"><table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-black/60 text-amber-400 border-b border-amber-500/20 font-mono">
+                <th class="p-3.5">Header Name</th>
+                <th class="p-3.5">Type</th>
+                <th class="p-3.5">Description</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td class="p-3.5 font-mono text-amber-300 font-bold">X-Admin-Secret</td>
+                <td class="p-3.5 font-mono">string</td>
+                <td class="p-3.5">Your merchant API Secret Key starting with <code class="text-amber-400">sk_live_...</code></td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-mono text-amber-300 font-bold">Idempotency-Key</td>
+                <td class="p-3.5 font-mono">string (UUID)</td>
+                <td class="p-3.5">Unique client request token to guarantee each charge is executed exactly once.</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-mono text-amber-300 font-bold">Content-Type</td>
+                <td class="p-3.5 font-mono">string</td>
+                <td class="p-3.5">Must be set to <code class="text-amber-400">application/json</code>.</td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- Section 4: API Reference -->
+      <section id="endpoints" class="space-y-6">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Core API Endpoints Reference</h2>
+          <p class="text-xs text-slate-400 mt-1">Production HTTP endpoints for payment creation, instant verification, status queries, and dynamic hosted forms.</p>
+        </div>
+
+        <!-- 4.1 Create Payment -->
+        <div id="create-payment" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+              <code class="text-sm font-bold text-amber-400">/v1/payment/create</code>
+            </div>
+            <button onclick="copySnippet('snippet-create-json')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700">Copy Payload</button>
+          </div>
+          <p class="text-xs text-slate-300">Creates a new payment checkout session and generates the hosted payment link.</p>
+
+          <pre id="snippet-create-json" class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto leading-relaxed">{
+  "order_id": "ORD-2026-9812",
+  "amount": 1250.00,
+  "currency": "BDT",
+  "customer_name": "Tanvir Hasan",
+  "customer_phone": "01712963652",
+  "customer_email": "tanvir@example.com",
+  "payment_method": "bKash",
+  "redirect_url": "https://merchant.example.com/checkout/success",
+  "cancel_url": "https://merchant.example.com/checkout/cancel"
+}</pre>
+
+          <div class="text-xs text-slate-400">
+            <strong class="text-white">Response (200 OK):</strong>
+            <pre class="mt-2 p-3 bg-black/60 rounded-xl text-emerald-400 font-mono leading-relaxed">{
+  "status": "SUCCESS",
+  "code": 200,
+  "data": {
+    "order_id": "ORD-2026-9812",
+    "payment_url": "https://pay.swapnopay.top/pay/ORD-2026-9812",
+    "assigned_gateway_number": "01784992118",
+    "payable_amount": 1250.00,
+    "expires_at": "2026-09-07T21:15:00Z"
+  }
+}</pre>
+          </div>
+        </div>
+
+        <!-- 4.2 Verify Payment -->
+        <div id="verify-payment" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+              <code class="text-sm font-bold text-amber-400">/v1/payment/verify</code>
+            </div>
+            <button onclick="copySnippet('snippet-verify-json')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700">Copy Payload</button>
+          </div>
+          <p class="text-xs text-slate-300">Invoked by the carrier SMS receiver to verify transaction parameters and settle order.</p>
+
+          <pre id="snippet-verify-json" class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto leading-relaxed">{
+  "order_id": "ORD-2026-9812",
+  "tran_id": "9H8B7G6F5E",
+  "sender_phone": "01712963652",
+  "amount": 1250.00,
+  "payment_method": "bKash"
+}</pre>
+        </div>
+
+        <!-- 4.3 Status Query -->
+        <div id="payment-status" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-black text-xs">GET</span>
+            <code class="text-sm font-bold text-amber-400">/v1/payment/status/{orderId}</code>
+          </div>
+          <p class="text-xs text-slate-300">Inspect live settlement status (<code class="text-emerald-400">PAID</code>, <code class="text-amber-400">PENDING</code>, <code class="text-red-400">EXPIRED</code>).</p>
+        </div>
+
+        <!-- 4.4 Hosted Form Submit -->
+        <div id="hosted-forms" class="glass-card rounded-2xl p-6 border border-amber-500/25 space-y-4">
+          <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs">POST</span>
+            <code class="text-sm font-bold text-amber-400">/v1/hosted-form/submit</code>
+          </div>
+          <p class="text-xs text-slate-300">Dynamic hosted form submission supporting custom date pickers, dropdowns, and file upload attachments.</p>
+        </div>
+
+        <!-- 4.5 Error Codes Table -->
+        <div id="error-codes" class="glass-card rounded-2xl overflow-hidden border border-amber-500/20">
+          <div class="p-4 bg-black/60 border-b border-amber-500/20 font-bold text-sm text-white">
+            ⚠️ API Error Codes Reference
+          </div>
+          <div class="docs-table-scroll" role="region" aria-label="Scrollable API reference table" tabindex="0"><table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-black/40 text-amber-400 border-b border-slate-800 font-mono">
+                <th class="p-3">Error Code</th>
+                <th class="p-3">HTTP</th>
+                <th class="p-3">Description & Resolution</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-300 font-mono text-[11px]">
+              <tr>
+                <td class="p-3 text-red-400 font-bold">ERR_INVALID_HMAC</td>
+                <td class="p-3">401</td>
+                <td class="p-3 text-slate-300 font-sans">HMAC-SHA256 signature verification failed. Check your webhook secret.</td>
+              </tr>
+              <tr>
+                <td class="p-3 text-red-400 font-bold">ERR_ORDER_EXPIRED</td>
+                <td class="p-3">400</td>
+                <td class="p-3 text-slate-300 font-sans">Order payment lifetime (default 10 min) elapsed before payment completion.</td>
+              </tr>
+              <tr>
+                <td class="p-3 text-red-400 font-bold">ERR_DUPLICATE_IDEMPOTENCY</td>
+                <td class="p-3">409</td>
+                <td class="p-3 text-slate-300 font-sans">Request with this Idempotency-Key was already processed. Read cached order.</td>
+              </tr>
+              <tr>
+                <td class="p-3 text-red-400 font-bold">ERR_INSUFFICIENT_AMOUNT</td>
+                <td class="p-3">422</td>
+                <td class="p-3 text-slate-300 font-sans">Customer paid less than order invoice. Transaction flagged for manual appeal.</td>
+              </tr>
+              <tr>
+                <td class="p-3 text-red-400 font-bold">ERR_GATEWAY_OFFLINE</td>
+                <td class="p-3">503</td>
+                <td class="p-3 text-slate-300 font-sans">No Android receiver phone currently online for requested payment gateway.</td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- Section 5: Webhooks & Security -->
+      <section id="webhooks" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Webhooks & HMAC Signature Security</h2>
+          <p class="text-xs text-slate-400 mt-1">SwapnoPay signs all webhook notifications with HMAC-SHA256 in the <code class="text-amber-300">X-Signature</code> header.</p>
+        </div>
+
+        <div class="glass-card rounded-2xl p-5 space-y-4 border border-amber-500/20">
+          <h3 class="font-bold text-white text-sm">Node.js Signature Verification:</h3>
+          <pre class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto font-mono leading-relaxed">const crypto = require('crypto');
+
+function verifySwapnoPayWebhook(rawBody, signatureHeader, webhookSecret) {
+  const expectedSignature = 'sha256=' + crypto
+    .createHmac('sha256', webhookSecret)
+    .update(rawBody, 'utf8')
+    .digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signatureHeader));
+}</pre>
+
+          <h3 class="font-bold text-white text-sm pt-2">Python Signature Verification:</h3>
+          <pre class="p-4 text-xs bg-black/90 text-amber-200 rounded-xl overflow-x-auto font-mono leading-relaxed">import hmac
+import hashlib
+
+def verify_swapnopay_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    expected = "sha256=" + hmac.new(secret.encode('utf-8'), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature_header)</pre>
+        </div>
+      </section>
+
+      <!-- Section 6: Video Tutorials Gallery (synced dynamically from Admin CMS) -->
+      <section id="video-tutorials" class="space-y-4">
+        <div class="border-b border-amber-500/20 pb-4 flex justify-between items-end">
+          <div>
+            <h2 class="text-2xl font-black text-white">Official Video Integration Tutorials</h2>
+            <p class="text-xs text-slate-400 mt-1">Step-by-step video guides managed dynamically from the Admin Panel CMS.</p>
+          </div>
+          <span id="tutorials-count-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            Loading...
+          </span>
+        </div>
+
+        <div id="video-tutorials-grid" class="grid sm:grid-cols-2 gap-4">
+          <!-- Video cards dynamically inserted by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Section 7: Multi-Language Code Examples -->
+      <section id="sdks" class="space-y-6">
+        <div class="border-b border-amber-500/20 pb-4">
+          <h2 class="text-2xl font-black text-white">Production SDK Code Examples</h2>
+          <p class="text-xs text-slate-400 mt-1">Copy-paste production integrations for your tech stack.</p>
+        </div>
+
+        <!-- 1. Node.js -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span>🟢 Node.js / Express</span>
+            <button onclick="copySnippet('snippet-node')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-node" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">const axios = require('axios');
+const crypto = require('crypto');
+
+async function createSwapnoPayOrder() {
+  const response = await axios.post('https://pay.swapnopay.top/v1/payment/create', {
+    order_id: 'ORD-2026-9812',
+    amount: 1250.00,
+    customer_phone: '01712963652',
+    payment_method: 'bKash',
+    redirect_url: 'https://mysite.com/success'
+  }, {
+    headers: {
+      'X-Admin-Secret': 'sk_live_your_api_secret',
+      'Idempotency-Key': crypto.randomUUID()
+    }
+  });
+  console.log('Redirect checkout URL:', response.data.data.payment_url);
+}</pre>
+        </div>
+
+        <!-- 2. Python -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined">code</span> Python (FastAPI / Requests)</span>
+            <button onclick="copySnippet('snippet-python')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-python" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">import requests
+import uuid
+
+response = requests.post(
+    "https://pay.swapnopay.top/v1/payment/create",
+    headers={
+        "X-Admin-Secret": "sk_live_your_api_secret",
+        "Idempotency-Key": str(uuid.uuid4())
+    },
+    json={
+        "order_id": "ORD-2026-9812",
+        "amount": 1250.00,
+        "customer_phone": "01712963652",
+        "payment_method": "bKash",
+        "redirect_url": "https://mysite.com/success"
+    }
+)
+print(response.json())</pre>
+        </div>
+
+        <!-- 3. PHP -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined">code</span> PHP (cURL / Laravel)</span>
+            <button onclick="copySnippet('snippet-php')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-php" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">&lt;?php
+$ch = curl_init('https://pay.swapnopay.top/v1/payment/create');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'X-Admin-Secret: sk_live_your_api_secret',
+    'Idempotency-Key: ' . uniqid()
+]);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+    'order_id' => 'ORD-2026-9812',
+    'amount' => 1250.00,
+    'customer_phone' => '01712963652',
+    'payment_method' => 'bKash',
+    'redirect_url' => 'https://mysite.com/success'
+]));
+$response = curl_exec($ch);
+print_r(json_decode($response, true));
+?&gt;</pre>
+        </div>
+
+        <!-- 4. Kotlin Android -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-amber-500/30">
+          <div class="bg-black/60 px-4 py-3 text-white text-xs font-bold flex justify-between items-center border-b border-amber-500/20">
+            <span><span class="material-symbols-outlined">phone_android</span> Kotlin (Android OkHttp)</span>
+            <button onclick="copySnippet('snippet-kotlin')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-lg border border-amber-500/40">Copy Code</button>
+          </div>
+          <pre id="snippet-kotlin" class="p-4 text-xs bg-black/90 text-amber-200 overflow-x-auto leading-relaxed">val client = OkHttpClient()
+val json = JSONObject().apply {
+    put("order_id", "ORD-2026-9812")
+    put("amount", 1250.00)
+    put("customer_phone", "01712963652")
+    put("payment_method", "bKash")
+    put("redirect_url", "https://mysite.com/success")
+}
+val request = Request.Builder()
+    .url("https://pay.swapnopay.top/v1/payment/create")
+    .addHeader("X-Admin-Secret", "sk_live_your_api_secret")
+    .addHeader("Idempotency-Key", java.util.UUID.randomUUID().toString())
+    .post(json.toString().toRequestBody("application/json".toMediaType()))
+    .build()
+client.newCall(request).execute().use { response ->
+    println(response.body?.string())
+}</pre>
+        </div>
+
+      </section>
+
+    </div>
+    <footer class="workspace-footer"><span>© 2026 SwapnoPay. Built for your next integration.</span><div><a href="/">Home</a><a href="docs.html">Documentation</a><a href="sms-docs.html">SMS Gateway</a><a href="privacy-policy.html">Privacy</a><a href="terms-and-conditions.html">Terms</a></div></footer>
+  </main>
+
+  <script>
+    // Exhaustive default API documentation markdown
+    const DEFAULT_FULL_DOCS = `# SwapnoPay Developer API & Webhook Specification (v2.0 Production)
+
+Welcome to the SwapnoPay Official API Documentation. SwapnoPay is an enterprise-grade payment aggregation and automated SMS reconciliation gateway supporting bKash, Nagad, Rocket, and Upay across Personal, Merchant, and Agent numbers.
+
+---
+
+## 1. Base URLs & Environments
+
+- **Production Gateway**: \`https://pay.swapnopay.top\`
+- **Supabase Edge Functions**: \`https://<your-project>.supabase.co/functions/v1\`
+- **WebSocket Gateway**: \`wss://pay.swapnopay.top\`
+- **Sandbox Testing**: Enable Test Mode in your merchant dashboard to simulate carrier SMS triggers.
+
+---
+
+## 2. Authentication & Headers
+
+All requests to the SwapnoPay API must include either your API Secret Key or a valid Supabase JWT Bearer token:
+
+| Header Name | Type | Description |
+|---|---|---|
+| \`X-Admin-Secret\` | string | Your platform or merchant API secret key. |
+| \`Authorization\` | string | \`Bearer <JWT_TOKEN>\` for authenticated merchant sessions. |
+| \`apikey\` | string | Supabase anon/publishable key for client-side queries. |
+| \`Idempotency-Key\` | string (UUID) | Unique request token to prevent double-charging or duplicate order creation. |
+| \`Content-Type\` | string | Must be \`application/json\`. |
+
+---
+
+## 3. Core API Endpoints
+
+### 3.1 Create Payment Order
+Create a new checkout session and obtain a hosted payment URL.
+
+- **Method**: \`POST\`
+- **Endpoint**: \`/v1/payment/create\`
+- **Edge Function Alternative**: \`POST /functions/v1/create-order\`
+
+#### Request Body:
+\`\`\`json
+{
+  "order_id": "ORD-2026-9812",
+  "amount": 1250.00,
+  "currency": "BDT",
+  "customer_name": "Tanvir Hasan",
+  "customer_email": "tanvir@example.com",
+  "customer_phone": "01712963652",
+  "payment_method": "bKash",
+  "redirect_url": "https://merchant.example.com/checkout/success",
+  "cancel_url": "https://merchant.example.com/checkout/cancel",
+  "webhook_url": "https://merchant.example.com/api/webhooks/swapnopay"
+}
+\`\`\`
+
+#### Response (200 OK):
+\`\`\`json
+{
+  "status": "SUCCESS",
+  "code": 200,
+  "message": "Payment session initialized successfully",
+  "data": {
+    "order_id": "ORD-2026-9812",
+    "payment_url": "https://pay.swapnopay.top/pay/ORD-2026-9812",
+    "assigned_gateway_number": "01784992118",
+    "gateway_type": "bKash Personal",
+    "fee_amount": 12.50,
+    "payable_amount": 1250.00,
+    "expires_at": "2026-09-07T21:15:00Z"
+  }
+}
+\`\`\`
+
+---
+
+### 3.2 Verify Payment & SMS Match
+Verify incoming carrier transaction details against pending orders.
+
+- **Method**: \`POST\`
+- **Endpoint**: \`/v1/payment/verify\`
+
+#### Request Body:
+\`\`\`json
+{
+  "order_id": "ORD-2026-9812",
+  "tran_id": "9H8B7G6F5E",
+  "sender_phone": "01712963652",
+  "amount": 1250.00,
+  "payment_method": "bKash"
+}
+\`\`\`
+
+#### Response (200 OK):
+\`\`\`json
+{
+  "status": "PAID",
+  "order_id": "ORD-2026-9812",
+  "trx_id": "9H8B7G6F5E",
+  "verified": true,
+  "matched_at": "2026-09-07T20:16:30Z",
+  "redirect_url": "https://merchant.example.com/checkout/success?order_id=ORD-2026-9812"
+}
+\`\`\`
+
+---
+
+### 3.3 Query Order Status
+Poll or inspect live order settlement status.
+
+- **Method**: \`GET\`
+- **Endpoint**: \`/v1/payment/status/{orderId}\`
+
+---
+
+### 3.4 Hosted Form Dynamic Submission
+Submit custom dynamic fields and uploaded proof attachments.
+
+- **Method**: \`POST\`
+- **Endpoint**: \`/v1/hosted-form/submit\`
+
+---
+
+## 4. Webhooks & HMAC Signature Security
+
+SwapnoPay sends instant JSON HTTP POST notifications whenever an order changes state.
+
+### 4.1 Signature Header
+Every webhook request contains an HMAC SHA-256 signature in the header:
+\`\`\`http
+X-Signature: sha256=4f6a9e1029c8b3...
+\`\`\`
+
+### 4.2 Webhook Event: \`payment.paid\`
+\`\`\`json
+{
+  "event": "payment.paid",
+  "timestamp": "2026-09-07T20:16:30Z",
+  "data": {
+    "order_id": "ORD-2026-9812",
+    "status": "PAID",
+    "amount": 1250.00,
+    "currency": "BDT",
+    "payment_method": "bKash",
+    "trx_id": "9H8B7G6F5E",
+    "sender_phone": "01712963652",
+    "customer_name": "Tanvir Hasan"
+  }
+}
+\`\`\`
+
+---
+
+## 5. Error Codes & Resolution
+
+| Error Code | HTTP Status | Description & Suggested Action |
+|---|---|---|
+| \`ERR_INVALID_HMAC\` | 401 | Webhook or request signature verification failed. Verify your secret key. |
+| \`ERR_ORDER_EXPIRED\` | 400 | Payment window expired (default 10 minutes). Re-initialize checkout session. |
+| \`ERR_DUPLICATE_IDEMPOTENCY\` | 409 | Request with this Idempotency-Key already processed. Safe to read cached order. |
+| \`ERR_INSUFFICIENT_AMOUNT\` | 422 | Paid MFS amount does not match expected invoice total. Flags for manual appeal. |
+| \`ERR_GATEWAY_OFFLINE\` | 503 | No Android receiver device is currently online for the requested payment number. |
+| \`ERR_TRX_ALREADY_USED\` | 409 | This carrier Transaction ID has already been credited to another order. |
+
+---
+*SwapnoPay Developer Portal & API Specification • Version 2.0*
+`;
+
+    let currentApiDocumentation = DEFAULT_FULL_DOCS;
+    let defaultVideos = [
+      {
+        id: "vid_bkash",
+        title: "bKash Automatic SMS Matching",
+        description: "Setup automated order matching with personal & merchant SIM.",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        duration: "5:24 min",
+        category: "Automation"
+      },
+      {
+        id: "vid_sms_app",
+        title: "SMS Gateway Background Service",
+        description: "Configure battery optimization, background service & permissions.",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        duration: "3:15 min",
+        category: "Setup"
+      },
+      {
+        id: "vid_woo",
+        title: "WooCommerce & Webhooks Setup",
+        description: "Install SwapnoPay WordPress plugin and configure instant IPN webhooks.",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        duration: "4:50 min",
+        category: "Integration"
+      },
+      {
+        id: "vid_postgres",
+        title: "Supabase Database & API Keys",
+        description: "Manage API secret keys, RLS security policies, and edge functions.",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        duration: "6:10 min",
+        category: "Security"
+      }
+    ];
+
+    function showToast(msg) {
+      const toast = document.getElementById('copy-toast');
+      const text = document.getElementById('toast-text');
+      if (text) text.innerText = msg;
+      if (toast) {
+        toast.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
+        }, 3000);
+      }
+    }
+
+    function copyFullApiDocumentation() {
+      copyDocumentationText(currentApiDocumentation, 'Full API documentation copied to clipboard.');
+    }
+
+    async function copyDocumentationText(text, message) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(message);
+      } catch (_) {
+        showToast('Clipboard unavailable. Select and copy the documentation text manually.');
+      }
+    }
+
+    function copySnippet(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        copyDocumentationText(el.innerText, 'Code snippet copied to clipboard.');
+      }
+    }
+
+    function renderVideoTutorials(videos) {
+      const container = document.getElementById('video-tutorials-grid');
+      const countBadge = document.getElementById('tutorials-count-badge');
+      if (!container) return;
+      if (countBadge) countBadge.innerText = (videos.length) + ' Video Guides';
+
+      container.innerHTML = videos.map((vid, idx) => `
+        <div class="glass-card rounded-2xl p-5 border border-amber-500/20 space-y-3 hover:border-amber-500/40 transition group">
+          <div class="flex justify-between items-center">
+            <span class="px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+              ${vid.category || 'General'}
+            </span>
+            <span class="text-slate-400 font-mono text-xs"><span class="material-symbols-outlined" style="vertical-align:middle;font-size:14px;margin-right:6px;">schedule</span>${vid.duration || '3:00 min'}</span>
+          </div>
+          <h4 class="font-extrabold text-white text-sm group-hover:text-amber-400 transition">${vid.title}</h4>
+          <p class="text-xs text-slate-400 leading-relaxed line-clamp-2">${vid.description || ''}</p>
+          <div class="pt-2 flex items-center justify-between">
+            <button onclick="openVideoModal('${vid.title.replace(/'/g, "\\'")}', '${vid.videoUrl}')" class="inline-flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-amber-300">
+              <span class="material-symbols-outlined text-base">play_arrow</span> <span>Watch Tutorial</span>
+            </button>
+            <a href="${vid.videoUrl}" target="_blank" rel="noreferrer" class="text-[11px] text-slate-500 hover:text-slate-400">Open External ↗</a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openVideoModal(title, url) {
+      const modal = document.getElementById('video-modal');
+      const titleEl = document.getElementById('modal-video-title');
+      const iframe = document.getElementById('modal-video-iframe');
+      if (!modal || !iframe) return;
+
+      if (titleEl) titleEl.innerText = title;
+      
+      let embedUrl = url;
+      if (url.includes('youtube.com/watch?v=')) {
+        const vidId = url.split('watch?v=')[1].split('&')[0];
+        embedUrl = 'https://www.youtube.com/embed/' + vidId + '?autoplay=1';
+      } else if (url.includes('youtu.be/')) {
+        const vidId = url.split('youtu.be/')[1].split('?')[0];
+        embedUrl = 'https://www.youtube.com/embed/' + vidId + '?autoplay=1';
+      }
+
+      iframe.src = embedUrl;
+      modal.classList.remove('hidden');
+    }
+
+    function closeVideoModal() {
+      const modal = document.getElementById('video-modal');
+      const iframe = document.getElementById('modal-video-iframe');
+      if (iframe) iframe.src = '';
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // Initial render of default video tutorials
+    renderVideoTutorials(defaultVideos);
+
+    // Live Supabase Sync
+    (async function initSupabaseSync() {
+      try {
+        const supaUrl = localStorage.getItem('swapnopay_admin_url') || 'https://swapnopay.supabase.co';
+        const supaKey = localStorage.getItem('swapnopay_admin_anon') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
+        if (window.supabase && supaUrl && supaKey && !supaUrl.includes('placeholder') && !supaKey.includes('placeholder')) {
+          const client = window.supabase.createClient(supaUrl, supaKey);
+          const { data } = await client.from('showcase_config').select('value').eq('key', 'system_config').single();
+          if (data && data.value) {
+            applyRemoteConfig(data.value);
+          }
+        }
+      } catch (err) {
+        console.warn('[DocsPortal] Remote config fallback:', err.message);
+      }
+    })();
+
+    function applyRemoteConfig(config) {
+      if (config.api_documentation && config.api_documentation.trim().length > 0) {
+        currentApiDocumentation = config.api_documentation;
+      }
+      if (Array.isArray(config.video_tutorials) && config.video_tutorials.length > 0) {
+        renderVideoTutorials(config.video_tutorials);
+      }
+      if (config.system_notice && config.system_notice.trim()) {
+        const banner = document.getElementById('admin-broadcast-banner');
+        const msg = document.getElementById('broadcast-message');
+        if (banner && msg) {
+          msg.innerText = config.system_notice;
+          banner.classList.remove('hidden');
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Form Gateway</title>
+  <!-- Google Fonts: Outfit, Inter, Roboto -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style id="base-form-css">
+    :root {
+      --primary: #5d45ff;
+      --bg-dark: #0f172a;
+      --card-bg: #ffffff;
+      --text-dark: #1e293b;
+      --text-light: #64748b;
+      --border: #e2e8f0;
+      --font: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --btn-radius: 14px;
+      --card-radius: 24px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+    }
+
+    body {
+      background-color: #f8fafc;
+      color: var(--text-dark);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      transition: background 0.3s;
+    }
+
+    .form-container {
+      background: var(--card-bg);
+      border-radius: var(--card-radius);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 560px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+    }
+
+    .form-banner {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .countdown-banner {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1.5px solid #F59E0B;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .logo-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .merchant-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--primary);
+      overflow: hidden;
+    }
+
+    .form-title h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-dark);
+      margin-bottom: 6px;
+    }
+
+    .form-title p {
+      font-size: 13.5px;
+      color: var(--text-light);
+      line-height: 1.5;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .field-label span.req {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+
+    .input-text, .input-select {
+      width: 100%;
+      height: 48px;
+      padding: 0 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      font-size: 14px;
+      color: var(--text-dark);
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-text:focus, .input-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(93, 69, 255, 0.12);
+    }
+
+    .input-area {
+      width: 100%;
+      height: 90px;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      font-size: 14px;
+      color: var(--text-dark);
+      background: #fff;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-area:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(93, 69, 255, 0.12);
+    }
+
+    .product-card {
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      background: #fff;
+      transition: all 0.2s;
+    }
+
+    .product-card:hover {
+      border-color: var(--primary);
+    }
+
+    .product-card.selected {
+      border-color: var(--primary);
+      background: rgba(93, 69, 255, 0.04);
+    }
+
+    .product-card-img {
+      width: 54px;
+      height: 54px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .product-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .product-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .product-card-price {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .product-card-sku {
+      font-size: 11px;
+      color: var(--text-light);
+    }
+
+    .product-qty-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .product-qty-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dark);
+      transition: background 0.15s;
+    }
+
+    .product-qty-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .product-qty-val {
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      color: var(--text-dark);
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .option-row input {
+      width: 17px;
+      height: 17px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .question-image {
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-top: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .method-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .method-card {
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #fff;
+    }
+
+    .method-card.active {
+      border-color: var(--primary);
+      background: #EEF2FF;
+      color: var(--primary);
+    }
+
+    .btn-submit {
+      width: 100%;
+      height: 52px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--btn-radius);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(93, 69, 255, 0.25);
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-submit:hover {
+      opacity: 0.95;
+    }
+
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .loading-spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top: 3px solid #fff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .closed-state {
+      text-align: center;
+      padding: 44px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .closed-state .icon {
+      font-size: 52px;
+    }
+
+    .closed-state h2 {
+      font-size: 22px;
+      color: var(--text-dark);
+    }
+
+    .closed-state p {
+      font-size: 14px;
+      color: var(--text-light);
+      line-height: 1.5;
+    }
+
+    /* Receipt Card */
+    .receipt-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 16px;
+      padding: 16px 8px;
+    }
+    .receipt-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
+    .receipt-details-table {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #f8fafc;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .receipt-row:last-child {
+      border-bottom: none;
+    }
+    .receipt-row .label {
+      color: var(--text-light);
+      font-weight: 500;
+    }
+    .receipt-row .val {
+      color: var(--text-dark);
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .btn-receipt-action {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-print {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-back {
+      background: #f1f5f9;
+      color: var(--text-dark);
+      border: 1px solid var(--border);
+    }
+    .tier-chip.selected {
+      border-color: var(--primary) !important;
+      background: rgba(93, 69, 255, 0.08) !important;
+      color: var(--primary) !important;
+    }
+
+    /* Multi-Page Stepper */
+    .step-progress-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .step-progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-light);
+    }
+    .step-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .step-progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    /* Product Gallery */
+    .product-gallery-thumbs {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .product-gallery-thumb {
+      width: 38px;
+      height: 38px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1.5px solid var(--border);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.2s;
+    }
+    .product-gallery-thumb.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(93, 69, 255, 0.25);
+    }
+
+    /* Product Variants */
+    .variant-selector-box {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .variant-select {
+      width: 100%;
+      height: 38px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      font-size: 12.5px;
+      background: #fff;
+      color: var(--text-dark);
+      cursor: pointer;
+    }
+
+    /* Wizard Navigation Buttons */
+    .wizard-nav {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      align-items: center;
+    }
+    .btn-prev {
+      flex: 1;
+      height: 52px;
+      border-radius: var(--btn-radius);
+      border: 1.5px solid var(--border);
+      background: #fff;
+      color: var(--text-dark);
+      font-weight: 700;
+      font-size: 14.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-prev:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .btn-next {
+      flex: 1.2;
+      height: 52px;
+      border-radius: var(--btn-radius);
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(93, 69, 255, 0.25);
+      transition: all 0.2s;
+    }
+    .btn-next:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .custom-html-card {
+      padding: 16px;
+      border-radius: 14px;
+      border: 1.5px solid var(--border);
+      background: #fafafa;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <style id="custom-user-css"></style>
+</head>
+<body>
+
+  <div class="form-container" id="form-wrap">
+    <!-- Optional Cover Banner -->
+    <div id="banner-holder"></div>
+
+    <!-- Countdown Banner (if configured) -->
+    <div id="countdown-banner-holder"></div>
+
+    <!-- Header -->
+    <div class="logo-header" id="header-section">
+      <div class="merchant-logo" id="form-logo">S</div>
+      <div class="form-title">
+        <h2 id="title-text">Payment Form Checkout</h2>
+        <p id="desc-text">Fill in details to proceed.</p>
+      </div>
+    </div>
+
+    <!-- Dynamic Form -->
+    <form id="dynamic-form" onsubmit="handleFormSubmit(event)" style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Hidden honeypot anti-spam check -->
+      <input type="text" name="_hp_check" id="_hp_check" style="display:none;" tabindex="-1" autocomplete="off" />
+
+      <!-- Step Indicator (visible for multi-page forms) -->
+      <div id="step-indicator-wrap" style="display: none;" class="step-progress-wrap">
+        <div class="step-progress-header">
+          <span id="step-count-text">Step 1 of 1</span>
+          <span id="step-title-text">Details</span>
+        </div>
+        <div class="step-progress-bar">
+          <div class="step-progress-fill" id="step-progress-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <div id="fields-container" style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Dynamic fields and product blocks rendered here -->
+      </div>
+
+      <!-- Payment Method Selection (hidden if non-payment form or total is 0) -->
+      <div class="field-group" id="method-section">
+        <label class="field-label">Payment Method <span class="req">*</span></label>
+        <div class="method-selector" id="method-selector">
+          <div class="method-card active" data-method="bKash" onclick="selectPaymentMethod('bKash')">bKash</div>
+          <div class="method-card" data-method="Nagad" onclick="selectPaymentMethod('Nagad')">Nagad</div>
+          <div class="method-card" data-method="Rocket" onclick="selectPaymentMethod('Rocket')">Rocket</div>
+          <div class="method-card" data-method="Upay" onclick="selectPaymentMethod('Upay')">Upay</div>
+        </div>
+      </div>
+
+      <div class="wizard-nav" id="wizard-nav">
+        <button type="button" class="btn-prev" id="prev-step-btn" style="display: none;" onclick="goToPreviousPage()">← Previous</button>
+        <button type="button" class="btn-next" id="next-step-btn" style="display: none;" onclick="goToNextPage()">Next Step →</button>
+        <button type="submit" class="btn-submit" id="submit-btn" style="flex: 1;">
+          <span id="btn-text">Submit Response</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    let formIdentifier = "";
+    let supabaseUrl = "";
+    let supabaseAnonKey = "";
+    let formConfig = null;
+    let selectedMethod = "bKash";
+    let selectedProductsMap = {}; // fieldId -> { selected: bool, price: num, qty: num, title: str, variant: str, variantId: str }
+    let baseFormAmount = 0;
+    let isPaymentEnabled = true;
+
+    // Multi-page Wizard state
+    let currentStep = 0;
+    let formPagesList = [];
+
+    // CSV Autofill state
+    let csvBackendData = [];
+    let csvLookupColumn = "";
+    let csvTargetFieldId = "";
+    let csvColumnMappings = {};
+
+    function switchProductGalleryImage(fId, url, thumbEl) {
+      const img = document.getElementById(`prod-main-img-${fId}`);
+      if (img) img.src = url;
+      if (thumbEl && thumbEl.parentElement) {
+        thumbEl.parentElement.querySelectorAll('.product-gallery-thumb').forEach(t => t.classList.remove('active'));
+        thumbEl.classList.add('active');
+      }
+    }
+
+    function onVariantSelectChanged(fId, selectEl) {
+      if (!selectEl) return;
+      const opt = selectEl.options[selectEl.selectedIndex];
+      if (!opt) return;
+      const price = parseFloat(opt.getAttribute('data-price') || 0);
+      const name = opt.getAttribute('data-name') || '';
+      const varId = selectEl.value;
+
+      if (selectedProductsMap[fId]) {
+        selectedProductsMap[fId].price = price;
+        selectedProductsMap[fId].variant = name;
+        selectedProductsMap[fId].variantId = varId;
+      }
+      const priceEl = document.getElementById(`prod-price-${fId}`);
+      if (priceEl) {
+        priceEl.innerText = `BDT ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      }
+      recalculateTotalAmount();
+    }
+
+    function updateStepNavigation() {
+      const totalPages = formPagesList.length;
+      if (totalPages <= 1) {
+        document.getElementById("step-indicator-wrap").style.display = "none";
+        document.getElementById("prev-step-btn").style.display = "none";
+        document.getElementById("next-step-btn").style.display = "none";
+        document.getElementById("submit-btn").style.display = "flex";
+        const total = recalculateTotalAmount();
+        document.getElementById("method-section").style.display = (isPaymentEnabled && total > 0) ? "flex" : "none";
+        return;
+      }
+
+      document.getElementById("step-indicator-wrap").style.display = "flex";
+      const pg = formPagesList[currentStep] || {};
+      document.getElementById("step-count-text").innerText = `Step ${currentStep + 1} of ${totalPages}`;
+      document.getElementById("step-title-text").innerText = pg.title || `Page ${currentStep + 1}`;
+      const pct = Math.round(((currentStep + 1) / totalPages) * 100);
+      document.getElementById("step-progress-fill").style.width = `${pct}%`;
+
+      document.querySelectorAll('.form-page-step').forEach((el, idx) => {
+        el.style.display = (idx === currentStep) ? "flex" : "none";
+      });
+
+      document.getElementById("prev-step-btn").style.display = (currentStep > 0) ? "block" : "none";
+
+      if (currentStep < totalPages - 1) {
+        document.getElementById("next-step-btn").style.display = "block";
+        document.getElementById("submit-btn").style.display = "none";
+        document.getElementById("method-section").style.display = "none";
+      } else {
+        document.getElementById("next-step-btn").style.display = "none";
+        document.getElementById("submit-btn").style.display = "flex";
+        const total = recalculateTotalAmount();
+        document.getElementById("method-section").style.display = (isPaymentEnabled && total > 0) ? "flex" : "none";
+      }
+    }
+
+    function goToNextPage() {
+      const curPageEl = document.getElementById(`page-step-${currentStep}`);
+      if (curPageEl) {
+        const inputs = curPageEl.querySelectorAll("input, select, textarea");
+        for (const inp of inputs) {
+          if (!inp.checkValidity()) {
+            inp.reportValidity();
+            return;
+          }
+        }
+      }
+      if (currentStep < formPagesList.length - 1) {
+        currentStep++;
+        updateStepNavigation();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function goToPreviousPage() {
+      if (currentStep > 0) {
+        currentStep--;
+        updateStepNavigation();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function renderPaymentReceipt(params) {
+      const orderId = params.get("order_id") || "N/A";
+      const trxId = params.get("trx_id") || params.get("trxId") || params.get("tran_id") || "";
+      const amountVal = parseFloat(params.get("amount") || 0);
+      const amountFormatted = !isNaN(amountVal) && amountVal > 0
+        ? `৳${amountVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+        : "Paid";
+      const formWrap = document.getElementById("form-wrap");
+      if (!formWrap) return;
+
+      const currentPath = window.location.pathname;
+
+      formWrap.innerHTML = `
+        <div class="receipt-card">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #ecfdf5; border: 3px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #10b981; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);">
+            ✓
+          </div>
+          <div class="receipt-badge">PAYMENT VERIFIED • PAID</div>
+          <h2 style="font-size: 22px; font-weight: 700; color: var(--text-dark); margin-top: 4px;">Payment Received!</h2>
+          <p style="font-size: 14px; color: var(--text-light); max-width: 400px; margin: 0 auto;">
+            Thank you! Your payment of <strong>${amountFormatted}</strong> has been confirmed and your form response is now registered.
+          </p>
+
+          <div class="receipt-details-table">
+            <div class="receipt-row">
+              <span class="label">Status</span>
+              <span class="val" style="color: #10b981;">COMPLETED / PAID</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Amount Paid</span>
+              <span class="val" style="color: var(--primary); font-size: 15px;">${amountFormatted}</span>
+            </div>
+            <div class="receipt-row">
+              <span class="label">Order / Reference</span>
+              <span class="val">#${orderId}</span>
+            </div>
+            ${trxId ? `
+            <div class="receipt-row">
+              <span class="label">Transaction Ref ID</span>
+              <span class="val" style="font-family: monospace;">${trxId}</span>
+            </div>` : ''}
+            <div class="receipt-row">
+              <span class="label">Date & Time</span>
+              <span class="val">${new Date().toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 14px;">
+            <button type="button" class="btn-receipt-action btn-print" onclick="window.print()">
+              🖨️ Print Receipt
+            </button>
+            <a href="${currentPath}" class="btn-receipt-action btn-back">
+              Submit Another Response
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    window.onload = function() {
+      const params = new URLSearchParams(window.location.search);
+      const status = (params.get("status") || params.get("payment") || "").toLowerCase();
+      if (status === "paid" || status === "success") {
+        renderPaymentReceipt(params);
+        return;
+      }
+
+      if (status === "cancelled" || status === "cancel") {
+        const holder = document.getElementById("countdown-banner-holder");
+        if (holder) {
+          holder.innerHTML = `
+            <div style="background:#FEF2F2; color:#B91C1C; border:1.5px solid #F87171; border-radius:12px; padding:10px 14px; font-size:13px; font-weight:600; margin-bottom:12px;">
+              ⚠️ Payment was cancelled. You can review your details and submit again.
+            </div>
+          `;
+        }
+      }
+
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const routeIdentifier = (pathParts[0] === 'f' || pathParts[0] === 'form' || pathParts[0] === 'forms') ? pathParts[1] : '';
+
+      formIdentifier = params.get("slug") || params.get("id") || routeIdentifier || "demo_form_id";
+      supabaseUrl = params.get("supabase_url") || window.SUPABASE_URL || "https://tldubojeokgyoclxnzkb.supabase.co";
+      supabaseAnonKey = params.get("supabase_anon_key") || window.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0";
+
+      if (formIdentifier !== "demo_form_id" && !supabaseUrl.includes("abc123xyz")) {
+        loadPaymentFormDetails();
+      } else {
+        renderDemoFields();
+      }
+    };
+
+    function normalizeToUuid(val) {
+      if (!val) return null;
+      const str = String(val).trim().toLowerCase();
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) {
+        return str;
+      }
+      const clean = str.replace(/[^0-9a-f]/g, '');
+      if (clean.length === 32) {
+        return `${clean.slice(0,8)}-${clean.slice(8,12)}-${clean.slice(12,16)}-${clean.slice(16,20)}-${clean.slice(20,32)}`;
+      }
+      return null;
+    }
+
+    function selectPaymentMethod(method) {
+      selectedMethod = method;
+      document.querySelectorAll('.method-card').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-method') === method);
+      });
+    }
+
+    async function loadPaymentFormDetails() {
+      // 1. Try Backend API first (/v1/forms/:slugOrId)
+      try {
+        const res = await fetch(`/v1/forms/${encodeURIComponent(formIdentifier)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok && data.form) {
+            formConfig = data.form;
+            renderConfiguredFields(formConfig);
+            return;
+          }
+        }
+      } catch (backendErr) {
+        console.warn("[form] Backend endpoint direct resolve error, falling back to Supabase:", backendErr.message);
+      }
+
+      // 1b. Try production gateway domains if running on alternate host/port
+      const fallbackGateways = ["https://swapnopay.top", "https://api.swapnopay.top", "https://pay.swapnopay.top"];
+      for (const origin of fallbackGateways) {
+        if (!window.location.origin.includes(origin.replace("https://", ""))) {
+          try {
+            const res = await fetch(`${origin}/v1/forms/${encodeURIComponent(formIdentifier)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.ok && data.form) {
+                formConfig = data.form;
+                renderConfiguredFields(formConfig);
+                return;
+              }
+            }
+          } catch (absErr) {
+            console.warn(`[form] Router lookup notice for ${origin}:`, absErr.message);
+          }
+        }
+      }
+
+      // 2. Fallback to Supabase direct query
+      const parsedUuid = normalizeToUuid(formIdentifier);
+      const encodedSlug = encodeURIComponent(formIdentifier);
+      const filter = parsedUuid
+        ? `or=(id.eq.${parsedUuid},slug.eq.${encodedSlug})`
+        : `slug=eq.${encodedSlug}`;
+
+      fetch(`${supabaseUrl}/rest/v1/payment_forms?${filter}&select=*`, {
+        headers: {
+          "apikey": supabaseAnonKey,
+          "Authorization": `Bearer ${supabaseAnonKey}`
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          formConfig = data[0];
+          renderConfiguredFields(formConfig);
+        } else {
+          document.getElementById("form-wrap").innerHTML = `
+            <div class="closed-state">
+              <div class="icon">🔍</div>
+              <h2>Form Not Found</h2>
+              <p>The form link may be incorrect, inactive, or removed.</p>
+            </div>
+          `;
+        }
+      })
+      .catch(err => {
+        console.error("Error loading payment form:", err);
+        document.getElementById("form-wrap").innerHTML = `
+          <div class="closed-state">
+            <div class="icon">⚠️</div>
+            <h2>Unable to Load Form</h2>
+            <p>Please check your internet connection or try again later.</p>
+          </div>
+        `;
+      });
+    }
+
+    function renderConfiguredFields(config) {
+      const theme = (config.theme && typeof config.theme === 'object') ? config.theme : {};
+
+      // 1. Check Closing Timeline & Response Limits
+      const deadlineEpoch = Number(theme.closing_deadline_epoch || theme.closingDeadlineEpoch || 0);
+      const isTimelineClosed = (theme.enable_closing_timeline === true || theme.enableClosingTimeline === true) && deadlineEpoch > 0 && Date.now() > deadlineEpoch;
+      const maxResponses = Number(theme.max_responses || theme.maxResponses || 1000);
+      const isLimitClosed = (theme.close_after_limit === true || theme.closeAfterLimit === true) && Number(config.submissions_count || 0) >= Math.max(1, maxResponses);
+
+      if (isTimelineClosed || isLimitClosed || config.closing_status?.closed) {
+        const closedMsg = theme.closed_message || theme.closedMessage || config.closing_status?.message || "This form is no longer accepting responses.";
+        document.getElementById("form-wrap").innerHTML = `
+          <div class="closed-state">
+            <div class="icon">🔒</div>
+            <h2>${config.title || "Form Closed"}</h2>
+            <p>${closedMsg}</p>
+          </div>
+        `;
+        return;
+      }
+
+      // 2. Apply Theme & Appearance
+      const primaryColor = theme.primary_color || theme.primaryColorHex || '#5d45ff';
+      document.documentElement.style.setProperty('--primary', primaryColor);
+
+      // Button shape
+      const btnShape = String(theme.button_shape || theme.buttonShape || 'ROUNDED').toUpperCase();
+      if (btnShape === 'PILL') {
+        document.documentElement.style.setProperty('--btn-radius', '9999px');
+      } else if (btnShape === 'SQUARE') {
+        document.documentElement.style.setProperty('--btn-radius', '4px');
+      } else {
+        const radius = Number(theme.border_radius || theme.borderRadiusDp || 14);
+        document.documentElement.style.setProperty('--btn-radius', `${radius}px`);
+      }
+
+      // Background Style
+      const bgStyle = String(theme.background_style || theme.backgroundStyle || 'SOLID').toUpperCase();
+      if (bgStyle === 'GRADIENT') {
+        const gStart = theme.gradient_start || theme.gradientColorStart || '#5B7FFF';
+        const gEnd = theme.gradient_end || theme.gradientColorEnd || '#7C4DFF';
+        document.body.style.background = `linear-gradient(135deg, ${gStart}, ${gEnd})`;
+      } else {
+        const bgColor = theme.background_color || theme.backgroundColorHex || '#f8fafc';
+        document.body.style.backgroundColor = bgColor;
+      }
+
+      // Form Width
+      const formWidth = Number(theme.form_width || theme.formWidthPx || 0);
+      if (formWidth >= 320 && formWidth <= 1200) {
+        document.getElementById("form-wrap").style.maxWidth = `${formWidth}px`;
+      }
+
+      // Custom CSS injection
+      if (theme.custom_css || theme.customCss) {
+        document.getElementById("custom-user-css").innerHTML = theme.custom_css || theme.customCss;
+      }
+
+      // Custom JS injection
+      if ((theme.enable_custom_js || theme.enableCustomJs) && (theme.custom_js || theme.customJs)) {
+        try {
+          const scriptEl = document.createElement("script");
+          scriptEl.textContent = theme.custom_js || theme.customJs;
+          document.body.appendChild(scriptEl);
+        } catch (e) {
+          console.warn("Custom JS warning:", e.message);
+        }
+      }
+
+      // Banner Image
+      const bannerUrl = config.banner_url || theme.banner_url || theme.bannerUrl || '';
+      if (bannerUrl) {
+        document.getElementById("banner-holder").innerHTML = `
+          <img src="${bannerUrl}" alt="Cover" class="form-banner" />
+        `;
+      }
+
+      // Header Visibility
+      const showHeader = theme.show_header !== false && theme.showHeader !== false && !theme.hide_form_header && !theme.hideFormHeader;
+      if (!showHeader) {
+        document.getElementById("header-section").style.display = "none";
+      } else {
+        document.getElementById("title-text").innerText = config.title || "Payment Form";
+        document.getElementById("desc-text").innerText = config.description || "Fill in details to proceed.";
+        const logo = document.getElementById("form-logo");
+        const logoUrl = config.logo_url || theme.logo_url || theme.logoUrl || '';
+        if (logoUrl) {
+          logo.innerHTML = `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:14px;" />`;
+        } else {
+          logo.innerText = (config.title || 'S').charAt(0);
+        }
+      }
+
+      // Countdown Timer Banner
+      if ((theme.enable_closing_timeline || theme.enableClosingTimeline) && deadlineEpoch > 0 && theme.show_countdown_timer !== false && theme.showCountdownTimer !== false) {
+        const bannerHolder = document.getElementById("countdown-banner-holder");
+        bannerHolder.innerHTML = `
+          <div class="countdown-banner" id="countdown-banner">
+            <span>⏳ Submissions Close In:</span>
+            <span id="countdown-val" style="font-family:monospace;font-size:14px;font-weight:700;">Loading...</span>
+          </div>
+        `;
+        const bannerInterval = setInterval(() => {
+          const diff = deadlineEpoch - Date.now();
+          const valEl = document.getElementById("countdown-val");
+          if (diff <= 0) {
+            clearInterval(bannerInterval);
+            if (valEl) valEl.innerText = "EXPIRED";
+            const btn = document.getElementById("submit-btn");
+            if (btn) { btn.disabled = true; btn.innerText = "Form Closed"; }
+          } else {
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+            if (valEl) valEl.innerText = (d > 0 ? d + "d " : "") + h + "h " + m + "m " + s + "s";
+          }
+        }, 1000);
+      }
+
+      // Payment Enablement
+      isPaymentEnabled = theme.enable_payment !== false && theme.enablePayment !== false;
+      baseFormAmount = parseFloat(config.amount || 0);
+
+      // Configure Dynamic Payment Methods from Merchant Gateway Config
+      const gwConfig = config.gateway_config || {};
+      const enabledMethods = gwConfig.enabled_methods || { bKash: true, Nagad: true, Rocket: true, Upay: true };
+      const receivingNums = gwConfig.receiving_numbers || {};
+      const selectorEl = document.getElementById("method-selector");
+
+      if (selectorEl) {
+        selectorEl.innerHTML = "";
+        const allMethods = ["bKash", "Nagad", "Rocket", "Upay"];
+        const activeMethods = allMethods.filter(m => enabledMethods[m] !== false);
+        const methodsToRender = activeMethods.length > 0 ? activeMethods : ["bKash"];
+
+        methodsToRender.forEach((m, idx) => {
+          const card = document.createElement("div");
+          card.className = `method-card ${idx === 0 ? 'active' : ''}`;
+          card.setAttribute("data-method", m);
+          card.onclick = () => selectPaymentMethod(m);
+
+          const num = receivingNums[m];
+          if (num) {
+            card.innerHTML = `<div>${m}</div><div style="font-size:10px;font-weight:normal;opacity:0.75;margin-top:2px;">${num}</div>`;
+          } else {
+            card.innerText = m;
+          }
+          selectorEl.appendChild(card);
+        });
+
+        // Auto-select first active method
+        selectedMethod = methodsToRender[0];
+      }
+
+      const container = document.getElementById("fields-container");
+      container.innerHTML = "";
+
+      // Parse JSON pages
+      let pages = [];
+      try {
+        pages = typeof config.pages === "string" ? JSON.parse(config.pages) : (config.pages || []);
+      } catch (e) {
+        pages = config.pages || [];
+      }
+      if (!Array.isArray(pages) || pages.length === 0) {
+        pages = [{ id: "page_0", title: "Page 1: Customer Details", is_custom_html: false }];
+      }
+      formPagesList = pages;
+      currentStep = 0;
+
+      // Parse JSON fields
+      let fieldsList = [];
+      try {
+        fieldsList = typeof config.fields === "string" ? JSON.parse(config.fields) : (config.fields || []);
+      } catch (e) {
+        fieldsList = config.fields || [];
+      }
+
+      // Parse Catalog products
+      let productsList = [];
+      try {
+        productsList = typeof config.products === "string" ? JSON.parse(config.products) : (config.products || []);
+      } catch { productsList = []; }
+
+      // Shuffle questions if enabled
+      if (theme.shuffle_questions || theme.shuffleQuestionOrder) {
+        fieldsList = [...fieldsList].sort(() => Math.random() - 0.5);
+      }
+
+      // Build each page step
+      formPagesList.forEach((pg, pageIdx) => {
+        const stepDiv = document.createElement("div");
+        stepDiv.className = "form-page-step";
+        stepDiv.id = `page-step-${pageIdx}`;
+        stepDiv.style.display = (pageIdx === 0) ? "flex" : "none";
+        stepDiv.style.flexDirection = "column";
+        stepDiv.style.gap = "16px";
+
+        if (pg.is_custom_html === true || pg.isCustomHtml === true) {
+          const htmlCard = document.createElement("div");
+          htmlCard.className = "custom-html-card";
+          let cHtml = pg.custom_html_content || pg.customHtmlContent || "<p>Custom HTML Page</p>";
+          cHtml = cHtml.replace(/\{\{form_title\}\}/g, config.title || '');
+          cHtml = cHtml.replace(/\{\{form_description\}\}/g, config.description || '');
+          cHtml = cHtml.replace(/\{\{page_title\}\}/g, pg.title || '');
+          const cCss = pg.custom_css_content || pg.customCssContent || '';
+          htmlCard.innerHTML = `
+            ${cCss ? `<style>${cCss}</style>` : ''}
+            <div>${cHtml}</div>
+          `;
+          stepDiv.appendChild(htmlCard);
+          container.appendChild(stepDiv);
+          return;
+        }
+
+        // Mandatory contact details on page 0
+        if (pageIdx === 0) {
+          addMandatoryContactFields(stepDiv);
+        }
+
+        // Catalog Products on page 0
+        if (pageIdx === 0 && productsList.length > 0) {
+          const prodSection = document.createElement("div");
+          prodSection.className = "field-group";
+          prodSection.innerHTML = `<label class="field-label">Select Product / Item</label>`;
+
+          productsList.forEach(p => {
+            const pId = `cat_prod_${p.id}`;
+            const pVariants = p.product_variants || p.productVariants || [];
+            let pPrice = parseFloat(p.sale_price > 0 ? p.sale_price : (p.salePrice > 0 ? p.salePrice : p.price || 0));
+            let initialVarName = '';
+            let initialVarId = '';
+            if (pVariants.length > 0) {
+              pPrice = parseFloat(pVariants[0].price || pPrice);
+              initialVarName = pVariants[0].name;
+              initialVarId = pVariants[0].id;
+            }
+
+            selectedProductsMap[pId] = {
+              selected: false,
+              price: pPrice,
+              qty: 1,
+              title: p.title,
+              variant: initialVarName,
+              variantId: initialVarId
+            };
+
+            const pCard = document.createElement("div");
+            pCard.className = "product-card";
+            pCard.id = `prod-card-${pId}`;
+            const pImgUrl = p.imageUrl || p.image_url || p.mediaUrl || p.media_url;
+            const pGallery = (p.gallery_urls || p.galleryUrls || []).filter(Boolean);
+            const allPImgs = [pImgUrl].concat(pGallery).filter(Boolean);
+            const mainPImg = allPImgs[0] || '';
+
+            const imgHtml = mainPImg ? `<img src="${mainPImg}" id="prod-main-img-${pId}" class="product-card-img" />` : `<div class="product-card-img" id="prod-main-img-${pId}">📦</div>`;
+
+            let galleryHtml = '';
+            if (allPImgs.length > 1) {
+              galleryHtml = `<div class="product-gallery-thumbs" onclick="event.stopPropagation()">`;
+              allPImgs.forEach((url, i) => {
+                galleryHtml += `<img src="${url}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onclick="switchProductGalleryImage('${pId}', '${url}', this)" />`;
+              });
+              galleryHtml += `</div>`;
+            }
+
+            let variantHtml = '';
+            if (pVariants.length > 0) {
+              variantHtml = `
+                <div class="variant-selector-box" onclick="event.stopPropagation()">
+                  <label style="font-size:11px;font-weight:600;color:var(--text-light);">Select Option / Variant:</label>
+                  <select class="variant-select" id="variant-select-${pId}" onchange="onVariantSelectChanged('${pId}', this)">
+                    ${pVariants.map(v => `<option value="${v.id}" data-price="${v.price}" data-name="${v.name}">${v.name} • BDT ${Number(v.price).toLocaleString(undefined, {minimumFractionDigits: 2})}</option>`).join('')}
+                  </select>
+                </div>
+              `;
+            }
+
+            pCard.innerHTML = `
+              ${imgHtml}
+              <div class="product-card-body">
+                <div class="product-card-title">${p.title}</div>
+                <div class="product-card-price" id="prod-price-${pId}">BDT ${pPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                ${p.sku ? `<div class="product-card-sku">SKU: ${p.sku}</div>` : ''}
+                ${galleryHtml}
+                ${variantHtml}
+              </div>
+              <div class="product-qty-ctrl" onclick="event.stopPropagation()">
+                <button type="button" class="product-qty-btn" onclick="updateFieldProductQty('${pId}', -1)">-</button>
+                <span class="product-qty-val" id="qty-val-${pId}">1</span>
+                <button type="button" class="product-qty-btn" onclick="updateFieldProductQty('${pId}', 1)">+</button>
+              </div>
+              <input type="checkbox" style="width:18px;height:18px;accent-color:var(--primary);margin-left:6px;"
+                id="chk-${pId}" onchange="toggleProductSelection('${pId}', this.checked)" />
+            `;
+
+            pCard.onclick = () => {
+              const chk = document.getElementById(`chk-${pId}`);
+              if (chk) {
+                chk.checked = !chk.checked;
+                toggleProductSelection(pId, chk.checked);
+              }
+            };
+
+            prodSection.appendChild(pCard);
+          });
+          stepDiv.appendChild(prodSection);
+        }
+
+        // Render fields belonging to this page
+        const pageFields = fieldsList.filter(f => {
+          const fPage = (f.page_index !== undefined) ? Number(f.page_index) : (f.pageIndex !== undefined ? Number(f.pageIndex) : 0);
+          return fPage === pageIdx;
+        });
+
+        pageFields.forEach(f => {
+          const group = document.createElement("div");
+          group.className = "field-group";
+
+          const fType = String(f.type || 'TEXT').toUpperCase();
+
+          // Check if PRODUCT block component
+          if (fType === "PRODUCT" || fType === "PRODUCT_LIST") {
+            const fId = f.id;
+            const isReq = f.required || f.isRequired;
+            const variants = f.product_variants || f.productVariants || [];
+            let price = parseFloat(f.minValue || f.min_value || f.defaultValue || 0);
+            let initialVarName = '';
+            let initialVarId = '';
+            if (variants.length > 0) {
+              price = parseFloat(variants[0].price || price);
+              initialVarName = variants[0].name;
+              initialVarId = variants[0].id;
+            }
+
+            selectedProductsMap[fId] = {
+              selected: isReq,
+              price: price,
+              qty: 1,
+              title: f.label || "Product Item",
+              variant: initialVarName,
+              variantId: initialVarId
+            };
+
+            const prodDiv = document.createElement("div");
+            prodDiv.className = `product-card ${selectedProductsMap[fId].selected ? 'selected' : ''}`;
+            prodDiv.id = `prod-card-${fId}`;
+
+            const mediaUrl = f.mediaUrl || f.media_url;
+            const gallery = (f.gallery_urls || f.galleryUrls || []).filter(Boolean);
+            const allMedia = [mediaUrl].concat(gallery).filter(Boolean);
+            const mainImg = allMedia[0] || '';
+
+            const imgHtml = mainImg
+              ? `<img src="${mainImg}" id="prod-main-img-${fId}" class="product-card-img" />`
+              : `<div class="product-card-img" id="prod-main-img-${fId}">🛍️</div>`;
+
+            let galleryHtml = '';
+            if (allMedia.length > 1) {
+              galleryHtml = `<div class="product-gallery-thumbs" onclick="event.stopPropagation()">`;
+              allMedia.forEach((url, i) => {
+                galleryHtml += `<img src="${url}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onclick="switchProductGalleryImage('${fId}', '${url}', this)" />`;
+              });
+              galleryHtml += `</div>`;
+            }
+
+            let variantHtml = '';
+            if (variants.length > 0) {
+              variantHtml = `
+                <div class="variant-selector-box" onclick="event.stopPropagation()">
+                  <label style="font-size:11px;font-weight:600;color:var(--text-light);">Select Option / Variant:</label>
+                  <select class="variant-select" id="variant-select-${fId}" onchange="onVariantSelectChanged('${fId}', this)">
+                    ${variants.map(v => `<option value="${v.id}" data-price="${v.price}" data-name="${v.name}">${v.name} • BDT ${Number(v.price).toLocaleString(undefined, {minimumFractionDigits: 2})}</option>`).join('')}
+                  </select>
+                </div>
+              `;
+            }
+
+            prodDiv.innerHTML = `
+              ${imgHtml}
+              <div class="product-card-body">
+                <div class="product-card-title">${f.label || 'Product'} ${isReq ? '<span style="color:#ef4444">*</span>' : ''}</div>
+                <div class="product-card-price" id="prod-price-${fId}">BDT ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                ${f.placeholder ? `<div class="product-card-sku">${f.placeholder}</div>` : ''}
+                ${galleryHtml}
+                ${variantHtml}
+              </div>
+              <div class="product-qty-ctrl" onclick="event.stopPropagation()">
+                <button type="button" class="product-qty-btn" onclick="updateFieldProductQty('${fId}', -1)">-</button>
+                <span class="product-qty-val" id="qty-val-${fId}">1</span>
+                <button type="button" class="product-qty-btn" onclick="updateFieldProductQty('${fId}', 1)">+</button>
+              </div>
+              <input type="checkbox" style="width:18px;height:18px;accent-color:var(--primary);margin-left:6px;"
+                id="chk-${fId}" ${selectedProductsMap[fId].selected ? 'checked' : ''} ${isReq ? 'disabled' : ''}
+                onchange="toggleProductSelection('${fId}', this.checked)" />
+            `;
+
+            prodDiv.onclick = () => {
+              if (!isReq) {
+                const chk = document.getElementById(`chk-${fId}`);
+                if (chk) {
+                  chk.checked = !chk.checked;
+                  toggleProductSelection(fId, chk.checked);
+                }
+              }
+            };
+
+            group.appendChild(prodDiv);
+            stepDiv.appendChild(group);
+            return;
+          }
+
+          // Standard field rendering
+          const label = document.createElement("label");
+          label.className = "field-label";
+          label.innerHTML = `${f.label} ${f.required || f.isRequired ? '<span class="req">*</span>' : ''}`;
+          group.appendChild(label);
+
+          if (f.image_url || f.media_url || f.mediaUrl) {
+            const img = document.createElement("img");
+            img.src = f.image_url || f.media_url || f.mediaUrl;
+            img.className = "question-image";
+            group.appendChild(img);
+          }
+
+          if (fType === "DATE") {
+            group.innerHTML += `<input type="date" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'YYYY-MM-DD'}" />`;
+          } else if (fType === "DROPDOWN") {
+            let selHtml = `<select class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} onchange="recalculateTotalAmount()">`;
+            selHtml += `<option value="">${f.placeholder || 'Select an option'}</option>`;
+            (f.options || []).forEach(o => {
+              selHtml += `<option value="${o}">${o}</option>`;
+            });
+            selHtml += `</select>`;
+            group.innerHTML += selHtml;
+          } else if (fType === "SHORT" || fType === "TEXT" || fType === "NAME") {
+            group.innerHTML += `<input type="text" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'Enter answer...'}" />`;
+          } else if (fType === "PHONE") {
+            group.innerHTML += `<input type="tel" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '017xxxxxxxx'}" />`;
+          } else if (fType === "EMAIL") {
+            group.innerHTML += `<input type="email" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'name@example.com'}" />`;
+          } else if (fType === "CUSTOM_AMOUNT") {
+            group.innerHTML += `<input type="number" step="0.01" class="input-text" data-field-id="${f.id}" id="custom-amount-input" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '0.00'}" oninput="recalculateTotalAmount()" />`;
+          } else if (fType === "QUANTITY") {
+            group.innerHTML += `<input type="number" step="1" min="1" data-field-type="QUANTITY" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '1'}" value="1" oninput="recalculateTotalAmount()" />`;
+          } else if (fType === "DONATION" || fType === "DONATION_TIER") {
+            const tiers = (f.options && f.options.length > 0) ? f.options : ["৳100", "৳500", "৳1,000", "৳5,000"];
+            let tiersHtml = `<div class="donation-tier-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">`;
+            tiers.forEach((tier, tIdx) => {
+              const pVal = extractOptionPrice(tier);
+              tiersHtml += `
+                <button type="button" class="tier-chip ${tIdx === 0 ? 'selected' : ''}" 
+                  style="padding:8px 14px; border:1.5px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; font-weight:600; font-size:13px; color:var(--text-dark); transition:all 0.2s;"
+                  onclick="selectDonationTier('${f.id}', ${pVal}, this)">
+                  ${tier}
+                </button>
+              `;
+            });
+            tiersHtml += `</div>`;
+            const firstPrice = extractOptionPrice(tiers[0]) || '';
+            tiersHtml += `<input type="number" step="1" min="1" class="input-text" data-field-id="${f.id}" id="donation-custom-${f.id}" value="${firstPrice}" placeholder="Or enter custom amount in ৳" oninput="onCustomDonationInput('${f.id}')" />`;
+            group.innerHTML += tiersHtml;
+          } else if (fType === "ADDRESS" || fType === "NOTES") {
+            group.innerHTML += `<textarea class="input-area" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'Enter details...'}"></textarea>`;
+          } else if (fType === "MCQ" || fType === "RADIO") {
+            let listHtml = `<div class="option-list">`;
+            (f.options || []).forEach((o, index) => {
+              listHtml += `
+                <label class="option-row">
+                  <input type="radio" name="field_${f.id}" value="${o}" ${(f.required || f.isRequired) && index === 0 ? 'checked' : ''} onchange="recalculateTotalAmount()" />
+                  <span>${o}</span>
+                </label>
+              `;
+            });
+            listHtml += `</div>`;
+            group.innerHTML += listHtml;
+          } else if (fType === "CHECKLIST" || fType === "CHECKBOX" || fType === "MULTI_SELECT") {
+            let listHtml = `<div class="option-list">`;
+            (f.options || []).forEach(o => {
+              listHtml += `
+                <label class="option-row">
+                  <input type="checkbox" name="field_${f.id}" value="${o}" onchange="recalculateTotalAmount()" />
+                  <span>${o}</span>
+                </label>
+              `;
+            });
+            listHtml += `</div>`;
+            group.innerHTML += listHtml;
+          } else if (fType === "TOGGLE") {
+            group.innerHTML += `
+              <label class="option-row">
+                <input type="checkbox" data-field-id="${f.id}" value="true" />
+                <span>${f.placeholder || 'Enable'}</span>
+              </label>
+            `;
+          } else if (fType === "DOCUMENT" || fType === "FILE_UPLOAD" || fType === "CAMERA_UPLOAD") {
+            group.innerHTML += `<input type="file" class="input-text" style="padding-top:10px;" data-field-id="${f.id}" ${fType === 'CAMERA_UPLOAD' ? 'capture="environment" accept="image/*"' : ''} />`;
+          } else {
+            group.innerHTML += `<input type="text" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'Enter value...'}" />`;
+          }
+
+          stepDiv.appendChild(group);
+        });
+
+        container.appendChild(stepDiv);
+      });
+
+      // Initial Stepper State
+      updateStepNavigation();
+
+      // Initial Total Calculation
+      recalculateTotalAmount();
+
+      // Setup CSV Backend Autofill if configured
+      if (theme.enable_csv_backend || theme.enableCsvBackend) {
+        setupCsvBackendAutofill(theme);
+      }
+    }
+
+    function selectDonationTier(fId, price, btnEl) {
+      const inp = document.getElementById(`donation-custom-${fId}`);
+      if (inp) {
+        inp.value = price > 0 ? price : '';
+      }
+      if (btnEl && btnEl.parentElement) {
+        btnEl.parentElement.querySelectorAll('.tier-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.style.borderColor = 'var(--border)';
+          c.style.background = '#fff';
+          c.style.color = 'var(--text-dark)';
+        });
+        btnEl.classList.add('selected');
+        btnEl.style.borderColor = 'var(--primary)';
+        btnEl.style.background = 'rgba(93, 69, 255, 0.08)';
+        btnEl.style.color = 'var(--primary)';
+      }
+      recalculateTotalAmount();
+    }
+
+    function onCustomDonationInput(fId) {
+      const inp = document.getElementById(`donation-custom-${fId}`);
+      const chipsParent = inp?.parentElement?.querySelector('.donation-tier-chips');
+      if (chipsParent) {
+        chipsParent.querySelectorAll('.tier-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.style.borderColor = 'var(--border)';
+          c.style.background = '#fff';
+          c.style.color = 'var(--text-dark)';
+        });
+      }
+      recalculateTotalAmount();
+    }
+
+    function extractOptionPrice(val) {
+      if (!val) return 0;
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      const str = String(val).trim();
+      if (!str) return 0;
+      // Match prefix: ৳500, BDT 1500, Tk. 2000
+      let m = str.match(/(?:৳|BDT|TK\.?|Tk\.?)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Match suffix: 500৳, 1500 BDT, 2000 Tk
+      m = str.match(/([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:৳|BDT|TK\.?|Tk\.?)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Match parentheses: (৳1500) or (1500)
+      m = str.match(/\(\s*(?:৳|BDT|TK\.?|Tk\.?)?\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:৳|BDT|TK\.?|Tk\.?)?\s*\)/i);
+      if (m && m[1]) {
+        const n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+      // Standalone number
+      const clean = str.replace(/,/g, '');
+      if (/^[0-9]+(?:\.[0-9]{1,2})?$/.test(clean)) {
+        const n = parseFloat(clean);
+        if (!isNaN(n) && n > 0) return n;
+      }
+      return 0;
+    }
+
+    function toggleProductSelection(id, isSelected) {
+      if (selectedProductsMap[id]) {
+        selectedProductsMap[id].selected = isSelected;
+        const card = document.getElementById(`prod-card-${id}`);
+        if (card) card.classList.toggle('selected', isSelected);
+        recalculateTotalAmount();
+      }
+    }
+
+    function updateFieldProductQty(id, delta) {
+      if (selectedProductsMap[id]) {
+        selectedProductsMap[id].qty = Math.max(1, (selectedProductsMap[id].qty || 1) + delta);
+        const qtyEl = document.getElementById(`qty-val-${id}`);
+        if (qtyEl) qtyEl.innerText = selectedProductsMap[id].qty;
+        recalculateTotalAmount();
+      }
+    }
+
+    function recalculateTotalAmount() {
+      let total = 0;
+
+      // 1. Sum selected product blocks
+      Object.values(selectedProductsMap).forEach(prod => {
+        if (prod.selected) {
+          total += (prod.price * (prod.qty || 1));
+        }
+      });
+
+      // 2. Add custom amount if filled
+      const customAmountInp = document.getElementById("custom-amount-input");
+      if (customAmountInp && customAmountInp.value) {
+        const cVal = parseFloat(customAmountInp.value);
+        if (!isNaN(cVal) && cVal > 0) total += cVal;
+      }
+
+      // 3. Add donation amounts if present
+      document.querySelectorAll('input[id^="donation-custom-"]').forEach(inp => {
+        if (inp && inp.value) {
+          const dVal = parseFloat(inp.value);
+          if (!isNaN(dVal) && dVal > 0) total += dVal;
+        }
+      });
+
+      // 4. Add selected radio button prices
+      document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+        const optVal = radio.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // 5. Add select dropdown option prices
+      document.querySelectorAll('select[data-field-id]').forEach(select => {
+        const optVal = select.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // 6. Add selected checkboxes prices
+      document.querySelectorAll('input[type="checkbox"][name^="field_"]:checked').forEach(chk => {
+        const optVal = chk.value || '';
+        const price = extractOptionPrice(optVal);
+        if (price > 0) total += price;
+      });
+
+      // Fallback to baseFormAmount if neither products nor options nor custom amount had prices
+      if (total === 0 && Object.keys(selectedProductsMap).length === 0 && !customAmountInp) {
+        total = baseFormAmount;
+      }
+
+      // Quantity multiplier if present
+      const qtyInp = document.querySelector('input[data-field-type="QUANTITY"]');
+      if (qtyInp && qtyInp.value && total > 0) {
+        const q = parseInt(qtyInp.value, 10);
+        if (!isNaN(q) && q > 1 && Object.keys(selectedProductsMap).length === 0) {
+          total = total * q;
+        }
+      }
+
+      const methodSec = document.getElementById("method-section");
+      const btnText = document.getElementById("btn-text");
+
+      if (isPaymentEnabled && total > 0) {
+        if (methodSec) methodSec.style.display = "flex";
+        if (btnText) btnText.innerText = `Proceed to Pay • BDT ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      } else {
+        if (methodSec) methodSec.style.display = "none";
+        if (btnText) btnText.innerText = "Submit Response";
+      }
+
+      return total;
+    }
+
+    function addMandatoryContactFields(container) {
+      const groupName = document.createElement("div");
+      groupName.className = "field-group";
+      groupName.innerHTML = `
+        <label class="field-label">Customer Full Name <span class="req">*</span></label>
+        <input type="text" class="input-text" id="customer-name-input" required placeholder="Enter your full name" />
+      `;
+      container.appendChild(groupName);
+
+      const groupPhone = document.createElement("div");
+      groupPhone.className = "field-group";
+      groupPhone.innerHTML = `
+        <label class="field-label">Customer Mobile Number <span class="req">*</span></label>
+        <input type="tel" class="input-text" id="customer-phone-input" required placeholder="017xxxxxxxx" />
+      `;
+      container.appendChild(groupPhone);
+
+      const groupEmail = document.createElement("div");
+      groupEmail.className = "field-group";
+      groupEmail.innerHTML = `
+        <label class="field-label">Customer Email Address</label>
+        <input type="email" class="input-text" id="customer-email-input" placeholder="customer@example.com" />
+      `;
+      container.appendChild(groupEmail);
+    }
+
+    function setupCsvBackendAutofill(theme) {
+      csvLookupColumn = String(theme.csv_lookup_column || theme.csvLookupColumn || "").trim();
+      csvTargetFieldId = String(theme.csv_target_lookup_field_id || theme.csvTargetLookupFieldId || "").trim();
+      csvColumnMappings = theme.csv_column_mappings || theme.csvColumnMappings || {};
+      const rawCsv = String(theme.csv_raw_data || theme.csvRawData || "");
+
+      if (!rawCsv || !csvLookupColumn || !csvTargetFieldId) return;
+
+      const lines = rawCsv.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim().length > 0);
+      if (lines.length <= 1) return;
+
+      const headers = lines[0].split(",").map(h => h.replace(/^["']|["']$/g, "").trim());
+      csvBackendData = [];
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(",");
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = parts[idx] ? parts[idx].replace(/^["']|["']$/g, "").trim() : "";
+        });
+        csvBackendData.push(row);
+      }
+
+      // Attach listener
+      const targetInput = document.querySelector(`[data-field-id="${csvTargetFieldId}"]`);
+      if (targetInput) {
+        let debounceTimer;
+        targetInput.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            const query = (targetInput.value || '').trim().toLowerCase();
+            if (!query) return;
+            const match = csvBackendData.find(r => String(r[csvLookupColumn] || '').trim().toLowerCase() === query);
+            if (match) {
+              targetInput.style.borderColor = '#10B981';
+              Object.entries(csvColumnMappings).forEach(([colHeader, targetId]) => {
+                const el = document.querySelector(`[data-field-id="${targetId}"]`);
+                if (el && match[colHeader] !== undefined) {
+                  el.value = match[colHeader];
+                }
+              });
+            } else {
+              targetInput.style.borderColor = '';
+            }
+          }, 250);
+        });
+      }
+    }
+
+    function renderDemoFields() {
+      const cleanConfig = {
+        title: "Payment Form",
+        description: "Please fill out the form below to proceed.",
+        amount: 0,
+        fields: [],
+        products: [],
+        theme: {
+          primary_color: "#5d45ff",
+          enable_payment: true
+        }
+      };
+      renderConfiguredFields(cleanConfig);
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const hp = document.getElementById("_hp_check").value;
+      if (hp) {
+        console.warn("Spam detected.");
+        return;
+      }
+
+      const submitBtn = document.getElementById("submit-btn");
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<div class="loading-spinner"></div>`;
+
+      const cusName = (document.getElementById("customer-name-input")?.value || "").trim();
+      const cusPhone = (document.getElementById("customer-phone-input")?.value || "").trim();
+      const cusEmail = (document.getElementById("customer-email-input")?.value || "").trim();
+
+      const answersMap = {};
+      document.querySelectorAll("#dynamic-form input[data-field-id], #dynamic-form select[data-field-id], #dynamic-form textarea[data-field-id]").forEach(inp => {
+        const fId = inp.getAttribute("data-field-id");
+        if (inp.type === 'checkbox') {
+          answersMap[fId] = inp.checked ? 'true' : 'false';
+        } else {
+          answersMap[fId] = inp.value;
+        }
+      });
+
+      document.querySelectorAll("#dynamic-form input[type='radio']:checked").forEach(rad => {
+        const name = rad.getAttribute("name");
+        if (name && name.startsWith("field_")) answersMap[name.replace("field_", "")] = rad.value;
+      });
+
+      document.querySelectorAll("#dynamic-form input[type='checkbox']:checked").forEach(cb => {
+        const name = cb.getAttribute("name");
+        if (name && name.startsWith("field_")) {
+          const fId = name.replace("field_", "");
+          answersMap[fId] = answersMap[fId] ? `${answersMap[fId]}, ${cb.value}` : cb.value;
+        }
+      });
+
+      // Add selected products details to answers
+      Object.entries(selectedProductsMap).forEach(([pId, info]) => {
+        if (info.selected) {
+          answersMap[pId] = {
+            product: info.title,
+            variant: info.variant || '',
+            unit_price: info.price,
+            price: info.price,
+            quantity: info.qty,
+            total_bdt: info.price * info.qty
+          };
+        }
+      });
+
+      // Find first selected catalog product and collect all selected products
+      let selectedProdId = null;
+      let selectedQty = 1;
+      const selectedProductsList = [];
+      for (const [key, val] of Object.entries(selectedProductsMap)) {
+        if (val.selected) {
+          const pId = key.replace('cat_prod_', '');
+          const qty = val.qty || 1;
+          if (!selectedProdId) {
+            selectedProdId = pId;
+            selectedQty = qty;
+          }
+          selectedProductsList.push({
+            id: pId,
+            product_id: pId,
+            title: val.title,
+            name: val.title,
+            variant: val.variant || '',
+            unit_price: val.price,
+            price: val.price,
+            quantity: qty,
+            qty: qty,
+            total_bdt: (val.price || 0) * qty
+          });
+        }
+      }
+
+      const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('req_' + Date.now());
+
+      // 1. Submit to Backend /v1/forms/:slugOrId/submit
+      try {
+        const calculatedTotal = recalculateTotalAmount();
+        const submitPayload = {
+          customer_name: cusName,
+          customer_phone: cusPhone,
+          customer_email: cusEmail,
+          amount: calculatedTotal,
+          calculated_amount: calculatedTotal,
+          selected_product_id: selectedProdId,
+          quantity: selectedQty,
+          selected_products: selectedProductsList,
+          payment_method: selectedMethod,
+          answers: answersMap,
+          _hp_check: hp,
+          request_id: requestId
+        };
+
+        const formSlugTarget = encodeURIComponent(formConfig?.slug || formIdentifier);
+        let response;
+        try {
+          response = await fetch(`/v1/forms/${formSlugTarget}/submit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(submitPayload)
+          });
+        } catch (fetchErr) {
+          response = await fetch(`https://pay.swapnopay.top/v1/forms/${formSlugTarget}/submit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(submitPayload)
+          });
+        }
+
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+          // If payment is required and order created -> redirect to payment widget
+          if (data.payment_required && data.order_id) {
+            const mid = encodeURIComponent(data.merchant_id || formConfig?.merchant_id || '');
+            const mMethod = encodeURIComponent(selectedMethod || 'bKash');
+            window.location.href = data.redirect_url || `/widget.html?order_id=${encodeURIComponent(data.order_id)}&amount=${data.amount}&merchant_id=${mid}&merchant_name=${encodeURIComponent(data.merchant_name || formConfig?.title || 'SwapnoPay')}&cus_name=${encodeURIComponent(cusName)}&cus_phone=${encodeURIComponent(cusPhone)}&method=${mMethod}`;
+            return;
+          }
+
+          // Non-Payment Form submission successful: Handle post-submission settings
+          if (data.redirect_type === 'REDIRECT_URL' && data.redirect_url) {
+            const delay = Number(data.redirect_delay || 0);
+            if (delay <= 0) {
+              window.location.href = data.redirect_url;
+              return;
+            }
+            document.getElementById("form-wrap").innerHTML = `
+              <div class="closed-state">
+                <div class="icon" style="color:#10B981">✓</div>
+                <h2>Response Submitted!</h2>
+                <p>Redirecting you to our partner page in <span id="redir-sec" style="font-weight:700;">${delay}</span>s...</p>
+              </div>
+            `;
+            let remaining = delay;
+            const timer = setInterval(() => {
+              remaining--;
+              const el = document.getElementById("redir-sec");
+              if (el) el.innerText = remaining;
+              if (remaining <= 0) {
+                clearInterval(timer);
+                window.location.href = data.redirect_url;
+              }
+            }, 1000);
+            return;
+          }
+
+          if (data.redirect_type === 'CUSTOM_HTML' && data.custom_html) {
+            document.getElementById("form-wrap").innerHTML = data.custom_html;
+            return;
+          }
+
+          // Default success message
+          document.getElementById("form-wrap").innerHTML = `
+            <div class="closed-state">
+              <div class="icon" style="color:#10B981">✓</div>
+              <h2>Response Recorded!</h2>
+              <p>${data.success_message || "Thank you! Your response has been submitted successfully."}</p>
+            </div>
+          `;
+          return;
+        }
+
+        throw new Error(data.error || "Submission failed");
+      } catch (err) {
+        console.warn("Backend submission error, attempting Supabase fallback:", err.message);
+
+        // Fallback to direct Supabase edge function or RPC
+        try {
+          const calcAmount = recalculateTotalAmount();
+          const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/create_hosted_form_submission`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": supabaseAnonKey,
+              "Authorization": `Bearer ${supabaseAnonKey}`
+            },
+            body: JSON.stringify({
+              p_form_id: formConfig?.id,
+              p_request_id: requestId,
+              p_customer_name: cusName || "Customer",
+              p_customer_phone: cusPhone,
+              p_customer_email: cusEmail,
+              p_amount: calcAmount,
+              p_payment_method: selectedMethod,
+              p_payment_required: calcAmount > 0 && isPaymentEnabled,
+              p_answers: answersMap,
+              p_client_hash: "web-client"
+            })
+          });
+
+          const rpcData = await rpcRes.json();
+          const record = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+          if (rpcRes.ok && record?.order_id) {
+            window.location.href = `widget.html?order_id=${record.order_id}&supabase_url=${encodeURIComponent(supabaseUrl)}&supabase_anon_key=${encodeURIComponent(supabaseAnonKey)}&amount=${record.amount}&merchant_name=${encodeURIComponent(formConfig?.title || 'SwapnoPay')}`;
+            return;
+          }
+
+          if (rpcRes.ok && (record?.ok || !calcAmount)) {
+            document.getElementById("form-wrap").innerHTML = `
+              <div class="closed-state">
+                <div class="icon" style="color:#10B981">✓</div>
+                <h2>Response Recorded!</h2>
+                <p>Thank you! Your submission has been saved.</p>
+              </div>
+            `;
+            return;
+          }
+
+          throw new Error(record?.error || rpcData?.error || "Submission could not be completed.");
+        } catch (rpcErr) {
+          alert(`Submission failed: ${err.message || rpcErr.message}`);
+          submitBtn.disabled = false;
+          recalculateTotalAmount();
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en" style="">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Payment Details - DreamMart</title>
+    <!-- Tailwind CSS CDN with forms and container-queries plugins -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <style data-purpose="typography">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+    <style data-purpose="custom-layout">
+        .step-bar-bg {
+            background-color: #E2E8F0;
+        }
+
+        .step-bar-active {
+            background-color: #2563EB;
+        }
+
+        .timer-card {
+            background-color: #FFF1F2;
+        }
+
+        .instruction-card {
+            background-color: #F0F7FF;
+        }
+    </style>
+    <link data-snapdom="injected-import"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+    <!-- BEGIN: MainContainer -->
+    <main
+        class="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative flex flex-col min-h-[850px]">
+        <!-- BEGIN: Header -->
+        <header class="p-6 pb-4 flex justify-between items-start">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-[#3D2C1A] rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-xl">D</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-1">
+                        <h1 class="font-bold text-gray-900">DreamMart</h1>
+                        <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path clip-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                fill-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <p class="text-xs text-gray-500">Your Trusted Online Store</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1">
+                <div class="w-8 h-8">
+                    <!-- Placeholder for SwapnoPay Logo -->
+                    <svg class="w-full h-full text-[#00A36C]" viewBox="0 0 100 100">
+                        <path
+                            d="M80 50c0-16.5-13.5-30-30-30s-30 13.5-30 30 13.5 30 30 30 30-13.5 30-30zm-30 20c-11 0-20-9-20-20s9-20 20-20 20 9 20 20-9 20-20 20z"
+                            fill="currentColor"></path>
+                        <circle cx="50" cy="50" fill="currentColor" r="10"></circle>
+                    </svg>
+                </div>
+                <span class="font-bold text-[#00A36C] text-lg">SwapnoPay</span>
+            </div>
+        </header>
+        <!-- END: Header -->
+        <!-- BEGIN: StepIndicator -->
+        <div class="px-6 mb-6">
+            <p class="text-blue-600 text-sm font-semibold mb-2">Step 2 of 3</p>
+            <div class="flex gap-2 h-1.5">
+                <div class="flex-1 step-bar-active rounded-full"></div>
+                <div class="flex-1 step-bar-active rounded-full"></div>
+                <div class="flex-1 step-bar-bg rounded-full"></div>
+            </div>
+        </div>
+        <div class="timer-card py-2 px-4 rounded-xl flex items-center justify-between mb-4 border border-rose-100 mx-6">
+            <div class="flex items-center gap-3 text-rose-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"
+                        stroke-width="2"></path>
+                </svg>
+                <span class="text-sm font-medium">Complete the payment within</span>
+            </div>
+            <div class="flex gap-3 text-center">
+                <div>
+                    <div class="text-rose-600 font-bold text-xl leading-none" id="min">04</div>
+                    <div class="text-[10px] uppercase text-rose-400 font-bold mt-1">Min</div>
+                </div>
+                <div class="text-rose-600 font-bold text-xl leading-none">:</div>
+                <div>
+                    <div class="text-rose-600 font-bold text-xl leading-none" id="sec">13</div>
+                    <div class="text-[10px] uppercase text-rose-400 font-bold mt-1">Sec</div>
+                </div>
+            </div>
+        </div>
+        <!-- END: StepIndicator -->
+        <!-- BEGIN: ContentArea -->
+        <div class="px-6 flex-grow">
+            <!-- Selected Payment Method -->
+            <div
+                class="flex items-center justify-between p-4 border border-rose-100 bg-white rounded-xl shadow-sm mb-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 flex items-center justify-center border border-gray-100 rounded-lg">
+                        <!-- bKash Logo Placeholder -->
+                        <img alt="bKash" class="w-10 h-10 object-contain"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-Y79wE8cHhAHM1BDLb4wwz0XKQyENh3PZGSzamk7YM-eqD8o9o-WJfFMBLKIMKjg79iu-Knc12B8KaCfZwSXQM_-o1n_fSSzQwzt69eBKLxq8JYgguoDNY6q93Mfb3A2XmqbjvI8UJUpZ62codKwCj_vD5rZL2i4FyCbvL0UOJdu6UKVHxP_racqdKtlUz85fdxUxP9BO6l4J2gyF5r4cXDLDgHRphsnHz2MMf_VbLGP9MwJmkVygkRRax7mwUzqnlCVO3-6m2ktMflI">
+                    </div>
+                    <span class="font-bold text-gray-800">bKash</span>
+                </div>
+                <button
+                    class="text-rose-500 text-sm font-semibold border border-rose-200 px-4 py-1.5 rounded-lg hover:bg-rose-50 transition-colors">Change</button>
+            </div>
+            <!-- Instructions -->
+            <div class="instruction-card p-5 rounded-xl mb-4">
+                <ol class="space-y-2 text-sm text-gray-700">
+                    <li class="flex gap-3"><span class="">1.</span> Open your bKash App</li>
+                    <li class="flex gap-3"><span class="">2.</span> Go to Send Money</li>
+                    <li class="flex gap-3"><span class="">3.</span> Enter the Merchant Number</li>
+                    <li class="flex gap-3"><span class="">4.</span> Enter the Amount and confirm</li>
+                </ol>
+            </div>
+            <!-- Input Fields -->
+            <div class="space-y-4 mb-6">
+                <div
+                    class="p-5 border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center gap-4 mb-4">
+                    <div class="w-48 h-48 rounded-lg overflow-hidden border border-gray-100">
+                        <div
+                            class="absolute top-2 right-2 flex items-center gap-1.5 bg-white/90 px-2 py-1 rounded-full shadow-sm z-10">
+                            <span class="flex h-2 w-2">
+                                <span
+                                    class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                            </span>
+                            <span class="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Live</span>
+                        </div><img alt="bKash QR Code" class="w-full h-full object-contain"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHFMW5aa9JpUKuB_49glGHCagkkur8z2kzLk4UNCPTuw31wJche1SVwSep8mwGK0JqTJD1QpaW-RDPRARLIEzRci5Yc0HmGgmuhwk-d3EmtVCkhfQH4Do4bcI1yauCcMDw8i2KdxV8DTQNE01meQhDIql_NlFLwUMTL7CWSCk32xyHGA3F_ricKyHtXY1WuufgGxf03-UPnU6d98t_55QzoeTc5k6_6u4eblCCewqnwZTK-vo4l1CnD0Zh3-nt598bvBJwrqv-ffrWcl4">
+                        <div class="hidden absolute inset-0 pointer-events-none" id="qr-scanner">
+                            <div
+                                class="w-full h-0.5 bg-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-[bounce_3s_infinite]">
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-700 text-center font-medium">Scan this QR code with your bKash app to
+                        pay instantly.</p>
+                </div>
+                <div data-purpose="merchant-number-input">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Merchant Number</label>
+                    <div class="relative flex">
+                        <input
+                            class="flex-grow bg-gray-50 border border-gray-200 rounded-l-xl px-4 py-3 text-gray-800 font-medium focus:ring-0 focus:border-gray-200"
+                            readonly="" type="text" value="017XXXXXXXX">
+                        <button
+                            class="flex items-center gap-2 px-4 py-3 bg-white border border-l-0 border-gray-200 rounded-r-xl text-blue-600 font-semibold text-sm hover:bg-gray-50">
+                            Copy
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div data-purpose="amount-input">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Amount</label>
+                    <div class="relative flex">
+                        <input
+                            class="flex-grow bg-gray-50 border border-gray-200 rounded-l-xl px-4 py-3 text-gray-800 font-bold focus:ring-0 focus:border-gray-200"
+                            readonly="" type="text" value="৳1,500.00">
+                        <button
+                            class="flex items-center gap-2 px-4 py-3 bg-white border border-l-0 border-gray-200 rounded-r-xl text-blue-600 font-semibold text-sm hover:bg-gray-50">
+                            Copy
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div><button
+                class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 mt-6"
+                id="complete-payment-btn">
+                <span class="">I Have Completed Payment</span>
+                <div class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
+                    id="loading-spinner"></div>
+            </button>
+            <div class="hidden mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-3 animate-pulse"
+                id="verification-status">
+                <div class="w-2 h-2 bg-blue-600 rounded-full"></div>
+                <p class="text-sm font-medium text-blue-700">Payment is being verified. Please do not close this window.
+                </p>
+            </div>
+            <!-- Countdown Timer -->
+            <!-- Action Button -->
+        </div>
+        <!-- END: ContentArea -->
+        <!-- BEGIN: FloatingHelpButton -->
+        <div class="fixed bottom-24 right-4 sm:absolute sm:bottom-28 sm:right-6">
+            <button
+                class="w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-xl hover:scale-105 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
+                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Help</span>
+            </button>
+        </div>
+        <!-- END: FloatingHelpButton -->
+        <!-- BEGIN: Footer -->
+        <footer class="p-6 border-t border-gray-100 mt-auto">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-gray-500 mb-1">Total Amount</p>
+                    <p class="text-blue-600 font-bold text-xl">৳1,500.00</p>
+                </div>
+                <div class="text-right flex items-center gap-2">
+                    <div class="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path clip-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                fill-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-700 uppercase tracking-tight">Secure Payment</p>
+                        <p class="text-[10px] text-gray-400">256-bit SSL Encrypted</p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+        <!-- END: Footer -->
+    </main>
+    <!-- END: MainContainer -->
+    <script data-purpose="timer-simulation">
+        // Minimal script to show the countdown behavior visually if needed
+        let timeLeft = 592; // 9:52 in seconds
+        const minEl = document.getElementById('min');
+        const secEl = document.getElementById('sec');
+
+        setInterval(() => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60);
+                const s = timeLeft % 60;
+                minEl.textContent = m.toString().padStart(2, '0');
+                secEl.textContent = s.toString().padStart(2, '0');
+            }
+        }, 1000);
+    </script>
+    <script>
+        document.getElementById('complete-payment-btn').addEventListener('click', function () {
+            const btn = this;
+            const spinner = document.getElementById('loading-spinner');
+            const status = document.getElementById('verification-status');
+            const scanner = document.getElementById('qr-scanner');
+            const merchantCard = document.querySelector('[data-purpose="merchant-number-input"]');
+            const amountCard = document.querySelector('[data-purpose="amount-input"]');
+
+            // Update Button State
+            btn.querySelector('span').textContent = 'Processing...';
+            spinner.classList.remove('hidden');
+            btn.classList.add('opacity-90', 'cursor-not-allowed');
+            btn.disabled = true;
+
+            // Show Verification UI
+            status.classList.remove('hidden');
+            scanner.classList.remove('hidden');
+
+            // Add Shimmer/Skeleton effect to cards
+            [merchantCard, amountCard].forEach(card => {
+                card.classList.add('animate-pulse', 'opacity-70');
+            });
+        });
+    </script>
+
+</body>
+
+</html>

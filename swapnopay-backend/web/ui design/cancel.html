@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Cancel Payment - DreamMart</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "primary": "#004cca",
+                        "on-secondary-fixed-variant": "#005229",
+                        "tertiary-fixed-dim": "#ffb874",
+                        "secondary": "#006d38",
+                        "secondary-fixed-dim": "#5ede8b",
+                        "on-primary-container": "#f3f3ff",
+                        "surface-container-highest": "#dce2f3",
+                        "tertiary": "#814900",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#151c27",
+                        "on-secondary-container": "#00743c",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-low": "#f0f3ff",
+                        "on-surface-variant": "#424656",
+                        "secondary-fixed": "#7cfca5",
+                        "on-error": "#ffffff",
+                        "surface": "#f9f9ff",
+                        "primary-fixed": "#dbe1ff",
+                        "on-background": "#151c27",
+                        "surface-container-high": "#e2e8f8",
+                        "outline-variant": "#c2c6d9",
+                        "surface-bright": "#f9f9ff",
+                        "primary-container": "#0062ff",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#2d1600",
+                        "inverse-surface": "#2a313d",
+                        "on-primary-fixed": "#00174b",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#e7eefe",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-tertiary-fixed-variant": "#6a3b00",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f9f9ff",
+                        "inverse-on-surface": "#ebf1ff",
+                        "tertiary-fixed": "#ffdcbf",
+                        "outline": "#737687",
+                        "surface-variant": "#dce2f3",
+                        "on-tertiary-container": "#fff1e8",
+                        "on-secondary-fixed": "#00210d",
+                        "surface-dim": "#d3daea",
+                        "tertiary-container": "#a45e00",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary-container": "#7cfca5",
+                        "surface-tint": "#0053da"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-padding": "20px",
+                        "xl": "32px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "base": "4px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "label-md": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["20px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "label-md": ["13px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "500" }]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Hanken Grotesk', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .step-progress {
+            height: 4px;
+            border-radius: 2px;
+            background-color: #e5e7eb;
+            position: relative;
+        }
+
+        .step-progress-active {
+            height: 100%;
+            background-color: #004cca;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col">
+    <!-- TopAppBar -->
+    <header class="bg-surface border-b border-outline-variant w-full sticky top-0 z-50">
+        <div class="flex flex-col w-full px-container-padding py-md max-w-[600px] mx-auto">
+            <div class="flex items-center justify-between mb-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-on-surface flex items-center justify-center overflow-hidden">
+                        <img class="w-full h-full object-cover"
+                            data-alt="A professional minimalist logo for DreamMart, featuring a sleek stylized letter D in gold on a deep black circular background, conveying trust and premium online shopping experience in a modern corporate style."
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0EmGuXkN6cnq7keGede7NlUxhELTPnmsoRT8QK8ADNJnsxMsuBASABrcEr_6dhwZn5ZzhkWLC0IUN0keT9vDG00LHCH6ZDYyhIP49Zvr3EJv6jfpeebIoQFJ9jRqWrjk8NB6RLT6ZhxHgLnV4D4dbjnB302pF8qkDSNxZTfN97qbAS3wqowSAS-i4dNTMfpUF3jzJ2mxi_bo-8xcA1QkRxHLZOiSrOD1Hw5rOVjd1CXsAHnxBAxYpd2H63t78g6mnGXEvB-GIHpb8" />
+                    </div>
+                    <div>
+                        <h1 class="text-headline-md font-headline-md text-on-surface">DreamMart <span
+                                class="text-primary text-sm inline-block"><span
+                                    class="material-symbols-outlined text-[16px]"
+                                    style="font-variation-settings: 'FILL' 1;">verified</span></span></h1>
+                        <p class="text-body-sm text-on-surface-variant">Your Trusted Online Store</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1 text-secondary">
+                        <img class="h-6"
+                            data-alt="Logo for SwapnoPay payment gateway, showcasing a professional dual-tone curved arrow design in teal and dark blue, representing secure and fluid financial transactions in a fintech environment."
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEbNhJ0h5zy3EoAj7VfG6SO5o1yCQKfelfOHfD7koefrPgA3czTQyT3CBySbN_qjKiV9XKG-7EMSR_Jo8pD0jHkFhmuotRpFg5gzPMdCV3G5_9eKW48of8zAiJQCJ4mwG9zKS_9rS6uCP_Mk0voxlQpdq6XWjV0aI75Yd-VLwIAM9TQLi_HBRoUrnFDx06rkY0nRmFFRF96sChhlTPq_3kJrsVO12VTgmM6Z-EIYhT-84JOSSudsxdDdnewNiltykKGSDYt6MV5xnL" />
+                        <span class="text-label-md font-label-md">SwapnoPay</span>
+                    </div>
+                    <span class="material-symbols-outlined text-outline">security</span>
+                </div>
+            </div>
+            <div class="mt-2">
+                <span class="text-label-md font-label-md text-primary">Cancel Order</span>
+                <div class="step-progress mt-1 flex gap-2">
+                    <div class="step-progress-active w-2/3"></div>
+                    <div class="flex-1 bg-outline-variant rounded-full"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- Main Content -->
+    <main
+        class="flex-grow w-full max-w-[600px] mx-auto px-container-padding py-xl flex flex-col items-center justify-center text-center">
+        <!-- Illustration Container -->
+        <div class="mb-lg relative w-full flex justify-center">
+            <div class="w-24 h-24 bg-error-container rounded-full flex items-center justify-center mb-6">
+                <span class="material-symbols-outlined text-error text-[48px]"
+                    style="font-variation-settings: 'FILL' 1;">report</span>
+            </div>
+        </div>
+        <h2 class="text-headline-lg-mobile font-headline-lg-mobile text-on-surface mb-md">Cancel Payment?</h2>
+        <p class="text-body-md text-on-surface-variant mb-xl max-w-[400px]">
+            Are you sure you want to cancel this payment? Stopping now will interrupt your purchase and potentially
+            expire any promotional offers.
+        </p>
+        <!-- Consequence Card -->
+        <div class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-md mb-xl text-left">
+            <h3 class="text-label-md font-label-md text-on-surface mb-sm">What happens if you cancel:</h3>
+            <ul class="space-y-sm">
+                <li class="flex items-start gap-2 text-body-sm text-on-surface-variant">
+                    <span class="material-symbols-outlined text-error text-[18px]">cancel</span>
+                    <span>The order will not be processed or shipped.</span>
+                </li>
+                <li class="flex items-start gap-2 text-body-sm text-on-surface-variant">
+                    <span class="material-symbols-outlined text-error text-[18px]">block</span>
+                    <span>Any pending transaction with SwapnoPay will be voided.</span>
+                </li>
+                <li class="flex items-start gap-2 text-body-sm text-on-surface-variant">
+                    <span class="material-symbols-outlined text-error text-[18px]">history</span>
+                    <span>Items in your cart may not be reserved for much longer.</span>
+                </li>
+            </ul>
+        </div>
+        <!-- Actions -->
+        <div class="w-full space-y-md">
+            <button
+                class="w-full py-md bg-primary text-on-primary rounded-lg font-bold text-body-lg hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2"
+                onclick="window.history.back()">
+                No, Go Back
+            </button>
+            <button
+                class="w-full py-md text-error font-semibold hover:bg-error-container transition-colors rounded-lg flex items-center justify-center">
+                Yes, Cancel Order
+            </button>
+        </div>
+    </main>
+    <!-- FAB Help -->
+    <button
+        class="fixed bottom-24 right-6 w-14 h-14 bg-primary-container text-on-primary-container rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-40">
+        <span class="material-symbols-outlined text-[28px]"
+            style="font-variation-settings: 'FILL' 1;">support_agent</span>
+        <span class="absolute -top-1 -right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+        </span>
+    </button>
+    <!-- Footer -->
+    <footer class="bg-surface-container-low border-t border-outline-variant w-full mt-auto">
+        <div class="flex justify-between items-center w-full px-container-padding py-lg max-w-[600px] mx-auto">
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2 text-on-surface">
+                    <span class="text-label-md font-label-md font-bold">256-bit SSL Encrypted</span>
+                </div>
+                <div class="flex items-center gap-2 text-secondary">
+                    <span class="material-symbols-outlined text-[18px]"
+                        style="font-variation-settings: 'FILL' 1;">verified_user</span>
+                    <span class="text-label-md font-label-md">Secure Payment</span>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-body-sm text-on-surface-variant">Total Amount</p>
+                <p class="text-headline-md font-headline-md text-primary">৳1,500.00</p>
+            </div>
+        </div>
+    </footer>
+    <script>
+        // Simple micro-interaction for the FAB
+        const fab = document.querySelector('button.fixed');
+        if (fab) {
+            fab.addEventListener('click', () => {
+                alert('Connecting you to a support agent for your payment inquiry...');
+            });
+        }
+    </script>
+</body>
+
+</html>
