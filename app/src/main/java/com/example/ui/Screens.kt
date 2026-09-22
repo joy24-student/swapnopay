@@ -11532,7 +11532,6 @@ fun MoreScreen(viewModel: AppViewModel) {
     var showPlanSheet by remember { mutableStateOf(false) }
     val language by viewModel.language.collectAsState()
     val isBangla = language == "Bangla"
-    var showDeleteAccountConfirmDialog by remember { mutableStateOf(false) }
 
     val merchantLogoData = remember(activeProfile.photoUrl) {
         val raw = activeProfile.photoUrl.trim()
@@ -11915,69 +11914,7 @@ fun MoreScreen(viewModel: AppViewModel) {
                                         }
                                     }
                                 }
-
-                                // Delete Account Button (Google Play Policy Compliance)
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isDarkMode) Color(0xFF241414) else Color(0xFFFEF2F2),
-                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
-                                    modifier = Modifier.clickable { showDeleteAccountConfirmDialog = true }
-                                ) {
-                                    Box(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                        ) {
-                                            Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(13.dp))
-                                            Text(if (isBangla) "অ্যাকাউন্ট ডিলিট" else "Delete Account", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
-                                        }
-                                    }
-                                }
                             }
-                        }
-
-                        if (showDeleteAccountConfirmDialog) {
-                            androidx.compose.material3.AlertDialog(
-                                onDismissRequest = { showDeleteAccountConfirmDialog = false },
-                                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFEF4444)) },
-                                title = {
-                                    Text(
-                                        if (isBangla) "অ্যাকাউন্ট ও ডাটা ডিলিট" else "Delete Account & All Data",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                },
-                                text = {
-                                    Text(
-                                        if (isBangla)
-                                            "আপনি কি নিশ্চিত যে আপনার মার্চেন্ট অ্যাকাউন্ট এবং সমস্ত সংরক্ষিত ব্যবসায়িক ডাটা স্থায়ীভাবে ডিলিট করতে চান? এই প্রক্রিয়া সম্পন্ন হলে কাস্টমার ও বিক্রয় লেজার পুনরুদ্ধার করা যাবে না।"
-                                        else
-                                            "Are you sure you want to permanently delete your merchant account and all associated business data? This action is irreversible and all your records will be purged.",
-                                        fontSize = 13.sp,
-                                        lineHeight = 18.sp
-                                    )
-                                },
-                                confirmButton = {
-                                    androidx.compose.material3.Button(
-                                        onClick = {
-                                            showDeleteAccountConfirmDialog = false
-                                            viewModel.logout {}
-                                        },
-                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                                    ) {
-                                        Text(if (isBangla) "হ্যাঁ, মুছে ফেলুন" else "Delete Permanently", color = Color.White)
-                                    }
-                                },
-                                dismissButton = {
-                                    androidx.compose.material3.TextButton(
-                                        onClick = { showDeleteAccountConfirmDialog = false }
-                                    ) {
-                                        Text(if (isBangla) "বাতিল" else "Cancel")
-                                    }
-                                }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -12677,6 +12614,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showTimeoutDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountConfirmDialog by remember { mutableStateOf(false) }
 
     SideEffect { isDarkModeGlobal = isDarkMode }
 
@@ -12965,11 +12903,11 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     }
                 }
 
-                // SMS & OTP GATEWAY SECTION
+                // ACCOUNT DELETION SECTION
                 item {
                     Column {
                         Text(
-                            text = t("SMS & OTP GATEWAY", languageState),
+                            text = if (languageState == "Bangla") "অ্যাকাউন্ট ও ডাটা ব্যবস্থাপনা" else "ACCOUNT & DATA",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = secondaryText,
@@ -12979,14 +12917,14 @@ fun SettingsScreen(viewModel: AppViewModel) {
                         Card(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = cardBg),
-                            border = BorderStroke(1.dp, cardBorder),
+                            border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF3F1D1D) else Color(0xFFFEE2E2)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.navigateTo("SmsGateway") }
+                                        .clickable { showDeleteAccountConfirmDialog = true }
                                         .padding(16.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -12997,27 +12935,32 @@ fun SettingsScreen(viewModel: AppViewModel) {
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         GradientIcon(
-                                            icon = Icons.Outlined.Sms,
-                                            gradient = listOf(Color(0xFF10B981), Color(0xFF059669)),
+                                            icon = Icons.Outlined.Delete,
+                                            gradient = listOf(Color(0xFFEF4444), Color(0xFFDC2626)),
                                             size = 36.dp,
                                             iconSize = 18.dp,
                                             cornerRadius = 10.dp
                                         )
                                         Column {
                                             Text(
-                                                text = "সিম এসএমএস ও ওটিপি গেটওয়ে",
+                                                text = if (languageState == "Bangla") "অ্যাকাউন্ট ও সমস্ত ডাটা মুছুন" else "Delete Account & All Data",
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = primaryText
+                                                color = Color(0xFFEF4444)
                                             )
                                             Text(
-                                                text = "অটো বাকি তাগাদা, মার্কেটিং ও এপিআই সেটিংস",
+                                                text = if (languageState == "Bangla") "স্থায়ীভাবে মার্চেন্ট প্রোফাইল ও লেজার ডাটা মুছে ফেলুন" else "Permanently erase merchant profile and stored data",
                                                 fontSize = 11.sp,
                                                 color = secondaryText
                                             )
                                         }
                                     }
-                                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = secondaryText, modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
@@ -13222,6 +13165,49 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     }
                 }
             }
+        }
+
+        // DIALOG: DELETE ACCOUNT CONFIRMATION
+        if (showDeleteAccountConfirmDialog) {
+            val isBangla = languageState == "Bangla"
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showDeleteAccountConfirmDialog = false },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFEF4444)) },
+                title = {
+                    Text(
+                        if (isBangla) "অ্যাকাউন্ট ও ডাটা ডিলিট" else "Delete Account & All Data",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        if (isBangla)
+                            "আপনি কি নিশ্চিত যে আপনার মার্চেন্ট অ্যাকাউন্ট এবং সমস্ত সংরক্ষিত ব্যবসায়িক ডাটা স্থায়ীভাবে ডিলিট করতে চান? এই প্রক্রিয়া সম্পন্ন হলে কাস্টমার ও বিক্রয় লেজার পুনরুদ্ধার করা যাবে না।"
+                        else
+                            "Are you sure you want to permanently delete your merchant account and all associated business data? This action is irreversible and all your records will be purged.",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            showDeleteAccountConfirmDialog = false
+                            viewModel.logout {}
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                    ) {
+                        Text(if (isBangla) "হ্যাঁ, মুছে ফেলুন" else "Delete Permanently", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { showDeleteAccountConfirmDialog = false }
+                    ) {
+                        Text(if (isBangla) "বাতিল" else "Cancel")
+                    }
+                }
+            )
         }
     }
 }
