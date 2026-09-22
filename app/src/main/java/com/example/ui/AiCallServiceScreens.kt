@@ -41,6 +41,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.util.Locale
 import android.widget.Toast
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 // ── Models for AI Call Service ──
 data class AiCallRecord(
@@ -1652,6 +1655,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
             isDarkMode = isDarkMode,
             isBangla = isBangla,
             isLoading = isActionLoading,
+            viewModel = viewModel,
             onDismiss = { showDueCallDialog = false },
             onDirectDial = { phone ->
                 showDueCallDialog = false
@@ -1671,6 +1675,7 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
             isDarkMode = isDarkMode,
             isBangla = isBangla,
             isLoading = isActionLoading,
+            viewModel = viewModel,
             onDismiss = { showOrderCallDialog = false },
             onConfirm = { phone, name, orderId, amount ->
                 viewModel.triggerOrderConfirmCall(phone, name, orderId, amount) { success, msg ->
@@ -2114,17 +2119,24 @@ fun AiVoiceSettingsTab(
 fun OutboundDueCallDialog(
     isDarkMode: Boolean,
     isBangla: Boolean,
-    isLoading: Boolean,
+    isLoading: Boolean = false,
     onDismiss: () -> Unit,
     onDirectDial: ((phone: String) -> Unit)? = null,
-    onConfirm: (phone: String, name: String, amount: Double) -> Unit
+    onConfirm: (phone: String, name: String, amount: Double) -> Unit,
+    viewModel: AppViewModel? = null
 ) {
+    val context = LocalContext.current
     var customerPhone by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }
     var dueAmountStr by remember { mutableStateOf("") }
+    var isExecuting by remember { mutableStateOf(false) }
+    var callSuccessUrl by remember { mutableStateOf<String?>(null) }
+    var callResultMessage by remember { mutableStateOf<String?>(null) }
+
+    val activeLoading = isLoading || isExecuting
 
     AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismiss() },
+        onDismissRequest = { if (!activeLoading) onDismiss() },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.PhoneCallback, null, tint = Color(0xFFEF4444))
@@ -2137,71 +2149,166 @@ fun OutboundDueCallDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = if (isBangla)
-                        "এআই কাস্টমারকে সরাসরি কল করে বকেয়ার পরিমাণ জানাবে এবং টাকা দেওয়ার তারিখ রেকর্ড করবে।"
-                    else
-                        "AI dials customer to inform them of due balance and captures their repayment commitment.",
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-                OutlinedTextField(
-                    value = customerPhone,
-                    onValueChange = { customerPhone = it },
-                    label = { Text(if (isBangla) "কাস্টমারের ফোন নম্বর" else "Customer Phone") },
-                    placeholder = { Text("017XXXXXXXX") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                OutlinedTextField(
-                    value = customerName,
-                    onValueChange = { customerName = it },
-                    label = { Text(if (isBangla) "কাস্টমারের নাম" else "Customer Name") },
-                    placeholder = { Text("আব্দুল রহিম") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                OutlinedTextField(
-                    value = dueAmountStr,
-                    onValueChange = { dueAmountStr = it },
-                    label = { Text(if (isBangla) "বকেয়া টাকা (৳)" else "Due Amount (৳)") },
-                    placeholder = { Text("1500") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                if (callSuccessUrl != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isDarkMode) Color(0xFF1E293B) else Color(0xFFECFDF5),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = if (isBangla) "কল সেশন সফলভাবে তৈরি হয়েছে!" else "Call Session Ready!",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF10B981)
+                                )
+                            }
+                            Text(
+                                text = callResultMessage ?: (if (isBangla) "গ্রাহকের জন্য ভয়েস কল সেশন প্রস্তুত।" else "Voice session active for customer."),
+                                fontSize = 11.5.sp,
+                                color = if (isDarkMode) Color.White.copy(alpha = 0.85f) else Color(0xFF334155)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(callSuccessUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
+                    ) {
+                        Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isBangla) "🌐 লাইভ এআই কল ইন্টারফেস খুলুন" else "🌐 Open Live AI Call UI", fontSize = 12.5.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (customerPhone.isNotBlank()) {
+                                try {
+                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$customerPhone"))
+                                    context.startActivity(dialIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Dialer error", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Phone, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isBangla) "📞 মোবাইল ডায়ালার থেকে কল করুন" else "📞 Direct Mobile Dial", fontSize = 12.5.sp)
+                    }
+                } else {
+                    Text(
+                        text = if (isBangla)
+                            "এআই কাস্টমারকে সরাসরি কল করে বকেয়ার পরিমাণ জানাবে এবং টাকা দেওয়ার তারিখ রেকর্ড করবে।"
+                        else
+                            "AI dials customer to inform them of due balance and captures their repayment commitment.",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        label = { Text(if (isBangla) "কাস্টমারের ফোন নম্বর" else "Customer Phone") },
+                        placeholder = { Text("017XXXXXXXX") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        label = { Text(if (isBangla) "কাস্টমারের নাম" else "Customer Name") },
+                        placeholder = { Text("আব্দুল রহিম") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                    OutlinedTextField(
+                        value = dueAmountStr,
+                        onValueChange = { dueAmountStr = it },
+                        label = { Text(if (isBangla) "বকেয়া টাকা (৳)" else "Due Amount (৳)") },
+                        placeholder = { Text("1500") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val amt = dueAmountStr.toDoubleOrNull() ?: 0.0
-                    onConfirm(customerPhone, customerName.ifBlank { "সম্মানিত গ্রাহক" }, amt)
-                },
-                enabled = customerPhone.isNotBlank() && !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                } else {
-                    Text(if (isBangla) "এখনই এআই কল দিন" else "Start AI Call", color = Color.White)
+            if (callSuccessUrl != null) {
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text(if (isBangla) "সম্পন্ন" else "Done", color = Color.White)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val amt = dueAmountStr.toDoubleOrNull() ?: 0.0
+                        val targetName = customerName.ifBlank { "সম্মানিত গ্রাহক" }
+                        if (viewModel != null) {
+                            isExecuting = true
+                            viewModel.triggerDueReminderCallWithUrl(customerPhone, targetName, amt) { success, msg, url ->
+                                isExecuting = false
+                                callResultMessage = msg
+                                if (success && !url.isNullOrBlank()) {
+                                    callSuccessUrl = url
+                                } else {
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    onDismiss()
+                                }
+                            }
+                        } else {
+                            onConfirm(customerPhone, targetName, amt)
+                        }
+                    },
+                    enabled = customerPhone.isNotBlank() && !activeLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    if (activeLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text(if (isBangla) "এখনই এআই কল দিন" else "Start AI Call", color = Color.White)
+                    }
                 }
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss, enabled = !isLoading) {
-                    Text(if (isBangla) "বাতিল" else "Cancel")
-                }
-                if (onDirectDial != null) {
-                    OutlinedButton(
-                        onClick = { onDirectDial(customerPhone) },
-                        enabled = customerPhone.isNotBlank() && !isLoading,
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Icon(Icons.Default.Phone, null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (isBangla) "সরাসরি ডায়াল" else "Direct Dial", fontSize = 11.sp)
+            if (callSuccessUrl == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss, enabled = !activeLoading) {
+                        Text(if (isBangla) "বাতিল" else "Cancel")
+                    }
+                    if (onDirectDial != null) {
+                        OutlinedButton(
+                            onClick = { onDirectDial(customerPhone) },
+                            enabled = customerPhone.isNotBlank() && !activeLoading,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Phone, null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isBangla) "সরাসরি ডায়াল" else "Direct Dial", fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -2216,17 +2323,24 @@ fun OutboundDueCallDialog(
 fun OutboundOrderCallDialog(
     isDarkMode: Boolean,
     isBangla: Boolean,
-    isLoading: Boolean,
+    isLoading: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: (phone: String, name: String, orderId: String, amount: Double) -> Unit
+    onConfirm: (phone: String, name: String, orderId: String, amount: Double) -> Unit,
+    viewModel: AppViewModel? = null
 ) {
+    val context = LocalContext.current
     var phone by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var orderId by remember { mutableStateOf("#ORD-") }
     var amountStr by remember { mutableStateOf("") }
+    var isExecuting by remember { mutableStateOf(false) }
+    var callSuccessUrl by remember { mutableStateOf<String?>(null) }
+    var callResultMessage by remember { mutableStateOf<String?>(null) }
+
+    val activeLoading = isLoading || isExecuting
 
     AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismiss() },
+        onDismissRequest = { if (!activeLoading) onDismiss() },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.CheckCircleOutline, null, tint = Color(0xFF10B981))
@@ -2239,56 +2353,152 @@ fun OutboundOrderCallDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text(if (isBangla) "কাস্টমার ফোন নম্বর" else "Customer Phone") },
-                    placeholder = { Text("018XXXXXXXX") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(if (isBangla) "কাস্টমার নাম" else "Customer Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                OutlinedTextField(
-                    value = orderId,
-                    onValueChange = { orderId = it },
-                    label = { Text(if (isBangla) "অর্ডার আইডি" else "Order ID") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                OutlinedTextField(
-                    value = amountStr,
-                    onValueChange = { amountStr = it },
-                    label = { Text(if (isBangla) "মোট বিল (৳)" else "Total Bill (৳)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                if (callSuccessUrl != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isDarkMode) Color(0xFF1E293B) else Color(0xFFECFDF5),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = if (isBangla) "অর্ডার কনফার্মেশন কল প্রস্তুত!" else "Order Call Ready!",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF10B981)
+                                )
+                            }
+                            Text(
+                                text = callResultMessage ?: (if (isBangla) "গ্রাহকের জন্য এআই ভয়েস কল সেশন সক্রিয়।" else "AI voice session ready for customer."),
+                                fontSize = 11.5.sp,
+                                color = if (isDarkMode) Color.White.copy(alpha = 0.85f) else Color(0xFF334155)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(callSuccessUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
+                    ) {
+                        Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isBangla) "🌐 লাইভ এআই কল ইন্টারফেস খুলুন" else "🌐 Open Live AI Call UI", fontSize = 12.5.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (phone.isNotBlank()) {
+                                try {
+                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                    context.startActivity(dialIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Dialer error", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Phone, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isBangla) "📞 মোবাইল ডায়ালার থেকে কল করুন" else "📞 Direct Mobile Dial", fontSize = 12.5.sp)
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text(if (isBangla) "কাস্টমার ফোন নম্বর" else "Customer Phone") },
+                        placeholder = { Text("018XXXXXXXX") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(if (isBangla) "কাস্টমার নাম" else "Customer Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                    OutlinedTextField(
+                        value = orderId,
+                        onValueChange = { orderId = it },
+                        label = { Text(if (isBangla) "অর্ডার আইডি" else "Order ID") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                    OutlinedTextField(
+                        value = amountStr,
+                        onValueChange = { amountStr = it },
+                        label = { Text(if (isBangla) "মোট বিল (৳)" else "Total Bill (৳)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !activeLoading
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val amt = amountStr.toDoubleOrNull() ?: 0.0
-                    onConfirm(phone, name.ifBlank { "সম্মানিত গ্রাহক" }, orderId, amt)
-                },
-                enabled = phone.isNotBlank() && !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                } else {
-                    Text(if (isBangla) "কনফার্ম কল দিন" else "Confirm Call", color = Color.White)
+            if (callSuccessUrl != null) {
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text(if (isBangla) "সম্পন্ন" else "Done", color = Color.White)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val amt = amountStr.toDoubleOrNull() ?: 0.0
+                        val targetName = name.ifBlank { "সম্মানিত গ্রাহক" }
+                        if (viewModel != null) {
+                            isExecuting = true
+                            viewModel.triggerOrderConfirmCallWithUrl(phone, targetName, orderId, amt) { success, msg, url ->
+                                isExecuting = false
+                                callResultMessage = msg
+                                if (success && !url.isNullOrBlank()) {
+                                    callSuccessUrl = url
+                                } else {
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    onDismiss()
+                                }
+                            }
+                        } else {
+                            onConfirm(phone, targetName, orderId, amt)
+                        }
+                    },
+                    enabled = phone.isNotBlank() && !activeLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    if (activeLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text(if (isBangla) "কনফার্ম কল দিন" else "Confirm Call", color = Color.White)
+                    }
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) {
-                Text(if (isBangla) "বাতিল" else "Cancel")
+            if (callSuccessUrl == null) {
+                TextButton(onClick = onDismiss, enabled = !activeLoading) {
+                    Text(if (isBangla) "বাতিল" else "Cancel")
+                }
             }
         }
     )
@@ -2316,14 +2526,23 @@ fun InteractiveVoiceTestDialog(
         )
     }
 
-    // TTS Engine initialization for speaking AI response aloud
+    // TTS Engine initialization for speaking AI response aloud with Bengali locale fallback
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     DisposableEffect(Unit) {
         var engineRef: TextToSpeech? = null
         val engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                val locale = if (voiceSettings.language.startsWith("bn")) Locale("bn", "BD") else Locale.US
-                engineRef?.language = locale
+                val bnBd = Locale("bn", "BD")
+                val bnIn = Locale("bn", "IN")
+                val bnGeneric = Locale("bn")
+                val chosenLocale = when {
+                    !voiceSettings.language.startsWith("bn") -> Locale.US
+                    engineRef?.isLanguageAvailable(bnBd) != null && engineRef!!.isLanguageAvailable(bnBd) >= TextToSpeech.LANG_AVAILABLE -> bnBd
+                    engineRef?.isLanguageAvailable(bnIn) != null && engineRef!!.isLanguageAvailable(bnIn) >= TextToSpeech.LANG_AVAILABLE -> bnIn
+                    engineRef?.isLanguageAvailable(bnGeneric) != null && engineRef!!.isLanguageAvailable(bnGeneric) >= TextToSpeech.LANG_AVAILABLE -> bnGeneric
+                    else -> Locale.getDefault()
+                }
+                engineRef?.language = chosenLocale
             }
         }
         engineRef = engine
@@ -2331,31 +2550,6 @@ fun InteractiveVoiceTestDialog(
         onDispose {
             engine.stop()
             engine.shutdown()
-        }
-    }
-
-    // Android Native Speech Recognizer Launcher
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!spoken.isNullOrBlank()) {
-                queryText = spoken
-            }
-        }
-    }
-
-    val launchSpeech = {
-        try {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (voiceSettings.language.startsWith("bn")) "bn-BD" else "en-US")
-                putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBangla) "এআই এর সাথে কথা বলুন..." else "Speak to AI...")
-            }
-            speechLauncher.launch(intent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Speech recognition not available", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -2373,6 +2567,66 @@ fun InteractiveVoiceTestDialog(
             conversation = updated + AiCallTurn("assistant", aiReply, "00:10")
             // Speak reply aloud via Android TTS
             tts?.speak(aiReply, TextToSpeech.QUEUE_FLUSH, null, "ai_interactive_test")
+        }
+    }
+
+    // Android Native Speech Recognizer Launcher
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spoken.isNullOrBlank()) {
+                queryText = spoken
+                sendQuestion(spoken)
+            }
+        }
+    }
+
+    val launchSpeechInternal = {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (voiceSettings.language.startsWith("bn")) "bn-BD" else "en-US")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBangla) "এআই এর সাথে কথা বলুন..." else "Speak to AI...")
+            }
+            if (intent.resolveActivity(context.packageManager) != null) {
+                speechLauncher.launch(intent)
+            } else {
+                Toast.makeText(
+                    context,
+                    if (isBangla) "ডিভাইসে স্পিচ সার্ভিস পাওয়া যায়নি, অনুগ্রহ করে টাইপ করুন।" else "Speech service not found, please type your message.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Speech recognition error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchSpeechInternal()
+        } else {
+            Toast.makeText(
+                context,
+                if (isBangla) "মাইক্রোফোন পারমিশন প্রয়োজন। আপনি লিখেও প্রশ্ন করতে পারেন।" else "Microphone permission required. You can type instead.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val launchSpeech = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            launchSpeechInternal()
+        } else {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -2490,19 +2744,29 @@ fun InstantVoiceRecordToAiDialog(
 ) {
     val context = LocalContext.current
     var isListening by remember { mutableStateOf(false) }
-    var statusText by remember { mutableStateOf(if (isBangla) "মাইক্রোফোনে ট্যাপ করে কথা বলুন..." else "Tap microphone to speak...") }
+    var statusText by remember { mutableStateOf(if (isBangla) "মাইক্রোফোনে ট্যাপ করে কথা বলুন বা নিচে লিখুন..." else "Tap microphone to speak or type below...") }
     var capturedSpeech by remember { mutableStateOf("") }
     var aiReplyText by remember { mutableStateOf("") }
     var isProcessing by remember { mutableStateOf(false) }
+    var manualTypedInput by remember { mutableStateOf("") }
 
-    // TTS Engine initialization for speaking AI response aloud
+    // TTS Engine initialization for speaking AI response aloud with Bengali locale fallback
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     DisposableEffect(Unit) {
         var engineRef: TextToSpeech? = null
         val engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                val locale = if (voiceSettings.language.startsWith("bn")) Locale("bn", "BD") else Locale.US
-                engineRef?.language = locale
+                val bnBd = Locale("bn", "BD")
+                val bnIn = Locale("bn", "IN")
+                val bnGeneric = Locale("bn")
+                val chosenLocale = when {
+                    !voiceSettings.language.startsWith("bn") -> Locale.US
+                    engineRef?.isLanguageAvailable(bnBd) != null && engineRef!!.isLanguageAvailable(bnBd) >= TextToSpeech.LANG_AVAILABLE -> bnBd
+                    engineRef?.isLanguageAvailable(bnIn) != null && engineRef!!.isLanguageAvailable(bnIn) >= TextToSpeech.LANG_AVAILABLE -> bnIn
+                    engineRef?.isLanguageAvailable(bnGeneric) != null && engineRef!!.isLanguageAvailable(bnGeneric) >= TextToSpeech.LANG_AVAILABLE -> bnGeneric
+                    else -> Locale.getDefault()
+                }
+                engineRef?.language = chosenLocale
             }
         }
         engineRef = engine
@@ -2510,6 +2774,22 @@ fun InstantVoiceRecordToAiDialog(
         onDispose {
             engine.stop()
             engine.shutdown()
+        }
+    }
+
+    fun submitQueryToAi(promptText: String) {
+        if (promptText.isBlank() || isProcessing) return
+        val query = promptText.trim()
+        capturedSpeech = query
+        manualTypedInput = ""
+        statusText = if (isBangla) "এআই প্রসেস করছে..." else "Processing with AI..."
+        isProcessing = true
+        viewModel.sendInstantRecordToAi(query) { success, _, reply ->
+            isProcessing = false
+            aiReplyText = reply
+            statusText = if (success) (if (isBangla) "এআই উত্তর দিয়েছে" else "AI Responded") else (if (isBangla) "ত্রুটি হয়েছে" else "Error")
+            // Speak aloud via TTS
+            tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "ai_voice_reply")
         }
     }
 
@@ -2521,23 +2801,14 @@ fun InstantVoiceRecordToAiDialog(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spoken.isNullOrBlank()) {
-                capturedSpeech = spoken
-                statusText = if (isBangla) "এআই প্রসেস করছে..." else "Processing with AI..."
-                isProcessing = true
-                viewModel.sendInstantRecordToAi(spoken) { success, _, reply ->
-                    isProcessing = false
-                    aiReplyText = reply
-                    statusText = if (success) (if (isBangla) "এআই উত্তর দিয়েছে" else "AI Responded") else (if (isBangla) "ত্রুটি হয়েছে" else "Error")
-                    // Speak aloud via TTS
-                    tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "ai_voice_reply")
-                }
+                submitQueryToAi(spoken)
             } else {
-                statusText = if (isBangla) "কোনো কথা শোনা যায়নি, আবার চেষ্টা করুন।" else "No speech detected, try again."
+                statusText = if (isBangla) "কোনো কথা শোনা যায়নি, আবার চেষ্টা করুন বা লিখুন।" else "No speech detected, try again or type below."
             }
         }
     }
 
-    val launchSpeech = {
+    val launchSpeechInternal = {
         try {
             isListening = true
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -2545,10 +2816,45 @@ fun InstantVoiceRecordToAiDialog(
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (voiceSettings.language.startsWith("bn")) "bn-BD" else "en-US")
                 putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBangla) "দোকানের সময়, অর্ডার বা হিসাব নিয়ে কথা বলুন..." else "Speak your question...")
             }
-            speechLauncher.launch(intent)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                speechLauncher.launch(intent)
+            } else {
+                isListening = false
+                Toast.makeText(
+                    context,
+                    if (isBangla) "ডিভাইসে স্পিচ রিকগনিশন নেই। অনুগ্রহ করে নিচে টাইপ করুন।" else "Speech recognition not available. Please type below.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         } catch (e: Exception) {
             isListening = false
-            Toast.makeText(context, "Speech recognition not available on this device", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Speech recognition error on device", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val recordPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchSpeechInternal()
+        } else {
+            Toast.makeText(
+                context,
+                if (isBangla) "মাইক্রোফোন পারমিশন প্রয়োজন। আপনি নিচে লিখেও প্রশ্ন করতে পারেন।" else "Microphone permission required. You can type below.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val launchSpeech = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            launchSpeechInternal()
+        } else {
+            recordPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -2608,6 +2914,33 @@ fun InstantVoiceRecordToAiDialog(
                     fontSize = 10.5.sp,
                     color = Color.Gray
                 )
+
+                // Fallback / Alternative manual text input
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = manualTypedInput,
+                        onValueChange = { manualTypedInput = it },
+                        placeholder = { Text(if (isBangla) "অথবা প্রশ্ন লিখে পাঠান..." else "Or type question here...", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        enabled = !isProcessing
+                    )
+                    IconButton(
+                        onClick = { submitQueryToAi(manualTypedInput) },
+                        enabled = manualTypedInput.isNotBlank() && !isProcessing,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(if (manualTypedInput.isNotBlank() && !isProcessing) BrandPurple else Color.Gray.copy(alpha = 0.2f))
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
 
                 // Captured User Speech Box
                 if (capturedSpeech.isNotBlank()) {

@@ -34,9 +34,10 @@ const VOICE_CONFIGS_FILE = path.join(DATA_DIR, 'voice_configs.json')
 
 // Candidate Gemini models in order of priority
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
   'gemini-2.0-flash',
-  'gemini-1.5-flash'
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro'
 ]
 
 export function aiVoiceRouter(io) {
@@ -184,44 +185,91 @@ export function aiVoiceRouter(io) {
     return null
   }
 
-  // ── Gemini Conversational Voice Reply ──
-  async function generateAiVoiceReply(customerQuery, merchantConfig, conversationHistory = []) {
-    const apiKey = merchantConfig.gemini_api_key || process.env.GEMINI_API_KEY || ''
-    
-    // Quick Rule-based fallback if no Gemini API Key is present
-    if (!apiKey) {
-      const q = (customerQuery || '').toLowerCase()
-      if (q.includes('খোলা') || q.includes('সময়') || q.includes('time') || q.includes('open')) {
-        return 'আমাদের প্রতিষ্ঠান প্রতিদিন সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা থাকে। ছুটির দিনেও আমাদের অনলাইন ডেলিভারি চালু থাকে।'
-      }
-      if (q.includes('বাকি') || q.includes('টাকা') || q.includes('due') || q.includes('balance')) {
-        return 'আপনার বকেয়া বা পেমেন্ট হিসাব জানতে অনুগ্রহ করে আপনার নিবন্ধিত মোবাইল নম্বরটি বলুন, আমি সিস্টেমে চেক করে জানিয়ে দিচ্ছি।'
-      }
-      if (q.includes('অর্ডার') || q.includes('ডেলিভারি') || q.includes('order') || q.includes('status')) {
-        return 'আপনার অর্ডারের সর্বশেষ অবস্থা জানতে ইনভয়েস নম্বরটি বলুন অথবা আমরা এসএমএসের মাধ্যমে আপনাকে ট্র্যাকিং লিঙ্ক পাঠিয়ে দিচ্ছি।'
-      }
-      if (q.includes('মিটিং') || q.includes('সম্মেলন') || q.includes('meeting')) {
-        return 'ধন্যবাদ! আমাদের আগামী সভার তথ্য আপনার হোয়াটসঅ্যাপ এবং এসএমএসে পাঠিয়ে দেওয়া হয়েছে।'
-      }
-      if (q.includes('ধন্যবাদ') || q.includes('বাই') || q.includes('thanks') || q.includes('bye')) {
-        return 'আপনাকেও অনেক ধন্যবাদ! ভালো থাকবেন, শুভদিন।'
-      }
-      if (q.includes('অফার') || q.includes('ডিসকাউন্ট') || q.includes('offer')) {
-        return 'আমাদের চলতি স্পেশাল অফারে সকল কেনাকাটায় ২৫% পর্যন্ত ক্যাশব্যাক ও বিশেষ মূল্যছাড় চলছে।'
-      }
-      return 'ধন্যবাদ আপনার প্রশ্নের জন্য। আমাদের শপ সংক্রান্ত যেকোনো তথ্য, পণ্য ও পেমেন্ট সেবা দিতে আমি প্রস্তুত। আর কিছু কি জানতে চান?'
+  // ── High-Speed Conversational Bengali Intent Engine (Sub-50ms) ──
+  function matchInstantHumanIntent(customerQuery, merchantConfig) {
+    const q = (customerQuery || '').trim().toLowerCase()
+    const shop = merchantConfig.business_name || 'স্বপ্নপে স্টোর'
+    const agent = merchantConfig.agent_name || 'তানিয়া'
+    if (!q) return null
+
+    // 1. Store Hours / Timing / Open / Close
+    if (/(খোলা|বন্ধ|সময়|কখন|কয়টা|টাইম|খোলে|ছুটি|open|close|time|hours|off)/i.test(q)) {
+      return `জি ভাইয়া! আমাদের ${shop} প্রতিদিন সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা থাকে। ছুটির দিনেও খোলা পাবেন। আর কিছু কি জানার ছিল ভাইয়া?`
     }
 
+    // 2. Due / Balance / Debt / বাকী
+    if (/(বাকি|বাকী|বকেয়া|টাকা|হিসাব|পাওনা|ব্যালেন্স|due|balance|debt|owed)/i.test(q)) {
+      return `জি ভাইয়া, আপনার বকেয়ার তথ্য দেখছি। আপনি চাইলে এখনই বিকাশ বা নগদে সরাসরি পরিশোধ করে দিতে পারেন। বিকাশ নম্বরটা কি বলে দেব?`
+    }
+
+    // 3. Payment Methods / bKash / Nagad / Rocket / Cash
+    if (/(পেমেন্ট|বিকাশ|নগদ|রকেট|টাকা দেব|টাকা পাঠাব|বিল|payment|bkash|nagad|rocket|cash|qr)/i.test(q)) {
+      return `জি ভাইয়া, আমাদের শপে বিকাশ, নগদ, রকেট এবং ক্যাশে পেমেন্ট নেওয়া হয়। আপনি কোন মাধ্যমে দিতে চান ভাইয়া?`
+    }
+
+    // 4. Order Status / Delivery / Courier / পার্সেল
+    if (/(অর্ডার|ডেলিভারি|পার্সেল|কুরিয়ার|পাঠাইছেন|কবে পাব|ট্র্যাকিং|পৌঁছাবে|order|delivery|courier|parcel|status)/i.test(q)) {
+      return `জি ভাইয়া, আপনার অর্ডারটি আমরা প্রস্তুত করে রেখেছি। খুব দ্রুত ডেলিভারি প্রতিনিধি আপনার সাথে ফোনে যোগাযোগ করবে। কোনো চিন্তা করবেন না ভাইয়া!`
+    }
+
+    // 5. Location / Address / কোথায়
+    if (/(ঠিকানা|কোথায়|লোকেশন|জায়গা|দোকান কোন|কিভাবে যাব|address|location|where)/i.test(q)) {
+      return `জি ভাইয়া, আমাদের শপ বাজারের প্রধান মোড়েই অবস্থিত। আপনি সহজে আসার জন্য চাইলে আপনার মোবাইলে লোকেশন লিঙ্ক পাঠিয়ে দিচ্ছি ভাইয়া!`
+    }
+
+    // 6. Connect with Store Owner / Manager / দোকানদার
+    if (/(মালিক|দোকানদার|ম্যানেজার|কথা বলব|মানুষের সাথে|owner|manager|boss|human|agent)/i.test(q)) {
+      return `জি ভাইয়া, অবশ্যই! আমি আমাদের শপ ওনারকে এখনই বিষয়টি জানাচ্ছি, এক মিনিট লাইনে থাকুন ভাইয়া।`
+    }
+
+    // 7. Discounts / Offers / মূল্যছাড়
+    if (/(অফার|ছাড়|ডিসকাউন্ট|কম|কমাবেন|offer|discount|sale|promo)/i.test(q)) {
+      return `জি ভাইয়া, আমাদের চলতি স্পেশাল অফারে সব কেনাকাটায় বিশেষ মূল্যছাড় চলছে! কেনাকাটা করলেই আপনি এই ক্যাশব্যাক অফার পাবেন।`
+    }
+
+    // 8. Greetings
+    if (/(সালাম|আসসালামু|নমস্কার|হ্যালো|হাই|কেমন|hello|hi|hey|salam)/i.test(q)) {
+      return `আসসালামু আলাইকুম ভাইয়া! আমি ${shop} থেকে বলছি। জি ভাইয়া, বলুন আপনাকে কীভাবে সহযোগিতা করতে পারি?`
+    }
+
+    // 9. Farewell / Thanks
+    if (/(ধন্যবাদ|থ্যাঙ্ক|বাই|ভালো|বিদায়|রাখলাম|রাখি|thanks|thank you|bye|good)/i.test(q)) {
+      return `আপনাকেও অনেক অনেক ধন্যবাদ ভাইয়া! ${shop}-এর সাথে থাকার জন্য ধন্যবাদ, ভালো থাকবেন ভাইয়া!`
+    }
+
+    // 10. Confirmation / Positive / হাঁ
+    if (/^(হ্যাঁ|হাঁ|জি|ঠিক আছে|আচ্ছা|ok|okay|yes|yeah|right)$/i.test(q)) {
+      return `জি ভাইয়া, বুঝতে পেরেছি। সবকিছু নোট করে রাখা হয়েছে। আর কোনো বিষয়ে সাহায্য লাগবে ভাইয়া?`
+    }
+
+    return null
+  }
+
+  // ── Gemini Conversational Voice Reply ──
+  async function generateAiVoiceReply(customerQuery, merchantConfig, conversationHistory = [], explicitApiKey = null) {
+    // Tier 1: Sub-50ms ultra-fast human intent matching
+    const instantReply = matchInstantHumanIntent(customerQuery, merchantConfig)
+    if (instantReply) {
+      return instantReply
+    }
+
+    const apiKey = explicitApiKey || merchantConfig.gemini_api_key || process.env.GEMINI_API_KEY || ''
+    
+    // Tier 2: If no Gemini API Key is present, return safe helpful human response
+    if (!apiKey) {
+      return `জি ভাইয়া, আপনার বিষয়টি বুঝতে পেরেছি। আমাদের ${merchantConfig.business_name || 'স্বপ্নপে শপ'} থেকে বিস্তারিত তথ্য জানিয়ে আমরা আপনাকে সহযোগিতা করছি। আর কিছু কি জানতে চান ভাইয়া?`
+    }
+
+    // Tier 3: Ultra-Fast Gemini 2.0 Flash generation with human phone persona
     try {
-      const systemPrompt = `You are an automated conversational AI voice phone receptionist for a Bangladeshi merchant named "${merchantConfig.business_name}".
-Your name is ${merchantConfig.agent_name}.
-You speak natural, warm, polite, and respectful Bengali (বাঙালি সম্মানসূচক ভাষা যেমন: "জি", "অনুগ্রহ করে", "ধন্যবাদ") with clear concise sentences suited for phone voice transmission.
-Rules for voice responses:
-1. Keep sentences SHORT (1-2 sentences max), because they will be read out via Text-to-Speech over a phone call.
-2. Avoid markdown formatting, bullet points, asterisks, emojis or symbols since this is pure spoken audio.
-3. If the user asks in English, reply in polite professional English. If the user speaks Bengali, reply in polite Bengali.
-4. Business hours: 9:00 AM - 10:00 PM daily.
-5. Provide helpful assistance on store hours, payment methods (bKash, Nagad, Rocket, Cash), order status, and customer debts.`
+      const systemPrompt = `You are Tania, an authentic, warm, polite Bangladeshi female phone receptionist answering a customer phone call at "${merchantConfig.business_name}".
+Customer is talking to you directly on the phone.
+CRITICAL PHONE RULES:
+1. Speak natural, warm colloquial Bangladeshi Bengali (চলিত কথ্য রূপ, e.g., "জি ভাইয়া", "হ্যাঁ ভাইয়া", "কোনো চিন্তা করবেন না", "ইনশাআল্লাহ").
+2. Answer in EXACTLY 1 or 2 short, crisp spoken sentences (maximum 25 words).
+3. NEVER use bullet points, asterisks (*), hashtags, markdown, or corporate robotic greetings.
+4. If customer asks in English, reply in friendly spoken English. Otherwise always speak natural spoken Bengali.
+5. Sound empathetic, confident, and helpful like a real human shopkeeper.`
 
       const contents = [
         {
@@ -231,8 +279,8 @@ Rules for voice responses:
       ]
 
       const reply = await callGemini(apiKey, contents, {
-        temperature: 0.3,
-        maxOutputTokens: 120
+        temperature: 0.25,
+        maxOutputTokens: 80
       })
 
       if (reply) {
@@ -242,7 +290,7 @@ Rules for voice responses:
       console.warn('[aiVoice] Gemini text generation error:', err.message)
     }
 
-    return 'জি আমি বুঝতে পেরেছি। আপনার প্রশ্নের সমাধান দিতে আমি আমাদের প্রতিনিধির কাছে তথ্যটি নোট করে রাখছি।'
+    return `জি ভাইয়া, বুঝতে পেরেছি। আপনার প্রশ্নের সমাধান দিতে আমি আমাদের ম্যানেজারের কাছে তথ্যটি নোট করে রাখছি ভাইয়া।`
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -255,12 +303,18 @@ Rules for voice responses:
         audio_base64,
         mime_type = 'audio/mp4',
         speech_text,
-        customer_name = 'গ্রাহক'
+        customer_name = 'গ্রাহক',
+        gemini_api_key
       } = req.body
 
       const config = getMerchantConfig(merchant_id)
       const callId = 'turn_' + crypto.randomUUID().slice(0, 8)
-      const apiKey = config.gemini_api_key || process.env.GEMINI_API_KEY || ''
+      const apiKey = (gemini_api_key || req.headers['x-gemini-api-key'] || config.gemini_api_key || process.env.GEMINI_API_KEY || '').trim()
+
+      if (gemini_api_key && !config.gemini_api_key) {
+        config.gemini_api_key = gemini_api_key
+        saveVoiceData()
+      }
 
       let transcribedUserText = speech_text || ''
       let aiVoiceReply = ''
@@ -310,7 +364,7 @@ Return strictly a JSON object with this format:
         transcribedUserText = 'আপনাদের দোকান কখন খোলা থাকে?'
       }
       if (!aiVoiceReply) {
-        aiVoiceReply = await generateAiVoiceReply(transcribedUserText, config)
+        aiVoiceReply = await generateAiVoiceReply(transcribedUserText, config, [], apiKey)
       }
 
       // Clean voice reply

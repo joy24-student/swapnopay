@@ -325,6 +325,10 @@ app.get(['/docs', '/doc', '/documentation'], (_req, res) => {
 app.get(['/widget'], (_req, res) => {
   res.redirect(301, '/widget.html')
 })
+app.get(['/voice-call', '/call', '/voice-calling', '/voice-agent'], (req, res) => {
+  const queryStr = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+  res.redirect(301, `/voice-call.html${queryStr}`)
+})
 
 // Hosted Checkout Form Dynamic Slugs (/f/:slug, /forms/:slug, /form/:slug)
 app.get(['/f/:slug', '/forms/:slug', '/form/:slug'], (req, res) => {
