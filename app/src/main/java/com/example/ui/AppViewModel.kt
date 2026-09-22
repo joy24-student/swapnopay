@@ -9809,7 +9809,6 @@ function executePayment() {
             try {
                 repository.checkoutPosSale(sale, movements, creditEntry)
             } catch (e: Exception) {
-                onError(e.message
                 onError(e.message ?: "Checkout failed; no partial stock change was committed")
                 return@launch
             }

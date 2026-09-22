@@ -58,8 +58,6 @@ async function getValidAccessToken(userId, txId) {
   const admin = getAdminClient()
   let conn = null
 
-  // 1. Lookup by user_id
-  if (userId) {
   // 1. Lookup in-memory cache
   if (userId && connectionsCache.has(userId)) {
     conn = connectionsCache.get(userId)
@@ -70,28 +68,19 @@ async function getValidAccessToken(userId, txId) {
 
   // 2. Lookup by user_id in DB
   if (!conn && userId) {
-    const { data } = await admin
-      .from('supabase_connections')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
-    if (data) conn = data
-  }
-
-  // 2. Lookup by tx_id via control_oauth_transactions
-  // 3. Lookup by tx_id via control_oauth_transactions
-  if (!conn && (txId || (userId && userId.includes('-')))) {
-    const lookupId = txId || userId
-    const { data: tx } = await admin
-      .from('control_oauth_transactions')
-      .select('user_id')
-      .eq('id', lookupId)
-      .maybeSingle()
-    if (tx?.user_id) {
+    try {
       const { data } = await admin
         .from('supabase_connections')
         .select('*')
-        .eq('user_id', tx.user_id)
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (data) conn = data
+    } catch (_) {}
+  }
+
+  // 3. Lookup by tx_id via control_oauth_transactions
+  if (!conn && (txId || (userId && userId.includes('-')))) {
+    const lookupId = txId || userId
     const cachedTx = oauthTxCache.get(lookupId)
     const matchedUserId = cachedTx?.user_id
     if (matchedUserId && connectionsCache.has(matchedUserId)) {
@@ -99,20 +88,21 @@ async function getValidAccessToken(userId, txId) {
     }
 
     if (!conn) {
-      const { data: tx } = await admin
-        .from('control_oauth_transactions')
-        .select('user_id')
-        .eq('id', lookupId)
-        .maybeSingle()
-      if (data) conn = data
-      if (tx?.user_id) {
-        const { data } = await admin
-          .from('supabase_connections')
-          .select('*')
-          .eq('user_id', tx.user_id)
+      try {
+        const { data: tx } = await admin
+          .from('control_oauth_transactions')
+          .select('user_id')
+          .eq('id', lookupId)
           .maybeSingle()
-        if (data) conn = data
-      }
+        if (tx?.user_id) {
+          const { data } = await admin
+            .from('supabase_connections')
+            .select('*')
+            .eq('user_id', tx.user_id)
+            .maybeSingle()
+          if (data) conn = data
+        }
+      } catch (_) {}
     }
   }
 
@@ -179,12 +169,8 @@ async function handleOAuthStart(req, res) {
     const codeChallenge = generateCodeChallenge(codeVerifier)
     const stateHash = hashState(rawState)
 
-    // 2. Save into control_oauth_transactions
     // 2. Save into cache & control_oauth_transactions
-    const admin = getAdminClient()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 mins
-
-    const { error: dbError } = await admin.from('control_oauth_transactions').insert({
     const txId = crypto.randomUUID()
     const txData = {
       id: txId,
@@ -194,16 +180,13 @@ async function handleOAuthStart(req, res) {
       redirect_back: redirectBack || null,
       consumed: false,
       expires_at: expiresAt,
-    })
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     }
     oauthTxCache.set(stateHash, txData)
     oauthTxCache.set(txId, txData)
 
-    if (dbError) {
-      console.error('[oauth-start] DB Save Error:', dbError)
-      return res.status(500).json({ error: 'Failed to initialize OAuth transaction' })
     try {
+      const admin = getAdminClient()
       const { error: dbError } = await admin.from('control_oauth_transactions').insert({
         id: txData.id,
         user_id: userId,
@@ -263,13 +246,11 @@ async function handleOAuthCallback(req, res) {
     `)
   }
 
-  if (!code || !rawState) {
   if (!code) {
     return res.status(400).send(`
       <!DOCTYPE html><html><body style="font-family:system-ui;text-align:center;padding:50px;background:#0f172a;color:#f8fafc;">
         <div style="background:#1e293b;max-width:440px;margin:0 auto;padding:32px;border-radius:16px;border:1px solid #eab308;">
           <h2 style="color:#eab308;">Authorization Incomplete</h2>
-          <p style="color:#94a3b8;">Missing authorization code or state parameter.</p>
           <p style="color:#94a3b8;">Missing authorization code from Supabase.</p>
         </div>
       </body></html>
@@ -319,12 +300,6 @@ async function handleOAuthCallback(req, res) {
     const stateHash = hashState(rawState)
 
     // 1. Lookup transaction in DB
-    const { data: tx, error: txError } = await admin
-      .from('control_oauth_transactions')
-      .select('*')
-      .eq('state_hash', stateHash)
-      .eq('consumed', false)
-      .single()
     // 1. Lookup transaction in memory first, then DB
     let tx = oauthTxCache.get(stateHash) || null
     if (!tx) {
@@ -339,8 +314,6 @@ async function handleOAuthCallback(req, res) {
       } catch (_) {}
     }
 
-    if (txError || !tx) {
-      console.warn('[oauth-callback] Transaction not matched in DB. Forwarding code to app deep link:', rawState)
     if (!tx) {
       console.warn('[oauth-callback] Transaction not matched in cache or DB. Forwarding code to app deep link:', rawState)
       if (code) {
@@ -399,11 +372,6 @@ async function handleOAuthCallback(req, res) {
       `)
     }
 
-    // 2. Mark consumed
-    await admin
-      .from('control_oauth_transactions')
-      .update({ consumed: true })
-      .eq('id', tx.id)
     // 2. Mark consumed in memory and DB
     tx.consumed = true
     try {
@@ -421,7 +389,6 @@ async function handleOAuthCallback(req, res) {
     tokenParams.append('grant_type', 'authorization_code')
     tokenParams.append('code', code)
     tokenParams.append('redirect_uri', redirectUri)
-    tokenParams.append('code_verifier', tx.pkce_verifier_encrypted)
     if (tx.pkce_verifier_encrypted) {
       tokenParams.append('code_verifier', tx.pkce_verifier_encrypted)
     }
@@ -448,21 +415,8 @@ async function handleOAuthCallback(req, res) {
       `)
     }
 
-    // 4. Save tokens to supabase_connections table
     // 4. Save tokens to memory cache and supabase_connections table
     const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString()
-    await admin.from('supabase_connections').upsert(
-      {
-        user_id: tx.user_id,
-        encrypted_access_token: tokenData.access_token,
-        encrypted_refresh_token: tokenData.refresh_token || '',
-        access_token_expires_at: expiresAt,
-        connection_status: 'CONNECTED',
-        provisioning_status: 'ACCOUNT_CONNECTED',
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    )
     const connRecord = {
       user_id: tx.user_id,
       encrypted_access_token: tokenData.access_token,

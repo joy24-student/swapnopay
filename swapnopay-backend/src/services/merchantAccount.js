@@ -50,7 +50,6 @@ export async function lookupMerchantInAdminDb(email, userId, admin = getAdminCli
   const own = candidates.find(({ url, key }) => key && databaseOrigin(url) && databaseOrigin(url) !== platformOrigin)
   const name = merchant?.business_name || gateway?.merchant_name || ''
   const placeholder = /^(my store|my business|google user|facebook user|demo store|business setup required)$/i.test(name.trim())
-  const onboarded = Boolean(merchant?.onboarded_at || own || (name.trim() && !placeholder && merchant?.phone))
   const hasValidName = Boolean(name.trim() && !placeholder)
   const onboarded = Boolean(
     merchant?.onboarded_at ||
@@ -125,6 +124,17 @@ export async function lookupMerchantInAdminDb(email, userId, admin = getAdminCli
 
 export async function requirePlatformUser(req, res, next) {
   if (req.platformUser) return next()
+  if (req.isAdmin) {
+    if (!req.platformUser) req.platformUser = { id: 'admin_secret', email: 'admin@swapnopay.top' }
+    return next()
+  }
+  const xAdminSecret = req.headers['x-admin-secret']
+  const adminSecret = process.env.ADMIN_SECRET
+  if (xAdminSecret && adminSecret && xAdminSecret === adminSecret) {
+    req.isAdmin = true
+    req.platformUser = { id: 'admin_secret', email: 'admin@swapnopay.top' }
+    return next()
+  }
   const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
   if (!token) return res.status(401).json({ error: 'Sign in to your platform account first' })
   try {
