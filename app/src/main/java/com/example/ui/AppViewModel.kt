@@ -5688,11 +5688,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addFormField(type: FormFieldType, label: String? = null, placeholder: String? = null) {
         if (formFieldsList.value.size >= 200) return
+        val defaultOptions = when (type) {
+            FormFieldType.COUPON -> listOf("SAVE10:10%", "FLAT50:50", "SWAPNO20:20%")
+            else -> listOf("Option 1", "Option 2")
+        }
         val newField = FormFieldItem(
             id = java.util.UUID.randomUUID().toString(),
             type = type,
-            label = label ?: type.displayName,
-            placeholder = placeholder ?: "Enter ${type.displayName.lowercase()}",
+            label = label ?: if (type == FormFieldType.COUPON) "Promo / Coupon Code" else type.displayName,
+            placeholder = placeholder ?: if (type == FormFieldType.COUPON) "Enter promo code (e.g. SAVE10)" else "Enter ${type.displayName.lowercase()}",
+            options = defaultOptions,
             isRequired = type in setOf(FormFieldType.PHONE, FormFieldType.CUSTOM_AMOUNT, FormFieldType.QUANTITY),
             minValue = when (type) {
                 FormFieldType.CUSTOM_AMOUNT, FormFieldType.QUANTITY -> 1.0
@@ -7212,10 +7217,15 @@ function executePayment() {
             FormFieldType.PDF -> ""
             else -> ""
         }
+        val defaultOptions = when (type) {
+            FormFieldType.COUPON -> listOf("SAVE10:10%", "FLAT50:50", "SWAPNO20:20%")
+            else -> listOf("Option 1", "Option 2")
+        }
         val newItem = FormFieldItem(
             type = type,
-            label = type.displayName,
-            placeholder = "Enter ${type.displayName.lowercase()}",
+            label = if (type == FormFieldType.COUPON) "Promo / Coupon Code" else type.displayName,
+            placeholder = if (type == FormFieldType.COUPON) "Enter promo code (e.g. SAVE10)" else "Enter ${type.displayName.lowercase()}",
+            options = defaultOptions,
             pageIndex = activePageIndex.value,
             helperText = if (type == FormFieldType.IMAGE) "Promotional Announcement Banner" else "",
             isRequired = type !in setOf(
@@ -8236,9 +8246,9 @@ function executePayment() {
                 }
 
                 val finalPhotoUrl = publicUrl ?: "data:image/jpeg;base64,${android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)}"
-                val updated = _activeProfile.value.copy(photoUrl = finalPhotoUrl)
-                repository.insertMerchantProfile(updated)
-                _activeProfile.value = updated
+                val updatedProfile = _activeProfile.value.copy(photoUrl = finalPhotoUrl)
+                repository.insertMerchantProfile(updatedProfile)
+                _activeProfile.value = updatedProfile
                 syncMerchantConfigToAdminDatabase()
 
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {

@@ -609,6 +609,43 @@ export function formRouter(io = null) {
         if (taxPercent > 0 && calculatedAmount > 0) {
           calculatedAmount += (calculatedAmount * taxPercent / 100)
         }
+        // Coupon / Promo Code discount calculation
+        const couponCode = req.body.coupon_code || answers['coupon_code'] || answers['promo_code'] || null
+        let discountAmount = parseFloat(req.body.discount_amount || 0) || 0
+
+        if (couponCode && calculatedAmount > 0) {
+          if (discountAmount <= 0) {
+            const couponFields = (form.fields || []).filter(f => String(f.type || '').toUpperCase() === 'COUPON')
+            let matchedCoupon = null
+            for (const cf of couponFields) {
+              const opts = Array.isArray(cf.options) ? cf.options : []
+              for (const opt of opts) {
+                const parts = String(opt).split(':').map(s => s.trim())
+                if (parts[0] && parts[0].toUpperCase() === String(couponCode).trim().toUpperCase()) {
+                  matchedCoupon = parts
+                  break
+                }
+              }
+              if (matchedCoupon) break
+            }
+            if (matchedCoupon) {
+              const discVal = matchedCoupon[1] || '0'
+              if (discVal.endsWith('%')) {
+                const pct = parseFloat(discVal) || 0
+                discountAmount = Math.round(calculatedAmount * (pct / 100))
+              } else {
+                discountAmount = parseFloat(discVal) || 0
+              }
+            }
+          }
+          if (discountAmount > 0) {
+            calculatedAmount = Math.max(0, Math.round((calculatedAmount - discountAmount) * 100) / 100)
+            answers['applied_coupon'] = {
+              code: String(couponCode).trim().toUpperCase(),
+              discount: discountAmount
+            }
+          }
+        }
       }
 
       calculatedAmount = Math.round(calculatedAmount * 100) / 100

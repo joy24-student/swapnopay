@@ -582,6 +582,131 @@
       background: #fafafa;
     }
 
+    /* Coupon / Promo Code Box */
+    .coupon-card {
+      background: var(--card-bg, #ffffff);
+      border: 1.5px dashed var(--border, #e2e8f0);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+    .coupon-card:focus-within {
+      border-color: var(--primary, #5D45FF);
+      background: #fafafa;
+    }
+    .coupon-input-wrap {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .coupon-input-wrap input {
+      flex: 1;
+      height: 42px;
+      padding: 0 12px;
+      border: 1.5px solid var(--border, #e2e8f0);
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dark, #0f172a);
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .coupon-input-wrap input:focus {
+      border-color: var(--primary, #5D45FF);
+    }
+    .coupon-apply-btn {
+      height: 42px;
+      padding: 0 18px;
+      background: var(--primary, #5D45FF);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .coupon-apply-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .coupon-status-msg {
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .coupon-status-msg.success {
+      color: #10b981;
+    }
+    .coupon-status-msg.error {
+      color: #ef4444;
+    }
+    .coupon-active-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 8px;
+      color: #065f46;
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .coupon-remove-btn {
+      background: none;
+      border: none;
+      color: #ef4444;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+
+    /* Order Summary Breakdown Card */
+    .order-summary-card {
+      background: var(--card-bg, #f8fafc);
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .order-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-light, #64748b);
+    }
+    .order-summary-row.total-row {
+      border-top: 1px dashed var(--border, #cbd5e1);
+      padding-top: 8px;
+      margin-top: 2px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-dark, #0f172a);
+    }
+    .order-summary-row .discount-val {
+      color: #10b981;
+      font-weight: 700;
+    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -627,6 +752,9 @@
         <!-- Dynamic fields and product blocks rendered here -->
       </div>
 
+      <!-- Order Summary Breakdown with Promo Code -->
+      <div id="order-summary-card" class="order-summary-card" style="display: none;"></div>
+
       <!-- Payment Method Selection (hidden if non-payment form or total is 0) -->
       <div class="field-group" id="method-section">
         <label class="field-label">Payment Method <span class="req">*</span></label>
@@ -667,6 +795,182 @@
     let csvLookupColumn = "";
     let csvTargetFieldId = "";
     let csvColumnMappings = {};
+
+    // Promo / Coupon Code state
+    let formCouponsList = []; // [{ code: 'SAVE20', type: 'PERCENT', value: 20, minAmount: 0, fieldId: '' }]
+    let appliedCoupon = null; // { code: 'SAVE20', type: 'PERCENT', value: 20, discountAmount: 200, fieldId: '' }
+
+    function parseCouponsFromForm(form) {
+      const coupons = [];
+      const fields = form.fields || [];
+      const couponFields = fields.filter(f => {
+        const t = String(f.type || '').toUpperCase();
+        return t === 'COUPON' || t === 'DISCOUNT';
+      });
+
+      couponFields.forEach(f => {
+        const opts = (f.options && f.options.length > 0) ? f.options : ["SAVE10:10%", "FLAT50:50", "SWAPNO20:20%"];
+        opts.forEach(opt => {
+          const raw = String(opt).trim();
+          if (!raw) return;
+          const parts = raw.split(':').map(s => s.trim());
+          const code = parts[0].toUpperCase();
+          const discountStr = parts[1] || '10%';
+          const minAmt = parseFloat(parts[2] || 0) || 0;
+          const isPercent = discountStr.includes('%');
+          const numVal = parseFloat(discountStr.replace('%', '')) || 0;
+          if (code && numVal > 0) {
+            coupons.push({
+              code: code,
+              type: isPercent ? 'PERCENT' : 'FIXED',
+              value: numVal,
+              minAmount: minAmt,
+              fieldId: f.id
+            });
+          }
+        });
+      });
+
+      // Also parse themeConfig coupons if specified
+      const theme = form.theme_config || form.themeConfig || {};
+      const themeCoupons = theme.coupon_codes || theme.coupons || [];
+      if (Array.isArray(themeCoupons)) {
+        themeCoupons.forEach(c => {
+          if (typeof c === 'string') {
+            const parts = c.split(':').map(s => s.trim());
+            const code = parts[0].toUpperCase();
+            const discountStr = parts[1] || '10%';
+            const isPercent = discountStr.includes('%');
+            const numVal = parseFloat(discountStr.replace('%', '')) || 0;
+            if (code && numVal > 0) {
+              coupons.push({
+                code: code,
+                type: isPercent ? 'PERCENT' : 'FIXED',
+                value: numVal,
+                minAmount: parseFloat(parts[2] || 0) || 0
+              });
+            }
+          } else if (c && c.code) {
+            coupons.push({
+              code: String(c.code).trim().toUpperCase(),
+              type: String(c.type || 'PERCENT').toUpperCase().includes('PERCENT') ? 'PERCENT' : 'FIXED',
+              value: parseFloat(c.value || c.discount || 0),
+              minAmount: parseFloat(c.min_amount || c.minAmount || 0)
+            });
+          }
+        });
+      }
+
+      return coupons;
+    }
+
+    function applyPromoCode(inputCode, targetFieldId) {
+      const codeInput = document.getElementById(targetFieldId ? `coupon-code-${targetFieldId}` : 'coupon-code-input');
+      const feedbackEl = document.getElementById(targetFieldId ? `coupon-feedback-${targetFieldId}` : 'coupon-feedback');
+      const entered = (inputCode || (codeInput ? codeInput.value : '')).trim().toUpperCase();
+
+      if (!entered) {
+        if (feedbackEl) {
+          feedbackEl.style.display = 'flex';
+          feedbackEl.className = 'coupon-status-msg error';
+          feedbackEl.innerHTML = '⚠️ Please enter a promo or coupon code.';
+        }
+        return;
+      }
+
+      const subtotal = calculateSubtotalWithoutDiscount();
+
+      // Find matching coupon from formCouponsList
+      let matched = formCouponsList.find(c => c.code === entered);
+
+      // If form has no coupons configured yet, support standard promo patterns (SAVE10, SAVE20, EID50, etc.)
+      if (!matched && formCouponsList.length === 0) {
+        const regexMatch = entered.match(/^(?:SAVE|OFF|DISCOUNT|EID|SWAPNO)(\d{1,2})$/);
+        if (regexMatch) {
+          const pct = parseInt(regexMatch[1], 10);
+          if (pct > 0 && pct <= 80) {
+            matched = { code: entered, type: 'PERCENT', value: pct, minAmount: 0 };
+          }
+        }
+      }
+
+      if (!matched) {
+        if (feedbackEl) {
+          feedbackEl.style.display = 'flex';
+          feedbackEl.className = 'coupon-status-msg error';
+          feedbackEl.innerHTML = `✕ Invalid or expired promo code "<strong>${entered}</strong>".`;
+        }
+        return;
+      }
+
+      if (matched.minAmount > 0 && subtotal < matched.minAmount) {
+        if (feedbackEl) {
+          feedbackEl.style.display = 'flex';
+          feedbackEl.className = 'coupon-status-msg error';
+          feedbackEl.innerHTML = `✕ Minimum order amount of BDT ${matched.minAmount.toLocaleString()} required for code "<strong>${entered}</strong>".`;
+        }
+        return;
+      }
+
+      let discount = 0;
+      if (matched.type === 'PERCENT') {
+        discount = Math.round(subtotal * (matched.value / 100));
+      } else {
+        discount = Math.min(subtotal, matched.value);
+      }
+
+      appliedCoupon = {
+        code: matched.code,
+        type: matched.type,
+        value: matched.value,
+        discountAmount: discount,
+        fieldId: targetFieldId || matched.fieldId || ''
+      };
+
+      if (codeInput) codeInput.value = matched.code;
+
+      if (feedbackEl) {
+        feedbackEl.style.display = 'flex';
+        feedbackEl.className = 'coupon-status-msg success';
+        feedbackEl.innerHTML = `✓ Promo code <strong>${matched.code}</strong> applied! You saved <strong>BDT ${discount.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong>`;
+      }
+
+      updateCouponCardDisplay(targetFieldId || matched.fieldId);
+      recalculateTotalAmount();
+    }
+
+    function removePromoCode(targetFieldId) {
+      appliedCoupon = null;
+      const codeInput = document.getElementById(targetFieldId ? `coupon-code-${targetFieldId}` : 'coupon-code-input');
+      const feedbackEl = document.getElementById(targetFieldId ? `coupon-feedback-${targetFieldId}` : 'coupon-feedback');
+      if (codeInput) codeInput.value = '';
+      if (feedbackEl) {
+        feedbackEl.style.display = 'none';
+        feedbackEl.innerHTML = '';
+      }
+      updateCouponCardDisplay(targetFieldId);
+      recalculateTotalAmount();
+    }
+
+    function updateCouponCardDisplay(targetFieldId) {
+      const wrap = document.getElementById(targetFieldId ? `coupon-wrap-${targetFieldId}` : 'coupon-input-wrap');
+      if (!wrap) return;
+      if (appliedCoupon) {
+        wrap.innerHTML = `
+          <div class="coupon-active-badge">
+            <span>🏷️ <strong>${appliedCoupon.code}</strong> (-BDT ${appliedCoupon.discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})})</span>
+            <button type="button" class="coupon-remove-btn" onclick="removePromoCode('${targetFieldId || ''}')" title="Remove promo code">✕</button>
+          </div>
+        `;
+      } else {
+        wrap.innerHTML = `
+          <input type="text" class="input-text coupon-input" id="coupon-code-${targetFieldId || 'input'}" 
+            data-field-id="${targetFieldId || ''}" placeholder="Enter promo code (e.g. SAVE10)" 
+            autocomplete="off" autocapitalize="characters" />
+          <button type="button" class="coupon-apply-btn" id="coupon-btn-${targetFieldId || 'apply'}" onclick="applyPromoCode(null, '${targetFieldId || ''}')">Apply</button>
+        `;
+      }
+    }
 
     const fallbackProductSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E";
 
@@ -1149,6 +1453,9 @@
         productsList = typeof config.products === "string" ? JSON.parse(config.products) : (config.products || []);
       } catch { productsList = []; }
 
+      // Parse configured coupons for promo functionality
+      formCouponsList = parseCouponsFromForm(config);
+
       // Shuffle questions if enabled
       if (theme.shuffle_questions || theme.shuffleQuestionOrder) {
         fieldsList = [...fieldsList].sort(() => Math.random() - 0.5);
@@ -1475,6 +1782,31 @@
             `;
           } else if (fType === "DOCUMENT" || fType === "FILE_UPLOAD" || fType === "CAMERA_UPLOAD") {
             group.innerHTML += `<input type="file" class="input-text" style="padding-top:10px;" data-field-id="${f.id}" ${fType === 'CAMERA_UPLOAD' ? 'capture="environment" accept="image/*"' : ''} />`;
+          } else if (fType === "COUPON" || fType === "DISCOUNT") {
+            const fId = f.id;
+            const defaultCodesHint = (f.options && f.options.length > 0) 
+              ? f.options.map(o => o.split(':')[0]).slice(0, 3).join(', ') 
+              : 'SAVE10, FLAT50';
+
+            const card = document.createElement("div");
+            card.className = "coupon-card";
+            card.id = `coupon-card-${fId}`;
+            card.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label class="field-label" style="margin:0;font-size:13px;display:flex;align-items:center;gap:6px;">
+                  🎟️ ${f.label || 'Promo / Coupon Code'}
+                </label>
+                ${defaultCodesHint ? `<span style="font-size:11px;color:var(--text-light);font-weight:500;">Valid: ${defaultCodesHint}</span>` : ''}
+              </div>
+              <div class="coupon-input-wrap" id="coupon-wrap-${fId}">
+                <input type="text" class="input-text coupon-input" id="coupon-code-${fId}" 
+                  data-field-id="${fId}" placeholder="${f.placeholder || 'Enter promo code (e.g. SAVE10)'}" 
+                  autocomplete="off" autocapitalize="characters" />
+                <button type="button" class="coupon-apply-btn" id="coupon-btn-${fId}" onclick="applyPromoCode(null, '${fId}')">Apply</button>
+              </div>
+              <div id="coupon-feedback-${fId}" class="coupon-status-msg" style="display:none;"></div>
+            `;
+            group.appendChild(card);
           } else {
             group.innerHTML += `<input type="text" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'Enter value...'}" />`;
           }
@@ -1581,13 +1913,13 @@
       }
     }
 
-    function recalculateTotalAmount() {
-      let total = 0;
+    function calculateSubtotalWithoutDiscount() {
+      let subtotal = 0;
 
       // 1. Sum selected product blocks
       Object.values(selectedProductsMap).forEach(prod => {
         if (prod.selected) {
-          total += (prod.price * (prod.qty || 1));
+          subtotal += (prod.price * (prod.qty || 1));
         }
       });
 
@@ -1595,14 +1927,14 @@
       const customAmountInp = document.getElementById("custom-amount-input");
       if (customAmountInp && customAmountInp.value) {
         const cVal = parseFloat(customAmountInp.value);
-        if (!isNaN(cVal) && cVal > 0) total += cVal;
+        if (!isNaN(cVal) && cVal > 0) subtotal += cVal;
       }
 
       // 3. Add donation amounts if present
       document.querySelectorAll('input[id^="donation-custom-"]').forEach(inp => {
         if (inp && inp.value) {
           const dVal = parseFloat(inp.value);
-          if (!isNaN(dVal) && dVal > 0) total += dVal;
+          if (!isNaN(dVal) && dVal > 0) subtotal += dVal;
         }
       });
 
@@ -1610,34 +1942,80 @@
       document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
         const optVal = radio.value || '';
         const price = extractOptionPrice(optVal);
-        if (price > 0) total += price;
+        if (price > 0) subtotal += price;
       });
 
       // 5. Add select dropdown option prices
       document.querySelectorAll('select[data-field-id]').forEach(select => {
         const optVal = select.value || '';
         const price = extractOptionPrice(optVal);
-        if (price > 0) total += price;
+        if (price > 0) subtotal += price;
       });
 
       // 6. Add selected checkboxes prices
       document.querySelectorAll('input[type="checkbox"][name^="field_"]:checked').forEach(chk => {
         const optVal = chk.value || '';
         const price = extractOptionPrice(optVal);
-        if (price > 0) total += price;
+        if (price > 0) subtotal += price;
       });
 
       // Fallback to baseFormAmount if neither products nor options nor custom amount had prices
-      if (total === 0 && Object.keys(selectedProductsMap).length === 0 && !customAmountInp) {
-        total = baseFormAmount;
+      if (subtotal === 0 && Object.keys(selectedProductsMap).length === 0 && !customAmountInp) {
+        subtotal = baseFormAmount;
       }
 
       // Quantity multiplier if present
       const qtyInp = document.querySelector('input[data-field-type="QUANTITY"]');
-      if (qtyInp && qtyInp.value && total > 0) {
+      if (qtyInp && qtyInp.value && subtotal > 0) {
         const q = parseInt(qtyInp.value, 10);
         if (!isNaN(q) && q > 1 && Object.keys(selectedProductsMap).length === 0) {
-          total = total * q;
+          subtotal = subtotal * q;
+        }
+      }
+
+      return subtotal;
+    }
+
+    function recalculateTotalAmount() {
+      const subtotal = calculateSubtotalWithoutDiscount();
+      let discount = 0;
+
+      if (appliedCoupon && subtotal > 0) {
+        if (appliedCoupon.type === 'PERCENT') {
+          discount = Math.round(subtotal * (appliedCoupon.value / 100));
+        } else {
+          discount = Math.min(subtotal, appliedCoupon.value);
+        }
+        appliedCoupon.discountAmount = discount;
+      }
+
+      const total = Math.max(0, subtotal - discount);
+
+      // Render Order Summary Breakdown
+      const summaryCard = document.getElementById("order-summary-card");
+      if (summaryCard) {
+        if (isPaymentEnabled && subtotal > 0) {
+          summaryCard.style.display = "flex";
+          summaryCard.innerHTML = `
+            <div class="order-summary-row">
+              <span>Subtotal</span>
+              <span>BDT ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            ${appliedCoupon && discount > 0 ? `
+            <div class="order-summary-row">
+              <span style="display:flex;align-items:center;gap:6px;">
+                🏷️ Promo Code (<strong style="color:var(--primary);">${appliedCoupon.code}</strong>)
+                <button type="button" class="coupon-remove-btn" onclick="removePromoCode('${appliedCoupon.fieldId || ''}')" title="Remove promo code">✕</button>
+              </span>
+              <span class="discount-val">- BDT ${discount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>` : ''}
+            <div class="order-summary-row total-row">
+              <span>Total to Pay</span>
+              <span style="color:var(--primary);">BDT ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+          `;
+        } else {
+          summaryCard.style.display = "none";
         }
       }
 
@@ -1829,12 +2207,21 @@
       // 1. Submit to Backend /v1/forms/:slugOrId/submit
       try {
         const calculatedTotal = recalculateTotalAmount();
+        const calculatedSubtotal = calculateSubtotalWithoutDiscount();
+        const appliedDiscount = appliedCoupon ? (appliedCoupon.discountAmount || 0) : 0;
+        if (appliedCoupon) {
+          answersMap['coupon_code'] = appliedCoupon.code;
+          answersMap['discount_amount'] = appliedDiscount;
+        }
         const submitPayload = {
           customer_name: cusName,
           customer_phone: cusPhone,
           customer_email: cusEmail,
           amount: calculatedTotal,
           calculated_amount: calculatedTotal,
+          subtotal_amount: calculatedSubtotal,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          discount_amount: appliedDiscount,
           selected_product_id: selectedProdId,
           quantity: selectedQty,
           selected_products: selectedProductsList,

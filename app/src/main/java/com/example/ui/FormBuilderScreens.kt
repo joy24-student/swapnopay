@@ -1245,6 +1245,7 @@ private fun FormBuilderTab(
     val elementChips = remember {
         listOf(
             "Product" to Icons.Outlined.ShoppingBag,
+            "Promo Code" to Icons.Outlined.LocalOffer,
             "Text Field" to Icons.Outlined.TextFields,
             "Email" to Icons.Outlined.Email,
             "Phone" to Icons.Outlined.Phone,
@@ -1464,6 +1465,7 @@ private fun FormBuilderTab(
                             onClick = {
                                 when (label) {
                                     "Product" -> viewModel.addFormField(FormFieldType.PRODUCT, "Product Name", "Product details / SKU")
+                                    "Promo Code" -> viewModel.addFormField(FormFieldType.COUPON, "Promo / Coupon Code", "Enter promo code (e.g. SAVE10)")
                                     "Text Field" -> viewModel.addFormField(FormFieldType.NAME, "Custom Text Field", "Enter value")
                                     "Email" -> viewModel.addFormField(FormFieldType.EMAIL, "Email Address", "name@example.com")
                                     "Phone" -> viewModel.addFormField(FormFieldType.PHONE, "Phone Number", "017XXXXXXXX")
@@ -2709,6 +2711,75 @@ private fun AdvancedFieldSettingsEditor(
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 3
             )
+        }
+        if (field.type == FormFieldType.COUPON) {
+            var couponRawText by remember(field.id) { mutableStateOf(field.options.joinToString(", ")) }
+            LaunchedEffect(field.options) {
+                val currentParsed = couponRawText.split(',').map(String::trim).filter(String::isNotBlank)
+                if (currentParsed != field.options) {
+                    couponRawText = field.options.joinToString(", ")
+                }
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = BorderStroke(1.dp, goldPrimary.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "🎟️ Configured Promo Codes",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textPrimary
+                    )
+                    Text(
+                        "Format: CODE:DISCOUNT (e.g. SAVE20:20% for 20% off, FLAT100:100 for ৳100 off). Separate multiple codes with commas.",
+                        fontSize = 11.sp,
+                        color = textSecondary,
+                        lineHeight = 15.sp
+                    )
+                    OutlinedTextField(
+                        value = couponRawText,
+                        onValueChange = { value ->
+                            couponRawText = value
+                            val parsed = value.split(',').map(String::trim).filter(String::isNotBlank).take(50)
+                            onUpdate(field.copy(options = parsed))
+                        },
+                        label = { Text("Coupon Codes (comma separated)") },
+                        placeholder = { Text("e.g. SAVE10:10%, FLAT50:50, SWAPNO20:20%") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf("SAVE10:10%", "SAVE20:20%", "FLAT50:50", "FLAT100:100").forEach { preset ->
+                            Surface(
+                                onClick = {
+                                    val currentList = field.options.toMutableList()
+                                    if (!currentList.contains(preset)) {
+                                        currentList.add(preset)
+                                        couponRawText = currentList.joinToString(", ")
+                                        onUpdate(field.copy(options = currentList))
+                                    }
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = cardBg,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Text(
+                                    "+ $preset",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontSize = 11.sp,
+                                    color = textPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
         if (field.type in listOf(FormFieldType.PRODUCT, FormFieldType.PRODUCT_LIST)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -6726,6 +6797,53 @@ private fun LivePreviewModal(
                                                 fontSize = 11.5.sp,
                                                 modifier = Modifier.padding(start = 4.dp)
                                             )
+                                        }
+                                    }
+                                }
+                                FormFieldType.COUPON -> {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF18140E) else Color(0xFFF8FAFC)),
+                                        border = BorderStroke(1.dp, if (isDark) Color(0xFF332918) else Color(0xFFE2E8F0)),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "🎟️ ${field.label.ifBlank { "Promo / Coupon Code" }}",
+                                                    fontSize = 12.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = textPrimary
+                                                )
+                                                val hint = field.options.firstOrNull()?.substringBefore(':') ?: "SAVE10"
+                                                Text("e.g. $hint", fontSize = 11.sp, color = textSecondary)
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = currentVal,
+                                                    onValueChange = { previewDynamicValues = previewDynamicValues + (field.id to it) },
+                                                    placeholder = { Text(field.placeholder.ifBlank { "Enter code" }, fontSize = 12.sp, color = textSecondary) },
+                                                    modifier = Modifier.weight(1f),
+                                                    singleLine = true,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                Button(
+                                                    onClick = { /* simulated apply in builder */ },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = goldPrimary),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text("Apply", fontSize = 12.sp, color = Color.White)
+                                                }
+                                            }
                                         }
                                     }
                                 }
