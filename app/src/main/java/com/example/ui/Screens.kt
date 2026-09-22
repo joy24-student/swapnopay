@@ -959,6 +959,7 @@ fun AppNavigation(viewModel: AppViewModel) {
         "PaymentGatewaySettings", "GatewaySettings" -> PaymentGatewaySettingsScreen(viewModel)
         "Reports", "Report", "Analytics", "ReportsScreen", "BusinessReport", "FinancialReport" -> ReportsScreen(viewModel)
         "Support", "Helpdesk", "Help", "SupportHelpdesk", "SupportScreen" -> SupportScreen(viewModel)
+        "SupportChat", "LiveSupport", "SupportChatScreen", "LiveChat", "ChatWithSupport" -> SupportChatScreen(viewModel)
         "ApiDoc", "DeveloperPortal", "DevPortal", "Developer", "DeveloperTools", "DeveloperPortalScreen" -> ApiDocScreen(viewModel)
         "Settings", "SystemSettings" -> SettingsScreen(viewModel)
         "PrivacyPolicy" -> PrivacyPolicyScreen(viewModel)

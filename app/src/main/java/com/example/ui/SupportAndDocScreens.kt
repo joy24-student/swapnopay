@@ -191,7 +191,7 @@ fun SupportScreen(viewModel: AppViewModel) {
                                         modifier = Modifier
                                             .size(40.dp)
                                             .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                                            .clickable { isChatOpen = true },
+                                            .clickable { viewModel.navigateTo("SupportChat") },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -456,7 +456,7 @@ fun SupportScreen(viewModel: AppViewModel) {
                             }
 
                             Button(
-                                onClick = { isChatOpen = true },
+                                onClick = { viewModel.navigateTo("SupportChat") },
                                 colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
@@ -534,121 +534,11 @@ fun SupportScreen(viewModel: AppViewModel) {
             }
         }
 
-        // 2. LIVE CHAT DIALOG
+        // 2. LIVE CHAT REDIRECT TO DEDICATED SCREEN
         if (isChatOpen) {
-            EnterpriseGestureModal(
-                onDismissRequest = { isChatOpen = false },
-                title = "SwapnoPay Live Support",
-                subtitle = "Online • Agent ready • Swipe down to dismiss",
-                icon = Icons.Default.Chat
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().height(420.dp)
-                ) {
-                    // Message History
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(supportChatList) { msg ->
-                            val isUser = msg.sender == "MERCHANT"
-                            val text = msg.message
-                            val time = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp))
-
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
-                            ) {
-                                Column(
-                                    horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
-                                ) {
-                                    Card(
-                                        shape = RoundedCornerShape(
-                                            topStart = 16.dp,
-                                            topEnd = 16.dp,
-                                            bottomStart = if (isUser) 16.dp else 4.dp,
-                                            bottomEnd = if (isUser) 4.dp else 16.dp
-                                        ),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isUser) BrandPurple else if (isDarkModeGlobal) Color(0xFF2E2F38) else Color(0xFFF1F5F9)
-                                        ),
-                                        modifier = Modifier.widthIn(max = 240.dp)
-                                    ) {
-                                        Text(
-                                            text = text,
-                                            fontSize = 13.sp,
-                                            lineHeight = 16.sp,
-                                            color = if (isUser) Color.White else AppTextPrimary,
-                                            modifier = Modifier.padding(12.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(text = time, fontSize = 9.sp, color = AppTextSecondary)
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Message Input (Placeholder guaranteed visible in dark & light themes)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (isDarkModeGlobal) Color(0xFF1E1F26) else Color(0xFFF1F5F9),
-                                RoundedCornerShape(24.dp)
-                            )
-                            .border(
-                                BorderStroke(1.dp, if (isDarkModeGlobal) Color(0xFF2E2F38) else Color(0xFFE2E8F0)),
-                                RoundedCornerShape(24.dp)
-                            )
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            if (chatInput.isEmpty()) {
-                                Text(
-                                    text = "Write your message...",
-                                    fontSize = 13.5.sp,
-                                    color = if (isDarkModeGlobal) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                )
-                            }
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = chatInput,
-                                onValueChange = { chatInput = it },
-                                singleLine = true,
-                                textStyle = TextStyle(
-                                    color = if (isDarkModeGlobal) Color.White else Color(0xFF0F172A),
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(BrandPurple),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                if (chatInput.trim().isNotEmpty()) {
-                                    viewModel.sendSupportChatMessage(chatInput.trim())
-                                    chatInput = ""
-                                }
-                            },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(BrandPurple, CircleShape)
-                        ) {
-                            Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
+            LaunchedEffect(Unit) {
+                isChatOpen = false
+                viewModel.navigateTo("SupportChat")
             }
         }
 
@@ -1031,7 +921,7 @@ fun SupportScreen(viewModel: AppViewModel) {
                                     Button(
                                         onClick = {
                                             activeCategoryDialog = null
-                                            isChatOpen = true
+                                            viewModel.navigateTo("SupportChat")
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
                                         shape = RoundedCornerShape(12.dp),
