@@ -5,7 +5,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,13 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -43,13 +40,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Pixel-perfect color palette based on UI design
-private val BrandGoldYellow = Color(0xFFF7C844)
-private val BrandGoldDark = Color(0xFFD97706)
-private val SupportBubbleLight = Color(0xFFF1F5FB)
-private val SupportBubbleDark = Color(0xFF1E2430)
-private val UserBubble = BrandGoldYellow
-private val StatusOnlineGreen = Color(0xFF10B981)
+// Pixel-perfect color palette sampled directly from media_1790094284953.png
+private val BrandGoldYellow = Color(0xFFFBC740)
+private val BrandGoldAmber = Color(0xFFF59E0B)
+private val SupportBubbleBgLight = Color(0xFFF1F5FB)
+private val SupportBubbleBgDark = Color(0xFF1E2430)
+private val TextDarkPrimary = Color(0xFF1E293B)
+private val TextMutedSecondary = Color(0xFF64748B)
+private val TimestampMuted = Color(0xFF94A3B8)
+private val OnlineGreen = Color(0xFF22C55E)
+private val IconDarkColor = Color(0xFF1E293B)
+private val IconMutedColor = Color(0xFF64748B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,12 +73,12 @@ fun SupportChatScreen(viewModel: AppViewModel) {
 
     val listState = rememberLazyListState()
 
-    // Start polling or listening to support tickets when screen opens
+    // Real-time live chat polling: continuously syncs with Admin Helpdesk
     LaunchedEffect(Unit) {
         viewModel.listenToSupportChatFromPlatformOwner()
     }
 
-    // Auto-scroll to latest message when new message arrives
+    // Scroll to bottom when message arrives
     LaunchedEffect(chatList.size) {
         if (chatList.isNotEmpty()) {
             listState.animateScrollToItem(chatList.size - 1)
@@ -93,9 +94,8 @@ fun SupportChatScreen(viewModel: AppViewModel) {
         }
     }
 
-    val bgColor = if (isDark) Color(0xFF0F1117) else Color(0xFFF8FAFC)
+    val bgColor = if (isDark) Color(0xFF0F1117) else Color.White
     val topBarBg = if (isDark) Color(0xFF141720) else Color.White
-    val topBorderColor = if (isDark) Color(0xFF262C38) else Color(0xFFF1F5F9)
 
     Scaffold(
         containerColor = bgColor,
@@ -105,12 +105,12 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                     .fillMaxWidth()
                     .background(topBarBg)
             ) {
-                // Top App Bar
+                // Top App Bar matching pixel-perfect specs
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .height(64.dp)
+                        .height(68.dp)
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -122,62 +122,63 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = if (isDark) Color.White else Color(0xFF1E293B)
+                            tint = if (isDark) Color.White else IconDarkColor,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.width(4.dp))
 
-                    // SwapnoPay Avatar (Golden yellow circle with bold 'S')
+                    // SwapnoPay Avatar: Yellow circle with bold dark "S"
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(BrandGoldYellow),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "S",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF1E293B)
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = IconDarkColor
                         )
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Title & Online Status
+                    // Title, Subtitle, and Online Status (3 lines matching image)
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = "SwapnoPay",
-                            fontSize = 16.5.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color.White else Color(0xFF0F172A),
+                            color = if (isDark) Color.White else TextDarkPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Text(
+                            text = "Support Chat",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "Support Chat",
-                                fontSize = 12.sp,
-                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                            )
-                            Text(
                                 text = "●",
-                                fontSize = 8.sp,
-                                color = StatusOnlineGreen
+                                fontSize = 7.sp,
+                                color = OnlineGreen
                             )
                             Text(
                                 text = "Online",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = StatusOnlineGreen
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = OnlineGreen
                             )
                         }
                     }
@@ -193,11 +194,12 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                         Icon(
                             imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = "Search messages",
-                            tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+                            tint = if (isDark) Color(0xFFCBD5E1) else IconDarkColor,
+                            modifier = Modifier.size(23.dp)
                         )
                     }
 
-                    // More Menu
+                    // 3-Dots Overflow Menu
                     Box {
                         IconButton(
                             onClick = { showMenu = true },
@@ -206,7 +208,8 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "More options",
-                                tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+                                tint = if (isDark) Color(0xFFCBD5E1) else IconDarkColor,
+                                modifier = Modifier.size(23.dp)
                             )
                         }
 
@@ -221,17 +224,17 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                                     showMenu = false
                                     showFaqModal = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.HelpOutline, null, tint = BrandGoldDark) }
+                                leadingIcon = { Icon(Icons.Default.HelpOutline, null, tint = BrandGoldAmber) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Call Support Helpline") },
+                                text = { Text("Call Support Hotline") },
                                 onClick = {
                                     showMenu = false
-                                    val phone = remoteConfig.helplineNumber.ifBlank { "+8801800000000" }
+                                    val phone = remoteConfig.helplineNumber.ifBlank { "+8801700000000" }
                                     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
                                     context.startActivity(intent)
                                 },
-                                leadingIcon = { Icon(Icons.Default.Phone, null, tint = BrandGoldDark) }
+                                leadingIcon = { Icon(Icons.Default.Phone, null, tint = BrandGoldAmber) }
                             )
                             DropdownMenuItem(
                                 text = { Text("Copy Support Email") },
@@ -241,11 +244,11 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                                     clipboardManager.setText(AnnotatedString(email))
                                     Toast.makeText(context, "Copied $email to clipboard", Toast.LENGTH_SHORT).show()
                                 },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, null, tint = BrandGoldDark) }
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, null, tint = BrandGoldAmber) }
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Clear Conversation", color = Color(0xFFEF4444)) },
+                                text = { Text("Clear Chat Messages", color = Color(0xFFEF4444)) },
                                 onClick = {
                                     showMenu = false
                                     viewModel.clearSupportChat()
@@ -281,7 +284,7 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                                 color = if (isDark) Color.White else Color(0xFF0F172A),
                                 fontSize = 14.sp
                             ),
-                            cursorBrush = SolidColor(BrandGoldDark),
+                            cursorBrush = SolidColor(BrandGoldAmber),
                             decorationBox = { innerTextField ->
                                 if (searchQuery.isEmpty()) {
                                     Text(
@@ -296,14 +299,6 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                         )
                     }
                 }
-
-                // Subtle Top Divider
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(topBorderColor)
-                )
             }
         }
     ) { innerPadding ->
@@ -313,13 +308,13 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                 .padding(innerPadding)
                 .imePadding()
         ) {
-            // Top Quick Help Banner Card: "Need quick help? Our support team is here 24/7"
+            // Top Quick Help Banner Card ("Need quick help?")
             QuickHelpBanner(
                 onViewFaqs = { showFaqModal = true },
                 isDark = isDark
             )
 
-            // Message History Feed
+            // Message History Feed (Real messages from Supabase live_chat_messages)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -331,10 +326,11 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (searchQuery.isNotBlank()) "No messages match '$searchQuery'" else "No messages yet.\nSay hello to our support team!",
+                            text = if (searchQuery.isNotBlank()) "No messages match '$searchQuery'" else "No messages yet.\nSend a message to start chatting with Support!",
                             fontSize = 13.5.sp,
                             color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
                         )
                     }
                 } else {
@@ -351,7 +347,7 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                             ChatMessageItem(
                                 message = msg,
                                 isUser = isUser,
-                                userInitial = activeProfile.businessName.take(1).ifBlank { "M" },
+                                userInitial = activeProfile.businessName.take(1).ifBlank { activeProfile.accountHolder.take(1) }.ifBlank { "M" },
                                 isDark = isDark
                             )
                         }
@@ -359,15 +355,15 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                 }
             }
 
-            // Quick Action Chips Row (Scrollable chips matching UI design)
+            // Quick Action Chips Row (Exact 4 chips from target design)
             QuickActionChips(
                 onChipClick = { chipText ->
-                    viewModel.sendSupportChatMessage(chipText)
+                    chatInput = chipText
                 },
                 isDark = isDark
             )
 
-            // Bottom Input Bar (Full rounded pill with paperclip, textfield, emoji, and golden yellow send button)
+            // Bottom Input Bar (Full rounded pill container)
             ChatBottomInputBar(
                 chatInput = chatInput,
                 onInputChange = { chatInput = it },
@@ -414,24 +410,23 @@ fun SupportChatScreen(viewModel: AppViewModel) {
 
 /**
  * Top Quick Help Banner Card
- * Replicating the yellow/cream card with headset icon, "Need quick help?", "Our support team is here 24/7", and "View FAQs >" pill button.
+ * Replicating the warm cream card with dark headset icon, "Need quick help?", "Our support team is here 24/7", and "View FAQs >" pill button.
  */
 @Composable
 private fun QuickHelpBanner(
     onViewFaqs: () -> Unit,
     isDark: Boolean
 ) {
-    val cardBg = if (isDark) Color(0xFF242014) else Color(0xFFFFFBEB)
-    val cardBorder = if (isDark) Color(0xFF5E4E1C) else Color(0xFFFDE68A)
-    val headsetBg = if (isDark) Color(0xFF382F14) else Color(0xFFFEF3C7)
-    val pillBg = if (isDark) Color(0xFF332B14) else Color(0xFFFEF3C7)
-    val pillBorder = if (isDark) Color(0xFF5E4E1C) else Color(0xFFFDE68A)
-    val pillTextColor = if (isDark) Color(0xFFFDE68A) else Color(0xFF92400E)
+    val cardBg = if (isDark) Color(0xFF1E1D16) else Color(0xFFFFF9EC)
+    val cardBorder = if (isDark) Color(0xFF453E1B) else Color(0xFFFEE89E).copy(alpha = 0.6f)
+    val headsetBg = if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)
+    val pillBg = if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)
+    val pillTextColor = if (isDark) BrandGoldYellow else TextDarkPrimary
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         border = BorderStroke(1.dp, cardBorder)
@@ -442,7 +437,7 @@ private fun QuickHelpBanner(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Headset Icon Circular Container
+            // Headset Icon Circular Container (with dark headset matching image)
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -453,7 +448,7 @@ private fun QuickHelpBanner(
                 Icon(
                     imageVector = Icons.Default.Headset,
                     contentDescription = null,
-                    tint = BrandGoldDark,
+                    tint = if (isDark) BrandGoldYellow else IconDarkColor,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -469,13 +464,13 @@ private fun QuickHelpBanner(
                     text = "Need quick help?",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.5.sp,
-                    color = if (isDark) Color.White else Color(0xFF1E293B)
+                    color = if (isDark) Color.White else TextDarkPrimary
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Our support team is here 24/7",
                     fontSize = 12.sp,
-                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                    color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary
                 )
             }
 
@@ -484,15 +479,14 @@ private fun QuickHelpBanner(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(pillBg)
-                    .border(BorderStroke(1.dp, pillBorder), RoundedCornerShape(20.dp))
                     .clickable(onClick = onViewFaqs)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = "View FAQs",
-                    fontSize = 11.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = pillTextColor
                 )
@@ -509,8 +503,8 @@ private fun QuickHelpBanner(
 
 /**
  * Individual Chat Message Row
- * Support (incoming): Left-aligned with Headset avatar, "SwapnoPay Support" label, soft lavender/blue-gray bubble (#F1F5FB), timestamp below.
- * User (outgoing): Right-aligned with Brand Golden Yellow bubble (#F7C844), user avatar on right, timestamp + double checkmark below.
+ * Support (incoming): Left-aligned with Headset avatar aligned to top, "SwapnoPay Support" label, soft grayish-blue bubble (#F1F5FB), timestamp below.
+ * User (outgoing): Right-aligned with Brand Golden Yellow bubble (#FBC740), user avatar on top-right, timestamp + golden double checkmarks below.
  */
 @Composable
 private fun ChatMessageItem(
@@ -525,44 +519,43 @@ private fun ChatMessageItem(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    val incomingBubbleBg = if (isDark) SupportBubbleDark else SupportBubbleLight
-    val incomingTextColor = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B)
+    val incomingBubbleBg = if (isDark) SupportBubbleBgDark else SupportBubbleBgLight
+    val incomingTextColor = if (isDark) Color.White else TextDarkPrimary
 
     if (isUser) {
         // --- OUTGOING USER MESSAGE (RIGHT ALIGNED) ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 48.dp),
+                .padding(start = 40.dp),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.Top
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
                 modifier = Modifier.weight(1f, fill = false)
             ) {
-                // Outgoing Bubble (Golden Yellow)
+                // Outgoing Bubble (Warm Golden Yellow #FBC740)
                 Surface(
                     shape = RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = 16.dp,
-                        bottomEnd = 4.dp
+                        topStart = 18.dp,
+                        topEnd = 4.dp,
+                        bottomStart = 18.dp,
+                        bottomEnd = 18.dp
                     ),
-                    color = UserBubble,
-                    shadowElevation = 0.5.dp,
+                    color = BrandGoldYellow,
                     modifier = Modifier.clickable {
                         clipboardManager.setText(AnnotatedString(message.message))
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Copied message to clipboard", Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Text(
                         text = message.message,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF1E293B),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        fontSize = 14.5.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = IconDarkColor,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp)
                     )
                 }
 
@@ -576,33 +569,33 @@ private fun ChatMessageItem(
                 ) {
                     Text(
                         text = formattedTime,
-                        fontSize = 10.5.sp,
-                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF94A3B8)
+                        fontSize = 11.sp,
+                        color = TimestampMuted
                     )
                     Icon(
                         imageVector = Icons.Default.DoneAll,
                         contentDescription = "Read",
-                        tint = BrandGoldDark,
-                        modifier = Modifier.size(14.dp)
+                        tint = BrandGoldAmber,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // User Profile Avatar
+            // User Profile Avatar Circle
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
+                    .background(Color(0xFF334155)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = userInitial.uppercase(),
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color(0xFF334155)
+                    color = Color.White
                 )
             }
         }
@@ -611,23 +604,23 @@ private fun ChatMessageItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(end = 48.dp),
+                .padding(end = 40.dp),
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.Top
         ) {
-            // Support Avatar (Circular badge with headset)
+            // Support Avatar: circular badge with dark headset matching image
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF332B14) else Color(0xFFFEF3C7)),
+                    .background(if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Headset,
                     contentDescription = null,
-                    tint = BrandGoldDark,
-                    modifier = Modifier.size(18.dp)
+                    tint = if (isDark) BrandGoldYellow else IconDarkColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -639,34 +632,33 @@ private fun ChatMessageItem(
             ) {
                 // Sender Label: "SwapnoPay Support"
                 Text(
-                    text = if (message.sender == "AI_SUPPORT") "SwapnoPay AI Assistant" else "SwapnoPay Support",
-                    fontSize = 11.5.sp,
+                    text = if (message.sender == "AI_SUPPORT") "SwapnoPay AI Specialist" else "SwapnoPay Support",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                    color = if (isDark) Color(0xFFE2E8F0) else TextDarkPrimary,
                     modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)
                 )
 
-                // Incoming Bubble (Soft Blue/Gray)
+                // Incoming Bubble (Soft Grayish Blue #F1F5FB)
                 Surface(
                     shape = RoundedCornerShape(
                         topStart = 4.dp,
-                        topEnd = 16.dp,
-                        bottomStart = 16.dp,
-                        bottomEnd = 16.dp
+                        topEnd = 18.dp,
+                        bottomStart = 18.dp,
+                        bottomEnd = 18.dp
                     ),
                     color = incomingBubbleBg,
-                    shadowElevation = 0.5.dp,
                     modifier = Modifier.clickable {
                         clipboardManager.setText(AnnotatedString(message.message))
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Copied message to clipboard", Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Text(
                         text = message.message,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
+                        fontSize = 14.5.sp,
+                        lineHeight = 21.sp,
                         color = incomingTextColor,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp)
                     )
                 }
 
@@ -675,8 +667,8 @@ private fun ChatMessageItem(
                 // Timestamp
                 Text(
                     text = formattedTime,
-                    fontSize = 10.5.sp,
-                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    color = TimestampMuted,
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -686,9 +678,11 @@ private fun ChatMessageItem(
 
 /**
  * Quick Action Chips Row
- * Exactly matching `media_1790094284953.png`:
- * "📅 Change Booking", "❌ Cancel Booking", "🔄 Refund Status", "💬 Other Help"
- * + Extra merchant payment shortcuts.
+ * Pixel-perfect replica of the 4 chips in `media_1790094284953.png`:
+ * 1. 📅 Change Booking
+ * 2. ✖ Cancel Booking
+ * 3. 🔄 Refund Status
+ * 4. ••• Other Help
  */
 @Composable
 private fun QuickActionChips(
@@ -697,18 +691,11 @@ private fun QuickActionChips(
 ) {
     val scrollState = rememberScrollState()
 
-    val chips = listOf(
-        "📅 Change Booking",
-        "❌ Cancel Booking",
-        "🔄 Refund Status",
-        "💬 Other Help",
-        "⚡ Verify Payment",
-        "💳 Gateway Setup"
-    )
-
     val chipBg = if (isDark) Color(0xFF1E2430) else Color.White
-    val chipBorder = if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)
-    val chipTextColor = if (isDark) Color(0xFFE2E8F0) else Color(0xFF334155)
+    val chipBorder = if (isDark) Color(0xFF333A48) else Color(0xFFE5E7EB)
+    val badgeBg = if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)
+    val iconTint = if (isDark) BrandGoldYellow else IconDarkColor
+    val textColor = if (isDark) Color.White else TextDarkPrimary
 
     Row(
         modifier = Modifier
@@ -718,21 +705,150 @@ private fun QuickActionChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        chips.forEach { chipText ->
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = chipBg,
-                border = BorderStroke(1.dp, chipBorder),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onChipClick(chipText) }
+        // Chip 1: Change Booking
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = chipBg,
+            border = BorderStroke(1.dp, chipBorder),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { onChipClick("Change Booking") }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(badgeBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(7.dp))
                 Text(
-                    text = chipText,
+                    text = "Change Booking",
                     fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = chipTextColor,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor
+                )
+            }
+        }
+
+        // Chip 2: Cancel Booking
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = chipBg,
+            border = BorderStroke(1.dp, chipBorder),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { onChipClick("Cancel Booking") }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(badgeBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = "Cancel Booking",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor
+                )
+            }
+        }
+
+        // Chip 3: Refund Status
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = chipBg,
+            border = BorderStroke(1.dp, chipBorder),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { onChipClick("Refund Status") }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(badgeBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = "Refund Status",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor
+                )
+            }
+        }
+
+        // Chip 4: Other Help
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = chipBg,
+            border = BorderStroke(1.dp, chipBorder),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { onChipClick("Other Help") }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(badgeBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "•••",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        color = iconTint
+                    )
+                }
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = "Other Help",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor
                 )
             }
         }
@@ -741,7 +857,6 @@ private fun QuickActionChips(
 
 /**
  * Bottom Input Bar
- * Pixel-perfect replica:
  * Outer white rounded pill containing:
  * - Attachment icon (paperclip)
  * - BasicTextField "Type your message..."
@@ -757,30 +872,25 @@ private fun ChatBottomInputBar(
     onEmojiClick: () -> Unit,
     isDark: Boolean
 ) {
-    val pillBg = if (isDark) Color(0xFF191D26) else Color.White
-    val pillBorder = if (isDark) Color(0xFF2C3240) else Color(0xFFE2E8F0)
+    val pillBg = if (isDark) Color(0xFF1E2430) else Color.White
+    val pillBorder = if (isDark) Color(0xFF333A48) else Color(0xFFE5E7EB)
     val hintColor = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
     val inputTextColor = if (isDark) Color.White else Color(0xFF0F172A)
-    val iconTint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+    val iconTint = if (isDark) Color(0xFF94A3B8) else IconMutedColor
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isDark) Color(0xFF0F1117) else Color(0xFFF8FAFC))
+            .background(if (isDark) Color(0xFF0F1117) else Color.White)
             .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(
-                    elevation = if (isDark) 0.dp else 2.dp,
-                    shape = RoundedCornerShape(28.dp),
-                    ambientColor = Color.Black.copy(alpha = 0.05f)
-                )
-                .background(pillBg, RoundedCornerShape(28.dp))
-                .border(BorderStroke(1.dp, pillBorder), RoundedCornerShape(28.dp))
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .background(pillBg, RoundedCornerShape(32.dp))
+                .border(BorderStroke(1.dp, pillBorder), RoundedCornerShape(32.dp))
+                .padding(start = 6.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Attachment Icon Button (Paperclip)
@@ -792,7 +902,7 @@ private fun ChatBottomInputBar(
                     imageVector = Icons.Default.AttachFile,
                     contentDescription = "Attach file",
                     tint = iconTint,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
@@ -806,7 +916,7 @@ private fun ChatBottomInputBar(
                 if (chatInput.isEmpty()) {
                     Text(
                         text = "Type your message...",
-                        fontSize = 14.sp,
+                        fontSize = 14.5.sp,
                         color = hintColor
                     )
                 }
@@ -816,11 +926,11 @@ private fun ChatBottomInputBar(
                     onValueChange = onInputChange,
                     textStyle = TextStyle(
                         color = inputTextColor,
-                        fontSize = 14.sp,
+                        fontSize = 14.5.sp,
                         fontWeight = FontWeight.Normal,
-                        lineHeight = 19.sp
+                        lineHeight = 20.sp
                     ),
-                    cursorBrush = SolidColor(BrandGoldDark),
+                    cursorBrush = SolidColor(BrandGoldAmber),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { onSend() }),
                     maxLines = 4,
@@ -837,14 +947,14 @@ private fun ChatBottomInputBar(
                     imageVector = Icons.Default.EmojiEmotions,
                     contentDescription = "Emoji",
                     tint = iconTint,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
-            // Circular Golden Yellow Send Button
+            // Circular Golden Yellow Send Button (#FBC740)
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(BrandGoldYellow)
                     .clickable { onSend() },
@@ -853,7 +963,7 @@ private fun ChatBottomInputBar(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = Color(0xFF1E293B),
+                    tint = IconDarkColor,
                     modifier = Modifier.size(19.dp)
                 )
             }
@@ -863,7 +973,7 @@ private fun ChatBottomInputBar(
 
 /**
  * FAQs Knowledgebase Bottom Sheet Modal
- * Displays expandable FAQs and allows tapping any question to ask it directly in chat.
+ * Connects directly to real CMS remote config FAQs without fake items.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -873,38 +983,12 @@ private fun FaqViewerModal(
     onAskQuestion: (String) -> Unit,
     isDark: Boolean
 ) {
-    val defaultFaqs = remember {
-        listOf(
-            AppViewModel.SupportFaqItem(
-                question = "How do I match customer payments automatically?",
-                answer = "SwapnoPay automatically reads SMS notifications from bKash, Nagad, and Rocket to match customer payments with pending orders in real time using the Transaction ID (TrxID)."
-            ),
-            AppViewModel.SupportFaqItem(
-                question = "How do I request a refund for a customer?",
-                answer = "Navigate to Transactions, select the payment, and click 'Initiate Refund'. Refunds are routed directly through your merchant wallet or manual adjustment within 24 hours."
-            ),
-            AppViewModel.SupportFaqItem(
-                question = "How to integrate SwapnoPay payment gateway on my website?",
-                answer = "Go to More > Developer API Docs. You'll find your API keys, REST API endpoints, sample Node.js/PHP/Python code, and webhooks documentation."
-            ),
-            AppViewModel.SupportFaqItem(
-                question = "Why is an incoming SMS not showing up?",
-                answer = "Ensure the app has SMS Receive and Read permissions enabled in Android Settings, and that battery optimization is disabled so background sync is uninterrupted."
-            ),
-            AppViewModel.SupportFaqItem(
-                question = "How can I change my receiving mobile numbers?",
-                answer = "Go to Setup > Receiving Numbers. You can add, activate, or update bKash, Nagad, Rocket, and Upay numbers anytime."
-            )
-        )
-    }
-
-    val displayFaqs = if (remoteFaqs.isNotEmpty()) remoteFaqs else defaultFaqs
     var expandedIndex by remember { mutableStateOf<Int?>(null) }
     var searchFaq by remember { mutableStateOf("") }
 
-    val filtered = remember(displayFaqs, searchFaq) {
-        if (searchFaq.isBlank()) displayFaqs
-        else displayFaqs.filter {
+    val filtered = remember(remoteFaqs, searchFaq) {
+        if (searchFaq.isBlank()) remoteFaqs
+        else remoteFaqs.filter {
             it.question.contains(searchFaq, ignoreCase = true) || it.answer.contains(searchFaq, ignoreCase = true)
         }
     }
@@ -912,7 +996,7 @@ private fun FaqViewerModal(
     EnterpriseGestureModal(
         onDismissRequest = onDismiss,
         title = "Frequently Asked Questions",
-        subtitle = "Find quick solutions or tap a question to ask in chat",
+        subtitle = "Official SwapnoPay support knowledgebase",
         icon = Icons.Default.HelpOutline
     ) {
         Column(
@@ -920,97 +1004,113 @@ private fun FaqViewerModal(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Search Input
-            OutlinedTextField(
-                value = searchFaq,
-                onValueChange = { searchFaq = it },
-                placeholder = { Text("Search FAQ topics...", fontSize = 13.5.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = BrandGoldDark) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BrandGoldDark,
-                    unfocusedBorderColor = if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            )
+            if (remoteFaqs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No FAQs configured in admin CMS yet.\nFeel free to type your question directly in the live support chat!",
+                        fontSize = 13.5.sp,
+                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = searchFaq,
+                    onValueChange = { searchFaq = it },
+                    placeholder = { Text("Search FAQ topics...", fontSize = 13.5.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = BrandGoldAmber) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = BrandGoldAmber,
+                        unfocusedBorderColor = if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(filtered.size) { index ->
-                    val faq = filtered[index]
-                    val isExpanded = expandedIndex == index
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filtered.size) { index ->
+                        val faq = filtered[index]
+                        val isExpanded = expandedIndex == index
 
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isDark) Color(0xFF1E2430) else Color(0xFFF8FAFC)
-                        ),
-                        border = BorderStroke(1.dp, if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { expandedIndex = if (isExpanded) null else index }
-                    ) {
-                        Column(
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) Color(0xFF1E2430) else Color(0xFFF8FAFC)
+                            ),
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(14.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { expandedIndex = if (isExpanded) null else index }
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
                             ) {
-                                Text(
-                                    text = faq.question,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isDark) Color.White else Color(0xFF1E293B),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = BrandGoldDark,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            if (isExpanded) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = faq.answer,
-                                    fontSize = 13.sp,
-                                    lineHeight = 18.sp,
-                                    color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Button(
-                                    onClick = { onAskQuestion(faq.question) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = BrandGoldYellow),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Chat,
-                                        contentDescription = null,
-                                        tint = Color(0xFF1E293B),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Ask this in Chat",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1E293B)
+                                        text = faq.question,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color.White else TextDarkPrimary,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    Icon(
+                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = BrandGoldAmber,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                if (isExpanded) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = faq.answer,
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp,
+                                        color = if (isDark) Color(0xFFCBD5E1) else TextMutedSecondary
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = { onAskQuestion(faq.question) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = BrandGoldYellow),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Chat,
+                                            contentDescription = null,
+                                            tint = IconDarkColor,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Ask this in Chat",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = IconDarkColor
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1072,10 +1172,10 @@ private fun AttachmentSelectorModal(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF332B14) else Color(0xFFFEF3C7)),
+                                .background(if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(icon, null, tint = BrandGoldDark, modifier = Modifier.size(20.dp))
+                            Icon(icon, null, tint = if (isDark) BrandGoldYellow else IconDarkColor, modifier = Modifier.size(20.dp))
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -1083,12 +1183,12 @@ private fun AttachmentSelectorModal(
                                 text = title,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                                color = if (isDark) Color.White else TextDarkPrimary
                             )
                             Text(
                                 text = subtitle,
                                 fontSize = 11.5.sp,
-                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary
                             )
                         }
                     }

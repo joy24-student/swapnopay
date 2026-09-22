@@ -1272,15 +1272,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _mySupportTicketsList = MutableStateFlow<List<SupportTicket>>(emptyList())
     val mySupportTicketsList: StateFlow<List<SupportTicket>> = _mySupportTicketsList.asStateFlow()
 
-    private val _supportChatList = MutableStateFlow<List<SupportChatMessage>>(
-        listOf(
-            SupportChatMessage(
-                merchantId = "system",
-                sender = "AI_SUPPORT",
-                message = "Hello! How can we help you with automatic payment matching and your merchant account today? 👋"
-            )
-        )
-    )
+    private val _supportChatList = MutableStateFlow<List<SupportChatMessage>>(emptyList())
     val supportChatList: StateFlow<List<SupportChatMessage>> = _supportChatList.asStateFlow()
 
     private val _isGatewayPermissionGranted = MutableStateFlow(true)
@@ -1492,24 +1484,77 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun refreshPlatformSupport() {
-        val merchantId = _activeProfile.value.id
-        val response = platformRequest("/v1/merchant/support")
-        if (_activeProfile.value.id != merchantId) return
-        val tickets = response.getJSONArray("tickets")
-        _mySupportTicketsList.value = (0 until tickets.length()).map { index ->
-            val t = tickets.getJSONObject(index)
-            SupportTicket(id = t.getString("id"), merchantId = merchantId,
-                businessName = t.optString("business_name"), subject = t.optString("subject"),
-                description = t.optString("description"), category = t.optString("category"),
-                status = t.optString("status"), adminReply = if (t.isNull("admin_reply")) "" else t.optString("admin_reply"),
-                createdAt = parseRemoteTimestamp(t.optString("created_at")))
-        }
-        val messages = response.getJSONArray("messages")
-        _supportChatList.value = (0 until messages.length()).map { index ->
-            val m = messages.getJSONObject(index)
-            SupportChatMessage(id = m.getString("id"), merchantId = merchantId,
-                sender = m.getString("sender"), message = m.getString("message"),
-                timestamp = parseRemoteTimestamp(m.optString("created_at")))
+        val merchantId = _activeProfile.value.id.ifBlank { "default_merchant" }
+
+        withContext(Dispatchers.IO) {
+            // 1. Direct live chat endpoint on backend (connects to Supabase live_chat_messages)
+            try {
+                val url = "https://api.swapnopay.top/v1/merchant/support/chat?merchant_id=${java.net.URLEncoder.encode(merchantId, "UTF-8")}"
+                val reqBuilder = okhttp3.Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/json")
+                    .header("x-merchant-id", merchantId)
+
+                val token = runCatching { getOrCreatePlatformSupabaseProfile().authSessionToken }.getOrNull()
+                if (!token.isNullOrBlank()) {
+                    reqBuilder.header("Authorization", "Bearer $token")
+                }
+
+                platformHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful && body.isNotBlank()) {
+                        val json = org.json.JSONObject(body)
+                        if (json.optBoolean("ok")) {
+                            val messages = json.getJSONArray("messages")
+                            val fetched = (0 until messages.length()).map { index ->
+                                val m = messages.getJSONObject(index)
+                                SupportChatMessage(
+                                    id = m.optString("id", java.util.UUID.randomUUID().toString()),
+                                    merchantId = m.optString("merchant_id", merchantId),
+                                    sender = m.optString("sender", "PLATFORM_OWNER"),
+                                    message = m.optString("message", ""),
+                                    timestamp = parseRemoteTimestamp(m.optString("created_at"))
+                                )
+                            }
+                            _supportChatList.value = fetched
+                            return@withContext
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                logFirebaseStatus("Direct live chat sync notice: ${e.message}")
+            }
+
+            // 2. Fallback to platformRequest("/v1/merchant/support")
+            try {
+                val response = platformRequest("/v1/merchant/support")
+                val tickets = response.optJSONArray("tickets")
+                if (tickets != null) {
+                    _mySupportTicketsList.value = (0 until tickets.length()).map { index ->
+                        val t = tickets.getJSONObject(index)
+                        SupportTicket(
+                            id = t.getString("id"), merchantId = merchantId,
+                            businessName = t.optString("business_name"), subject = t.optString("subject"),
+                            description = t.optString("description"), category = t.optString("category"),
+                            status = t.optString("status"), adminReply = if (t.isNull("admin_reply")) "" else t.optString("admin_reply"),
+                            createdAt = parseRemoteTimestamp(t.optString("created_at"))
+                        )
+                    }
+                }
+                val messages = response.optJSONArray("messages")
+                if (messages != null) {
+                    _supportChatList.value = (0 until messages.length()).map { index ->
+                        val m = messages.getJSONObject(index)
+                        SupportChatMessage(
+                            id = m.getString("id"), merchantId = merchantId,
+                            sender = m.getString("sender"), message = m.getString("message"),
+                            timestamp = parseRemoteTimestamp(m.optString("created_at"))
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                logFirebaseStatus("Support refresh fallback notice: ${error.message}")
+            }
         }
     }
 
@@ -1518,11 +1563,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun sendSupportChatMessage(messageText: String) {
         val trimmed = messageText.trim()
         if (trimmed.isBlank()) return
+        val merchantId = _activeProfile.value.id.ifBlank { "default_merchant" }
 
-        // Optimistic UI update so messages appear immediately in the chat
+        // Optimistic UI update so the merchant's real message appears immediately
+        val tempId = java.util.UUID.randomUUID().toString()
         val userMsg = SupportChatMessage(
-            id = java.util.UUID.randomUUID().toString(),
-            merchantId = _activeProfile.value.id,
+            id = tempId,
+            merchantId = merchantId,
             sender = "MERCHANT",
             message = trimmed,
             timestamp = System.currentTimeMillis()
@@ -1530,46 +1577,55 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _supportChatList.value = _supportChatList.value + userMsg
 
         viewModelScope.launch {
-            try {
-                platformRequest("/v1/merchant/support/messages", org.json.JSONObject().put("message", trimmed))
-                refreshPlatformSupport()
-            } catch (error: Exception) {
-                logFirebaseStatus("Support message remote push status: ${error.message}")
-            }
+            withContext(Dispatchers.IO) {
+                var sent = false
 
-            // Intelligent automated agent reply simulation for immediate assistance
-            kotlinx.coroutines.delay(1000)
-            val lower = trimmed.lowercase(java.util.Locale.getDefault())
-            val replyText = when {
-                lower.contains("booking") -> "We have recorded your booking inquiry! Our team is reviewing the booking schedule and will update your dashboard within 15 minutes."
-                lower.contains("cancel") -> "Your cancellation request has been logged. Any eligible refund will be processed back to the original account within 24 hours."
-                lower.contains("refund") -> "Refund requests are processed within 1-2 business days back to the original bKash/Nagad/Rocket/Bank account. Reference: #RF-${System.currentTimeMillis() % 100000}."
-                lower.contains("sms") || lower.contains("verify") || lower.contains("match") -> "For SMS payment verification, please confirm the TrxID and amount under Transactions. Ensure SMS reader permissions are granted."
-                lower.contains("gateway") || lower.contains("api") || lower.contains("key") -> "You can generate or regenerate your live Payment Gateway API keys under Settings > Developer API Docs."
-                lower.contains("hello") || lower.contains("hi") || lower.contains("hey") -> "Hello! How can we assist you with SwapnoPay automatic payments or merchant operations today?"
-                else -> "Thank you for contacting SwapnoPay Support. An agent has received your inquiry: \"$trimmed\" and will follow up shortly."
-            }
-            val botReply = SupportChatMessage(
-                id = java.util.UUID.randomUUID().toString(),
-                merchantId = _activeProfile.value.id,
-                sender = "AI_SUPPORT",
-                message = replyText,
-                timestamp = System.currentTimeMillis()
-            )
-            if (_supportChatList.value.none { it.id == botReply.id || it.message == replyText }) {
-                _supportChatList.value = _supportChatList.value + botReply
+                // 1. Send via direct live support chat route to save in Supabase live_chat_messages
+                try {
+                    val url = "https://api.swapnopay.top/v1/merchant/support/chat"
+                    val payload = org.json.JSONObject().apply {
+                        put("merchant_id", merchantId)
+                        put("message", trimmed)
+                    }
+                    val reqBuilder = okhttp3.Request.Builder()
+                        .url(url)
+                        .header("Content-Type", "application/json")
+                        .header("Accept", "application/json")
+                        .header("x-merchant-id", merchantId)
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+
+                    val token = runCatching { getOrCreatePlatformSupabaseProfile().authSessionToken }.getOrNull()
+                    if (!token.isNullOrBlank()) {
+                        reqBuilder.header("Authorization", "Bearer $token")
+                    }
+
+                    platformHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                        if (response.isSuccessful) {
+                            sent = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    logFirebaseStatus("Live chat send notice: ${e.message}")
+                }
+
+                // 2. Fallback via platformRequest if direct route was not reached
+                if (!sent) {
+                    try {
+                        platformRequest("/v1/merchant/support/messages", org.json.JSONObject().put("message", trimmed))
+                        sent = true
+                    } catch (e: Exception) {
+                        logFirebaseStatus("Support message fallback error: ${e.message}")
+                    }
+                }
+
+                // Refresh immediately to sync the persisted server message and timestamp
+                runCatching { refreshPlatformSupport() }
             }
         }
     }
 
     fun clearSupportChat() {
-        _supportChatList.value = listOf(
-            SupportChatMessage(
-                merchantId = "system",
-                sender = "AI_SUPPORT",
-                message = "Hello! How can we help you with automatic payment matching and your merchant account today? 👋"
-            )
-        )
+        _supportChatList.value = emptyList()
     }
 
     fun listenToSupportChatFromPlatformOwner() {
@@ -1580,7 +1636,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     if (error is kotlinx.coroutines.CancellationException) throw error
                     logFirebaseStatus("Support refresh failed: ${error.message}")
                 }
-                kotlinx.coroutines.delay(15000)
+                kotlinx.coroutines.delay(3500) // Fast 3.5s polling for true live chat responsiveness
             }
         }
     }

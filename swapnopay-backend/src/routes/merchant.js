@@ -14,6 +14,57 @@ merchantRouter.get('/system-config', async (_req, res) => {
   } catch (error) { res.status(503).json({ error: error.message }) }
 })
 
+// Public / Direct Live Chat endpoints for merchant mobile app & admin helpdesk sync
+merchantRouter.get('/support/chat', async (req, res) => {
+  try {
+    const merchantId = req.headers['x-merchant-id'] || req.query.merchant_id || req.headers['x-device-id']
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Merchant identifier is required' })
+    }
+    const admin = getAdminClient()
+    const { data: messages, error } = await admin
+      .from('live_chat_messages')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .order('created_at', { ascending: true })
+      .limit(300)
+    if (error) throw error
+    res.json({ ok: true, messages: messages || [] })
+  } catch (error) {
+    res.status(503).json({ error: error.message })
+  }
+})
+
+merchantRouter.post('/support/chat', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const merchantId = req.headers['x-merchant-id'] || body.merchant_id || req.headers['x-device-id']
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Merchant identifier is required' })
+    }
+    const msg = body.message
+    if (typeof msg !== 'string' || !msg.trim()) {
+      return res.status(400).json({ error: 'Message content is required' })
+    }
+    const admin = getAdminClient()
+    const row = {
+      merchant_id: merchantId,
+      sender: 'MERCHANT',
+      message: msg.trim(),
+      created_at: new Date().toISOString()
+    }
+    const { data: saved, error } = await admin
+      .from('live_chat_messages')
+      .insert(row)
+      .select('*')
+      .single()
+    if (error) throw error
+    res.status(201).json({ ok: true, record: saved })
+  } catch (error) {
+    res.status(503).json({ error: error.message })
+  }
+})
+
 merchantRouter.use(requirePlatformUser)
 merchantRouter.use(requirePlatformMerchant)
 merchantRouter.get('/support', async (req, res) => {
