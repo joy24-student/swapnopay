@@ -1188,7 +1188,7 @@ fun LockScreen(viewModel: AppViewModel) {
     }
 
     // Auto-trigger on screen entry if biometric is enabled
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isBiometricLocked) {
         if (isBiometricLocked) {
             triggerBiometricPrompt()
         }
@@ -1354,7 +1354,13 @@ fun LockScreen(viewModel: AppViewModel) {
                                     )
                                     .clickable {
                                         when (key) {
-                                            "bio" -> triggerBiometricPrompt()
+                                            "bio" -> {
+                                                if (isBiometricLocked) {
+                                                    triggerBiometricPrompt()
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "Biometric unlock is turned off in Settings", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
                                             "del" -> { if (pinInput.isNotEmpty()) pinInput = pinInput.dropLast(1) }
                                             else  -> { if (pinInput.length < 4) pinInput += key }
                                         }
@@ -1362,12 +1368,16 @@ fun LockScreen(viewModel: AppViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 when (key) {
-                                    "bio" -> Icon(
-                                        imageVector = Icons.Default.Fingerprint,
-                                        contentDescription = "Biometrics",
-                                        tint = if (isDarkMode) Color(0xFF818CF8) else Color(0xFF4F46E5),
-                                        modifier = Modifier.size(32.dp)
-                                    )
+                                    "bio" -> {
+                                        if (isBiometricLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Fingerprint,
+                                                contentDescription = "Biometrics",
+                                                tint = if (isDarkMode) Color(0xFF818CF8) else Color(0xFF4F46E5),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
+                                    }
                                     "del" -> Icon(
                                         imageVector = Icons.Default.ArrowBack,
                                         contentDescription = "Delete",
@@ -2090,7 +2100,7 @@ fun OnboardingScreen(viewModel: AppViewModel) {
     
     // PIN and biometric lock states (realtime biometric & pin setup)
     var onboardingPin by remember { mutableStateOf("") }
-    var onboardingBiometricEnabled by remember { mutableStateOf(true) }
+    var onboardingBiometricEnabled by remember { mutableStateOf(false) }
     
     var isPasswordVisible by remember { mutableStateOf(false) }
     var useSecureProxyMode by remember { mutableStateOf(false) }
@@ -11524,6 +11534,14 @@ fun MoreScreen(viewModel: AppViewModel) {
     val isBangla = language == "Bangla"
     var showDeleteAccountConfirmDialog by remember { mutableStateOf(false) }
 
+    val merchantLogoData = remember(activeProfile.photoUrl) {
+        val raw = activeProfile.photoUrl.trim()
+        when {
+            raw.startsWith("/data/") || (raw.startsWith("/") && !raw.startsWith("//")) -> java.io.File(raw.removePrefix("file://"))
+            else -> raw
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.listenToSystemConfig()
         viewModel.refreshSimCards()
@@ -11612,12 +11630,26 @@ fun MoreScreen(viewModel: AppViewModel) {
                                     .border(BorderStroke(1.5.dp, if (isDarkMode) goldPrimary else Color(0xFF0F172A)), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = activeProfile.businessName.take(1).uppercase().ifEmpty { "S" },
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                if (activeProfile.photoUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(merchantLogoData)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "Merchant Logo",
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Text(
+                                        text = activeProfile.businessName.take(1).uppercase().ifEmpty { "S" },
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                             Column {
                                 Text(
@@ -11745,12 +11777,26 @@ fun MoreScreen(viewModel: AppViewModel) {
                                             .border(BorderStroke(2.dp, if (isDarkMode) goldPrimary else Color(0xFF0F172A)), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = activeProfile.businessName.take(1).uppercase().ifEmpty { "S" },
-                                            fontSize = 22.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = goldPrimary
-                                        )
+                                        if (activeProfile.photoUrl.isNotBlank()) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(merchantLogoData)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                contentDescription = "Merchant Logo",
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = activeProfile.businessName.take(1).uppercase().ifEmpty { "S" },
+                                                fontSize = 22.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = goldPrimary
+                                            )
+                                        }
                                     }
                                     Box(
                                         modifier = Modifier

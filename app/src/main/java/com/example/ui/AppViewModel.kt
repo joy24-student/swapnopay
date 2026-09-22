@@ -221,6 +221,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         syncAllCachedFormsToVps()
         startObservingPaymentFormsCache()
+        viewModelScope.launch {
+            repository.observeMerchantProfile().collect { profile ->
+                if (profile != null && profile.businessName.isNotBlank()) {
+                    _activeProfile.value = profile
+                }
+            }
+        }
     }
 
     val expenses: StateFlow<List<ExpenseEntity>> = activeProfile.flatMapLatest { repository.observeExpenses(it.id) }
@@ -940,7 +947,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _splashStatusText.value = "Verifying biometric authentication flags..."
             updateSplashStep(3, isRunning = true)
 
-            val isBiometricEnabled = securityPrefs.getBoolean("is_biometric_locked", true)
+            val isBiometricEnabled = securityPrefs.getBoolean("is_biometric_locked", false)
             _isBiometricLocked.value = isBiometricEnabled
             kotlinx.coroutines.delay(500)
             updateSplashStep(3, isCompleted = true, isRunning = false)
@@ -3073,7 +3080,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPinSyncing = MutableStateFlow(false)
     val isPinSyncing: StateFlow<Boolean> = _isPinSyncing.asStateFlow()
 
-    private val _isBiometricLocked = MutableStateFlow(securityPrefs.getBoolean("is_biometric_locked", true))
+    private val _isBiometricLocked = MutableStateFlow(securityPrefs.getBoolean("is_biometric_locked", false))
     val isBiometricLocked: StateFlow<Boolean> = _isBiometricLocked.asStateFlow()
 
     private val _isAppLocked = MutableStateFlow(true) // Starts locked on launch
@@ -3221,19 +3228,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun lockAppOnBackground() {
-        if (isExternalActivityExpected) {
-            isExternalActivityExpected = false
-            return
-        }
-        val hasSecurity = _appPin.value.isNotBlank() || _isBiometricLocked.value
-        if (!hasSecurity) return
-
-        val current = _currentScreen.value
-        if (current != "Splash" && current != "Login" && current != "Onboarding" && current != "LockScreen" && current != "SupabaseSetupGuide") {
-            _previousScreenBeforeLock = current
-            _isAppLocked.value = true
-            _currentScreen.value = "LockScreen"
-        }
+        // App lock should not appear when user switches tabs or apps on mobile
+        return
     }
 
     fun unlockAppAndRestore() {

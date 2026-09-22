@@ -140,9 +140,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         if (isAppInBackground) {
             isAppInBackground = false
-            if (!isRequestingPermission && !viewModel.isExternalActivityExpected) {
-                viewModel.lockAppOnBackground()
-            }
+            // Switching between other mobile tabs/apps and returning should not trigger app lock
         }
     }
 
