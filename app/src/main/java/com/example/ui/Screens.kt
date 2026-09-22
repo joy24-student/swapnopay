@@ -12075,14 +12075,12 @@ fun MoreScreen(viewModel: AppViewModel) {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     val adminItems = listOf(
-                        AdminItemData(if (isBangla) "সাবস্ক্রিপশন ও বিলিং" else "Subscription & Billing", if (isBangla) "প্ল্যান ও অটো-গেটওয়ে পেমেন্ট" else "Plans & Auto-Gateway Billing", Icons.Outlined.CardMembership, Color(0xFF10B981)) { viewModel.navigateTo("Subscription") },
                         AdminItemData("Launch Web Store", "Deploy & manage VPS store", Icons.Outlined.Storefront, Color(0xFF4F46E5)) { viewModel.navigateTo("LaunchWebsite") },
                         AdminItemData("Employees & Team", "Manage team members", Icons.Outlined.Group, Color(0xFFF59E0B)) { viewModel.navigateTo("Employees") },
                         AdminItemData("Gateway Management", "MFS accounts & routing", Icons.Outlined.PointOfSale, Color(0xFF3B82F6)) { viewModel.navigateTo("PaymentGatewaySettings") },
                         AdminItemData("Devices", "Printers, POS & Terminals", Icons.Outlined.Devices, Color(0xFF8B5CF6)) { viewModel.navigateTo("DeviceManager") },
                         AdminItemData("Backup & Restore", "Data backup settings", Icons.Outlined.Cloud, Color(0xFF0EA5E9)) { viewModel.navigateTo("BackupAndRestore") },
                         AdminItemData("SIM SMS Gateway", "Auto due, marketing & OTP", Icons.Outlined.Sms, Color(0xFF10B981)) { viewModel.navigateTo("SmsGateway") },
-                        AdminItemData("AI Voice Calling", "Voice receptionist & reminders", Icons.Outlined.PhoneInTalk, Color(0xFFEC4899)) { viewModel.navigateTo("AiCallService") },
                         AdminItemData("Developer Portal", "API keys, webhooks & docs", Icons.Outlined.Code, Color(0xFF6366F1)) { viewModel.navigateTo("DeveloperPortal") }
                     )
 
@@ -12151,6 +12149,9 @@ fun MoreScreen(viewModel: AppViewModel) {
                                             )
                                         }
                                     }
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
