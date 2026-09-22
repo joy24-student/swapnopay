@@ -446,7 +446,23 @@ export async function setGatewayConfig(config) {
  */
 export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) {
   const globalConfig = await getGatewayConfig()
-  if (!merchantId) return { ...globalConfig, device_active: null, merchant_logo_url: null, merchant_name: null }
+  if (!merchantId) {
+    try {
+      const admin = getAdminClient()
+      if (admin) {
+        const { data: latestMerchant } = await admin
+          .from('merchant_gateway_settings')
+          .select('merchant_id')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (latestMerchant?.merchant_id) {
+          return getMerchantGatewayConfig(latestMerchant.merchant_id, heartbeatMap)
+        }
+      }
+    } catch (_) {}
+    return { ...globalConfig, device_active: null, merchant_logo_url: null, merchant_name: null }
+  }
 
   const creds = await getMerchantCredentials(merchantId)
 

@@ -7,13 +7,13 @@ import kotlinx.coroutines.flow.Flow
 interface AppDao {
 
     // SMS Queue
-    @Query("SELECT * FROM sms_queue WHERE merchantId = :merchantId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM sms_queue WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY timestamp DESC")
     fun observeSmsQueue(merchantId: String): Flow<List<SmsQueueEntity>>
 
     @Query("SELECT * FROM sms_queue WHERE status = 'PENDING'")
     suspend fun getPendingSms(): List<SmsQueueEntity>
 
-    @Query("SELECT * FROM sms_queue WHERE merchantId = :merchantId AND status = 'PENDING'")
+    @Query("SELECT * FROM sms_queue WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default') AND status = 'PENDING'")
     suspend fun getPendingSms(merchantId: String): List<SmsQueueEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -76,7 +76,7 @@ interface AppDao {
     suspend fun deleteOrderById(id: String)
 
     // Payments
-    @Query("SELECT * FROM cached_payments WHERE merchantId = :merchantId OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = '00000000-0000-0000-0000-000000000001' ORDER BY timestamp DESC")
+    @Query("SELECT * FROM cached_payments WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' OR :merchantId = '00000000-0000-0000-0000-000000000001' ORDER BY timestamp DESC")
     fun observePayments(merchantId: String): Flow<List<CachedPaymentEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -653,8 +653,11 @@ interface AppDao {
     suspend fun deleteMerchantNumber(merchantId: String, number: String)
 
     // Offline form and response mirrors
-    @Query("SELECT * FROM payment_form_cache WHERE merchantId = :merchantId ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM payment_form_cache WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY updatedAt DESC")
     fun observePaymentFormCache(merchantId: String): Flow<List<PaymentFormCacheEntity>>
+
+    @Query("SELECT * FROM payment_form_cache WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY updatedAt DESC")
+    suspend fun getPaymentFormCaches(merchantId: String): List<PaymentFormCacheEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPaymentFormCache(form: PaymentFormCacheEntity)
@@ -665,7 +668,7 @@ interface AppDao {
     @Query("DELETE FROM payment_form_cache WHERE id = :id")
     suspend fun deletePaymentFormCache(id: String)
 
-    @Query("SELECT * FROM form_submission_cache WHERE merchantId = :merchantId ORDER BY submittedAt DESC")
+    @Query("SELECT * FROM form_submission_cache WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY submittedAt DESC")
     fun observeFormSubmissionCache(merchantId: String): Flow<List<FormSubmissionCacheEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

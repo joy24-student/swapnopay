@@ -180,6 +180,16 @@ window.onload = function () {
   const receiverNumber = params.get("merchant_number") || "017XXXXXXXX";
   merchantDefaultNumber = receiverNumber;
 
+  const initialAccountType = params.get("account_type");
+  if (initialAccountType) {
+    merchantAccountTypes[params.get("method") || "bKash"] = initialAccountType;
+  }
+
+  const urlMerchantLogo = params.get("merchant_logo");
+  if (urlMerchantLogo && !urlMerchantLogo.startsWith("/data/") && !urlMerchantLogo.startsWith("file://")) {
+    setMerchantLogo(urlMerchantLogo);
+  }
+
   const urlMerchantId = params.get("merchant_id") || null;
   if (urlMerchantId) {
     merchantId = urlMerchantId;
@@ -641,7 +651,10 @@ window.subscribeForDeviceOnlineAlert = function() {
 // Merchant Logo Display
 // ──────────────────────────────────────────────────────────────────────────────
 function setMerchantLogo(logoUrl) {
-  merchantLogoUrl = logoUrl;
+  if (!logoUrl || typeof logoUrl !== 'string') return;
+  const trimmed = logoUrl.trim();
+  if (trimmed.startsWith('/data/') || trimmed.startsWith('file://')) return;
+  merchantLogoUrl = trimmed;
 
   // List of all avatar element IDs + their sizes
   const avatarConfigs = [
@@ -990,6 +1003,8 @@ function selectMFS(method, color) {
     activeCard.className = `border ${borderMap[method]} rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer shadow-sm mfs-option`;
   }
 
+  updateLabelsForMfs(method);
+
   const logoImg = document.getElementById("mfs-selected-logo");
   if (logoImg) {
     const logoSrc = { bKash: "BKash-Icon2-Logo.wine.svg", Nagad: "Nagad-Logo.wine.svg", Rocket: "Rocket.png", Upay: "upay-seeklogo.png" };
@@ -1016,19 +1031,31 @@ function updateLabelsForMfs(method) {
   const qrCard       = document.getElementById("qr-code-card");
   const instructionsHeader = document.querySelector('[data-translate="scanPay"]');
 
-  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : "merchant";
-  const isPersonal = (accType === "personal");
+  const urlAccType = new URLSearchParams(window.location.search).get("account_type") || "";
+  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : urlAccType.trim().toLowerCase();
+  const isPersonal = accType.includes("personal");
   const currentReceiverNum = (merchantReceivingNumbers && merchantReceivingNumbers[method]) ? merchantReceivingNumbers[method] : (document.getElementById("merchant-num-display")?.value || "");
 
   if (qrCard) {
-    qrCard.style.display = isPersonal ? "none" : "";
+    if (isPersonal) {
+      qrCard.style.setProperty("display", "none", "important");
+    } else {
+      qrCard.style.display = "";
+    }
   }
 
   if (currentLang === "en") {
     if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "Send Money Instructions" : "Scan & Pay Instructions";
     if (phoneLabel) phoneLabel.innerText = `Payment Number (Your ${method} Number) *`;
+    if (numLabel)   numLabel.innerText   = `${method} Merchant Number`;
     if (numLabel)   numLabel.innerText   = isPersonal ? `${method} Personal Number (Send Money)` : `${method} Merchant Number (Payment)`;
     if (qrHint)     qrHint.innerText     = `Scan this QR code with your ${method} app to pay instantly.`;
+    if (instructions) instructions.innerHTML = `
+      <li>1. Open your ${method} App</li>
+      <li>2. Go to Send Money or Scan</li>
+      <li>3. Enter the Merchant Wallet Number</li>
+      <li>4. Input the exact Amount and confirm</li>
+    `;
     if (instructions) {
       if (isPersonal) {
         instructions.innerHTML = `
@@ -1049,8 +1076,15 @@ function updateLabelsForMfs(method) {
   } else {
     if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "সেন্ড মানি করার নির্দেশিকা" : "পেমেন্ট নির্দেশিকা";
     if (phoneLabel) phoneLabel.innerText = `পেমেন্ট মোবাইল নম্বর (আপনার ${method} নম্বর) *`;
+    if (numLabel)   numLabel.innerText   = `${method} মার্চেন্ট নম্বর`;
     if (numLabel)   numLabel.innerText   = isPersonal ? `${method} ব্যক্তিগত নম্বর (সেন্ড মানি)` : `${method} মার্চেন্ট নম্বর (পেমেন্ট)`;
     if (qrHint)     qrHint.innerText     = `তাত্ক্ষণিকভাবে অর্থ প্রদানের জন্য আপনার ${method} অ্যাপ দিয়ে এই QR কোডটি স্ক্যান করুন।`;
+    if (instructions) instructions.innerHTML = `
+      <li>১. আপনার ${method} অ্যাপ খুলুন</li>
+      <li>২. 'সেন্ড মানি' বা 'স্ক্যান' অপশনে যান</li>
+      <li>৩. মার্চেন্ট ওয়ালেট নম্বরটি লিখুন</li>
+      <li>৪. সঠিক পরিমাণ লিখে পেমেন্ট নিশ্চিত করুন</li>
+    `;
     if (instructions) {
       if (isPersonal) {
         instructions.innerHTML = `
@@ -1082,6 +1116,7 @@ function copyNumber() {
   const num = document.getElementById("merchant-num-display").value;
   const isPersonal = (merchantAccountTypes[selectedMethod] || '').toLowerCase() === 'personal';
   navigator.clipboard.writeText(num).then(() => {
+    alert(currentLang === "en" ? "Merchant number copied!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!");
     alert(currentLang === "en" ? (isPersonal ? "Personal number copied!" : "Merchant number copied!") : (isPersonal ? "ব্যক্তিগত নম্বরটি কপি করা হয়েছে!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!"));
   });
 }

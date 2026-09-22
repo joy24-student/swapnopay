@@ -407,6 +407,104 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   })
 
   // ──────────────────────────────────────────────────────────────────────────
+  // POST /v1/payment/report-payment
+  // Called by merchant's Android phone when an incoming SMS transaction is parsed.
+  // Directly records verified payment event (status: 'PAID') and triggers
+  // instant verification if an order is waiting for this TrxID!
+  // ──────────────────────────────────────────────────────────────────────────
+  router.post('/report-payment', async (req, res) => {
+    try {
+      const {
+        merchant_id, trx_id, amount, payment_method, sender_number, timestamp, device_id
+      } = req.body || {}
+
+      if (!trx_id) {
+        return res.status(400).json({ ok: false, error: 'trx_id is required' })
+      }
+
+      const cleanTrx = String(trx_id).trim().toUpperCase()
+      const numAmount = parseFloat(amount) || 0
+
+      console.log(`[payment/report-payment] 📲 Incoming payment reported from Android device: TrxID ${cleanTrx} | ৳${numAmount} | Method: ${payment_method || 'bKash'} | Merchant: ${merchant_id}`)
+
+      // 1. Record in admin DB payment_events as PAID
+      try {
+        recordPaymentEvent(cleanTrx, {
+          tran_id: cleanTrx,
+          trx_id: cleanTrx,
+          status: 'PAID',
+          amount: numAmount,
+          currency: 'BDT',
+          payment_method: payment_method || 'bKash',
+          sender_number: sender_number || null,
+          merchant_id: merchant_id || null,
+          payment_time: timestamp ? new Date(Number(timestamp)).toISOString() : new Date().toISOString(),
+          product_name: `SMS Capture on Device: ${device_id || 'unknown'}`
+        })
+      } catch (recErr) {
+        console.warn('[payment/report-payment] Event record notice:', recErr.message)
+      }
+
+      // 2. Check if an order in payment_events is waiting for this TrxID
+      try {
+        const { getAdminClient } = await import('../services/adminSupabase.js')
+        const admin = getAdminClient()
+        if (admin) {
+          const { data: pendingEvents } = await admin.from('payment_events')
+            .select('*')
+            .eq('trx_id', cleanTrx)
+            .eq('status', 'PENDING')
+            .limit(5)
+
+          if (pendingEvents && pendingEvents.length > 0) {
+            for (const ev of pendingEvents) {
+              const matchedOrderId = ev.order_id || ev.tran_id
+              console.log(`[payment/report-payment] 🎯 Matched pending order: ${matchedOrderId} with TrxID: ${cleanTrx}`)
+              recordPaymentEvent(matchedOrderId, {
+                status: 'PAID',
+                trx_id: cleanTrx,
+                amount: numAmount || ev.amount,
+                payment_method: payment_method || ev.payment_method
+              })
+
+              io.to(`order:${matchedOrderId}`).emit('payment_status', {
+                order_id: matchedOrderId,
+                status: 'PAID',
+                trx_id: cleanTrx,
+                amount: numAmount || ev.amount,
+                paid_at: new Date().toISOString()
+              })
+
+              try {
+                const { handleFormPaymentPaid } = await import('./form.js')
+                await handleFormPaymentPaid(matchedOrderId, cleanTrx, numAmount || ev.amount, io)
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (matchErr) {
+        console.warn('[payment/report-payment] Pending order matching notice:', matchErr.message)
+      }
+
+      // 3. Emit payment broadcast to merchant dashboard
+      if (merchant_id) {
+        io.to(`merchant:${merchant_id}`).emit('payment_received', {
+          trx_id: cleanTrx,
+          amount: numAmount,
+          method: payment_method,
+          sender: sender_number,
+          time: new Date().toISOString()
+        })
+      }
+
+      return res.json({ ok: true, message: 'Payment recorded and verified.', trx_id: cleanTrx })
+    } catch (err) {
+      console.error('[payment/report-payment] Error:', err.message)
+      return res.status(500).json({ ok: false, error: err.message })
+    }
+  })
+
+  // ──────────────────────────────────────────────────────────────────────────
   // POST /v1/payment/notify
   // Widget calls this when customer taps "I Have Completed Payment".
   // Emits to BOTH order room (widget) AND merchant room (Android app).
@@ -462,7 +560,9 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         let query = admin.from('payment_events')
           .select('*')
           .eq('trx_id', cleanTrx)
-        if (merchant_id) query = query.eq('merchant_id', merchant_id)
+        if (merchant_id) {
+          query = query.or(`merchant_id.eq.${merchant_id},merchant_id.eq.merchant_default,merchant_id.eq.00000000-0000-0000-0000-000000000001,merchant_id.is.null`)
+        }
         const { data: matchedEvents } = await query.limit(1)
 
         if (matchedEvents && matchedEvents.length > 0 && matchedEvents[0].status === 'PAID') {

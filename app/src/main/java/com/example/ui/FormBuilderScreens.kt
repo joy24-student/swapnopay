@@ -2691,10 +2691,19 @@ private fun AdvancedFieldSettingsEditor(
             }
         }
         if (field.type in listOf(FormFieldType.DROPDOWN, FormFieldType.RADIO, FormFieldType.MULTI_SELECT)) {
+            var optionsRawText by remember(field.id) { mutableStateOf(field.options.joinToString(", ")) }
+            LaunchedEffect(field.options) {
+                val currentParsed = optionsRawText.split(',').map(String::trim).filter(String::isNotBlank)
+                if (currentParsed != field.options) {
+                    optionsRawText = field.options.joinToString(", ")
+                }
+            }
             OutlinedTextField(
-                value = field.options.joinToString(", "),
+                value = optionsRawText,
                 onValueChange = { value ->
-                    onUpdate(field.copy(options = value.split(',').map(String::trim).filter(String::isNotBlank).take(100)))
+                    optionsRawText = value
+                    val parsed = value.split(',').map(String::trim).filter(String::isNotBlank).take(100)
+                    onUpdate(field.copy(options = parsed))
                 },
                 label = { Text("Options (comma separated)") },
                 modifier = Modifier.fillMaxWidth(),
@@ -2858,7 +2867,7 @@ private fun AdvancedFieldSettingsEditor(
 
                 OutlinedTextField(
                     value = field.mediaUrl,
-                    onValueChange = { onUpdate(field.copy(mediaUrl = it.take(500))) },
+                    onValueChange = { onUpdate(field.copy(mediaUrl = it.trim())) },
                     label = { Text("Or paste Image URL", fontSize = 11.5.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true

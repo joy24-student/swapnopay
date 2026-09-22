@@ -618,16 +618,74 @@ class AppRepository(private val context: Context) {
             return false
         }
 
-        // Attempt upload to Supabase, fallback to Room if fails
+        // 1. Immediately report verified payment to SwapnoPay central gateway for instant verification
+        val reported = reportPaymentToBackend(paymentEntity)
+        if (reported) {
+            dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
+        }
+
+        // 2. Also attempt upload to custom Supabase database if configured
         val success = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
-        if (success) {
+        if (success && !reported) {
             dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
         }
         
         return true
     }
 
+    suspend fun reportPaymentToBackend(payment: CachedPaymentEntity): Boolean = withContext(Dispatchers.IO) {
+        val payload = org.json.JSONObject().apply {
+            put("merchant_id", payment.merchantId)
+            put("trx_id", payment.id)
+            put("amount", payment.amount)
+            put("payment_method", payment.method)
+            put("sender_number", payment.sender)
+            put("timestamp", payment.timestamp)
+            put("device_id", installationId)
+        }
+        val endpoints = listOf(
+            "https://api.swapnopay.top/v1/payment/report-payment",
+            "https://swapnopay.top/v1/payment/report-payment"
+        )
+        for (urlStr in endpoints) {
+            try {
+                val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("x-device-id", installationId)
+                conn.setRequestProperty("x-merchant-id", payment.merchantId)
+                conn.doOutput = true
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    android.util.Log.d("AppRepository", "Reported payment ${payment.id} to SwapnoPay backend ($urlStr)")
+                    return@withContext true
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("AppRepository", "Failed to report payment to $urlStr: ${e.message}")
+            }
+        }
+        false
+    }
+
     suspend fun uploadSmsToSupabase(sms: SmsQueueEntity): Boolean = withContext(Dispatchers.IO) {
+        // First try central backend
+        val backendReported = reportPaymentToBackend(
+            CachedPaymentEntity(
+                id = sms.trxId,
+                merchantId = sms.merchantId,
+                amount = sms.amount,
+                sender = sms.sender,
+                timestamp = sms.timestamp,
+                status = "UNMATCHED",
+                method = "bKash",
+                orderId = null
+            )
+        )
+        if (backendReported) return@withContext true
+
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
         
@@ -735,10 +793,10 @@ class AppRepository(private val context: Context) {
 
     fun isAllowedSender(address: String?): Boolean {
         val s = address?.lowercase()?.trim() ?: return false
-        return s == "bkash" || s == "nagad" || s == "upay" || s == "16216" ||
-               s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("16216")
         val clean = s.filter { it.isLetterOrDigit() }
-        return clean.contains("bkash") ||
+        return s == "bkash" || s == "nagad" || s == "upay" || s == "rocket" || s == "16216" ||
+               s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("rocket") || s.endsWith("16216") ||
+               clean.contains("bkash") ||
                clean.contains("nagad") ||
                clean.contains("upay") ||
                clean.contains("rocket") ||
@@ -752,18 +810,15 @@ class AppRepository(private val context: Context) {
         val senderLower = sender.lowercase().trim()
         val clean = senderLower.filter { it.isLetterOrDigit() }
         val bodyLower = body.lowercase()
-        return when {
-            senderLower.contains("bkash") -> bodyLower.contains("received") || bodyLower.contains("cash in")
-            senderLower.contains("nagad") -> bodyLower.contains("money received") || bodyLower.contains("cash in") || bodyLower.contains("received")
-            senderLower.contains("upay") -> bodyLower.contains("money received") || bodyLower.contains("received taka") || bodyLower.contains("cash in")
-            senderLower.contains("16216") -> bodyLower.contains("cash-in") || bodyLower.contains("cash in") || bodyLower.contains("received")
-            else -> false
-        }
-        val isMfsSender = clean.contains("bkash") || clean.contains("nagad") || clean.contains("upay") || clean.contains("rocket") ||
+
+        val isMfsSender = senderLower.contains("bkash") || senderLower.contains("nagad") || senderLower.contains("upay") || senderLower.contains("rocket") ||
+                          clean.contains("bkash") || clean.contains("nagad") || clean.contains("upay") || clean.contains("rocket") ||
                           clean == "16247" || clean.endsWith("16247") ||
                           clean == "16167" || clean.endsWith("16167") ||
                           clean == "16216" || clean.endsWith("16216") ||
-                          clean == "16268" || clean.endsWith("16268")
+                          clean == "16268" || clean.endsWith("16268") ||
+                          bodyLower.contains("bkash") || bodyLower.contains("nagad") || bodyLower.contains("upay") || bodyLower.contains("rocket")
+
         if (!isMfsSender) return false
 
         return bodyLower.contains("received") ||
@@ -772,7 +827,9 @@ class AppRepository(private val context: Context) {
                bodyLower.contains("cash-in") ||
                bodyLower.contains("credited") ||
                bodyLower.contains("deposit") ||
-               bodyLower.contains("transferred")
+               bodyLower.contains("transferred") ||
+               bodyLower.contains("money received") ||
+               bodyLower.contains("received taka")
     }
 
     private fun parseSmsDateToMillis(dateStr: String, isRocket: Boolean): Long {

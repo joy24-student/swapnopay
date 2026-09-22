@@ -147,7 +147,8 @@ app.options('*', cors(corsOptions))
 // Three base64 documents can exceed the normal API body limit. Authenticate
 // before reading this larger payload and keep other routes at 2 MB.
 app.use('/v1/kyc/submit', requirePlatformUser, express.json({ limit: '26mb', strict: true }))
-app.use(express.json({ limit: '2mb', strict: true, verify: (req, _res, buffer) => { req.rawBody = buffer.toString('utf8') } }))
+app.use(['/v1/forms/upload-image', '/v1/forms/routes', '/routes', '/v1/payment/merchant-config'], express.json({ limit: '26mb', strict: true }))
+app.use(express.json({ limit: '10mb', strict: true, verify: (req, _res, buffer) => { req.rawBody = buffer.toString('utf8') } }))
 
 // Global rate limiting
 app.use(rateLimit({
@@ -312,7 +313,6 @@ app.get('/', (req, res, next) => {
 })
 
 // Serve web root (checkout widget, hosted forms runner, docs)
-const webDir = path.resolve(__dirname, '../../web')
 const webDirCandidates = [
   path.resolve(__dirname, '../web'),
   path.resolve(__dirname, '../../web'),

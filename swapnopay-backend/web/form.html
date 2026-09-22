@@ -673,7 +673,7 @@
     function sanitizeImageUrl(url) {
       if (!url || typeof url !== 'string') return '';
       const trimmed = url.trim();
-      if (trimmed.startsWith('content://') || trimmed.startsWith('file://')) return '';
+      if (trimmed.startsWith('content://') || trimmed.startsWith('file://') || trimmed.startsWith('/data/')) return '';
       return trimmed;
     }
 

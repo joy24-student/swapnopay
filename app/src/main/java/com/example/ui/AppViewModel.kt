@@ -220,6 +220,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         syncAllCachedFormsToVps()
+        startObservingPaymentFormsCache()
     }
 
     val expenses: StateFlow<List<ExpenseEntity>> = activeProfile.flatMapLatest { repository.observeExpenses(it.id) }
@@ -577,7 +578,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         put("merchant_name", mName)
                     }
                     if (mProfile.photoUrl.isNotBlank()) {
-                        put("merchant_logo_url", mProfile.photoUrl)
+                        val validLogoUrl = if (mProfile.photoUrl.startsWith("/data/") || mProfile.photoUrl.startsWith("file://")) {
+                            try {
+                                val f = java.io.File(mProfile.photoUrl.removePrefix("file://"))
+                                if (f.exists() && f.length() <= 2 * 1024 * 1024) {
+                                    "data:image/jpeg;base64,${android.util.Base64.encodeToString(f.readBytes(), android.util.Base64.NO_WRAP)}"
+                                } else null
+                            } catch (_: Exception) { null }
+                        } else mProfile.photoUrl
+                        if (!validLogoUrl.isNullOrBlank()) {
+                            put("merchant_logo_url", validLogoUrl)
+                        }
                     }
                     if (active?.supabaseUrl?.isNotBlank() == true) {
                         put("supabase_url", active.supabaseUrl)
@@ -2239,6 +2250,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _activeProfile.value = restored
         repository.insertMerchantProfile(restored)
         repository.switchProfile(restored.id)
+        repository.reassignMerchantData("merchant_default", restored.id)
+        repository.reassignMerchantData("00000000-0000-0000-0000-000000000001", restored.id)
+        syncAllCachedFormsToVps()
+        startObservingPaymentFormsCache()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val conn = java.net.URL("https://api.swapnopay.top/v1/forms?merchant_id=${restored.id}").openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 6000
+                conn.readTimeout = 6000
+                if (conn.responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val arr = org.json.JSONArray(body)
+                    for (i in 0 until arr.length()) {
+                        val formObj = arr.getJSONObject(i)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            loadCachedPaymentForm(formObj, autoSelect = false)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         setUserEmail(result.email)
         _onboardingBusinessName.value = result.businessName
         _onboardingPhone.value = result.phone
@@ -5150,6 +5182,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 android.util.Log.w("FormSync", "syncAllCachedFormsToVps error: ${e.message}")
+            }
+        }
+    }
+
+    fun startObservingPaymentFormsCache() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.observePaymentFormCache(activeProfile.value.id).collect { cachedList ->
+                    for (cached in cachedList) {
+                        try {
+                            val json = org.json.JSONObject(cached.payloadJson)
+                            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                loadCachedPaymentForm(json, autoSelect = false)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("FormSync", "Failed observing payment forms: ${e.message}")
             }
         }
     }
@@ -8146,23 +8197,53 @@ function executePayment() {
                 }
                 val photoFile = java.io.File(photosDir, "merchant_${merchantId}_${System.currentTimeMillis()}.jpg")
                 photoFile.outputStream().use { it.write(imageBytes) }
-                val savedPath = photoFile.absolutePath
 
-                val updated = _activeProfile.value.copy(photoUrl = savedPath)
-                repository.insertMerchantProfile(updated)
-                _activeProfile.value = updated
-
+                // 1. Attempt upload to SwapnoPay central gateway CDN
+                var publicUrl: String? = null
                 try {
-                    val fileName = "merchants/${merchantId}/photo_${System.currentTimeMillis()}.jpg"
-                    val publicUrl = "${r2PublicDomain.value.trimEnd('/')}/$fileName"
-                    database?.getReference("merchants")?.child(merchantId)?.child("photoUrl")?.setValue(publicUrl)
+                    val base64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+                    val jsonPayload = org.json.JSONObject().apply {
+                        put("image", "data:image/jpeg;base64,$base64")
+                        put("filename", "logo_${merchantId}_${System.currentTimeMillis()}.jpg")
+                    }
+                    val body = jsonPayload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                    val endpoints = listOf(
+                        "https://api.swapnopay.top/v1/forms/upload-image",
+                        "https://swapnopay.top/v1/forms/upload-image"
+                    )
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    for (endpoint in endpoints) {
+                        try {
+                            val request = okhttp3.Request.Builder().url(endpoint).post(body).build()
+                            val response = client.newCall(request).execute()
+                            val responseBody = response.body?.string().orEmpty()
+                            if (response.isSuccessful) {
+                                val resJson = org.json.JSONObject(responseBody)
+                                val returnedUrl = resJson.optString("url")
+                                if (returnedUrl.isNotBlank()) {
+                                    publicUrl = returnedUrl
+                                    break
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
                 } catch (e: Exception) {
-                    android.util.Log.w("AppViewModel", "Photo cloud sync warning: ${e.message}")
+                    android.util.Log.w("AppViewModel", "Logo upload to CDN error: ${e.message}")
                 }
 
+                val finalPhotoUrl = publicUrl ?: "data:image/jpeg;base64,${android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)}"
+                val updated = _activeProfile.value.copy(photoUrl = finalPhotoUrl)
+                repository.insertMerchantProfile(updated)
+                _activeProfile.value = updated
+                syncMerchantConfigToAdminDatabase()
+
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    logFirebaseStatus("Merchant photo updated: $savedPath")
-                    onComplete?.invoke(savedPath)
+                    logFirebaseStatus("Merchant photo updated: $finalPhotoUrl")
+                    onComplete?.invoke(finalPhotoUrl)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("AppViewModel", "uploadMerchantPhoto failed: ${e.message}")
@@ -9081,41 +9162,94 @@ function executePayment() {
     }
 
     fun fetchFormSubmissions(formId: String? = null) {
-        val configuredProfile = _activeSupabaseProfile.value ?: return
-        if (configuredProfile.supabaseUrl.isEmpty() || configuredProfile.anonKey.isEmpty()) return
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val active = validSupabaseSession(configuredProfile) ?: return@launch
-            val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
-                .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
-            com.example.data.remote.SupabaseClient.fetchFormSubmissions(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
-                token = active.authSessionToken,
-                formId = formId,
-                onSuccess = { jsonArray ->
-                    val cache = mutableListOf<FormSubmissionCacheEntity>()
-                    for (i in 0 until jsonArray.length()) {
-                        val item = jsonArray.getJSONObject(i)
-                        if (item.optString("id") in dirtyIds) continue
-                        cache.add(
-                            FormSubmissionCacheEntity(
-                                id = item.getString("id"),
-                                merchantId = activeProfile.value.id,
-                                formId = item.optString("form_id"),
-                                payloadJson = item.toString(),
-                                submittedAt = parseRemoteTimestamp(item.optString("created_at")),
-                                isDirty = false
+        val configuredProfile = _activeSupabaseProfile.value
+        if (configuredProfile != null && configuredProfile.supabaseUrl.isNotEmpty() && configuredProfile.anonKey.isNotEmpty()) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val active = validSupabaseSession(configuredProfile) ?: return@launch
+                val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
+                    .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
+                com.example.data.remote.SupabaseClient.fetchFormSubmissions(
+                    url = active.supabaseUrl,
+                    anonKey = active.anonKey,
+                    token = active.authSessionToken,
+                    formId = formId,
+                    onSuccess = { jsonArray ->
+                        val cache = mutableListOf<FormSubmissionCacheEntity>()
+                        for (i in 0 until jsonArray.length()) {
+                            val item = jsonArray.getJSONObject(i)
+                            if (item.optString("id") in dirtyIds) continue
+                            cache.add(
+                                FormSubmissionCacheEntity(
+                                    id = item.getString("id"),
+                                    merchantId = activeProfile.value.id,
+                                    formId = item.optString("form_id"),
+                                    payloadJson = item.toString(),
+                                    submittedAt = parseRemoteTimestamp(item.optString("created_at")),
+                                    isDirty = false
+                                )
                             )
-                        )
+                        }
+                        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            repository.upsertFormSubmissionCaches(cache)
+                        }
+                    },
+                    onFailure = { err ->
+                        logFirebaseStatus("Error loading submissions: $err")
                     }
-                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        repository.upsertFormSubmissionCaches(cache)
+                )
+            }
+        } else {
+            // Platform & Central Backend fallback
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
+                        .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
+                    val targetFormId = formId ?: activeFormId.value
+                    val endpoints = listOf(
+                        "https://api.swapnopay.top/v1/forms/$targetFormId/submissions",
+                        "https://swapnopay.top/v1/forms/$targetFormId/submissions"
+                    )
+                    for (endpoint in endpoints) {
+                        try {
+                            val conn = java.net.URL(endpoint).openConnection() as java.net.HttpURLConnection
+                            conn.requestMethod = "GET"
+                            conn.setRequestProperty("x-merchant-id", activeProfile.value.id)
+                            conn.connectTimeout = 8000
+                            conn.readTimeout = 8000
+                            if (conn.responseCode in 200..299) {
+                                val resStr = conn.inputStream.bufferedReader().use { it.readText() }
+                                val resJson = org.json.JSONObject(resStr)
+                                val submissionsArray = resJson.optJSONArray("submissions") ?: org.json.JSONArray()
+                                val cache = mutableListOf<FormSubmissionCacheEntity>()
+                                for (i in 0 until submissionsArray.length()) {
+                                    val item = submissionsArray.getJSONObject(i)
+                                    val subId = item.optString("id", java.util.UUID.randomUUID().toString())
+                                    if (subId in dirtyIds) continue
+                                    cache.add(
+                                        FormSubmissionCacheEntity(
+                                            id = subId,
+                                            merchantId = activeProfile.value.id,
+                                            formId = item.optString("form_id", targetFormId),
+                                            payloadJson = item.toString(),
+                                            submittedAt = parseRemoteTimestamp(item.optString("submitted_at", item.optString("created_at"))),
+                                            isDirty = false
+                                        )
+                                    )
+                                }
+                                if (cache.isNotEmpty()) {
+                                    repository.upsertFormSubmissionCaches(cache)
+                                    logFirebaseStatus("Loaded ${cache.size} submissions from SwapnoPay central gateway.")
+                                }
+                                break
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("AppViewModel", "Failed fetching submissions from $endpoint: ${e.message}")
+                        }
                     }
-                },
-                onFailure = { err ->
-                    logFirebaseStatus("Error loading submissions: $err")
+                } catch (e: Exception) {
+                    android.util.Log.e("AppViewModel", "fetchFormSubmissions central error: ${e.message}")
                 }
-            )
+            }
         }
     }
 

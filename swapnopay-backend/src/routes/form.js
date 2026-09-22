@@ -856,8 +856,34 @@ export function formRouter(io = null) {
 
         const reqOrigin = req.get('host') ? `${req.protocol}://${req.get('host')}` : null
         const publicOrigin = process.env.PAYMENT_ROUTER_ORIGIN || reqOrigin || 'https://pay.swapnopay.top'
-        const merchantParam = form.merchant_id ? `&merchant_id=${encodeURIComponent(form.merchant_id)}` : ''
+        let merchantParam = form.merchant_id ? `&merchant_id=${encodeURIComponent(form.merchant_id)}` : ''
         const methodParam = payment_method ? `&method=${encodeURIComponent(payment_method)}` : ''
+        let numberParam = ''
+        let accTypeParam = ''
+        let logoParam = ''
+
+        // Resolve merchant receiving numbers, account types, and logo for instant display
+        try {
+          const { getMerchantGatewayConfig } = await import('../services/adminSupabase.js')
+          const mConfig = await getMerchantGatewayConfig(form.merchant_id || null)
+          if (mConfig) {
+            if (!merchantParam && mConfig.merchant_id) {
+              merchantParam = `&merchant_id=${encodeURIComponent(mConfig.merchant_id)}`
+            }
+            const activeMethod = payment_method || 'bKash'
+            const activeNum = (mConfig.receiving_numbers && mConfig.receiving_numbers[activeMethod]) || (mConfig.receiving_numbers && Object.values(mConfig.receiving_numbers)[0])
+            if (activeNum) {
+              numberParam = `&merchant_number=${encodeURIComponent(activeNum)}`
+            }
+            const activeType = (mConfig.account_types && mConfig.account_types[activeMethod]) || 'personal'
+            if (activeType) {
+              accTypeParam = `&account_type=${encodeURIComponent(activeType)}`
+            }
+            if (mConfig.merchant_logo_url && !mConfig.merchant_logo_url.startsWith('/data/')) {
+              logoParam = `&merchant_logo=${encodeURIComponent(mConfig.merchant_logo_url)}`
+            }
+          }
+        } catch (_) {}
 
         // Build return URLs so customer returns to the form on success or cancel
         const defaultSuccessUrl = (theme.redirect_type === 'REDIRECT_URL' && theme.redirect_url)
@@ -866,7 +892,7 @@ export function formRouter(io = null) {
         const defaultCancelUrl = `${publicOrigin}/f/${form.slug || form.id}?status=cancelled`
         const successParam = `&success_url=${encodeURIComponent(defaultSuccessUrl)}`
         const cancelParam = `&cancel_url=${encodeURIComponent(defaultCancelUrl)}`
-        const redirectUrl = `/widget.html?order_id=${encodeURIComponent(orderUuid)}&amount=${calculatedAmount}&merchant_name=${encodeURIComponent(form.title || 'SwapnoPay')}&cus_name=${encodeURIComponent(clientName)}&cus_phone=${encodeURIComponent(clientPhone)}${merchantParam}${methodParam}${successParam}${cancelParam}`
+        const redirectUrl = `/widget.html?order_id=${encodeURIComponent(orderUuid)}&amount=${calculatedAmount}&merchant_name=${encodeURIComponent(form.title || 'SwapnoPay')}&cus_name=${encodeURIComponent(clientName)}&cus_phone=${encodeURIComponent(clientPhone)}${merchantParam}${methodParam}${numberParam}${accTypeParam}${logoParam}${successParam}${cancelParam}`
 
         return res.json({
           ok: true,

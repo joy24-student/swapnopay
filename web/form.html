@@ -188,20 +188,15 @@
     }
 
     .product-card-img {
-      width: 54px;
-      height: 54px;
-      border-radius: 10px;
       width: 72px;
       height: 72px;
       border-radius: 12px;
       object-fit: cover;
-      background: #f1f5f9;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
       font-size: 26px;
       flex-shrink: 0;
       cursor: pointer;
@@ -678,14 +673,13 @@
     function sanitizeImageUrl(url) {
       if (!url || typeof url !== 'string') return '';
       const trimmed = url.trim();
-      if (trimmed.startsWith('content://') || trimmed.startsWith('file://')) return '';
+      if (trimmed.startsWith('content://') || trimmed.startsWith('file://') || trimmed.startsWith('/data/')) return '';
       return trimmed;
     }
 
     function switchProductGalleryImage(fId, url, thumbEl) {
       const safeUrl = sanitizeImageUrl(url);
       const img = document.getElementById(`prod-main-img-${fId}`);
-      if (img) img.src = url;
       if (img) {
         if (img.tagName.toLowerCase() === 'img') {
           img.src = safeUrl || fallbackProductSvg;
@@ -1224,10 +1218,8 @@
             const pImgUrl = p.imageUrl || p.image_url || p.mediaUrl || p.media_url;
             const pGallery = (p.gallery_urls || p.galleryUrls || []).filter(Boolean);
             const allPImgs = [pImgUrl].concat(pGallery).filter(Boolean);
-            const mainPImg = allPImgs[0] || '';
             const mainPImg = sanitizeImageUrl(allPImgs[0] || '');
 
-            const imgHtml = mainPImg ? `<img src="${mainPImg}" id="prod-main-img-${pId}" class="product-card-img" />` : `<div class="product-card-img" id="prod-main-img-${pId}">📦</div>`;
             const imgHtml = mainPImg
               ? `<img src="${mainPImg}" id="prod-main-img-${pId}" class="product-card-img" onerror="this.onerror=null;this.src='${fallbackProductSvg}';" alt="${p.title || 'Product'}" />`
               : `<div class="product-card-img" id="prod-main-img-${pId}">📦</div>`;
@@ -1236,7 +1228,6 @@
             if (allPImgs.length > 1) {
               galleryHtml = `<div class="product-gallery-thumbs" onclick="event.stopPropagation()">`;
               allPImgs.forEach((url, i) => {
-                galleryHtml += `<img src="${url}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onclick="switchProductGalleryImage('${pId}', '${url}', this)" />`;
                 const sUrl = sanitizeImageUrl(url);
                 if (sUrl) {
                   galleryHtml += `<img src="${sUrl}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onerror="this.onerror=null;this.src='${fallbackProductSvg}';" onclick="switchProductGalleryImage('${pId}', '${sUrl}', this)" />`;
@@ -1330,11 +1321,9 @@
             const mediaUrl = f.mediaUrl || f.media_url;
             const gallery = (f.gallery_urls || f.galleryUrls || []).filter(Boolean);
             const allMedia = [mediaUrl].concat(gallery).filter(Boolean);
-            const mainImg = allMedia[0] || '';
             const mainImg = sanitizeImageUrl(allMedia[0] || '');
 
             const imgHtml = mainImg
-              ? `<img src="${mainImg}" id="prod-main-img-${fId}" class="product-card-img" />`
               ? `<img src="${mainImg}" id="prod-main-img-${fId}" class="product-card-img" onerror="this.onerror=null;this.src='${fallbackProductSvg}';" alt="${f.label || 'Product'}" />`
               : `<div class="product-card-img" id="prod-main-img-${fId}">🛍️</div>`;
 
@@ -1342,7 +1331,6 @@
             if (allMedia.length > 1) {
               galleryHtml = `<div class="product-gallery-thumbs" onclick="event.stopPropagation()">`;
               allMedia.forEach((url, i) => {
-                galleryHtml += `<img src="${url}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onclick="switchProductGalleryImage('${fId}', '${url}', this)" />`;
                 const sUrl = sanitizeImageUrl(url);
                 if (sUrl) {
                   galleryHtml += `<img src="${sUrl}" class="product-gallery-thumb ${i === 0 ? 'active' : ''}" onerror="this.onerror=null;this.src='${fallbackProductSvg}';" onclick="switchProductGalleryImage('${fId}', '${sUrl}', this)" />`;
@@ -1404,10 +1392,6 @@
           group.appendChild(label);
 
           if (f.image_url || f.media_url || f.mediaUrl) {
-            const img = document.createElement("img");
-            img.src = f.image_url || f.media_url || f.mediaUrl;
-            img.className = "question-image";
-            group.appendChild(img);
             const rawImg = f.image_url || f.media_url || f.mediaUrl;
             const sImg = sanitizeImageUrl(rawImg);
             if (sImg) {

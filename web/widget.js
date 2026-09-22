@@ -180,6 +180,16 @@ window.onload = function () {
   const receiverNumber = params.get("merchant_number") || "017XXXXXXXX";
   merchantDefaultNumber = receiverNumber;
 
+  const initialAccountType = params.get("account_type");
+  if (initialAccountType) {
+    merchantAccountTypes[params.get("method") || "bKash"] = initialAccountType;
+  }
+
+  const urlMerchantLogo = params.get("merchant_logo");
+  if (urlMerchantLogo && !urlMerchantLogo.startsWith("/data/") && !urlMerchantLogo.startsWith("file://")) {
+    setMerchantLogo(urlMerchantLogo);
+  }
+
   const urlMerchantId = params.get("merchant_id") || null;
   if (urlMerchantId) {
     merchantId = urlMerchantId;
@@ -641,7 +651,10 @@ window.subscribeForDeviceOnlineAlert = function() {
 // Merchant Logo Display
 // ──────────────────────────────────────────────────────────────────────────────
 function setMerchantLogo(logoUrl) {
-  merchantLogoUrl = logoUrl;
+  if (!logoUrl || typeof logoUrl !== 'string') return;
+  const trimmed = logoUrl.trim();
+  if (trimmed.startsWith('/data/') || trimmed.startsWith('file://')) return;
+  merchantLogoUrl = trimmed;
 
   // List of all avatar element IDs + their sizes
   const avatarConfigs = [
@@ -1018,12 +1031,17 @@ function updateLabelsForMfs(method) {
   const qrCard       = document.getElementById("qr-code-card");
   const instructionsHeader = document.querySelector('[data-translate="scanPay"]');
 
-  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : "merchant";
-  const isPersonal = (accType === "personal");
+  const urlAccType = new URLSearchParams(window.location.search).get("account_type") || "";
+  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : urlAccType.trim().toLowerCase();
+  const isPersonal = accType.includes("personal");
   const currentReceiverNum = (merchantReceivingNumbers && merchantReceivingNumbers[method]) ? merchantReceivingNumbers[method] : (document.getElementById("merchant-num-display")?.value || "");
 
   if (qrCard) {
-    qrCard.style.display = isPersonal ? "none" : "";
+    if (isPersonal) {
+      qrCard.style.setProperty("display", "none", "important");
+    } else {
+      qrCard.style.display = "";
+    }
   }
 
   if (currentLang === "en") {
