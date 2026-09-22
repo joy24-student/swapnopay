@@ -312,6 +312,7 @@ app.get('/', (req, res, next) => {
 })
 
 // Serve web root (checkout widget, hosted forms runner, docs)
+const webDir = path.resolve(__dirname, '../../web')
 const webDirCandidates = [
   path.resolve(__dirname, '../web'),
   path.resolve(__dirname, '../../web'),

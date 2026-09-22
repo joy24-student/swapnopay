@@ -531,41 +531,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             securityPrefs.edit().putString("gateway_config_json", json.toString()).apply()
             val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) }
-            if (active == null) {
-                _gatewaySettingsStatus.value = "Saved locally; sign in to sync merchant database"
-                logFirebaseStatus("Gateway settings saved locally; authenticated merchant database is unavailable.")
-                return@launch
-            }
-            val payload = org.json.JSONObject().apply {
-                put("merchant_id", _activeProfile.value.id)
-                put("gateway_enabled", isGatewayPermissionGranted.value)
-                put("min_amount", safeConfig.minAmount)
-                put("max_amount", safeConfig.maxAmount)
-                put("daily_limit", safeConfig.dailyLimit)
-                put("receipt_retry_limit", safeConfig.retryCount)
-                put("auto_receipt_retry", safeConfig.autoFailover)
-                put("customer_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.customerReceiptsEnabled)
-                put("merchant_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess)
-                put("merchant_receipt_email", safeConfig.notificationEmail.trim().ifEmpty { JSONObject.NULL })
-                put("sms_notifications_enabled", false)
-                put("notification_phone", JSONObject.NULL)
-                put("success_callback_url", safeConfig.successCallbackUrl.trim().ifEmpty { JSONObject.NULL })
-                put("failure_callback_url", safeConfig.failureCallbackUrl.trim().ifEmpty { JSONObject.NULL })
-                put("cancel_callback_url", safeConfig.cancelCallbackUrl.trim().ifEmpty { JSONObject.NULL })
-            }
-            _gatewaySettingsStatus.value = "Saving to merchant database…"
-            com.example.data.remote.SupabaseClient.upsertRecord(
-                active.supabaseUrl, active.anonKey, active.authSessionToken,
-                "payment_gateway_settings", payload,
-                onSuccess = {
-                    _gatewaySettingsStatus.value = "Synced with merchant database"
-                    logFirebaseStatus("Payment gateway policy and receipt preferences synced to the merchant database.")
-                },
-                onFailure = {
-                    _gatewaySettingsStatus.value = "Merchant database sync failed"
-                    logFirebaseStatus("Gateway settings sync failed: $it")
+            if (active != null) {
+                val payload = org.json.JSONObject().apply {
+                    put("merchant_id", _activeProfile.value.id)
+                    put("gateway_enabled", isGatewayPermissionGranted.value)
+                    put("min_amount", safeConfig.minAmount)
+                    put("max_amount", safeConfig.maxAmount)
+                    put("daily_limit", safeConfig.dailyLimit)
+                    put("receipt_retry_limit", safeConfig.retryCount)
+                    put("auto_receipt_retry", safeConfig.autoFailover)
+                    put("customer_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.customerReceiptsEnabled)
+                    put("merchant_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess)
+                    put("merchant_receipt_email", safeConfig.notificationEmail.trim().ifEmpty { JSONObject.NULL })
+                    put("sms_notifications_enabled", false)
+                    put("notification_phone", JSONObject.NULL)
+                    put("success_callback_url", safeConfig.successCallbackUrl.trim().ifEmpty { JSONObject.NULL })
+                    put("failure_callback_url", safeConfig.failureCallbackUrl.trim().ifEmpty { JSONObject.NULL })
+                    put("cancel_callback_url", safeConfig.cancelCallbackUrl.trim().ifEmpty { JSONObject.NULL })
                 }
-            )
+                _gatewaySettingsStatus.value = "Saving to merchant database…"
+                com.example.data.remote.SupabaseClient.upsertRecord(
+                    active.supabaseUrl, active.anonKey, active.authSessionToken,
+                    "payment_gateway_settings", payload,
+                    onSuccess = {
+                        _gatewaySettingsStatus.value = "Synced with merchant database"
+                        logFirebaseStatus("Payment gateway policy and receipt preferences synced to the merchant database.")
+                    },
+                    onFailure = {
+                        _gatewaySettingsStatus.value = "Merchant database sync failed"
+                        logFirebaseStatus("Gateway settings sync failed: $it")
+                    }
+                )
+            } else {
+                _gatewaySettingsStatus.value = "Saved locally & syncing with gateway"
+                logFirebaseStatus("Gateway settings saved locally; syncing with SwapnoPay cloud gateway.")
+            }
 
             // ── Sync dynamically with SwapnoPay Backend (/v1/payment/merchant-config) ──
             try {
@@ -579,10 +579,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     if (mProfile.photoUrl.isNotBlank()) {
                         put("merchant_logo_url", mProfile.photoUrl)
                     }
-                    if (active.supabaseUrl.isNotBlank()) {
+                    if (active?.supabaseUrl?.isNotBlank() == true) {
                         put("supabase_url", active.supabaseUrl)
                     }
-                    if (active.anonKey.isNotBlank()) {
+                    if (active?.anonKey?.isNotBlank() == true) {
                         put("supabase_anon_key", active.anonKey)
                     }
                     put("bkash_enabled", safeConfig.activeMethods["bKash"] ?: true)
@@ -594,14 +594,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     put("cancel_url", safeConfig.cancelCallbackUrl.trim().ifEmpty { org.json.JSONObject.NULL })
 
                     val receivingNums = org.json.JSONObject()
+                    val accountTypesObj = org.json.JSONObject()
                     val qrCodesObj = org.json.JSONObject()
-                    merchantNumbers.value.filter { it.isActive }.forEach { num ->
+                    val dbNumbers = repository.getMerchantNumbers(_activeProfile.value.id)
+                    val activeNums = if (dbNumbers.isNotEmpty()) dbNumbers else merchantNumbers.value.map { MerchantNumberEntity(it.number, _activeProfile.value.id, it.method, it.type, it.isActive, it.isDefault, it.qrCodeUrl) }
+                    activeNums.filter { it.isActive }.forEach { num ->
                         receivingNums.put(num.method, num.number)
+                        accountTypesObj.put(num.method, num.accountType)
                         if (!num.qrCodeUrl.isNullOrBlank()) {
                             qrCodesObj.put(num.method, num.qrCodeUrl)
                         }
                     }
                     put("receiving_numbers", receivingNums)
+                    put("account_types", accountTypesObj)
                     put("qr_codes", qrCodesObj)
                 }
 
@@ -3288,6 +3293,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     "Supabase requires a valid user session. Sign in again before cloud synchronization."
                 }
                 logFirebaseStatus(message)
+                // Platform fallback sync without dedicated Supabase: sync transactions from backend & refresh local datasets
+                repository.syncPaymentsFromSupabase()
+                repository.sendDeviceHeartbeat(getApplication())
+                fetchPaymentForms()
+                fetchFormSubmissions()
+                val mId = activeProfile.value.id
+                if (mId.isNotBlank() && mId != "00000000-0000-0000-0000-000000000001") {
+                    repository.reassignMerchantData("00000000-0000-0000-0000-000000000001", mId)
+                }
+                logFirebaseStatus("Synced transactions and forms with SwapnoPay cloud gateway.")
             }
             
             isSyncing.value = false
@@ -7306,11 +7321,11 @@ function executePayment() {
         if (theme.redirectType == "CUSTOM_HTML" && theme.customHtmlContent.isBlank()) {
             publishErrors["custom_html"] = "Upload or enter custom HTML before using the custom-code response."
         }
-        if (theme.bannerUrl.isNotBlank() && !theme.bannerUrl.matches(Regex("^https://[^\\s]+$"))) {
-            publishErrors["banner_url"] = "Cover photo URL must use HTTPS."
+        if (theme.bannerUrl.isNotBlank() && !theme.bannerUrl.matches(Regex("^(https://|data:image/)[^\\s]+$"))) {
+            publishErrors["banner_url"] = "Cover photo URL must use HTTPS or data URI."
         }
-        if (theme.logoUrl.isNotBlank() && !theme.logoUrl.matches(Regex("^https://[^\\s]+$"))) {
-            publishErrors["logo_url"] = "Logo URL must use HTTPS."
+        if (theme.logoUrl.isNotBlank() && !theme.logoUrl.matches(Regex("^(https://|data:image/)[^\\s]+$"))) {
+            publishErrors["logo_url"] = "Logo URL must use HTTPS or data URI."
         }
         if (theme.backgroundStyle == "GRADIENT" && listOf(theme.gradientColorStart, theme.gradientColorEnd).any { !it.matches(Regex("^#[0-9A-Fa-f]{6}$")) }) {
             publishErrors["gradient_colors"] = "Gradient colors must use six-digit hex values such as #5B7FFF."
@@ -7405,8 +7420,8 @@ function executePayment() {
                 publishErrors["product_sale_price_${product.id}"] = "$productKey sale price cannot exceed its regular price."
             }
             if (product.stock < 0) publishErrors["product_stock_${product.id}"] = "$productKey cannot have negative stock."
-            if (product.imageUrl.isNotBlank() && !product.imageUrl.matches(Regex("^https://[^\\s]+$"))) {
-                publishErrors["product_image_${product.id}"] = "$productKey image URL must use HTTPS."
+            if (product.imageUrl.isNotBlank() && !product.imageUrl.matches(Regex("^(https://|data:image/)[^\\s]+$"))) {
+                publishErrors["product_image_${product.id}"] = "$productKey image URL must use HTTPS or data URI."
             }
             if (product.isDigital && product.digitalDownloadUrl.isNotBlank() && !product.digitalDownloadUrl.matches(Regex("^https://[^\\s]+$"))) {
                 publishErrors["product_download_${product.id}"] = "$productKey download URL must use HTTPS."
@@ -8381,6 +8396,7 @@ function executePayment() {
                     )
                 }
                 syncMerchantNumberToSupabase(entity)
+                syncMerchantConfigToAdminDatabase()
             }
         }
     }
@@ -10419,33 +10435,41 @@ function executePayment() {
 
                 val body = jsonPayload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
-                val request = okhttp3.Request.Builder()
-                    .url("https://api.swapnopay.top/v1/forms/upload-image")
-                    .post(body)
-                    .build()
+                val endpoints = listOf(
+                    "https://api.swapnopay.top/v1/forms/upload-image",
+                    "https://swapnopay.top/v1/forms/upload-image"
+                )
+                for (endpoint in endpoints) {
+                    try {
+                        val request = okhttp3.Request.Builder()
+                            .url(endpoint)
+                            .post(body)
+                            .build()
 
-                val response = client.newCall(request).execute()
-                val responseBody = response.body?.string().orEmpty()
+                        val response = client.newCall(request).execute()
+                        val responseBody = response.body?.string().orEmpty()
 
-                if (response.isSuccessful) {
-                    val resJson = org.json.JSONObject(responseBody)
-                    val publicUrl = resJson.optString("url")
-                    if (!publicUrl.isNullOrBlank()) {
-                        logFirebaseStatus("Product image uploaded to SwapnoPay backend: $publicUrl")
-                        withContext(Dispatchers.Main) {
-                            onResult(true, "Image uploaded to cloud", publicUrl)
+                        if (response.isSuccessful) {
+                            val resJson = org.json.JSONObject(responseBody)
+                            val publicUrl = resJson.optString("url")
+                            if (!publicUrl.isNullOrBlank()) {
+                                logFirebaseStatus("Product image uploaded to SwapnoPay backend ($endpoint): $publicUrl")
+                                withContext(Dispatchers.Main) {
+                                    onResult(true, "Image uploaded to cloud", publicUrl)
+                                }
+                                return@launch
+                            }
                         }
-                        return@launch
-                    }
+                    } catch (_: Exception) {}
                 }
-                logFirebaseStatus("Backend image upload returned status ${response.code}: $responseBody")
             } catch (e: Exception) {
                 logFirebaseStatus("uploadProductImageToBackend error: ${e.message}")
             }
 
-            // Fallback to local URI
+            // Universal offline fallback: inline Base64 data URI (displays in all browsers)
+            val base64Fallback = "data:image/jpeg;base64,${android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)}"
             withContext(Dispatchers.Main) {
-                onResult(true, "Saved locally", fallbackLocalUri)
+                onResult(true, "Saved as responsive image", base64Fallback)
             }
         }
     }

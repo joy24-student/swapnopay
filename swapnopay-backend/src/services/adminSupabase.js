@@ -470,9 +470,44 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
 
   // If merchant account is ACTIVE in database or has configured receiving numbers, never falsely declare offline
   const isAccountActive = creds?.status === 'ACTIVE'
-  const effectiveReceiving = merchantRow?.receiving_numbers && Object.keys(merchantRow.receiving_numbers).length > 0
-    ? merchantRow.receiving_numbers
-    : (creds?.receiving_numbers || {})
+  const effectiveReceiving = {
+    ...(creds?.receiving_numbers || {}),
+    ...(merchantRow?.receiving_numbers || {})
+  }
+  const effectiveAccountTypes = {
+    ...(creds?.account_types || {}),
+    ...(merchantRow?.account_types || {})
+  }
+  const effectiveQrCodes = {
+    ...(creds?.qr_codes || {}),
+    ...(merchantRow?.qr_codes || {})
+  }
+
+  // Also query merchant_numbers table if available in Admin Supabase
+  try {
+    const admin = getAdminClient()
+    const { data: numRows } = await admin
+      .from('merchant_numbers')
+      .select('*')
+      .or(`merchant_id.eq.${merchantId},user_id.eq.${merchantId}`)
+      .eq('active', true)
+    if (Array.isArray(numRows) && numRows.length > 0) {
+      for (const row of numRows) {
+        const method = row.type || row.method
+        if (method && row.number) {
+          if (!effectiveReceiving[method]) {
+            effectiveReceiving[method] = row.number
+          }
+          if (row.account_type) {
+            effectiveAccountTypes[method] = row.account_type
+          }
+          if (row.qr_code_url && !effectiveQrCodes[method]) {
+            effectiveQrCodes[method] = row.qr_code_url
+          }
+        }
+      }
+    }
+  } catch (_) {}
 
   const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
   if (deviceStatus.active === false && (isAccountActive || hasNumbers || !deviceStatus.device_count)) {
@@ -496,9 +531,10 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     default_fail_url:     merchantRow?.fail_url    || globalConfig.default_fail_url,
     default_cancel_url:   merchantRow?.cancel_url  || globalConfig.default_cancel_url,
     receiving_numbers:    effectiveReceiving,
-    qr_codes:             merchantRow?.qr_codes || {},
+    account_types:        effectiveAccountTypes,
+    qr_codes:             effectiveQrCodes,
     auto_appeal_matching: merchantRow?.auto_appeal_matching ?? false,
-    merchant_customized:  Boolean(merchantRow || creds),
+    merchant_customized:  Boolean(merchantRow || creds || hasNumbers),
     merchant_logo_url:    effectiveLogo,
     merchant_name:        effectiveName,
     merchant_id:          creds?.merchant_id || merchantId,
@@ -528,6 +564,7 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
     fail_url:             settings.fail_url || null,
     cancel_url:           settings.cancel_url || null,
     receiving_numbers:    settings.receiving_numbers || {},
+    account_types:        settings.account_types || {},
     qr_codes:             settings.qr_codes || {},
     auto_appeal_matching: settings.auto_appeal_matching ?? false,
     updated_at:           new Date().toISOString(),

@@ -76,7 +76,7 @@ interface AppDao {
     suspend fun deleteOrderById(id: String)
 
     // Payments
-    @Query("SELECT * FROM cached_payments WHERE merchantId = :merchantId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM cached_payments WHERE merchantId = :merchantId OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = '00000000-0000-0000-0000-000000000001' ORDER BY timestamp DESC")
     fun observePayments(merchantId: String): Flow<List<CachedPaymentEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -633,6 +633,9 @@ interface AppDao {
     // Merchant payment numbers
     @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId ORDER BY isDefault DESC, method ASC")
     fun observeMerchantNumbers(merchantId: String): Flow<List<MerchantNumberEntity>>
+
+    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId ORDER BY isDefault DESC, method ASC")
+    suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMerchantNumber(number: MerchantNumberEntity)

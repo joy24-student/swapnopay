@@ -103,6 +103,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         default_fail_url:           config.default_fail_url,
         default_cancel_url:         config.default_cancel_url,
         receiving_numbers:          config.receiving_numbers || {},
+        account_types:              config.account_types || {},
         // Per-method uploaded QR code image URLs (override auto-generated QR in widget)
         qr_codes:                   config.qr_codes || {},
         maintenance_mode:           config.maintenance_mode,
@@ -140,6 +141,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         maintenance_mode: false,
         maintenance_message: '',
         receiving_numbers: {},
+        account_types: {},
         qr_codes: {},
         merchant_logo_url: null,
         supabase_url: null,
@@ -148,6 +150,51 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         device_last_seen: null,
         device_count: 0,
       })
+    }
+  })
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /v1/payment/transactions
+  // App/Merchant queries recent transactions & payment events
+  // Query: ?merchant_id=<id>&limit=100
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get('/transactions', async (req, res) => {
+    try {
+      const merchantId = req.query.merchant_id || req.headers['x-merchant-id']
+      const limit = Math.min(parseInt(req.query.limit || '50', 10), 200)
+      if (!merchantId) {
+        return res.status(400).json({ ok: false, error: 'merchant_id is required' })
+      }
+      const { getAdminClient } = await import('../services/adminSupabase.js')
+      const admin = getAdminClient()
+      const { data, error } = await admin
+        .from('payment_events')
+        .select('*')
+        .or(`merchant_id.eq.${merchantId},order_id.eq.${merchantId}`)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (error) {
+        console.warn('[payment/transactions] Query error:', error.message)
+        return res.json({ ok: true, transactions: [] })
+      }
+
+      const transactions = (data || []).map(row => ({
+        id: row.trx_id || row.tran_id || row.id,
+        trx_id: row.trx_id || '',
+        order_id: row.order_id || null,
+        merchant_id: row.merchant_id || merchantId,
+        amount: Number(row.amount || 0),
+        sender: row.sender_number || 'Customer',
+        method: row.payment_method || 'bKash',
+        status: row.status === 'PAID' ? 'MATCHED' : (row.status || 'UNMATCHED'),
+        timestamp: new Date(row.payment_time || row.created_at).getTime(),
+      }))
+
+      res.json({ ok: true, transactions })
+    } catch (err) {
+      console.error('[payment/transactions] Error:', err.message)
+      res.json({ ok: true, transactions: [] })
     }
   })
 
@@ -324,6 +371,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         fail_url,
         cancel_url,
         receiving_numbers,
+        account_types,
         qr_codes,
         auto_appeal_matching,
       } = req.body || {}
@@ -345,6 +393,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         fail_url,
         cancel_url,
         receiving_numbers,
+        account_types,
         qr_codes,
         auto_appeal_matching,
       })

@@ -19,6 +19,7 @@ let successUrl     = "/";
 let failUrl        = "/";
 let cancelUrl      = "/";
 let merchantReceivingNumbers = {};
+let merchantAccountTypes = {};
 let countdownSeconds = 600;
 let timerInterval    = null;
 let webSocket        = null;
@@ -395,6 +396,12 @@ function loadGatewayConfig(merchantIdParam) {
           updateQrCode(merchantReceivingNumbers[selectedMethod]);
         }
       }
+
+      // ── Account types (Personal vs Merchant) ──
+      if (config.account_types) {
+        merchantAccountTypes = config.account_types;
+      }
+      updateLabelsForMfs(selectedMethod);
 
       // ── Redirect URLs (respect query parameters if provided) ──
       const urlRedirectParams = new URLSearchParams(window.location.search);
@@ -997,6 +1004,7 @@ function selectMFS(method, color) {
 
   const num = document.getElementById("merchant-num-display").value;
   updateQrCode(num);
+  updateLabelsForMfs(method);
 }
 
 function updateLabelsForMfs(method) {
@@ -1007,10 +1015,22 @@ function updateLabelsForMfs(method) {
   const numLabel     = document.getElementById("merchant-num-label");
   const qrHint       = document.getElementById("qr-hint-text");
   const instructions = document.getElementById("instructions-list");
+  const qrCard       = document.getElementById("qr-code-card");
+  const instructionsHeader = document.querySelector('[data-translate="scanPay"]');
+
+  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : "merchant";
+  const isPersonal = (accType === "personal");
+  const currentReceiverNum = (merchantReceivingNumbers && merchantReceivingNumbers[method]) ? merchantReceivingNumbers[method] : (document.getElementById("merchant-num-display")?.value || "");
+
+  if (qrCard) {
+    qrCard.style.display = isPersonal ? "none" : "";
+  }
 
   if (currentLang === "en") {
+    if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "Send Money Instructions" : "Scan & Pay Instructions";
     if (phoneLabel) phoneLabel.innerText = `Payment Number (Your ${method} Number) *`;
     if (numLabel)   numLabel.innerText   = `${method} Merchant Number`;
+    if (numLabel)   numLabel.innerText   = isPersonal ? `${method} Personal Number (Send Money)` : `${method} Merchant Number (Payment)`;
     if (qrHint)     qrHint.innerText     = `Scan this QR code with your ${method} app to pay instantly.`;
     if (instructions) instructions.innerHTML = `
       <li>1. Open your ${method} App</li>
@@ -1018,9 +1038,28 @@ function updateLabelsForMfs(method) {
       <li>3. Enter the Merchant Wallet Number</li>
       <li>4. Input the exact Amount and confirm</li>
     `;
+    if (instructions) {
+      if (isPersonal) {
+        instructions.innerHTML = `
+          <li>1. Open your ${method} App</li>
+          <li>2. Select <strong>Send Money</strong> (সেন্ড মানি)</li>
+          <li>3. Enter Personal Number: <strong>${currentReceiverNum}</strong></li>
+          <li>4. Input exact Amount and confirm transfer</li>
+        `;
+      } else {
+        instructions.innerHTML = `
+          <li>1. Open your ${method} App</li>
+          <li>2. Scan QR or go to <strong>Payment</strong></li>
+          <li>3. Enter Merchant Number: <strong>${currentReceiverNum}</strong></li>
+          <li>4. Input exact Amount and confirm</li>
+        `;
+      }
+    }
   } else {
+    if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "সেন্ড মানি করার নির্দেশিকা" : "পেমেন্ট নির্দেশিকা";
     if (phoneLabel) phoneLabel.innerText = `পেমেন্ট মোবাইল নম্বর (আপনার ${method} নম্বর) *`;
     if (numLabel)   numLabel.innerText   = `${method} মার্চেন্ট নম্বর`;
+    if (numLabel)   numLabel.innerText   = isPersonal ? `${method} ব্যক্তিগত নম্বর (সেন্ড মানি)` : `${method} মার্চেন্ট নম্বর (পেমেন্ট)`;
     if (qrHint)     qrHint.innerText     = `তাত্ক্ষণিকভাবে অর্থ প্রদানের জন্য আপনার ${method} অ্যাপ দিয়ে এই QR কোডটি স্ক্যান করুন।`;
     if (instructions) instructions.innerHTML = `
       <li>১. আপনার ${method} অ্যাপ খুলুন</li>
@@ -1028,6 +1067,23 @@ function updateLabelsForMfs(method) {
       <li>৩. মার্চেন্ট ওয়ালেট নম্বরটি লিখুন</li>
       <li>৪. সঠিক পরিমাণ লিখে পেমেন্ট নিশ্চিত করুন</li>
     `;
+    if (instructions) {
+      if (isPersonal) {
+        instructions.innerHTML = `
+          <li>১. আপনার ${method} অ্যাপ ওপেন করুন</li>
+          <li>২. <strong>'সেন্ড মানি'</strong> অপশনে যান</li>
+          <li>৩. ব্যক্তিগত নম্বরটি লিখুন: <strong>${currentReceiverNum}</strong></li>
+          <li>৪. সঠিক টাকার পরিমাণ লিখে সেন্ড মানি করুন</li>
+        `;
+      } else {
+        instructions.innerHTML = `
+          <li>১. আপনার ${method} অ্যাপ ওপেন করুন</li>
+          <li>২. কিউআর স্ক্যান করুন বা <strong>'পেমেন্ট'</strong> অপশনে যান</li>
+          <li>৩. মার্চেন্ট নম্বরটি লিখুন: <strong>${currentReceiverNum}</strong></li>
+          <li>৪. সঠিক টাকার পরিমাণ লিখে পেমেন্ট নিশ্চিত করুন</li>
+        `;
+      }
+    }
   }
 }
 
@@ -1040,8 +1096,10 @@ function updateQrCode(number) {
 
 function copyNumber() {
   const num = document.getElementById("merchant-num-display").value;
+  const isPersonal = (merchantAccountTypes[selectedMethod] || '').toLowerCase() === 'personal';
   navigator.clipboard.writeText(num).then(() => {
     alert(currentLang === "en" ? "Merchant number copied!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!");
+    alert(currentLang === "en" ? (isPersonal ? "Personal number copied!" : "Merchant number copied!") : (isPersonal ? "ব্যক্তিগত নম্বরটি কপি করা হয়েছে!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!"));
   });
 }
 

@@ -1350,7 +1350,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                 }
                             }
                         } else {
-                            recentOrders.take(5).forEach { order ->
+                            for (order in recentOrders.take(5)) {
                                 val isPaid = order.status.equals("PAID", ignoreCase = true)
                                 val statusColor = if (isPaid) successGreen else Color(0xFFF59E0B)
                                 val dateStr = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.getDefault())

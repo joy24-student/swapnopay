@@ -283,44 +283,87 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncPaymentsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        val active = getAuthenticatedSupabaseProfile()
+        var didSyncAny = false
 
-        var resultData: org.json.JSONArray? = null
-        try {
-            com.example.data.remote.SupabaseClient.fetchPayments(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
-                token = active.authSessionToken,
-                merchantId = active.id,
-                onSuccess = { jsonArray -> resultData = jsonArray },
-                onFailure = { err ->
-                    android.util.Log.e("AppRepository", "Failed to fetch payments: $err")
-                }
-            )
-        } catch (e: Exception) {
-            android.util.Log.e("AppRepository", "Exception fetching payments", e)
-        }
-
-        if (resultData != null) {
-            for (i in 0 until resultData!!.length()) {
-                val obj = resultData!!.getJSONObject(i)
-                val payment = CachedPaymentEntity(
-                    id = obj.optString("trx_id", obj.getString("id")),
+        if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty() && active.authSessionToken.isNotEmpty()) {
+            var resultData: org.json.JSONArray? = null
+            try {
+                com.example.data.remote.SupabaseClient.fetchPayments(
+                    url = active.supabaseUrl,
+                    anonKey = active.anonKey,
+                    token = active.authSessionToken,
                     merchantId = active.id,
-                    amount = obj.getDouble("amount"),
-                    sender = obj.optString("sender_number", "Unknown"),
-                    timestamp = parseIsoDateToMillis(obj.optString("sms_timestamp", obj.optString("created_at"))),
-                    status = obj.getString("status"),
-                    method = obj.optString("method", "bKash"),
-                    orderId = if (obj.isNull("matched_order_id")) null else obj.getString("matched_order_id")
+                    onSuccess = { jsonArray -> resultData = jsonArray },
+                    onFailure = { err ->
+                        android.util.Log.e("AppRepository", "Failed to fetch payments: $err")
+                    }
                 )
-                dao.insertPayment(payment)
+            } catch (e: Exception) {
+                android.util.Log.e("AppRepository", "Exception fetching payments", e)
             }
-            true
-        } else {
-            false
+
+            if (resultData != null) {
+                for (i in 0 until resultData!!.length()) {
+                    val obj = resultData!!.getJSONObject(i)
+                    val payment = CachedPaymentEntity(
+                        id = obj.optString("trx_id", obj.getString("id")),
+                        merchantId = active.id,
+                        amount = obj.getDouble("amount"),
+                        sender = obj.optString("sender_number", "Unknown"),
+                        timestamp = parseIsoDateToMillis(obj.optString("sms_timestamp", obj.optString("created_at"))),
+                        status = obj.getString("status"),
+                        method = obj.optString("method", "bKash"),
+                        orderId = if (obj.isNull("matched_order_id")) null else obj.getString("matched_order_id")
+                    )
+                    dao.insertPayment(payment)
+                }
+                didSyncAny = true
+            }
         }
+
+        // Backend Sync Fallback: /v1/payment/transactions?merchant_id=...
+        val targetMerchantId = dao.getMerchantProfile()?.id
+            ?: active?.id
+            ?: activeProfileId
+        if (targetMerchantId.isNotBlank() && targetMerchantId != "00000000-0000-0000-0000-000000000001") {
+            try {
+                val url = java.net.URL("https://api.swapnopay.top/v1/payment/transactions?merchant_id=${java.net.URLEncoder.encode(targetMerchantId, "UTF-8")}")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                if (conn.responseCode in 200..299) {
+                    val respStr = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = org.json.JSONObject(respStr)
+                    val list = json.optJSONArray("transactions")
+                    if (list != null && list.length() > 0) {
+                        for (i in 0 until list.length()) {
+                            val obj = list.getJSONObject(i)
+                            val trxId = obj.optString("trx_id").ifBlank { obj.optString("id") }
+                            if (trxId.isNotBlank()) {
+                                val payment = CachedPaymentEntity(
+                                    id = trxId,
+                                    merchantId = targetMerchantId,
+                                    amount = obj.optDouble("amount", 0.0),
+                                    sender = obj.optString("sender_number", obj.optString("sender", "Unknown")),
+                                    timestamp = parseIsoDateToMillis(obj.optString("created_at")),
+                                    status = obj.optString("status", "SUCCESS"),
+                                    method = obj.optString("payment_method", obj.optString("method", "bKash")),
+                                    orderId = if (obj.isNull("order_id")) null else obj.optString("order_id")
+                                )
+                                dao.insertPayment(payment)
+                            }
+                        }
+                        didSyncAny = true
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.d("AppRepository", "Backend transactions sync notice: ${e.message}")
+            }
+        }
+
+        didSyncAny
     }
 
     suspend fun syncAppealsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
@@ -544,7 +587,9 @@ class AppRepository(private val context: Context) {
             return false
         }
 
-        val merchantId = getActiveSupabaseProfile()?.id ?: activeProfileId
+        val merchantId = dao.getMerchantProfile()?.id
+            ?: getActiveSupabaseProfile()?.id
+            ?: activeProfileId
         val smsEntity = SmsQueueEntity(
             merchantId = merchantId,
             amount = parsed.amount,
@@ -692,10 +737,20 @@ class AppRepository(private val context: Context) {
         val s = address?.lowercase()?.trim() ?: return false
         return s == "bkash" || s == "nagad" || s == "upay" || s == "16216" ||
                s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("16216")
+        val clean = s.filter { it.isLetterOrDigit() }
+        return clean.contains("bkash") ||
+               clean.contains("nagad") ||
+               clean.contains("upay") ||
+               clean.contains("rocket") ||
+               clean == "16247" || clean.endsWith("16247") ||
+               clean == "16167" || clean.endsWith("16167") ||
+               clean == "16216" || clean.endsWith("16216") ||
+               clean == "16268" || clean.endsWith("16268")
     }
 
     fun isIncomingMoneyAlert(sender: String, body: String): Boolean {
         val senderLower = sender.lowercase().trim()
+        val clean = senderLower.filter { it.isLetterOrDigit() }
         val bodyLower = body.lowercase()
         return when {
             senderLower.contains("bkash") -> bodyLower.contains("received") || bodyLower.contains("cash in")
@@ -704,6 +759,20 @@ class AppRepository(private val context: Context) {
             senderLower.contains("16216") -> bodyLower.contains("cash-in") || bodyLower.contains("cash in") || bodyLower.contains("received")
             else -> false
         }
+        val isMfsSender = clean.contains("bkash") || clean.contains("nagad") || clean.contains("upay") || clean.contains("rocket") ||
+                          clean == "16247" || clean.endsWith("16247") ||
+                          clean == "16167" || clean.endsWith("16167") ||
+                          clean == "16216" || clean.endsWith("16216") ||
+                          clean == "16268" || clean.endsWith("16268")
+        if (!isMfsSender) return false
+
+        return bodyLower.contains("received") ||
+               bodyLower.contains("payment") ||
+               bodyLower.contains("cash in") ||
+               bodyLower.contains("cash-in") ||
+               bodyLower.contains("credited") ||
+               bodyLower.contains("deposit") ||
+               bodyLower.contains("transferred")
     }
 
     private fun parseSmsDateToMillis(dateStr: String, isRocket: Boolean): Long {
@@ -737,11 +806,20 @@ class AppRepository(private val context: Context) {
 
     private suspend fun parseSms(sender: String, body: String): ParsedSms? {
         val senderLower = sender.lowercase().trim()
+        val cleanSender = sender.lowercase().filter { it.isLetterOrDigit() }
         val mfsName = when {
             senderLower.contains("bkash") -> "bKash"
             senderLower.contains("nagad") -> "Nagad"
             senderLower.contains("upay") -> "Upay"
             senderLower.contains("16216") -> "Rocket"
+            cleanSender.contains("bkash") || cleanSender.endsWith("16247") -> "bKash"
+            cleanSender.contains("nagad") || cleanSender.endsWith("16167") -> "Nagad"
+            cleanSender.contains("upay") || cleanSender.endsWith("16268") -> "Upay"
+            cleanSender.contains("rocket") || cleanSender.endsWith("16216") -> "Rocket"
+            body.contains("bkash", ignoreCase = true) -> "bKash"
+            body.contains("nagad", ignoreCase = true) -> "Nagad"
+            body.contains("upay", ignoreCase = true) -> "Upay"
+            body.contains("rocket", ignoreCase = true) -> "Rocket"
             else -> return null
         }
         
@@ -796,7 +874,56 @@ class AppRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            android.util.Log.e("AppRepository", "Cached regex pattern matching failed: ${e.message}")
         }
+
+        // Resilient Fallback Parser for Bangladeshi MFS Masked SMS (bKash, Nagad, Upay, Rocket)
+        try {
+            // 1. Extract Amount: "Tk 1,500.00", "Amount: Tk 500", "Taka 250"
+            val amtPattern = Pattern.compile("(?:Amount:\\s*)?(?:Tk|Taka|BDT|Tk\\.)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
+            val amtMatcher = amtPattern.matcher(body)
+            val amount = if (amtMatcher.find()) {
+                amtMatcher.group(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+            } else 0.0
+
+            // 2. Extract TrxID / TxnID: "TrxID 9ABCDE", "TxnID: 12345", "TxnId: 888"
+            val trxPattern = Pattern.compile("(?:TrxID|TxnID|TxnId|Trx ID|Trans ID)[:\\s]+([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE)
+            val trxMatcher = trxPattern.matcher(body)
+            val trxId = if (trxMatcher.find()) {
+                trxMatcher.group(1) ?: "TRX_${System.currentTimeMillis()}"
+            } else {
+                "TRX_${System.currentTimeMillis()}"
+            }
+
+            // 3. Extract Sender Phone / Account: "from 01712***789", "Sender: 018***", "A/C: *017***"
+            val senderPattern = Pattern.compile("(?:from|Sender:?|from A/C:?|A/C:?)\\s*([0-9*xX+ -]{6,18})", Pattern.CASE_INSENSITIVE)
+            val senderMatcher = senderPattern.matcher(body)
+            val senderPhone = if (senderMatcher.find()) {
+                senderMatcher.group(1)?.trim() ?: "Payer"
+            } else "Payer"
+
+            // 4. Extract Date / Time if available
+            val datePattern = Pattern.compile("(\\d{2}/\\d{2}/\\d{4}\\s+\\d{2}:\\d{2})|(\\d{2}-[A-Za-z]{3}-\\d{2}\\s+\\d{2}:\\d{2}(?::\\d{2})?\\s*[ap]m)", Pattern.CASE_INSENSITIVE)
+            val dateMatcher = datePattern.matcher(body)
+            val timestamp = if (dateMatcher.find()) {
+                val matched = dateMatcher.group(0) ?: ""
+                parseSmsDateToMillis(matched, isRocket = (mfsName == "Rocket"))
+            } else System.currentTimeMillis()
+
+            if (amount > 0.0) {
+                return ParsedSms(
+                    amount = amount,
+                    senderPhone = senderPhone,
+                    trxId = trxId,
+                    receiver = "${mfsName.lowercase()}_merchant",
+                    method = mfsName,
+                    timestamp = timestamp
+                )
+            }
+        } catch (fallbackErr: Exception) {
+            android.util.Log.e("AppRepository", "Resilient SMS parser error: ${fallbackErr.message}")
+        }
+
         return null
     }
 
@@ -1343,6 +1470,7 @@ class AppRepository(private val context: Context) {
 
     fun observeMerchantNumbers(merchantId: String): Flow<List<MerchantNumberEntity>> =
         dao.observeMerchantNumbers(merchantId)
+    suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity> = dao.getMerchantNumbers(merchantId)
     suspend fun upsertMerchantNumber(number: MerchantNumberEntity) = dao.upsertMerchantNumber(number)
     suspend fun setDefaultMerchantNumber(merchantId: String, number: MerchantNumberEntity) {
         dao.setDefaultMerchantNumber(merchantId, number)
