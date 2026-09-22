@@ -53,18 +53,18 @@ data class SubscriptionPlanUi(
 )
 
 data class SubscriptionStatusState(
-    val status: String = "ACTIVE", // "ACTIVE", "TRIAL", "EXPIRED", "REQUIRES_NID", "FREE"
+    val status: String = "FREE", // "ACTIVE", "TRIAL", "EXPIRED", "REQUIRES_NID", "FREE"
     val canAccessService: Boolean = true,
     val lockReason: String? = null,
-    val hasNid: Boolean = true,
+    val hasNid: Boolean = false,
     val nidNumber: String? = null,
-    val isKycVerified: Boolean = true,
-    val isSubscriptionActive: Boolean = true,
-    val subscriptionPlan: String? = "PRO",
-    val subscriptionExpiresAt: String? = "2026-04-15T00:00:00Z",
+    val isKycVerified: Boolean = false,
+    val isSubscriptionActive: Boolean = false,
+    val subscriptionPlan: String? = "FREE",
+    val subscriptionExpiresAt: String? = null,
     val isTrialActive: Boolean = false,
-    val trialDaysTotal: Int = 90,
-    val trialRemainingDays: Int = 90,
+    val trialDaysTotal: Int = 0,
+    val trialRemainingDays: Int = 0,
     val trialEndsAt: String? = null,
     val monthlyPrice: Double = 299.0,
     val quarterlyPrice: Double = 799.0,
@@ -73,12 +73,12 @@ data class SubscriptionStatusState(
 
 data class SubscriptionCheckoutState(
     val orderId: String = "",
-    val planType: String = "PRO",
+    val planType: String = "MONTHLY",
     val amount: Double = 299.0,
     val days: Int = 30,
     val currency: String = "BDT",
     val paymentMethod: String = "bKash",
-    val receivingAccount: String = "01711223344",
+    val receivingAccount: String = "",
     val nidAssociated: String? = null,
     val instructions: String = "",
     val checkoutUrl: String? = null
@@ -88,15 +88,15 @@ data class SubscriptionPaymentHistoryItem(
     val id: String = "",
     val merchantId: String = "",
     val nidNumber: String? = null,
-    val planType: String = "PRO",
-    val planNameDisplay: String = "Pro Plan",
-    val billingCycle: String = "Monthly",
-    val dateRangeDisplay: String = "Apr 15, 2026 – May 15, 2026",
-    val amount: Double = 299.0,
-    val trxId: String? = "8N92K810A2",
-    val paymentMethod: String = "bKash",
-    val status: String = "Paid",
-    val createdAt: String = "2026-04-15",
+    val planType: String = "",
+    val planNameDisplay: String = "",
+    val billingCycle: String = "",
+    val dateRangeDisplay: String = "",
+    val amount: Double = 0.0,
+    val trxId: String? = null,
+    val paymentMethod: String = "",
+    val status: String = "",
+    val createdAt: String = "",
     val verifiedAt: String? = null,
     val iconType: String = "crown" // "crown" | "sync" | "briefcase"
 )
@@ -197,99 +197,66 @@ fun SubscriptionScreen(
         )
     }
 
-    // History Records matching screenshot reference fallback while binding dynamically to real DB items
+    // Dynamic subscription history records from real DB items
     val formattedHistoryList: List<SubscriptionPaymentHistoryItem> = remember(subHistoryRaw) {
         if (subHistoryRaw.isNotEmpty()) {
             subHistoryRaw.mapIndexed { index, raw ->
                 val planDisplayName = when (raw.planType.uppercase()) {
-                    "FREE" -> "Basic Plan"
-                    "BUSINESS" -> "Business Plan"
-                    else -> if (index == 1) "Pro Plan (Renewal)" else "Pro Plan"
+                    "FREE" -> "Free Plan"
+                    "BUSINESS", "QUARTERLY" -> "Quarterly Plan"
+                    "MONTHLY", "PRO" -> "Monthly Plan"
+                    else -> raw.planType.ifBlank { "Subscription" }
                 }
                 val icon = when {
-                    planDisplayName.contains("Renewal", ignoreCase = true) -> "sync"
-                    raw.planType.uppercase() == "FREE" || planDisplayName.contains("Basic", ignoreCase = true) -> "briefcase"
+                    raw.planType.uppercase() in setOf("BUSINESS", "QUARTERLY") -> "briefcase"
+                    raw.planType.uppercase() == "FREE" -> "briefcase"
                     else -> "crown"
                 }
                 val dateStr = if (raw.createdAt.isNotBlank()) {
                     raw.createdAt.take(10)
                 } else {
-                    "Apr 15, 2026"
+                    ""
                 }
+                val cycleText = if (dateStr.isNotBlank()) dateStr else "Completed"
                 SubscriptionPaymentHistoryItem(
-                    id = raw.id.ifBlank { "inv_${index + 1}" },
+                    id = raw.id.ifBlank { "INV-${raw.trxId?.takeLast(6) ?: (index + 1).toString()}" },
                     merchantId = raw.merchantId,
                     nidNumber = raw.nidNumber,
                     planType = raw.planType,
                     planNameDisplay = planDisplayName,
-                    billingCycle = "Monthly",
-                    dateRangeDisplay = "$dateStr – Next Cycle",
+                    billingCycle = if (raw.planType.uppercase() in setOf("QUARTERLY", "BUSINESS")) "Quarterly" else "Monthly",
+                    dateRangeDisplay = cycleText,
                     amount = raw.amount,
-                    trxId = raw.trxId ?: "TXN${raw.id.takeLast(6)}",
-                    paymentMethod = raw.paymentMethod,
-                    status = if (raw.status.equals("COMPLETED", true) || raw.status.equals("PAID", true)) "Paid" else raw.status,
+                    trxId = raw.trxId ?: "",
+                    paymentMethod = raw.paymentMethod.ifBlank { "MFS" },
+                    status = if (raw.status.equals("COMPLETED", true) || raw.status.equals("PAID", true)) "Paid" else raw.status.ifBlank { "Paid" },
                     createdAt = raw.createdAt,
                     verifiedAt = raw.verifiedAt,
                     iconType = icon
                 )
             }
         } else {
-            // Exact screenshot reference items when database is freshly initialized
-            listOf(
-                SubscriptionPaymentHistoryItem(
-                    id = "INV-2026-001",
-                    merchantId = "aerospacehub26",
-                    planType = "PRO",
-                    planNameDisplay = "Pro Plan",
-                    billingCycle = "Monthly",
-                    dateRangeDisplay = "Apr 15, 2026 – May 15, 2026",
-                    amount = 299.0,
-                    trxId = "9K87LM01PQ",
-                    paymentMethod = "bKash",
-                    status = "Paid",
-                    createdAt = "2026-04-15",
-                    iconType = "crown"
-                ),
-                SubscriptionPaymentHistoryItem(
-                    id = "INV-2025-012",
-                    merchantId = "aerospacehub26",
-                    planType = "PRO",
-                    planNameDisplay = "Pro Plan (Renewal)",
-                    billingCycle = "Monthly",
-                    dateRangeDisplay = "Mar 15, 2025 – Apr 15, 2025",
-                    amount = 299.0,
-                    trxId = "8N92K810A2",
-                    paymentMethod = "Nagad",
-                    status = "Paid",
-                    createdAt = "2025-03-15",
-                    iconType = "sync"
-                ),
-                SubscriptionPaymentHistoryItem(
-                    id = "INV-2025-001",
-                    merchantId = "aerospacehub26",
-                    planType = "FREE",
-                    planNameDisplay = "Basic Plan",
-                    billingCycle = "Monthly",
-                    dateRangeDisplay = "Feb 10, 2025 – Mar 10, 2025",
-                    amount = 0.0,
-                    trxId = "FREE_TIER_INIT",
-                    paymentMethod = "System",
-                    status = "Paid",
-                    createdAt = "2025-02-10",
-                    iconType = "briefcase"
-                )
-            )
+            emptyList()
         }
     }
 
-    val currentPlanKey = (subStatus.subscriptionPlan ?: "PRO").uppercase()
-    val isCurrentActive = subStatus.isSubscriptionActive || subStatus.isTrialActive || currentPlanKey == "PRO"
-    val renewalDateText = remember(subStatus.subscriptionExpiresAt) {
-        if (!subStatus.subscriptionExpiresAt.isNullOrBlank()) {
-            val raw = subStatus.subscriptionExpiresAt!!.take(10)
-            "Renews on $raw"
-        } else {
-            "Renews on Apr 15, 2026"
+    val currentPlanKey = (subStatus.subscriptionPlan ?: "FREE").uppercase()
+    val isCurrentActive = when {
+        currentPlanKey == "FREE" -> true
+        subStatus.isSubscriptionActive -> true
+        subStatus.isTrialActive -> true
+        else -> false
+    }
+    val renewalDateText = remember(subStatus.subscriptionExpiresAt, subStatus.isTrialActive, subStatus.isSubscriptionActive, currentPlanKey) {
+        val expiresAt = subStatus.subscriptionExpiresAt
+        when {
+            !expiresAt.isNullOrBlank() -> {
+                val raw = expiresAt.take(10)
+                if (subStatus.isSubscriptionActive) "Renews on $raw" else "Expired on $raw"
+            }
+            subStatus.isTrialActive -> "Trial period active"
+            currentPlanKey == "FREE" -> "No renewal required (Free Plan)"
+            else -> "No active renewal date"
         }
     }
 
@@ -335,6 +302,11 @@ fun SubscriptionScreen(
 
             // ── Top Header: Merchant Profile & Actions ──
             item {
+                val hasAdminNotice = viewModel.adminNoticePopup.collectAsState().value != null || 
+                                     !viewModel.marqueeNotice.collectAsState().value.isNullOrBlank()
+                val merchantName = activeProfile.businessName.ifBlank { activeProfile.accountHolder.ifBlank { "Merchant" } }
+                val initial = merchantName.firstOrNull()?.uppercaseChar()?.toString() ?: "M"
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -342,11 +314,11 @@ fun SubscriptionScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: Business Avatar & Title
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val initial = (activeProfile.businessName.ifBlank { activeProfile.accountHolder.ifBlank { "aerospacehub26" } })
-                            .firstOrNull()?.uppercaseChar()?.toString() ?: "A"
-
+                    // Left: Business Avatar & Title with weight to prevent collapse
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
@@ -364,22 +336,26 @@ fun SubscriptionScreen(
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        Column {
+                        Column(modifier = Modifier.padding(end = 8.dp)) {
                             Text(
-                                text = activeProfile.businessName.ifBlank { "aerospacehub26" },
-                                fontSize = 15.5.sp,
+                                text = merchantName,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF0F172A)
+                                color = if (isDark) Color.White else Color(0xFF0F172A),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = activeProfile.businessType.ifBlank { "Retail Store" },
-                                fontSize = 12.sp,
-                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                text = activeProfile.businessType.ifBlank { "Merchant Store" },
+                                fontSize = 11.5.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    // Right: Settings cog & Notification Bell with Badge
+                    // Right: Settings cog & Notification Bell with real badge
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             modifier = Modifier
@@ -422,21 +398,14 @@ fun SubscriptionScreen(
                                 }
                             }
 
-                            // Notification badge (3)
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 2.dp, y = (-2).dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFF59E0B)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "3",
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
+                            if (hasAdminNotice) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 1.dp, y = (-1).dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444))
                                 )
                             }
                         }
@@ -472,18 +441,19 @@ fun SubscriptionScreen(
                         )
                     }
 
-                    Column(modifier = Modifier.padding(start = 2.dp)) {
+                    Column(modifier = Modifier.weight(1f).padding(start = 2.dp)) {
                         Text(
                             text = "Subscription",
-                            fontSize = 24.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isDark) Color.White else Color(0xFF0F172A)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Manage your plan, billing and view your subscription history.",
-                            fontSize = 13.sp,
-                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                            fontSize = 12.5.sp,
+                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                            lineHeight = 17.sp
                         )
                     }
                 }
@@ -500,98 +470,128 @@ fun SubscriptionScreen(
                     border = BorderStroke(1.dp, if (isDark) Color(0xFF262F40) else Color(0xFFEDF2F7)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
+                            .padding(16.dp)
                     ) {
-                        // Left side: Crown icon circle + plan info
-                        Row(verticalAlignment = Alignment.Top) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDark) Color(0xFF2E230B) else Color(0xFFFFFBEB))
-                                    .border(1.dp, Color(0xFFFDE68A), CircleShape),
-                                contentAlignment = Alignment.Center
+                        // Top Section: Icon, Plan details (left) & Price (right)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.EmojiEvents,
-                                    contentDescription = "Current Plan Crown",
-                                    tint = Color(0xFFF59E0B),
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isDark) Color(0xFF2E230B) else Color(0xFFFFFBEB))
+                                        .border(1.dp, Color(0xFFFDE68A), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EmojiEvents,
+                                        contentDescription = "Current Plan",
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Current Plan",
+                                        fontSize = 11.5.sp,
+                                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = when (currentPlanKey) {
+                                                "FREE" -> "Free Plan"
+                                                "BUSINESS", "QUARTERLY" -> "Business Plan"
+                                                else -> "Pro Plan"
+                                            },
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color(0xFF0F172A),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isCurrentActive) Color(0xFF10B981) else Color(0xFFEF4444)
+                                        ) {
+                                            Text(
+                                                text = if (isCurrentActive) "Active" else "Expired",
+                                                color = Color.White,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = renewalDateText,
+                                        fontSize = 11.5.sp,
+                                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
 
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                            Column {
-                                Text(
-                                    text = "Current Plan",
-                                    fontSize = 12.sp,
-                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Right side: Price
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.Bottom) {
                                     Text(
-                                        text = when (currentPlanKey) {
-                                            "FREE" -> "Free Plan"
-                                            "BUSINESS" -> "Business Plan"
-                                            else -> "Pro Plan"
-                                        },
-                                        fontSize = 19.sp,
+                                        text = "৳ ${if (currentPlanKey == "FREE") 0 else proPrice}",
+                                        fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isDark) Color.White else Color(0xFF0F172A)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isCurrentActive) Color(0xFF10B981) else Color(0xFFEF4444)
-                                    ) {
-                                        Text(
-                                            text = if (isCurrentActive) "Active" else "Expired",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
+                                    Text(
+                                        text = " / mo",
+                                        fontSize = 11.5.sp,
+                                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(3.dp))
-                                Text(
-                                    text = renewalDateText,
-                                    fontSize = 12.sp,
-                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                )
                             }
                         }
 
-                        // Right side: Price & Manage Plan button
-                        Column(horizontalAlignment = Alignment.End) {
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "৳ ${if (currentPlanKey == "FREE") 0 else proPrice}",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color.White else Color(0xFF0F172A)
-                                )
-                                Text(
-                                    text = " / month",
-                                    fontSize = 12.sp,
-                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                                    modifier = Modifier.padding(bottom = 2.dp)
-                                )
-                            }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = if (isDark) Color(0xFF262F40) else Color(0xFFF1F5F9))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                        // Bottom Action Row inside Card
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isAutoRenew) "Auto-renew enabled" else "Manual renewal",
+                                fontSize = 11.5.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                            )
 
                             OutlinedButton(
                                 onClick = { showManagePlanSheet = true },
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                                border = BorderStroke(1.dp, if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.Transparent
                                 )
@@ -600,12 +600,12 @@ fun SubscriptionScreen(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = null,
                                     tint = if (isDark) Color.White else Color(0xFF1E293B),
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = "Manage Plan",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (isDark) Color.White else Color(0xFF1E293B)
                                 )
@@ -723,18 +723,22 @@ fun SubscriptionScreen(
                                     // Features List
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         plan.features.forEach { feat ->
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.Top
+                                            ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = if (isDark) Color(0xFFCBD5E1) else Color(0xFF334155),
-                                                    modifier = Modifier.size(15.dp)
+                                                    tint = if (isDark) Color(0xFF10B981) else Color(0xFF059669),
+                                                    modifier = Modifier.size(15.dp).padding(top = 1.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = feat,
                                                     fontSize = 12.sp,
-                                                    color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+                                                    color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569),
+                                                    modifier = Modifier.weight(1f)
                                                 )
                                             }
                                         }
@@ -862,7 +866,10 @@ fun SubscriptionScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
@@ -883,45 +890,47 @@ fun SubscriptionScreen(
                         Column {
                             Text(
                                 text = "Subscription History",
-                                fontSize = 17.sp,
+                                fontSize = 16.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color(0xFF0F172A)
                             )
                             Text(
                                 text = "View your past subscriptions and payments.",
-                                fontSize = 12.sp,
+                                fontSize = 11.5.sp,
                                 color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
                             )
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = { showFullHistorySheet = true },
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "View All",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isDark) Color.White else Color(0xFF334155)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = if (isDark) Color.White else Color(0xFF334155),
-                                modifier = Modifier.size(14.dp)
-                            )
+                    if (formattedHistoryList.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = { showFullHistorySheet = true },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "View All",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isDark) Color.White else Color(0xFF334155)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color.White else Color(0xFF334155),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // ── Subscription History Card with Interactive Rows ──
+            // ── Subscription History Card with Interactive Rows OR Empty State ──
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -932,104 +941,175 @@ fun SubscriptionScreen(
                     border = BorderStroke(1.dp, if (isDark) Color(0xFF262F40) else Color(0xFFE2E8F0)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
                 ) {
-                    Column {
-                        formattedHistoryList.take(3).forEachIndexed { idx, histItem ->
-                            Row(
+                    if (isHistoryLoading) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color(0xFFF59E0B),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Loading history...",
+                                fontSize = 12.5.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                            )
+                        }
+                    } else if (formattedHistoryList.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 28.dp, horizontal = 20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedReceiptItem = histItem
-                                        showReceiptDialog = true
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 13.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // Circular Icon matching design
-                                    val bg = when (histItem.iconType) {
-                                        "sync" -> if (isDark) Color(0xFF1E2E4A) else Color(0xFFEFF6FF)
-                                        "briefcase" -> if (isDark) Color(0xFF262F40) else Color(0xFFF1F5F9)
-                                        else -> if (isDark) Color(0xFF2E230B) else Color(0xFFFFFBEB)
-                                    }
-                                    val iconTint = when (histItem.iconType) {
-                                        "sync" -> Color(0xFF3B82F6)
-                                        "briefcase" -> Color(0xFF64748B)
-                                        else -> Color(0xFFF59E0B)
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(bg),
-                                        contentAlignment = Alignment.Center
+                                Icon(
+                                    imageVector = Icons.Default.ReceiptLong,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "No Subscription History",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = if (isDark) Color.White else Color(0xFF0F172A)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Your subscription payments and invoices will appear here.",
+                                fontSize = 11.5.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        Column {
+                            formattedHistoryList.take(3).forEachIndexed { idx, histItem ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedReceiptItem = histItem
+                                            showReceiptDialog = true
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = when (histItem.iconType) {
-                                                "sync" -> Icons.Default.Sync
-                                                "briefcase" -> Icons.Default.BusinessCenter
-                                                else -> Icons.Default.EmojiEvents
-                                            },
-                                            contentDescription = null,
-                                            tint = iconTint,
-                                            modifier = Modifier.size(19.dp)
-                                        )
+                                        val bg = when (histItem.iconType) {
+                                            "sync" -> if (isDark) Color(0xFF1E2E4A) else Color(0xFFEFF6FF)
+                                            "briefcase" -> if (isDark) Color(0xFF262F40) else Color(0xFFF1F5F9)
+                                            else -> if (isDark) Color(0xFF2E230B) else Color(0xFFFFFBEB)
+                                        }
+                                        val iconTint = when (histItem.iconType) {
+                                            "sync" -> Color(0xFF3B82F6)
+                                            "briefcase" -> Color(0xFF64748B)
+                                            else -> Color(0xFFF59E0B)
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape)
+                                                .background(bg),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = when (histItem.iconType) {
+                                                    "sync" -> Icons.Default.Sync
+                                                    "briefcase" -> Icons.Default.BusinessCenter
+                                                    else -> Icons.Default.EmojiEvents
+                                                },
+                                                contentDescription = null,
+                                                tint = iconTint,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(10.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = histItem.planNameDisplay,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDark) Color.White else Color(0xFF0F172A),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(1.dp))
+                                            Text(
+                                                text = "৳ ${histItem.amount.toInt()} • ${histItem.billingCycle}",
+                                                fontSize = 11.5.sp,
+                                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (histItem.dateRangeDisplay.isNotBlank()) {
+                                                Text(
+                                                    text = histItem.dateRangeDisplay,
+                                                    fontSize = 11.sp,
+                                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
                                     }
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
 
-                                    Column {
-                                        Text(
-                                            text = histItem.planNameDisplay,
-                                            fontSize = 14.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isDark) Color.White else Color(0xFF0F172A)
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "৳ ${histItem.amount.toInt()} • ${histItem.billingCycle}",
-                                            fontSize = 12.sp,
-                                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                        )
-                                        Text(
-                                            text = histItem.dateRangeDisplay,
-                                            fontSize = 11.5.sp,
-                                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isDark) Color(0xFF0E382B) else Color(0xFFDCFCE7)
+                                        ) {
+                                            Text(
+                                                text = histItem.status,
+                                                color = Color(0xFF16A34A),
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowRight,
+                                            contentDescription = "Details",
+                                            tint = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = if (isDark) Color(0xFF0E382B) else Color(0xFFDCFCE7)
-                                    ) {
-                                        Text(
-                                            text = histItem.status,
-                                            color = Color(0xFF16A34A),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(6.dp))
-
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowRight,
-                                        contentDescription = "Details",
-                                        tint = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                        modifier = Modifier.size(18.dp)
+                                if (idx < formattedHistoryList.take(3).lastIndex) {
+                                    HorizontalDivider(
+                                        color = if (isDark) Color(0xFF262F40) else Color(0xFFF1F5F9),
+                                        thickness = 1.dp
                                     )
                                 }
-                            }
-
-                            if (idx < formattedHistoryList.take(3).lastIndex) {
-                                HorizontalDivider(
-                                    color = if (isDark) Color(0xFF262F40) else Color(0xFFF1F5F9),
-                                    thickness = 1.dp
-                                )
                             }
                         }
                     }
@@ -1065,8 +1145,13 @@ fun SubscriptionScreen(
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    val currentDisplayPlan = when (currentPlanKey) {
+                        "FREE" -> "Free Plan (৳ 0 / month)"
+                        "BUSINESS", "QUARTERLY" -> "Business Plan (৳ $quarterlyPrice / 3 months)"
+                        else -> "Pro Plan (৳ $proPrice / month)"
+                    }
                     Text(
-                        text = "Plan: ${subStatus.subscriptionPlan ?: "Pro Plan"} (৳ $proPrice / month)",
+                        text = "Plan: $currentDisplayPlan",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isDark) Color.White else Color(0xFF0F172A)
@@ -1081,66 +1166,72 @@ fun SubscriptionScreen(
                     HorizontalDivider(color = if (isDark) Color(0xFF262F40) else Color(0xFFE2E8F0))
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Auto-Renew Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Auto-Renew Subscription",
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF0F172A)
-                            )
-                            Text(
-                                text = "Automatically renew at end of billing cycle",
-                                fontSize = 11.5.sp,
-                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                    if (currentPlanKey != "FREE") {
+                        // Auto-Renew Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Auto-Renew Subscription",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.White else Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = "Automatically renew at end of billing cycle",
+                                    fontSize = 11.5.sp,
+                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                )
+                            }
+
+                            Switch(
+                                checked = isAutoRenew,
+                                onCheckedChange = { newState ->
+                                    viewModel.toggleAutoRenew(newState) { _, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             )
                         }
 
-                        Switch(
-                            checked = isAutoRenew,
-                            onCheckedChange = { newState ->
-                                viewModel.toggleAutoRenew(newState) { _, msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    if (formattedHistoryList.isNotEmpty()) {
+                        // Download / View Receipt button
+                        OutlinedButton(
+                            onClick = {
+                                showManagePlanSheet = false
+                                selectedReceiptItem = formattedHistoryList.firstOrNull()
+                                showReceiptDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("View Current Cycle Receipt", fontSize = 12.5.sp)
+                        }
 
-                    // Download / View Receipt button
-                    OutlinedButton(
-                        onClick = {
-                            showManagePlanSheet = false
-                            selectedReceiptItem = formattedHistoryList.firstOrNull()
-                            showReceiptDialog = true
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("View Current Cycle Receipt", fontSize = 12.5.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Downgrade to Free Plan button
-                    Button(
-                        onClick = {
-                            showManagePlanSheet = false
-                            showDowngradeConfirmDialog = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Cancel / Downgrade to Free Plan", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                    if (currentPlanKey != "FREE") {
+                        // Downgrade to Free Plan button
+                        Button(
+                            onClick = {
+                                showManagePlanSheet = false
+                                showDowngradeConfirmDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Cancel / Downgrade to Free Plan", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             },
@@ -1438,43 +1529,78 @@ fun SubscriptionScreen(
             },
             text = {
                 Box(modifier = Modifier.heightIn(max = 420.dp).fillMaxWidth()) {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(formattedHistoryList) { hist ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        showFullHistorySheet = false
-                                        selectedReceiptItem = hist
-                                        showReceiptDialog = true
-                                    },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, if (isDark) Color(0xFF262F40) else Color(0xFFE2E8F0)),
-                                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF161B26) else Color.White)
-                            ) {
-                                Row(
+                    if (formattedHistoryList.isEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "No subscription payments recorded yet.",
+                                fontSize = 13.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(formattedHistoryList) { hist ->
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clickable {
+                                            showFullHistorySheet = false
+                                            selectedReceiptItem = hist
+                                            showReceiptDialog = true
+                                        },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, if (isDark) Color(0xFF262F40) else Color(0xFFE2E8F0)),
+                                    colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF161B26) else Color.White)
                                 ) {
-                                    Column {
-                                        Text(hist.planNameDisplay, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text("৳ ${hist.amount.toInt()} • ${hist.dateRangeDisplay}", fontSize = 11.5.sp, color = Color(0xFF64748B))
-                                        Text("TrxID: ${hist.trxId ?: "N/A"} (${hist.paymentMethod})", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isDark) Color(0xFF0E382B) else Color(0xFFDCFCE7)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = hist.status,
-                                            color = Color(0xFF16A34A),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                hist.planNameDisplay,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.5.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                "৳ ${hist.amount.toInt()} • ${hist.dateRangeDisplay}",
+                                                fontSize = 11.5.sp,
+                                                color = Color(0xFF64748B),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (!hist.trxId.isNullOrBlank()) {
+                                                Text(
+                                                    "TrxID: ${hist.trxId} (${hist.paymentMethod})",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFF94A3B8),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isDark) Color(0xFF0E382B) else Color(0xFFDCFCE7)
+                                        ) {
+                                            Text(
+                                                text = hist.status,
+                                                color = Color(0xFF16A34A),
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1495,6 +1621,7 @@ fun SubscriptionScreen(
     // ──────────────────────────────────────────────────────────────────────────
     selectedReceiptItem?.let { receipt ->
         if (showReceiptDialog) {
+            val merchantDisplayName = activeProfile.businessName.ifBlank { activeProfile.accountHolder.ifBlank { "Merchant" } }
             AlertDialog(
                 onDismissRequest = { showReceiptDialog = false },
                 title = {
@@ -1506,7 +1633,7 @@ fun SubscriptionScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Payment Invoice & Receipt", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text("Payment Invoice & Receipt", fontSize = 16.5.sp, fontWeight = FontWeight.Bold)
                     }
                 },
                 text = {
@@ -1519,29 +1646,31 @@ fun SubscriptionScreen(
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Invoice No:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text(receipt.id, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(receipt.id, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Merchant:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text(activeProfile.businessName.ifBlank { "aerospacehub26" }, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(merchantDisplayName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Plan:", fontSize = 12.sp, color = Color(0xFF64748B))
                                 Text(receipt.planNameDisplay, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
                             }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Billing Period:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text(receipt.dateRangeDisplay, fontSize = 11.5.sp)
+                            if (receipt.dateRangeDisplay.isNotBlank()) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Billing Period:", fontSize = 12.sp, color = Color(0xFF64748B))
+                                    Text(receipt.dateRangeDisplay, fontSize = 11.5.sp)
+                                }
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Amount Paid:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text("৳ ${receipt.amount.toInt()} BDT", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                Text("৳ ${receipt.amount.toInt()} BDT", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
                             }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text("TrxID:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(receipt.trxId ?: "N/A", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    if (!receipt.trxId.isNullOrBlank()) {
+                            if (!receipt.trxId.isNullOrBlank()) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("TrxID:", fontSize = 12.sp, color = Color(0xFF64748B))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(receipt.trxId, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Icon(
                                             Icons.Default.ContentCopy,
@@ -1557,13 +1686,15 @@ fun SubscriptionScreen(
                                     }
                                 }
                             }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Method:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text(receipt.paymentMethod, fontSize = 12.sp)
+                            if (receipt.paymentMethod.isNotBlank()) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Method:", fontSize = 12.sp, color = Color(0xFF64748B))
+                                    Text(receipt.paymentMethod, fontSize = 12.sp)
+                                }
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Status:", fontSize = 12.sp, color = Color(0xFF64748B))
-                                Text("PAID ✓", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
+                                Text(if (receipt.status.equals("Paid", true)) "PAID ✓" else receipt.status, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
                             }
                         }
                     }
