@@ -1407,7 +1407,26 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    fun isFakePhoneNumber(number: String): Boolean {
+        val clean = number.filter(Char::isDigit)
+        if (clean.length < 10) return true
+        val fakeSet = setOf(
+            "01711223344", "01811223344", "019112233441", "01928092777",
+            "01712963652", "01819283746", "01612345678", "01712345678",
+            "01700000000", "01700000001", "01800000000", "01900000000",
+            "01600000000", "01500000000"
+        )
+        if (clean in fakeSet) return true
+        if (clean.contains("11223344") || clean.contains("12345678") || clean.contains("0000000")) return true
+        return false
+    }
+
+    suspend fun purgeFakeMerchantNumbers() = withContext(Dispatchers.IO) {
+        dao.purgeFakeMerchantNumbers()
+    }
+
     suspend fun syncMerchantNumbersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
+        dao.purgeFakeMerchantNumbers()
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
@@ -1436,7 +1455,7 @@ class AppRepository(private val context: Context) {
                 if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     val rawNum = obj.optString("number")
                     val numStr = rawNum.filter(Char::isDigit)
-                    if (numStr.length in 10..15) {
+                    if (numStr.length in 10..15 && !isFakePhoneNumber(numStr)) {
                         dao.upsertMerchantNumber(
                             MerchantNumberEntity(
                                 number = numStr,

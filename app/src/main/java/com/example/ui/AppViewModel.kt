@@ -615,8 +615,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     val accountTypesObj = org.json.JSONObject()
                     val qrCodesObj = org.json.JSONObject()
                     val dbNumbers = repository.getMerchantNumbers(_activeProfile.value.id)
-                    val activeNums = if (dbNumbers.isNotEmpty()) dbNumbers else merchantNumbers.value.map { MerchantNumberEntity(it.number, _activeProfile.value.id, it.method, it.type, it.isActive, it.isDefault, it.qrCodeUrl) }
-                    activeNums.filter { it.isActive }.forEach { num ->
+                    val activeNums = (if (dbNumbers.isNotEmpty()) dbNumbers else merchantNumbers.value.map { MerchantNumberEntity(it.number, _activeProfile.value.id, it.method, it.type, it.isActive, it.isDefault, it.qrCodeUrl) })
+                        .filter { it.isActive && !repository.isFakePhoneNumber(it.number) }
+                    activeNums.forEach { num ->
                         receivingNums.put(num.method, num.number)
                         accountTypesObj.put(num.method, num.accountType)
                         if (!num.qrCodeUrl.isNullOrBlank()) {
@@ -777,13 +778,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             val accountTypes = configObj.optJSONObject("account_types")
                             val qrCodes = configObj.optJSONObject("qr_codes")
 
+                            repository.purgeFakeMerchantNumbers()
                             if (receivingNums != null && receivingNums.length() > 0) {
                                 val keys = receivingNums.keys()
                                 while (keys.hasNext()) {
                                     val methodKey = keys.next()
                                     val rawNumber = receivingNums.optString(methodKey, "")
                                     val normalized = rawNumber.filter(Char::isDigit)
-                                    if (normalized.length in 10..15) {
+                                    if (normalized.length in 10..15 && !repository.isFakePhoneNumber(normalized)) {
                                         val normMethod = when (methodKey.lowercase()) {
                                             "bkash" -> "bKash"
                                             "nagad" -> "Nagad"
@@ -1267,6 +1269,63 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val timestamp: Long = System.currentTimeMillis()
     )
 
+    data class SupportChatSession(
+        val id: String = java.util.UUID.randomUUID().toString(),
+        val title: String = "Support Conversation",
+        val timestamp: Long = System.currentTimeMillis(),
+        val messages: List<SupportChatMessage> = emptyList(),
+        val status: String = "ACTIVE"
+    ) {
+        fun toJson(): JSONObject {
+            val obj = JSONObject()
+            obj.put("id", id)
+            obj.put("title", title)
+            obj.put("timestamp", timestamp)
+            obj.put("status", status)
+            val msgArr = JSONArray()
+            for (m in messages) {
+                val mObj = JSONObject().apply {
+                    put("id", m.id)
+                    put("merchantId", m.merchantId)
+                    put("sender", m.sender)
+                    put("message", m.message)
+                    put("timestamp", m.timestamp)
+                }
+                msgArr.put(mObj)
+            }
+            obj.put("messages", msgArr)
+            return obj
+        }
+
+        companion object {
+            fun fromJson(obj: JSONObject): SupportChatSession? {
+                return try {
+                    val id = obj.optString("id", java.util.UUID.randomUUID().toString())
+                    val title = obj.optString("title", "Support Conversation")
+                    val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                    val status = obj.optString("status", "ACTIVE")
+                    val msgArr = obj.optJSONArray("messages") ?: JSONArray()
+                    val messages = mutableListOf<SupportChatMessage>()
+                    for (i in 0 until msgArr.length()) {
+                        val mObj = msgArr.optJSONObject(i) ?: continue
+                        messages.add(
+                            SupportChatMessage(
+                                id = mObj.optString("id", java.util.UUID.randomUUID().toString()),
+                                merchantId = mObj.optString("merchantId", ""),
+                                sender = mObj.optString("sender", "MERCHANT"),
+                                message = mObj.optString("message", ""),
+                                timestamp = mObj.optLong("timestamp", System.currentTimeMillis())
+                            )
+                        )
+                    }
+                    SupportChatSession(id, title, timestamp, messages, status)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
+
     data class SupportFaqItem(
         val question: String = "",
         val answer: String = ""
@@ -1393,6 +1452,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _supportChatList = MutableStateFlow<List<SupportChatMessage>>(emptyList())
     val supportChatList: StateFlow<List<SupportChatMessage>> = _supportChatList.asStateFlow()
+
+    private val _currentSupportSessionId = MutableStateFlow<String>(java.util.UUID.randomUUID().toString())
+    val currentSupportSessionId: StateFlow<String> = _currentSupportSessionId.asStateFlow()
+
+    private val _savedSupportChatSessions = MutableStateFlow<List<SupportChatSession>>(loadSavedSupportChatSessions())
+    val savedSupportChatSessions: StateFlow<List<SupportChatSession>> = _savedSupportChatSessions.asStateFlow()
 
     private val _isGatewayPermissionGranted = MutableStateFlow(true)
     val isGatewayPermissionGranted: StateFlow<Boolean> = _isGatewayPermissionGranted.asStateFlow()
@@ -1658,6 +1723,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 )
                             }
                             _supportChatList.value = fetched
+                            if (fetched.isNotEmpty()) {
+                                saveOrUpdateCurrentSupportChatSession()
+                            }
                         }
                     }
                 }
@@ -1760,6 +1828,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             timestamp = System.currentTimeMillis()
         )
         _supportChatList.value = _supportChatList.value + userMsg
+        saveOrUpdateCurrentSupportChatSession()
 
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -1809,8 +1878,91 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadSavedSupportChatSessions(): List<SupportChatSession> {
+        val jsonStr = securityPrefs.getString("saved_support_chat_sessions_v1", null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(jsonStr)
+            val list = mutableListOf<SupportChatSession>()
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                SupportChatSession.fromJson(item)?.let { list.add(it) }
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun persistSupportChatSessions() {
+        val list = _savedSupportChatSessions.value
+        val arr = JSONArray()
+        for (session in list) {
+            arr.put(session.toJson())
+        }
+        securityPrefs.edit().putString("saved_support_chat_sessions_v1", arr.toString()).apply()
+    }
+
+    fun saveOrUpdateCurrentSupportChatSession() {
+        val messages = _supportChatList.value
+        if (messages.isEmpty()) return
+        val firstUserMsg = messages.firstOrNull { it.sender.equals("MERCHANT", ignoreCase = true) || it.sender.equals("USER", ignoreCase = true) }?.message?.trim()
+            ?: messages.firstOrNull()?.message?.trim() ?: "Support Chat"
+        val sessionTitle = if (firstUserMsg.length > 45) firstUserMsg.take(42) + "..." else firstUserMsg
+        val currentId = _currentSupportSessionId.value
+        val list = _savedSupportChatSessions.value.toMutableList()
+        val existingIndex = list.indexOfFirst { it.id == currentId }
+        val updatedSession = SupportChatSession(
+            id = currentId,
+            title = sessionTitle,
+            timestamp = System.currentTimeMillis(),
+            messages = messages,
+            status = "ACTIVE"
+        )
+        if (existingIndex >= 0) {
+            list[existingIndex] = updatedSession
+        } else {
+            list.add(0, updatedSession)
+        }
+        _savedSupportChatSessions.value = list
+        persistSupportChatSessions()
+    }
+
+    fun startNewSupportChatSession() {
+        saveOrUpdateCurrentSupportChatSession()
+        _currentSupportSessionId.value = java.util.UUID.randomUUID().toString()
+        _supportChatList.value = emptyList()
+    }
+
+    fun loadSupportChatSession(sessionId: String) {
+        saveOrUpdateCurrentSupportChatSession()
+        val session = _savedSupportChatSessions.value.find { it.id == sessionId } ?: return
+        _currentSupportSessionId.value = session.id
+        _supportChatList.value = session.messages
+    }
+
+    fun deleteSupportChatSession(sessionId: String) {
+        val list = _savedSupportChatSessions.value.filterNot { it.id == sessionId }
+        _savedSupportChatSessions.value = list
+        persistSupportChatSessions()
+        if (_currentSupportSessionId.value == sessionId) {
+            _currentSupportSessionId.value = java.util.UUID.randomUUID().toString()
+            _supportChatList.value = emptyList()
+        }
+    }
+
+    fun clearAllSupportChatSessions() {
+        _savedSupportChatSessions.value = emptyList()
+        securityPrefs.edit().remove("saved_support_chat_sessions_v1").apply()
+        _currentSupportSessionId.value = java.util.UUID.randomUUID().toString()
+        _supportChatList.value = emptyList()
+    }
+
     fun clearSupportChat() {
         _supportChatList.value = emptyList()
+        val currentId = _currentSupportSessionId.value
+        val list = _savedSupportChatSessions.value.filterNot { it.id == currentId }
+        _savedSupportChatSessions.value = list
+        persistSupportChatSessions()
     }
 
     fun listenToSupportChatFromPlatformOwner() {
@@ -5857,7 +6009,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val receivingNums = org.json.JSONObject()
         val accountTypesObj = org.json.JSONObject()
         val qrCodesObj = org.json.JSONObject()
-        val activeNums = merchantNumbers.value.filter { it.isActive }
+        val activeNums = merchantNumbers.value.filter { it.isActive && !repository.isFakePhoneNumber(it.number) }
         activeNums.forEach { num ->
             receivingNums.put(num.method, num.number)
             accountTypesObj.put(num.method, num.type)
@@ -15270,7 +15422,7 @@ function executePayment() {
                             days = json.optInt("days", 30),
                             currency = json.optString("currency", "BDT"),
                             paymentMethod = json.optString("payment_method", paymentMethod),
-                            receivingAccount = json.optString("receiving_account", "01711223344"),
+                            receivingAccount = json.optString("receiving_account", ""),
                             nidAssociated = json.optString("nid_associated").takeIf { it.isNotBlank() },
                             instructions = json.optString("instructions"),
                             checkoutUrl = json.optString("checkout_url").takeIf { it.isNotBlank() }
@@ -15563,7 +15715,7 @@ function executePayment() {
                                 merchantId = merchObj?.optString("id") ?: fallbackMerchantId,
                                 merchantStoreName = merchObj?.optString("store_name") ?: "SwapnoPay Merchant Store",
                                 currency = merchObj?.optString("currency") ?: "BDT",
-                                gatewayMethods = if (gwMap.isEmpty()) mapOf("bKash" to "01928092777", "Nagad" to "01712963652", "Rocket" to "01819283746", "Upay" to "01612345678") else gwMap,
+                                gatewayMethods = gwMap,
                                 isActive = true
                             )
                         } else if (!respStr.isNullOrBlank()) {
@@ -15580,7 +15732,7 @@ function executePayment() {
                         merchantId = fallbackMerchantId,
                         merchantStoreName = activeProfile.value.businessName.ifBlank { "SwapnoPay Store" },
                         currency = "BDT",
-                        gatewayMethods = mapOf("bKash" to "01928092777", "Nagad" to "01712963652", "Rocket" to "01819283746", "Upay" to "01612345678"),
+                        gatewayMethods = emptyMap(),
                         isActive = true
                     )
                 }
@@ -16246,7 +16398,7 @@ data class EmployeeSession(
     val merchantStoreName: String = "SwapnoPay Store",
     val currency: String = "BDT",
     val permissions: List<String> = listOf("POS & Billing Access", "Inventory Access"),
-    val gatewayMethods: Map<String, String> = mapOf("bKash" to "01928092777", "Nagad" to "01712963652", "Rocket" to "01819283746", "Upay" to "01612345678"),
+    val gatewayMethods: Map<String, String> = emptyMap(),
     val isActive: Boolean = true
 )
 

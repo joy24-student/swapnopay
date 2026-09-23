@@ -1205,7 +1205,7 @@ private fun EmployeeCheckoutDialog(
                                 }
                             } else {
                                 // MFS Instant Matching Flow
-                                val mfsNumber = session.gatewayMethods[paymentMethod] ?: "01928092777"
+                                val mfsNumber = session.gatewayMethods[paymentMethod] ?: ""
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC)),

@@ -631,11 +631,14 @@ interface AppDao {
     suspend fun deleteEmployee(id: String)
 
     // Merchant payment numbers
-    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default') AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     fun observeMerchantNumbers(merchantId: String): Flow<List<MerchantNumberEntity>>
 
-    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default') AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity>
+
+    @Query("DELETE FROM merchant_numbers WHERE number IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') OR number LIKE '%XXXX%' OR number LIKE '%11223344%' OR number LIKE '%0000000%'")
+    suspend fun purgeFakeMerchantNumbers()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMerchantNumber(number: MerchantNumberEntity)

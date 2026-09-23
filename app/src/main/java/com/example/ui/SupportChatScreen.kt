@@ -66,19 +66,21 @@ fun SupportChatScreen(viewModel: AppViewModel) {
     val chatList by viewModel.supportChatList.collectAsState()
     val remoteConfig by viewModel.systemRemoteConfig.collectAsState()
     val activeProfile by viewModel.activeProfile.collectAsState()
+    val savedSessions by viewModel.savedSupportChatSessions.collectAsState()
+    val currentSessionId by viewModel.currentSupportSessionId.collectAsState()
+    val myTickets by viewModel.mySupportTicketsList.collectAsState()
 
     var chatInput by remember { mutableStateOf("") }
-    var isSearchActive by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var showMenu by remember { mutableStateOf(false) }
+    var showHistoryDrawer by remember { mutableStateOf(false) }
     var showFaqModal by remember { mutableStateOf(false) }
     var showAttachmentModal by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
 
-    // Real-time live chat polling: continuously syncs with Admin Helpdesk
+    // Real-time live chat polling: continuously syncs with Admin Helpdesk & Tickets
     LaunchedEffect(Unit) {
         viewModel.listenToSupportChatFromPlatformOwner()
+        viewModel.listenToMerchantSupportTickets()
     }
 
     // Auto-scroll to bottom when new messages arrive
@@ -88,65 +90,17 @@ fun SupportChatScreen(viewModel: AppViewModel) {
         }
     }
 
-    val filteredMessages = remember(chatList, searchQuery) {
-        if (searchQuery.isBlank()) chatList
-        else chatList.filter { it.message.contains(searchQuery, ignoreCase = true) }
-    }
-
-    Scaffold(
-        containerColor = if (isDark) Color(0xFF0F1117) else Color.White,
-        topBar = {
-            ChatTopAppBar(
-                isDark = isDark,
-                isSearchActive = isSearchActive,
-                searchQuery = searchQuery,
-                showMenu = showMenu,
-                onBack = { viewModel.goBack() },
-                onToggleSearch = {
-                    isSearchActive = !isSearchActive
-                    if (!isSearchActive) searchQuery = ""
-                },
-                onSearchChange = { searchQuery = it },
-                onToggleMenu = { showMenu = !showMenu },
-                onMenuDismiss = { showMenu = false },
-                onOpenFaq = {
-                    showMenu = false
-                    showFaqModal = true
-                },
-                onCallHelpline = {
-                    showMenu = false
-                    val helpline = remoteConfig.supportHelpline.ifBlank { "+8801700000000" }
-                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$helpline"))
-                    runCatching { context.startActivity(intent) }
-                },
-                onEmailSupport = {
-                    showMenu = false
-                    val email = remoteConfig.supportEmail.ifBlank { "support@swapnopay.top" }
-                    clipboardManager.setText(AnnotatedString(email))
-                    Toast.makeText(context, "Support email copied: $email", Toast.LENGTH_SHORT).show()
-                },
-                onClearChat = {
-                    showMenu = false
-                    viewModel.clearSupportChat()
-                    Toast.makeText(context, "Chat cleared", Toast.LENGTH_SHORT).show()
-                }
-            )
-        },
-        bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (isDark) Color(0xFF0F1117) else Color.White)
-            ) {
-                // 4 Target Quick Action Chips
-                ChatQuickActionChips(
-                    onChipClick = { promptText ->
-                        viewModel.sendSupportChatMessage(promptText)
-                    },
-                    isDark = isDark
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = if (isDark) Color(0xFF0F1117) else Color.White,
+            topBar = {
+                ChatTopAppBar(
+                    isDark = isDark,
+                    onBack = { viewModel.goBack() },
+                    onOpenHistory = { showHistoryDrawer = true }
                 )
-
-                // Pill Input Bar
+            },
+            bottomBar = {
                 ChatBottomInputBar(
                     chatInput = chatInput,
                     onInputChange = { chatInput = it },
@@ -164,86 +118,155 @@ fun SupportChatScreen(viewModel: AppViewModel) {
                     isDark = isDark
                 )
             }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(if (isDark) Color(0xFF0F1117) else Color.White)
-        ) {
-            // "Need quick help?" Banner Card
-            QuickHelpBannerCard(
-                onViewFaqs = { showFaqModal = true },
-                isDark = isDark
-            )
-
-            // Conversation Messages Feed
-            if (filteredMessages.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(if (isDark) Color(0xFF0F1117) else Color.White)
+            ) {
+                // Conversation Messages Feed
+                if (chatList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF1E2430) else Color(0xFFF1F5FB)),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.HeadsetMic,
-                                contentDescription = null,
-                                tint = if (isDark) BrandGoldYellow else BrandGoldAmber,
-                                modifier = Modifier.size(32.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color(0xFF1E2430) else Color(0xFFF1F5FB)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.HeadsetMic,
+                                    contentDescription = null,
+                                    tint = if (isDark) BrandGoldYellow else BrandGoldAmber,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "How can we help you today?",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color.White else TextDarkPrimary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Send a message below to chat with our 24/7 support specialist.",
+                                fontSize = 13.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 24.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "No messages match '$searchQuery'" else "How can we help you today?",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) Color.White else TextDarkPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "Try searching for a different keyword" else "Send a message or tap one of the quick actions below to reach out to our team.",
-                            fontSize = 13.sp,
-                            color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 14.dp),
+                        contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(chatList, key = { it.id }) { message ->
+                            ChatMessageItem(
+                                message = message,
+                                userInitial = activeProfile.businessName.ifBlank { "You" }.take(1).uppercase(Locale.getDefault()),
+                                onCopy = { text ->
+                                    clipboardManager.setText(AnnotatedString(text))
+                                    Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                                },
+                                isDark = isDark
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 14.dp),
-                    contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(filteredMessages, key = { it.id }) { message ->
-                        ChatMessageItem(
-                            message = message,
-                            userInitial = activeProfile.businessName.ifBlank { "You" }.take(1).uppercase(Locale.getDefault()),
-                            onCopy = { text ->
-                                clipboardManager.setText(AnnotatedString(text))
-                                Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
-                            },
-                            isDark = isDark
-                        )
+            }
+        }
+
+        // Side Navigation Drawer for Chat History & Actions
+        if (showHistoryDrawer) {
+            // Semi-transparent Backdrop Scrim
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable { showHistoryDrawer = false }
+            )
+
+            // Sliding Sidebar Drawer Content from Right Side
+            AnimatedVisibility(
+                visible = showHistoryDrawer,
+                enter = slideInHorizontally(initialOffsetX = { it }),
+                exit = slideOutHorizontally(targetOffsetX = { it }),
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                ChatHistorySideDrawer(
+                    savedSessions = savedSessions,
+                    currentSessionId = currentSessionId,
+                    currentChatMessages = chatList,
+                    myTickets = myTickets,
+                    isDark = isDark,
+                    onClose = { showHistoryDrawer = false },
+                    onNewChat = {
+                        viewModel.startNewSupportChatSession()
+                        showHistoryDrawer = false
+                        Toast.makeText(context, "New chat started", Toast.LENGTH_SHORT).show()
+                    },
+                    onSelectSession = { sessionId ->
+                        viewModel.loadSupportChatSession(sessionId)
+                        showHistoryDrawer = false
+                    },
+                    onDeleteSession = { sessionId ->
+                        viewModel.deleteSupportChatSession(sessionId)
+                        Toast.makeText(context, "Conversation deleted", Toast.LENGTH_SHORT).show()
+                    },
+                    onClearAllSessions = {
+                        viewModel.clearAllSupportChatSessions()
+                        Toast.makeText(context, "All history cleared", Toast.LENGTH_SHORT).show()
+                    },
+                    onOpenFaq = {
+                        showHistoryDrawer = false
+                        showFaqModal = true
+                    },
+                    onCallHelpline = {
+                        showHistoryDrawer = false
+                        val helpline = remoteConfig.supportHelpline.ifBlank { "+8801700000000" }
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$helpline"))
+                        runCatching { context.startActivity(intent) }
+                    },
+                    onEmailSupport = {
+                        showHistoryDrawer = false
+                        val email = remoteConfig.supportEmail.ifBlank { "support@swapnopay.top" }
+                        clipboardManager.setText(AnnotatedString(email))
+                        Toast.makeText(context, "Support email copied: $email", Toast.LENGTH_SHORT).show()
+                    },
+                    onCopyTranscript = {
+                        val transcript = if (chatList.isEmpty()) "No messages in conversation"
+                        else chatList.joinToString("\n\n") { msg ->
+                            val time = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(msg.timestamp))
+                            "[${msg.sender} - $time]\n${msg.message}"
+                        }
+                        clipboardManager.setText(AnnotatedString(transcript))
+                        Toast.makeText(context, "Chat transcript copied to clipboard", Toast.LENGTH_SHORT).show()
+                    },
+                    onClearCurrentChat = {
+                        viewModel.clearSupportChat()
+                        showHistoryDrawer = false
+                        Toast.makeText(context, "Chat cleared", Toast.LENGTH_SHORT).show()
                     }
-                }
+                )
             }
         }
     }
@@ -276,27 +299,16 @@ fun SupportChatScreen(viewModel: AppViewModel) {
 
 /**
  * Top App Bar
- * Pure pixel-perfect match:
  * - Back button
  * - Circular Golden Yellow Avatar ('S')
  * - 3-Line title block: SwapnoPay / Support Chat / ● Online
- * - Action buttons: Search and 3-dots Menu
+ * - Action button: Chat History side navigation drawer toggle (Replaces Three-dot and Search)
  */
 @Composable
 private fun ChatTopAppBar(
     isDark: Boolean,
-    isSearchActive: Boolean,
-    searchQuery: String,
-    showMenu: Boolean,
     onBack: () -> Unit,
-    onToggleSearch: () -> Unit,
-    onSearchChange: (String) -> Unit,
-    onToggleMenu: () -> Unit,
-    onMenuDismiss: () -> Unit,
-    onOpenFaq: () -> Unit,
-    onCallHelpline: () -> Unit,
-    onEmailSupport: () -> Unit,
-    onClearChat: () -> Unit
+    onOpenHistory: () -> Unit
 ) {
     Surface(
         color = if (isDark) Color(0xFF0F1117) else Color.White,
@@ -382,169 +394,16 @@ private fun ChatTopAppBar(
                     }
                 }
 
-                // Search Icon
+                // Chat History Button (Replaces Three-dot and Search icon)
                 IconButton(
-                    onClick = onToggleSearch,
+                    onClick = onOpenHistory,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                        contentDescription = "Search",
+                        imageVector = Icons.Default.History,
+                        contentDescription = "Chat History",
                         tint = if (isDark) Color.White else IconDarkColor,
                         modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Overflow 3-dots Menu
-                Box {
-                    IconButton(
-                        onClick = onToggleMenu,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu",
-                            tint = if (isDark) Color.White else IconDarkColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = onMenuDismiss,
-                        modifier = Modifier.background(if (isDark) Color(0xFF1E2430) else Color.White)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("View FAQs & Guides", fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.HelpOutline, null, tint = BrandGoldAmber) },
-                            onClick = onOpenFaq
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Call Support Helpline", fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.Phone, null, tint = BrandGoldAmber) },
-                            onClick = onCallHelpline
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Copy Support Email", fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.Email, null, tint = BrandGoldAmber) },
-                            onClick = onEmailSupport
-                        )
-                        HorizontalDivider(color = if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0))
-                        DropdownMenuItem(
-                            text = { Text("Clear Chat", fontSize = 14.sp, color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = onClearChat
-                        )
-                    }
-                }
-            }
-
-            // In-Chat Search Bar expansion
-            AnimatedVisibility(
-                visible = isSearchActive,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchChange,
-                    placeholder = { Text("Search messages...", fontSize = 13.5.sp) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = BrandGoldYellow,
-                        unfocusedBorderColor = if (isDark) Color(0xFF333A48) else Color(0xFFE2E8F0)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * "Need quick help?" Banner Card
- * Golden cream background (#FFFBF0) with amber border (#FDE68A)
- * Black headset inside circular golden badge (#FEE89E)
- * "View FAQs >" golden rounded pill button
- */
-@Composable
-private fun QuickHelpBannerCard(
-    onViewFaqs: () -> Unit,
-    isDark: Boolean
-) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E222D) else Color(0xFFFFFBF0)
-        ),
-        border = BorderStroke(1.dp, if (isDark) Color(0xFF3D3522) else Color(0xFFFDE68A)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Yellow circular badge with black headset
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.HeadsetMic,
-                    contentDescription = null,
-                    tint = if (isDark) BrandGoldYellow else IconDarkColor,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "Need quick help?",
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else TextDarkPrimary
-                )
-                Text(
-                    text = "Our support team is here 24/7",
-                    fontSize = 12.sp,
-                    color = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // "View FAQs >" Pill Button
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = if (isDark) Color(0xFF2C2E38) else Color.White,
-                border = BorderStroke(1.dp, if (isDark) Color(0xFF3D3522) else Color(0xFFFDE68A)),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onViewFaqs() }
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "View FAQs >",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isDark) BrandGoldYellow else BrandGoldAmber
                     )
                 }
             }
@@ -734,176 +593,694 @@ private fun ChatMessageItem(
 }
 
 /**
- * 4 Target Quick Action Chips
- * 1. Change Booking
- * 2. Cancel Booking
- * 3. Refund Status
- * 4. Other Help
- * Each chip has a circular golden badge containing a dark icon.
+ * Chat History Side Navigation Drawer
+ * Displays past conversation sessions, support tickets, and quick support options.
  */
 @Composable
-private fun ChatQuickActionChips(
-    onChipClick: (String) -> Unit,
-    isDark: Boolean
+private fun ChatHistorySideDrawer(
+    savedSessions: List<AppViewModel.SupportChatSession>,
+    currentSessionId: String,
+    currentChatMessages: List<AppViewModel.SupportChatMessage>,
+    myTickets: List<AppViewModel.SupportTicket>,
+    isDark: Boolean,
+    onClose: () -> Unit,
+    onNewChat: () -> Unit,
+    onSelectSession: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onClearAllSessions: () -> Unit,
+    onOpenFaq: () -> Unit,
+    onCallHelpline: () -> Unit,
+    onEmailSupport: () -> Unit,
+    onCopyTranscript: () -> Unit,
+    onClearCurrentChat: () -> Unit
 ) {
-    val chipBg = if (isDark) Color(0xFF191D26) else Color(0xFFF8FAFC)
-    val chipBorder = if (isDark) Color(0xFF2C3240) else Color(0xFFE2E8F0)
-    val badgeBg = if (isDark) Color(0xFF383214) else Color(0xFFFEE89E)
-    val iconTint = if (isDark) BrandGoldYellow else IconDarkColor
-    val textColor = if (isDark) Color.White else TextDarkPrimary
+    val drawerBg = if (isDark) Color(0xFF131824) else Color.White
+    val cardBg = if (isDark) Color(0xFF1C2233) else Color(0xFFF8FAFC)
+    val cardBorder = if (isDark) Color(0xFF2C3549) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDark) Color.White else TextDarkPrimary
+    val textSecondary = if (isDark) Color(0xFF94A3B8) else TextMutedSecondary
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Chip 1: Change Booking
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = chipBg,
-            border = BorderStroke(1.dp, chipBorder),
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .clickable { onChipClick("Change Booking") }
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(badgeBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(13.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = "Change Booking",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textColor
-                )
-            }
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Chats, 1: Tickets, 2: Support
+    var historySearch by remember { mutableStateOf("") }
+
+    val allSessions = remember(savedSessions, currentSessionId, currentChatMessages) {
+        val list = savedSessions.toMutableList()
+        if (currentChatMessages.isNotEmpty() && list.none { it.id == currentSessionId }) {
+            val firstMsg = currentChatMessages.firstOrNull { it.sender.equals("MERCHANT", ignoreCase = true) || it.sender.equals("USER", ignoreCase = true) }?.message?.trim()
+                ?: currentChatMessages.firstOrNull()?.message?.trim() ?: "Support Chat"
+            val title = if (firstMsg.length > 45) firstMsg.take(42) + "..." else firstMsg
+            list.add(0, AppViewModel.SupportChatSession(
+                id = currentSessionId,
+                title = title,
+                timestamp = currentChatMessages.lastOrNull()?.timestamp ?: System.currentTimeMillis(),
+                messages = currentChatMessages,
+                status = "ACTIVE"
+            ))
         }
+        list
+    }
 
-        // Chip 2: Cancel Booking
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = chipBg,
-            border = BorderStroke(1.dp, chipBorder),
+    val filteredSessions = remember(allSessions, historySearch) {
+        if (historySearch.isBlank()) allSessions
+        else allSessions.filter { session ->
+            session.title.contains(historySearch, ignoreCase = true) ||
+                session.messages.any { it.message.contains(historySearch, ignoreCase = true) }
+        }
+    }
+
+    val filteredTickets = remember(myTickets, historySearch) {
+        if (historySearch.isBlank()) myTickets
+        else myTickets.filter { ticket ->
+            ticket.subject.contains(historySearch, ignoreCase = true) ||
+                ticket.description.contains(historySearch, ignoreCase = true) ||
+                ticket.category.contains(historySearch, ignoreCase = true)
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .widthIn(max = 340.dp)
+            .fillMaxWidth(0.85f),
+        color = drawerBg,
+        shadowElevation = 24.dp,
+        shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp),
+        border = BorderStroke(1.dp, cardBorder)
+    ) {
+        Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .clickable { onChipClick("Cancel Booking") }
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
+            // Header
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(badgeBg),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(BrandGoldYellow),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = IconDarkColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Chat History",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = "Past conversations & tickets",
+                            fontSize = 11.5.sp,
+                            color = textSecondary
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(13.dp)
+                        contentDescription = "Close",
+                        tint = textSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = "Cancel Booking",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textColor
-                )
             }
-        }
 
-        // Chip 3: Refund Status
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = chipBg,
-            border = BorderStroke(1.dp, chipBorder),
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .clickable { onChipClick("Refund Status") }
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // "+ Start New Chat" Button
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = BrandGoldYellow,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onNewChat() }
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(badgeBg),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
+                        imageVector = Icons.Default.Add,
                         contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(13.dp)
+                        tint = IconDarkColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Start New Chat",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = IconDarkColor
                     )
                 }
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = "Refund Status",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textColor
-                )
             }
-        }
 
-        // Chip 4: Other Help
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = chipBg,
-            border = BorderStroke(1.dp, chipBorder),
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .clickable { onChipClick("Other Help") }
-        ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Search Filter
+            OutlinedTextField(
+                value = historySearch,
+                onValueChange = { historySearch = it },
+                placeholder = { Text("Search history...", fontSize = 12.5.sp, color = textSecondary) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = textSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (historySearch.isNotEmpty()) {
+                        IconButton(
+                            onClick = { historySearch = "" },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = null,
+                                tint = textSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BrandGoldYellow,
+                    unfocusedBorderColor = cardBorder
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Tab Row (Chats / Tickets / Support)
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(cardBg, RoundedCornerShape(10.dp))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    "Chats (${allSessions.size})",
+                    "Tickets (${myTickets.size})",
+                    "Support"
+                ).forEachIndexed { idx, label ->
+                    val isSelected = selectedTab == idx
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { selectedTab = idx },
+                        color = if (isSelected) BrandGoldYellow else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) IconDarkColor else textSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 7.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Tab Content
+            Box(modifier = Modifier.weight(1f)) {
+                when (selectedTab) {
+                    0 -> {
+                        // CHATS TAB
+                        if (filteredSessions.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChatBubbleOutline,
+                                        contentDescription = null,
+                                        tint = textSecondary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = if (historySearch.isNotBlank()) "No matching conversations" else "No saved conversations yet",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Messages are automatically saved to your history.",
+                                        fontSize = 11.5.sp,
+                                        color = textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredSessions, key = { it.id }) { session ->
+                                    val isActive = session.id == currentSessionId
+                                    val dateStr = remember(session.timestamp) {
+                                        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+                                        sdf.format(Date(session.timestamp))
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { onSelectSession(session.id) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isActive) {
+                                                if (isDark) Color(0xFF262B3D) else Color(0xFFFFF9E6)
+                                            } else cardBg
+                                        ),
+                                        border = BorderStroke(
+                                            if (isActive) 1.5.dp else 1.dp,
+                                            if (isActive) BrandGoldYellow else cardBorder
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isActive) BrandGoldYellow
+                                                        else (if (isDark) Color(0xFF2E384D) else Color(0xFFE2E8F0))
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ChatBubbleOutline,
+                                                    contentDescription = null,
+                                                    tint = if (isActive) IconDarkColor else textSecondary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(10.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = session.title.ifBlank { "Support Conversation" },
+                                                        fontSize = 12.5.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = textPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
+                                                    )
+                                                    if (isActive) {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = BrandGoldYellow
+                                                        ) {
+                                                            Text(
+                                                                text = "Active",
+                                                                fontSize = 9.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = IconDarkColor,
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(3.dp))
+
+                                                Text(
+                                                    text = "$dateStr • ${session.messages.size} msgs",
+                                                    fontSize = 11.sp,
+                                                    color = textSecondary
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = { onDeleteSession(session.id) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.DeleteOutline,
+                                                    contentDescription = "Delete",
+                                                    tint = textSecondary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    1 -> {
+                        // TICKETS TAB
+                        if (filteredTickets.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Description,
+                                        contentDescription = null,
+                                        tint = textSecondary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = if (historySearch.isNotBlank()) "No matching tickets" else "No support tickets",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Your platform tickets and disputes will appear here.",
+                                        fontSize = 11.5.sp,
+                                        color = textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredTickets, key = { it.id }) { ticket ->
+                                    val dateStr = remember(ticket.createdAt) {
+                                        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+                                        sdf.format(Date(ticket.createdAt))
+                                    }
+                                    val statusColor = when (ticket.status.uppercase(Locale.getDefault())) {
+                                        "OPEN" -> BrandGoldAmber
+                                        "RESOLVED" -> OnlineGreen
+                                        else -> textSecondary
+                                    }
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = cardBg),
+                                        border = BorderStroke(1.dp, cardBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = ticket.category.ifBlank { "General Support" },
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = BrandGoldAmber
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = statusColor.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.8.dp, statusColor)
+                                                ) {
+                                                    Text(
+                                                        text = ticket.status.uppercase(Locale.getDefault()),
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = statusColor,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Text(
+                                                text = ticket.subject.ifBlank { ticket.description.take(40) },
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = textPrimary,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+
+                                            if (ticket.adminReply.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isDark) Color(0xFF162030) else Color(0xFFEFF6FF),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(6.dp),
+                                                        verticalAlignment = Alignment.Top
+                                                    ) {
+                                                        Text(
+                                                            text = "Admin: ${ticket.adminReply}",
+                                                            fontSize = 11.sp,
+                                                            color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8),
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Text(
+                                                text = dateStr,
+                                                fontSize = 10.5.sp,
+                                                color = textSecondary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> {
+                        // QUICK SUPPORT ACTIONS
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Call Helpline
+                            DrawerActionCard(
+                                title = "Call Support Helpline",
+                                subtitle = "24/7 dedicated merchant assistance",
+                                icon = Icons.Default.Phone,
+                                iconBg = BrandGoldYellow,
+                                iconTint = IconDarkColor,
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = textPrimary,
+                                textSecondary = textSecondary,
+                                onClick = onCallHelpline
+                            )
+
+                            // Email Support
+                            DrawerActionCard(
+                                title = "Copy Support Email",
+                                subtitle = "support@swapnopay.top",
+                                icon = Icons.Default.Email,
+                                iconBg = BrandGoldYellow,
+                                iconTint = IconDarkColor,
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = textPrimary,
+                                textSecondary = textSecondary,
+                                onClick = onEmailSupport
+                            )
+
+                            // FAQs
+                            DrawerActionCard(
+                                title = "Knowledgebase FAQs",
+                                subtitle = "Frequently asked questions & guides",
+                                icon = Icons.Default.HelpOutline,
+                                iconBg = BrandGoldYellow,
+                                iconTint = IconDarkColor,
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = textPrimary,
+                                textSecondary = textSecondary,
+                                onClick = onOpenFaq
+                            )
+
+                            // Copy Transcript
+                            DrawerActionCard(
+                                title = "Copy Chat Transcript",
+                                subtitle = "Save conversation to clipboard",
+                                icon = Icons.Default.ContentCopy,
+                                iconBg = if (isDark) Color(0xFF2E384D) else Color(0xFFE2E8F0),
+                                iconTint = textPrimary,
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = textPrimary,
+                                textSecondary = textSecondary,
+                                onClick = onCopyTranscript
+                            )
+
+                            // Clear Current Chat
+                            DrawerActionCard(
+                                title = "Clear Current Chat",
+                                subtitle = "Remove messages on screen",
+                                icon = Icons.Default.DeleteOutline,
+                                iconBg = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                iconTint = Color(0xFFEF4444),
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = Color(0xFFEF4444),
+                                textSecondary = textSecondary,
+                                onClick = onClearCurrentChat
+                            )
+
+                            // Clear All History
+                            DrawerActionCard(
+                                title = "Clear All History",
+                                subtitle = "Delete all saved conversation sessions",
+                                icon = Icons.Default.DeleteForever,
+                                iconBg = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                iconTint = Color(0xFFEF4444),
+                                cardBg = cardBg,
+                                cardBorder = cardBorder,
+                                textPrimary = Color(0xFFEF4444),
+                                textSecondary = textSecondary,
+                                onClick = onClearAllSessions
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Footer
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 12.dp)
+                horizontalArrangement = Arrangement.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
-                        .background(badgeBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "•••",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = iconTint
-                    )
-                }
-                Spacer(modifier = Modifier.width(7.dp))
+                        .background(OnlineGreen)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Other Help",
+                    text = "SwapnoPay Support Desk • 24/7 Active",
+                    fontSize = 11.sp,
+                    color = textSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrawerActionCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconBg: Color,
+    iconTint: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, cardBorder)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = textColor
+                    color = textPrimary
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 10.5.sp,
+                    color = textSecondary
                 )
             }
         }
