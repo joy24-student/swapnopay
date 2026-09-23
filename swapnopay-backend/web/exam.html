@@ -6,150 +6,182 @@
 <title>Online Assessment — Exam Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#FAFAFA; --surface:#FFFFFF; --border:#E2E4E9; --text:#1C1F26; --muted:#6B7280;
-  --accent:#2856E0; --accent-soft:#E8EDFC;
-  --ok:#1B8A5A; --ok-soft:#E3F5EC;
-  --warn:#C77D0A; --warn-soft:#FCF0DF;
-  --danger:#C23B3B; --danger-soft:#FBE9E9;
-  --radius:8px;
+  --bg:#F8FAFC; --surface:#FFFFFF; --border:#E2E8F0; --text:#0F172A; --muted:#64748B;
+  --accent:#2563EB; --accent-soft:#EFF6FF;
+  --ok:#16A34A; --ok-soft:#DCFCE7;
+  --warn:#D97706; --warn-soft:#FEF3C7;
+  --danger:#DC2626; --danger-soft:#FEE2E2;
+  --radius:10px;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#14161B; --surface:#1C1F26; --border:#2C303A; --text:#EDEEF2; --muted:#9AA1AE;
-    --accent:#6B8CF0; --accent-soft:#22284A;
-    --ok:#3FC788; --ok-soft:#173229;
-    --warn:#E0A23B; --warn-soft:#3A2C10;
-    --danger:#E36A6A; --danger-soft:#3A1C1C;
+    --bg:#0B0F19; --surface:#131B2E; --border:#1E293B; --text:#F8FAFC; --muted:#94A3B8;
+    --accent:#3B82F6; --accent-soft:#1E293B;
+    --ok:#22C55E; --ok-soft:#064E3B;
+    --warn:#F59E0B; --warn-soft:#451A03;
+    --danger:#EF4444; --danger-soft:#450A0A;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#14161B; --surface:#1C1F26; --border:#2C303A; --text:#EDEEF2; --muted:#9AA1AE;
-  --accent:#6B8CF0; --accent-soft:#22284A;
-  --ok:#3FC788; --ok-soft:#173229;
-  --warn:#E0A23B; --warn-soft:#3A2C10;
-  --danger:#E36A6A; --danger-soft:#3A1C1C;
+  --bg:#0B0F19; --surface:#131B2E; --border:#1E293B; --text:#F8FAFC; --muted:#94A3B8;
+  --accent:#3B82F6; --accent-soft:#1E293B;
+  --ok:#22C55E; --ok-soft:#064E3B;
+  --warn:#F59E0B; --warn-soft:#451A03;
+  --danger:#EF4444; --danger-soft:#450A0A;
 }
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
+html,body{min-height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 button{font-family:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* Shimmer Loading Animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--accent-soft) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* Header */
 .header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);
-  padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top,0px));
+  padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top,0px));
   display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.header-left{display:flex;flex-direction:column;gap:2px;min-width:0}
-.exam-title{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-left{display:flex;flex-direction:column;gap:3px;min-width:0}
+.brand-strip{display:flex;align-items:center;gap:8px}
+.brand-logo{width:24px;height:24px;border-radius:6px;object-fit:cover;background:var(--accent-soft)}
+.exam-title{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .progress{font-size:12.5px;color:var(--muted);font-weight:500}
-.header-right{display:flex;align-items:center;gap:14px}
+.header-right{display:flex;align-items:center;gap:12px}
 .autosave{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .autosave-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);transition:background 0.3s}
 .autosave.saving .autosave-dot{background:var(--warn);animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.timer{font-variant-numeric:tabular-nums;font-size:16px;font-weight:700;padding:5px 12px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;gap:6px}
+.timer{font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;padding:5px 12px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;gap:6px}
 .timer.warn{background:var(--danger-soft);color:var(--danger);animation:timerPulse 1s infinite alternate}
 @keyframes timerPulse{from{transform:scale(1)}to{transform:scale(1.03)}}
+.theme-toggle{background:none;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 9px;font-size:13px;display:flex;align-items:center;gap:4px}
 
-.theme-toggle{background:none;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:13px;display:flex;align-items:center;gap:4px}
-
-.candidate-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 18px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+/* Candidate Bar */
+.candidate-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 20px;font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .candidate-tag{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--text)}
 
-.layout{display:flex;max-width:1120px;margin:0 auto;padding:20px 16px;gap:20px;padding-bottom:96px}
-.sidebar{flex:0 0 230px}
-.nav-title{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 10px 2px;text-transform:uppercase;letter-spacing:0.5px}
-.nav-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+/* Layout */
+.layout{display:flex;max-width:1120px;margin:0 auto;padding:24px 20px;gap:24px;padding-bottom:100px}
+.sidebar{flex:0 0 240px}
+.nav-title{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 12px 2px;text-transform:uppercase;letter-spacing:0.5px}
+.nav-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .nav-btn{position:relative;height:38px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;transition:all 0.15s ease}
-.nav-btn:hover{border-color:var(--accent)}
+.nav-btn:hover{border-color:var(--accent);transform:translateY(-1px)}
 .nav-btn.answered{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
 .nav-btn.flagged{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 .nav-btn.current{outline:2.5px solid var(--accent);outline-offset:2px;font-weight:700}
-.legend{margin-top:16px;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);padding:12px;border:1px solid var(--border);border-radius:var(--radius)}
+.legend{margin-top:18px;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);padding:14px;border:1px solid var(--border);border-radius:var(--radius)}
 .legend span{display:inline-flex;align-items:center;gap:8px}
 .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
 
+/* Main Question Card */
 .main{flex:1;min-width:0}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.03)}
-.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
-.q-type{font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px}
-.q-prompt{font-size:16.5px;font-weight:600;margin:4px 0 0;line-height:1.5}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:26px;box-shadow:0 4px 16px rgba(0,0,0,0.02)}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:18px}
+.q-type{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px}
+.q-prompt{font-size:17px;font-weight:600;margin:6px 0 0;line-height:1.5;color:var(--text)}
 .flag-btn{display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);flex:0 0 auto;transition:all 0.2s}
 .flag-btn:hover{border-color:var(--warn);color:var(--warn)}
 .flag-btn.on{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 
-.passage-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.passage-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;color:var(--text);max-height:260px;overflow-y:auto;line-height:1.6}
+.passage-wrap{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:16px}
+.passage-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:14px;color:var(--text);max-height:280px;overflow-y:auto;line-height:1.6}
 .passage-box h4{margin:0 0 8px;font-size:14px;color:var(--accent);font-weight:700}
 
-.options{display:flex;flex-direction:column;gap:9px;margin-top:10px}
-.option{display:flex;align-items:center;gap:12px;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:all 0.15s ease;background:var(--surface);cursor:pointer}
+.options{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.option{display:flex;align-items:center;gap:14px;border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;transition:all 0.15s ease;background:var(--surface);cursor:pointer}
 .option:hover{border-color:var(--accent);background:var(--accent-soft)}
 .option input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
-.option label{flex:1;font-size:14.5px;cursor:pointer;user-select:none;color:var(--text)}
+.option label{flex:1;font-size:14.5px;cursor:pointer;user-select:none;color:var(--text);line-height:1.4}
 
-.blank-line{font-size:15px;line-height:2;padding:12px 0}
-.blank-input{border:none;border-bottom:2px solid var(--accent);background:var(--bg);color:var(--text);font-size:15px;width:220px;padding:4px 8px;border-radius:4px 4px 0 0;font-weight:600}
+.blank-line{font-size:15px;line-height:2.2;padding:12px 0}
+.blank-input{border:none;border-bottom:2px solid var(--accent);background:var(--bg);color:var(--text);font-size:15px;width:100%;max-width:380px;padding:6px 10px;border-radius:4px 4px 0 0;font-weight:600}
 .blank-input:focus{outline:none;background:var(--accent-soft)}
 
 textarea.code{width:100%;min-height:160px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;resize:vertical;line-height:1.5}
 textarea.code:focus{outline:none;border-color:var(--accent)}
 
-.match-row{display:grid;grid-template-columns:1fr 1.2fr;gap:14px;align-items:center;margin-top:10px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.match-row{display:grid;grid-template-columns:1fr 1.2fr;gap:14px;align-items:center;margin-top:10px;padding:10px 0;border-bottom:1px dashed var(--border)}
 .match-row:last-child{border-bottom:none}
 .match-row .term{font-size:14px;font-weight:600;color:var(--text)}
 .match-row select{width:100%;padding:9px 12px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13.5px}
-
-.order-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-.order-item{display:flex;align-items:center;gap:12px;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:var(--surface);cursor:grab;transition:box-shadow 0.15s ease}
-.order-item:active{cursor:grabbing}
-.order-item.dragging{opacity:.4;box-shadow:0 8px 16px rgba(0,0,0,0.1)}
-.order-num{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-.drag-handle{margin-left:auto;color:var(--muted);font-size:13px;letter-spacing:1px}
 
 .file-drop{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;color:var(--muted);font-size:13.5px;background:var(--bg);transition:border-color 0.2s}
 .file-drop:hover{border-color:var(--accent)}
 .file-drop input{margin-top:12px}
 .file-name{margin-top:10px;font-size:13px;color:var(--ok);font-weight:600}
 
+/* Action Bar */
 .action-bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);
   padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
-  display:flex;gap:12px;align-items:center;justify-content:space-between;z-index:20;box-shadow:0 -2px 10px rgba(0,0,0,0.04)}
-.btn{border-radius:var(--radius);padding:10px 18px;font-size:14px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text);transition:all 0.15s}
+  display:flex;gap:12px;align-items:center;justify-content:space-between;z-index:20;box-shadow:0 -4px 16px rgba(0,0,0,0.03)}
+.btn{border-radius:var(--radius);padding:10px 20px;font-size:14px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text);transition:all 0.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn:hover{filter:brightness(0.96)}
 .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn-primary:hover{filter:brightness(1.08)}
 .btn-ghost{background:transparent}
 .bar-nav{display:flex;gap:10px}
 
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:30;padding:20px;backdrop-filter:blur(3px)}
+/* Entrance Gate Card */
+.gate-wrap{max-width:580px;margin:50px auto;padding:0 20px}
+.gate-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:0 8px 30px rgba(0,0,0,0.04)}
+.gate-badge{display:inline-block;padding:4px 10px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;border-radius:20px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
+.gate-title{font-size:24px;font-weight:800;color:var(--text);margin:0 0 8px;line-height:1.3}
+.gate-desc{color:var(--muted);font-size:14.5px;margin:0 0 24px;line-height:1.6}
+.gate-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+.gate-stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.gate-stat .val{font-size:17px;font-weight:700;color:var(--text)}
+.gate-stat .lbl{font-size:12px;color:var(--muted)}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.form-group input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:14px;transition:border-color 0.2s}
+.form-group input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.gate-fee{display:flex;align-items:center;justify-content:space-between;background:var(--ok-soft);color:var(--ok);padding:12px 16px;border-radius:8px;font-weight:700;margin-bottom:20px}
+
+/* Modal Overlay */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:30;padding:20px;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
-.modal{background:var(--surface);border-radius:var(--radius);padding:26px;max-width:380px;width:100%;border:1px solid var(--border);box-shadow:0 12px 32px rgba(0,0,0,0.15)}
-.modal h3{margin:0 0 10px;font-size:18px;color:var(--text)}
+.modal{background:var(--surface);border-radius:var(--radius);padding:28px;max-width:400px;width:100%;border:1px solid var(--border);box-shadow:0 16px 40px rgba(0,0,0,0.15)}
+.modal h3{margin:0 0 10px;font-size:19px;color:var(--text)}
 .modal p{color:var(--muted);font-size:14px;margin:0 0 8px;line-height:1.5}
-.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions{display:flex;gap:10px;margin-top:22px}
 .modal-actions .btn{flex:1}
 
-.done-screen{max-width:480px;margin:60px auto;text-align:center;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,0.04)}
-.done-icon{width:64px;height:64px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:32px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;font-weight:bold}
-.done-screen h2{margin:0 0 8px;font-size:22px;color:var(--text)}
-.done-screen p{color:var(--muted);margin:0 0 20px;line-height:1.6}
-.done-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0;text-align:left}
-.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px}
+/* Completed & State Cards */
+.state-screen{max-width:520px;margin:60px auto;text-align:center;padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,0.04)}
+.state-icon{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px auto;font-size:32px;font-weight:bold}
+.state-icon.ok{background:var(--ok-soft);color:var(--ok)}
+.state-icon.warn{background:var(--warn-soft);color:var(--warn)}
+.state-icon.err{background:var(--danger-soft);color:var(--danger)}
+.state-screen h2{margin:0 0 10px;font-size:22px;color:var(--text)}
+.state-screen p{color:var(--muted);margin:0 0 20px;line-height:1.6;font-size:14.5px}
+.done-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;text-align:left}
+.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px}
 .stat-box .val{font-size:18px;font-weight:700;color:var(--text)}
-.stat-box .lbl{font-size:11.5px;color:var(--muted)}
+.stat-box .lbl{font-size:12px;color:var(--muted)}
 
 @media (max-width:768px){
   .layout{flex-direction:column;padding-bottom:100px}
   .sidebar{flex:none;width:100%}
-  .nav-grid{grid-auto-flow:column;grid-template-columns:none;grid-template-rows:1fr;overflow-x:auto;padding-bottom:6px}
-  .nav-btn{min-width:42px}
+  .nav-grid{grid-auto-flow:column;grid-template-columns:none;grid-template-rows:1fr;overflow-x:auto;padding-bottom:8px}
+  .nav-btn{min-width:44px}
   .legend{display:none}
   .passage-wrap{grid-template-columns:1fr}
   .match-row{grid-template-columns:1fr}
@@ -158,24 +190,101 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
 </head>
 <body>
 
-<div class="header">
+<!-- 1. ACTIVE EXAM HEADER -->
+<div class="header" id="examHeader" style="display:none;">
   <div class="header-left">
-    <div class="exam-title" id="examTitle">Certified Project Practitioner — Assessment</div>
-    <div class="progress" id="progress">Question 1 of 12</div>
+    <div class="brand-strip">
+      <img id="headerLogo" class="brand-logo" src="" alt="Logo" style="display:none;" />
+      <div class="exam-title" id="examTitle">Loading Assessment…</div>
+    </div>
+    <div class="progress" id="progress">Preparing questions…</div>
   </div>
   <div class="header-right">
     <button class="theme-toggle" id="themeToggleBtn" title="Toggle Dark/Light Mode">🌓</button>
     <div class="autosave" id="autosave"><span class="autosave-dot"></span><span id="autosaveText">All changes saved</span></div>
-    <div class="timer" id="timer">⏱️ <span id="timerVal">25:00</span></div>
+    <div class="timer" id="timer"><span id="timerIcon">⏱️</span> <span id="timerVal">--:--</span></div>
   </div>
 </div>
 
+<!-- 2. CANDIDATE TAG STRIP -->
 <div class="candidate-bar" id="candidateBar" style="display:none;">
-  <div>Candidate: <span class="candidate-tag" id="candName">—</span></div>
-  <div>ID / Roll: <span class="candidate-tag" id="candId">—</span></div>
+  <div>Candidate: <span class="candidate-tag" id="candNameDisplay">—</span></div>
+  <div id="candIdSection">Roll / ID: <span class="candidate-tag" id="candIdDisplay">—</span></div>
 </div>
 
-<div class="layout" id="layout">
+<!-- 3. SKELETON LOADING STATE -->
+<div class="layout" id="loadingState">
+  <div class="sidebar">
+    <div class="skeleton" style="height:20px;width:120px;margin-bottom:14px;"></div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+      <div class="skeleton" style="height:38px;"></div>
+      <div class="skeleton" style="height:38px;"></div>
+      <div class="skeleton" style="height:38px;"></div>
+      <div class="skeleton" style="height:38px;"></div>
+      <div class="skeleton" style="height:38px;"></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="card">
+      <div class="skeleton" style="height:16px;width:140px;margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:24px;width:75%;margin-bottom:24px;"></div>
+      <div class="skeleton" style="height:48px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:48px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:48px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:48px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. ENTRANCE GATE / CANDIDATE VERIFICATION -->
+<div class="gate-wrap" id="gateWrap" style="display:none;">
+  <div class="gate-card">
+    <span class="gate-badge" id="gateBadge">Official Assessment</span>
+    <h1 class="gate-title" id="gateTitle">Assessment Verification</h1>
+    <p class="gate-desc" id="gateDesc">Please review your credentials and examination details before beginning.</p>
+
+    <div class="gate-meta">
+      <div class="gate-stat">
+        <div class="val" id="metaQuestionCount">—</div>
+        <div class="lbl">Total Questions</div>
+      </div>
+      <div class="gate-stat">
+        <div class="val" id="metaDuration">—</div>
+        <div class="lbl">Duration</div>
+      </div>
+      <div class="gate-stat" id="metaFeeBox" style="display:none;">
+        <div class="val" id="metaFeeVal">Free</div>
+        <div class="lbl">Exam Fee</div>
+      </div>
+    </div>
+
+    <div id="candidateFormFields">
+      <div class="form-group" id="groupName">
+        <label for="inputName">Full Name *</label>
+        <input type="text" id="inputName" placeholder="Enter your full name" required>
+      </div>
+      <div class="form-group" id="groupId">
+        <label for="inputId">Roll / Student ID</label>
+        <input type="text" id="inputId" placeholder="Enter roll number or ID">
+      </div>
+      <div class="form-group" id="groupPhone">
+        <label for="inputPhone">Phone Number *</label>
+        <input type="tel" id="inputPhone" placeholder="01XXXXXXXXX" required>
+      </div>
+      <div class="form-group" id="groupEmail" style="display:none;">
+        <label for="inputEmail">Email Address</label>
+        <input type="email" id="inputEmail" placeholder="your.email@example.com">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="startExamBtn" style="width:100%;padding:14px;font-size:16px;margin-top:10px;">
+      Start Assessment →
+    </button>
+  </div>
+</div>
+
+<!-- 5. ACTIVE EXAM RUNNER LAYOUT -->
+<div class="layout" id="examLayout" style="display:none;">
   <div class="sidebar">
     <p class="nav-title">Questions Palette</p>
     <div class="nav-grid" id="navGrid"></div>
@@ -190,7 +299,7 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
     <div class="card">
       <div class="card-head">
         <div>
-          <div class="q-type" id="qType">Multiple choice</div>
+          <div class="q-type" id="qType">Multiple Choice</div>
           <p class="q-prompt" id="qPromptStatic"></p>
         </div>
         <button class="flag-btn" id="flagBtn">🔖 Flag</button>
@@ -200,20 +309,24 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
   </div>
 </div>
 
-<div class="action-bar">
+<!-- 6. BOTTOM ACTION BAR -->
+<div class="action-bar" id="actionBar" style="display:none;">
   <button class="btn btn-ghost" id="prevBtn">← Previous</button>
   <div class="bar-nav">
     <button class="btn btn-primary" id="nextBtn">Next →</button>
-    <button class="btn" id="submitBtn" style="display:none;background:var(--danger);border-color:var(--danger);color:#fff">Submit Exam</button>
+    <button class="btn" id="submitBtn" style="display:none;background:var(--danger);border-color:var(--danger);color:#fff">
+      Submit Exam
+    </button>
   </div>
 </div>
 
+<!-- 7. SUBMISSION CONFIRMATION MODAL -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <h3>Submit exam?</h3>
+    <h3>Submit assessment?</h3>
     <p id="modalUnanswered"></p>
     <p id="modalFlagged"></p>
-    <p style="font-size:13px;color:var(--text);margin-top:8px;">Once submitted, your answers will be locked and cannot be changed.</p>
+    <p style="font-size:13px;color:var(--text);margin-top:8px;">Once submitted, your answers will be locked and finalized.</p>
     <div class="modal-actions">
       <button class="btn" id="modalReview">Review</button>
       <button class="btn btn-primary" id="modalConfirm">Confirm & Submit</button>
@@ -221,48 +334,30 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
   </div>
 </div>
 
-<script>
-// ── Default Fallback Exam Questions (Used when no dynamic form ID is supplied) ──
-const DEFAULT_QUESTIONS = [
-  {id:1, type:'mcq', prompt:'Which methodology emphasizes iterative delivery in short cycles?',
-    options:['Waterfall','Agile','Critical Path Method','Six Sigma']},
-  {id:2, type:'truefalse', prompt:'A risk register should be updated only at project closure.'},
-  {id:3, type:'multi', prompt:'Select all elements typically found in a project charter.',
-    options:['Business case','Stakeholder list','Detailed Gantt chart','High-level budget','Vendor invoices']},
-  {id:4, type:'blank', pre:'The process of identifying, analyzing, and responding to project risk is called risk', post:'.'},
-  {id:5, type:'passage', passageTitle:'Change Control Excerpt',
-    passage:'When a change request is submitted, the change control board reviews the impact on scope, schedule, and cost before approval. Emergency changes may bypass board review but require retroactive documentation within 48 hours.',
-    prompt:'According to the excerpt, what must happen within 48 hours of an emergency change?',
-    options:['Board pre-approval','Retroactive documentation','Budget reallocation','Stakeholder sign-off']},
-  {id:6, type:'code', prompt:'Write a function isOverBudget(actual, planned) that returns true if actual cost exceeds the planned budget.'},
-  {id:7, type:'match', prompt:'Match each term to its definition.',
-    left:['Scope creep','Critical path','Milestone'],
-    rightOptions:['Uncontrolled expansion of project scope','Longest sequence of dependent tasks','A significant point or event in the schedule']},
-  {id:8, type:'order', prompt:'Arrange the steps of the risk management process in the correct order.',
-    items:['Identify risks','Assess likelihood and impact','Plan responses','Monitor and control']},
-  {id:9, type:'file', prompt:'Upload your completed risk register (PDF or XLSX).'},
-  {id:10, type:'mcq', prompt:'Which document formally authorizes a project to begin?',
-    options:['Project charter','Status report','Lessons learned register','RACI matrix']},
-  {id:11, type:'truefalse', prompt:'Earned Value Management can be used to forecast final project cost.'},
-  {id:12, type:'blank', pre:'A project is considered complete when all deliverables are accepted and the project is formally', post:'.'}
-];
+<!-- 8. DYNAMIC ERROR / CLOSED / SUCCESS CONTAINER -->
+<div id="feedbackContainer" style="display:none;"></div>
 
-let questions = [...DEFAULT_QUESTIONS];
+<script>
+// ── State Variables ─────────────────────────────────────────────────────────
+let questions = [];
+let candidateFieldsConfig = [];
 let current = 0;
 const answers = {};
 const flagged = new Set();
 const touched = new Set();
-let seconds = 25 * 60;
-let totalExamSeconds = 25 * 60;
+let seconds = 0;
+let totalExamSeconds = 0;
+let isCountDown = false;
 let submitted = false;
 let formIdentifier = '';
 let formConfig = null;
+let candidateInfo = { name: '', id: '', phone: '', email: '' };
 
 const typeLabels = {
   mcq: 'Multiple Choice',
   truefalse: 'True / False',
   multi: 'Multi-Select',
-  blank: 'Fill in the Blank',
+  blank: 'Short Answer / Fill in Blank',
   passage: 'Reading Comprehension',
   code: 'Code / Free Response',
   match: 'Matching',
@@ -270,22 +365,45 @@ const typeLabels = {
   file: 'File Upload'
 };
 
-function orderState(q) {
-  if (!answers[q.id]) answers[q.id] = [...q.items];
-  return answers[q.id];
+// ── Theme Style Applicator ──────────────────────────────────────────────────
+function applyThemeConfig(theme) {
+  if (!theme) return;
+  if (theme.primary_color || theme.primaryColor) {
+    const c = theme.primary_color || theme.primaryColor;
+    document.documentElement.style.setProperty('--accent', c);
+  }
+  if (theme.font_family || theme.fontFamily) {
+    const f = theme.font_family || theme.fontFamily;
+    document.body.style.fontFamily = `"${f}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  }
 }
 
-function markTouched(id) {
-  touched.add(id);
+// ── Theme toggle logic ──────────────────────────────────────────────────────
+const themeBtn = document.getElementById('themeToggleBtn');
+if (themeBtn) {
+  themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('swapnopay_exam_theme', next); } catch {}
+  });
+  try {
+    const savedTheme = localStorage.getItem('swapnopay_exam_theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  } catch {}
+}
+
+// ── Autosave & Storage ──────────────────────────────────────────────────────
+function markTouched(qId) {
+  touched.add(qId);
   const autosave = document.getElementById('autosave');
   autosave.classList.add('saving');
   document.getElementById('autosaveText').textContent = 'Saving…';
   
-  // Persist to local storage
   if (formIdentifier) {
     try {
-      localStorage.setItem(`exam_answers_${formIdentifier}`, JSON.stringify(answers));
-      localStorage.setItem(`exam_flagged_${formIdentifier}`, JSON.stringify([...flagged]));
+      localStorage.setItem(`exam_ans_${formIdentifier}`, JSON.stringify(answers));
+      localStorage.setItem(`exam_flg_${formIdentifier}`, JSON.stringify([...flagged]));
     } catch {}
   }
   
@@ -293,10 +411,11 @@ function markTouched(id) {
   window._saveT = setTimeout(() => {
     autosave.classList.remove('saving');
     document.getElementById('autosaveText').textContent = 'All changes saved';
-  }, 600);
+  }, 500);
   renderNav();
 }
 
+// ── Palette Rendering ───────────────────────────────────────────────────────
 function renderNav() {
   const grid = document.getElementById('navGrid');
   grid.innerHTML = '';
@@ -312,11 +431,14 @@ function renderNav() {
   });
 }
 
+// ── Single Question Renderer ────────────────────────────────────────────────
 function renderQuestion() {
+  if (!questions || questions.length === 0) return;
   const q = questions[current];
   document.getElementById('progress').textContent = `Question ${current + 1} of ${questions.length}`;
   document.getElementById('qType').textContent = typeLabels[q.type] || 'Question';
   document.getElementById('qPromptStatic').textContent = q.prompt || '';
+  
   const flagBtn = document.getElementById('flagBtn');
   flagBtn.classList.toggle('on', flagged.has(q.id));
   flagBtn.textContent = flagged.has(q.id) ? '🔖 Flagged' : '🔖 Flag';
@@ -336,14 +458,14 @@ function renderQuestion() {
     (q.options || []).forEach((opt, idx) => {
       const row = document.createElement('div');
       row.className = 'option';
-      row.innerHTML = `<input type="radio" name="q${q.id}" id="q${q.id}o${idx}" ${answers[q.id] === idx ? 'checked' : ''}>
-        <label for="q${q.id}o${idx}">${opt}</label>`;
-      row.querySelector('input').addEventListener('change', () => { answers[q.id] = idx; markTouched(q.id); });
+      const isChecked = answers[q.id] === opt || answers[q.id] === idx;
+      row.innerHTML = `<input type="radio" name="q_${q.id}" id="q_${q.id}_opt_${idx}" ${isChecked ? 'checked' : ''}>
+        <label for="q_${q.id}_opt_${idx}">${opt}</label>`;
+      row.querySelector('input').addEventListener('change', () => { answers[q.id] = opt; markTouched(q.id); });
       row.addEventListener('click', (e) => {
         if (e.target.tagName !== 'INPUT') {
-          const inp = row.querySelector('input');
-          inp.checked = true;
-          answers[q.id] = idx;
+          row.querySelector('input').checked = true;
+          answers[q.id] = opt;
           markTouched(q.id);
         }
       });
@@ -357,14 +479,14 @@ function renderQuestion() {
     ['True', 'False'].forEach((opt, idx) => {
       const row = document.createElement('div');
       row.className = 'option';
-      row.innerHTML = `<input type="radio" name="q${q.id}" id="q${q.id}o${idx}" ${answers[q.id] === idx ? 'checked' : ''}>
-        <label for="q${q.id}o${idx}">${opt}</label>`;
-      row.querySelector('input').addEventListener('change', () => { answers[q.id] = idx; markTouched(q.id); });
+      const isChecked = answers[q.id] === opt;
+      row.innerHTML = `<input type="radio" name="q_${q.id}" id="q_${q.id}_tf_${idx}" ${isChecked ? 'checked' : ''}>
+        <label for="q_${q.id}_tf_${idx}">${opt}</label>`;
+      row.querySelector('input').addEventListener('change', () => { answers[q.id] = opt; markTouched(q.id); });
       row.addEventListener('click', (e) => {
         if (e.target.tagName !== 'INPUT') {
-          const inp = row.querySelector('input');
-          inp.checked = true;
-          answers[q.id] = idx;
+          row.querySelector('input').checked = true;
+          answers[q.id] = opt;
           markTouched(q.id);
         }
       });
@@ -373,18 +495,21 @@ function renderQuestion() {
     body.appendChild(wrap);
   }
   else if (q.type === 'multi') {
-    if (!answers[q.id]) answers[q.id] = [];
+    if (!Array.isArray(answers[q.id])) answers[q.id] = [];
     const wrap = document.createElement('div');
     wrap.className = 'options';
     (q.options || []).forEach((opt, idx) => {
       const row = document.createElement('div');
       row.className = 'option';
-      const checked = answers[q.id].includes(idx);
-      row.innerHTML = `<input type="checkbox" id="q${q.id}o${idx}" ${checked ? 'checked' : ''}>
-        <label for="q${q.id}o${idx}">${opt}</label>`;
+      const checked = answers[q.id].includes(opt);
+      row.innerHTML = `<input type="checkbox" id="q_${q.id}_m_${idx}" ${checked ? 'checked' : ''}>
+        <label for="q_${q.id}_m_${idx}">${opt}</label>`;
       row.querySelector('input').addEventListener('change', (e) => {
-        const arr = answers[q.id];
-        if (e.target.checked) { arr.push(idx); } else { answers[q.id] = arr.filter(v => v !== idx); }
+        if (e.target.checked) {
+          if (!answers[q.id].includes(opt)) answers[q.id].push(opt);
+        } else {
+          answers[q.id] = answers[q.id].filter(v => v !== opt);
+        }
         markTouched(q.id);
       });
       wrap.appendChild(row);
@@ -394,73 +519,31 @@ function renderQuestion() {
   else if (q.type === 'blank') {
     const wrap = document.createElement('div');
     wrap.className = 'blank-line';
-    wrap.innerHTML = `${q.pre || ''} <input class="blank-input" type="text" placeholder="type your answer..." value="${answers[q.id] || ''}"> ${q.post || ''}`;
+    wrap.innerHTML = `<input class="blank-input" type="text" placeholder="Type your response here…" value="${answers[q.id] || ''}">`;
     wrap.querySelector('input').addEventListener('input', (e) => { answers[q.id] = e.target.value; markTouched(q.id); });
     body.appendChild(wrap);
   }
   else if (q.type === 'code') {
     const ta = document.createElement('textarea');
     ta.className = 'code';
-    ta.placeholder = '// Type your response or code solution here...';
+    ta.placeholder = 'Type your response, explanation, or code solution here…';
     ta.value = answers[q.id] || '';
     ta.addEventListener('input', (e) => { answers[q.id] = e.target.value; markTouched(q.id); });
     body.appendChild(ta);
   }
-  else if (q.type === 'match') {
-    if (!answers[q.id]) answers[q.id] = {};
-    (q.left || []).forEach((term, idx) => {
-      const row = document.createElement('div');
-      row.className = 'match-row';
-      const sel = document.createElement('select');
-      sel.innerHTML = `<option value="">Choose a match…</option>` +
-        (q.rightOptions || []).map((r, ri) => `<option value="${ri}" ${answers[q.id][idx] == ri ? 'selected' : ''}>${r}</option>`).join('');
-      sel.addEventListener('change', (e) => { answers[q.id][idx] = e.target.value; markTouched(q.id); });
-      row.innerHTML = `<div class="term">${term}</div>`;
-      row.appendChild(sel);
-      body.appendChild(row);
-    });
-  }
-  else if (q.type === 'order') {
-    const list = document.createElement('ul');
-    list.className = 'order-list';
-    const items = orderState(q);
-    items.forEach((item, idx) => {
-      const li = document.createElement('li');
-      li.className = 'order-item';
-      li.draggable = true;
-      li.dataset.idx = idx;
-      li.innerHTML = `<span class="order-num">${idx + 1}</span><span>${item}</span><span class="drag-handle">⠿ drag</span>`;
-      li.addEventListener('dragstart', () => { li.classList.add('dragging'); });
-      li.addEventListener('dragend', () => { li.classList.remove('dragging'); markTouched(q.id); renderQuestion(); });
-      li.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const dragging = list.querySelector('.dragging');
-        if (dragging && dragging !== li) {
-          const rect = li.getBoundingClientRect();
-          const before = (e.clientY - rect.top) < rect.height / 2;
-          list.insertBefore(dragging, before ? li : li.nextSibling);
-        }
-      });
-      list.appendChild(li);
-    });
-    list.addEventListener('drop', () => {
-      const newOrder = [...list.children].map(li => li.querySelector('span:nth-child(2)').textContent);
-      answers[q.id] = newOrder;
-    });
-    body.appendChild(list);
-  }
   else if (q.type === 'file') {
     const wrap = document.createElement('div');
     wrap.className = 'file-drop';
-    wrap.innerHTML = `Drag a file here, or browse from device<br><input type="file">
-      <div class="file-name" id="fname">${answers[q.id] ? ('Uploaded: ' + answers[q.id]) : ''}</div>`;
+    wrap.innerHTML = `Drag a file here or browse from device<br><input type="file">
+      <div class="file-name" id="fname">${answers[q.id] ? ('Selected: ' + answers[q.id]) : ''}</div>`;
     wrap.querySelector('input').addEventListener('change', (e) => {
       const name = e.target.files[0]?.name;
-      if (name) { answers[q.id] = name; wrap.querySelector('#fname').textContent = 'Uploaded: ' + name; markTouched(q.id); }
+      if (name) { answers[q.id] = name; wrap.querySelector('#fname').textContent = 'Selected: ' + name; markTouched(q.id); }
     });
     body.appendChild(wrap);
   }
 
+  // Navigation button states
   document.getElementById('prevBtn').disabled = current === 0;
   document.getElementById('prevBtn').style.opacity = current === 0 ? .4 : 1;
   const isLast = current === questions.length - 1;
@@ -469,7 +552,9 @@ function renderQuestion() {
   renderNav();
 }
 
+// ── Control Event Listeners ─────────────────────────────────────────────────
 document.getElementById('flagBtn').addEventListener('click', () => {
+  if (!questions[current]) return;
   const id = questions[current].id;
   flagged.has(id) ? flagged.delete(id) : flagged.add(id);
   renderQuestion();
@@ -491,50 +576,130 @@ document.getElementById('modalReview').addEventListener('click', () => {
 });
 document.getElementById('modalConfirm').addEventListener('click', finishExam);
 
+// ── Timer Logic ─────────────────────────────────────────────────────────────
+function tick() {
+  if (submitted) return;
+  if (isCountDown) {
+    seconds--;
+    if (seconds <= 0) {
+      seconds = 0;
+      finishExam();
+      return;
+    }
+  } else {
+    seconds++;
+  }
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  const t = document.getElementById('timerVal');
+  if (t) t.textContent = `${m}:${s}`;
+  const timerCard = document.getElementById('timer');
+  if (timerCard && isCountDown) {
+    timerCard.classList.toggle('warn', seconds < 300);
+  }
+}
+
+// ── Finish & Submit Exam ────────────────────────────────────────────────────
 async function finishExam() {
+  if (submitted) return;
   submitted = true;
   clearInterval(window._timerInt);
   document.getElementById('modalOverlay').classList.remove('open');
 
   const answeredCount = touched.size;
   const totalCount = questions.length;
-  const timeSpentSec = totalExamSeconds - seconds;
+  const timeSpentSec = isCountDown ? (totalExamSeconds - seconds) : seconds;
   const timeSpentMins = Math.floor(timeSpentSec / 60);
   const timeSpentRemSec = timeSpentSec % 60;
   const refId = 'EXAM-' + Math.random().toString(36).substring(2, 9).toUpperCase();
 
-  // If connected to a real form, submit results to backend
+  // Show submitting status
+  document.getElementById('examLayout').style.display = 'none';
+  document.getElementById('actionBar').style.display = 'none';
+  document.getElementById('examHeader').style.display = 'none';
+  document.getElementById('candidateBar').style.display = 'none';
+
+  const fb = document.getElementById('feedbackContainer');
+  fb.style.display = 'block';
+  fb.innerHTML = `
+    <div class="state-screen">
+      <div class="skeleton" style="width:68px;height:68px;border-radius:50%;margin:0 auto 16px;"></div>
+      <h2>Submitting your assessment…</h2>
+      <p>Encrypting responses and securing submission with SwapnoPay…</p>
+    </div>
+  `;
+
+  // Submit to Backend API
+  let paymentRedirectUrl = null;
   if (formIdentifier) {
     try {
-      await fetch(`/v1/hosted-forms/${encodeURIComponent(formIdentifier)}/submit`, {
+      const payload = {
+        answers,
+        customer_name: candidateInfo.name,
+        customer_phone: candidateInfo.phone,
+        customer_email: candidateInfo.email,
+        answered_count: answeredCount,
+        total_questions: totalCount,
+        time_taken_seconds: timeSpentSec,
+        reference_id: refId,
+        selected_product_id: formConfig?.products?.[0]?.id || null,
+        quantity: 1
+      };
+
+      const res = await fetch(`/v1/forms/${encodeURIComponent(formIdentifier)}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers,
-          answered_count: answeredCount,
-          total_questions: totalCount,
-          time_taken_seconds: timeSpentSec,
-          reference_id: refId,
-          submitted_at: new Date().toISOString()
-        })
+        body: JSON.stringify(payload)
       });
-      localStorage.removeItem(`exam_answers_${formIdentifier}`);
-      localStorage.removeItem(`exam_flagged_${formIdentifier}`);
+
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.payment_required && resData.redirect_url) {
+          paymentRedirectUrl = resData.redirect_url;
+        } else if (resData.redirect_url && resData.redirect_type === 'REDIRECT_URL') {
+          window.location.href = resData.redirect_url;
+          return;
+        }
+      }
+      try {
+        localStorage.removeItem(`exam_ans_${formIdentifier}`);
+        localStorage.removeItem(`exam_flg_${formIdentifier}`);
+      } catch {}
     } catch (e) {
-      console.warn('[Exam] Submit error:', e.message);
+      console.warn('[Exam] Submit network notice:', e.message);
     }
   }
 
-  document.body.innerHTML = `
-    <div class="done-screen">
-      <div class="done-icon">✓</div>
-      <h2>Exam Submitted Successfully</h2>
-      <p>Your responses have been recorded and locked for evaluation. Confirmation has been logged.</p>
+  // If payment required (Exam fee), redirect to SwapnoPay payment gateway widget
+  if (paymentRedirectUrl) {
+    fb.innerHTML = `
+      <div class="state-screen">
+        <div class="state-icon warn">💳</div>
+        <h2>Examination Fee Required</h2>
+        <p>Your responses have been recorded. Please complete the examination fee payment to finalize your registration.</p>
+        <a href="${paymentRedirectUrl}" class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;text-decoration:none;">
+          Proceed to Payment Gateway →
+        </a>
+      </div>
+    `;
+    setTimeout(() => {
+      window.location.href = paymentRedirectUrl;
+    }, 1200);
+    return;
+  }
+
+  // If Free Assessment, show official completion receipt
+  const successMsg = formConfig?.theme?.success_message || 'Your responses have been recorded and locked for evaluation.';
+  fb.innerHTML = `
+    <div class="state-screen">
+      <div class="state-icon ok">✓</div>
+      <h2>Assessment Submitted Successfully</h2>
+      <p>${successMsg}</p>
       
       <div class="done-stats">
         <div class="stat-box">
           <div class="val">${answeredCount} / ${totalCount}</div>
-          <div class="lbl">Questions Answered</div>
+          <div class="lbl">Questions Completed</div>
         </div>
         <div class="stat-box">
           <div class="val">${timeSpentMins}m ${timeSpentRemSec}s</div>
@@ -542,146 +707,355 @@ async function finishExam() {
         </div>
       </div>
 
-      <div style="margin-top:20px;padding:12px;background:var(--accent-soft);color:var(--accent);font-weight:700;border-radius:6px;font-size:14px;">
-        Reference ID: ${refId}
+      <div style="margin-top:16px;padding:14px;background:var(--accent-soft);color:var(--accent);font-weight:700;border-radius:8px;font-size:14px;">
+        Candidate: ${candidateInfo.name || 'Verified'}${candidateInfo.id ? ` • Roll: ${candidateInfo.id}` : ''}<br>
+        <span style="font-size:12px;opacity:0.85;">Reference ID: ${refId}</span>
       </div>
     </div>
   `;
 }
 
-function tick() {
-  if (submitted) return;
-  seconds--;
-  if (seconds <= 0) {
-    seconds = 0;
-    finishExam();
-    return;
-  }
-  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  const t = document.getElementById('timerVal');
-  if (t) t.textContent = `${m}:${s}`;
-  const timerCard = document.getElementById('timer');
-  if (timerCard) timerCard.classList.toggle('warn', seconds < 300);
-}
-
-// ── Theme toggle logic ─────────────────────────────────────────────────────────
-const themeBtn = document.getElementById('themeToggleBtn');
-if (themeBtn) {
-  themeBtn.addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme');
-    const next = cur === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('exam_theme', next); } catch {}
-  });
-  try {
-    const savedTheme = localStorage.getItem('exam_theme');
-    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
-  } catch {}
-}
-
-// ── Dynamic Form Config Loader (Loads from SwapnoPay API or URL param) ────────
+// ── Dynamic Form Config Loader ──────────────────────────────────────────────
 async function loadDynamicExamConfig() {
   const urlParams = new URLSearchParams(window.location.search);
   formIdentifier = urlParams.get('id') || urlParams.get('form') || urlParams.get('slug') || '';
 
   if (!formIdentifier) {
-    // Run default exam questions
-    window._timerInt = setInterval(tick, 1000);
-    renderQuestion();
+    const pathMatch = window.location.pathname.match(/\/(?:e|exam|exams|quiz|assessment)\/([^\/?#]+)/i);
+    if (pathMatch) formIdentifier = pathMatch[1];
+  }
+
+  if (!formIdentifier) {
+    showErrorState("No Assessment Specified", "Please provide a valid exam link or ID (e.g. /exam.html?id=YOUR_FORM_ID or /exam/YOUR_SLUG).");
     return;
   }
 
+  let rawData = null;
+
+  // 1. Primary endpoint lookup
   try {
-    const res = await fetch(`/v1/hosted-forms/${encodeURIComponent(formIdentifier)}`);
+    const res = await fetch(`/v1/forms/${encodeURIComponent(formIdentifier)}`);
     if (res.ok) {
       const data = await res.json();
-      formConfig = data?.form || data;
-      if (formConfig) {
-        document.getElementById('examTitle').textContent = formConfig.title || 'Online Assessment';
-        document.title = (formConfig.title || 'Exam') + ' — Exam Portal';
-
-        // Parse timer
-        const theme = formConfig.theme || {};
-        if (theme.timerMinutes && Number(theme.timerMinutes) > 0) {
-          totalExamSeconds = Number(theme.timerMinutes) * 60;
-          seconds = totalExamSeconds;
-        }
-
-        // Map form fields to questions
-        let fields = [];
-        try {
-          fields = typeof formConfig.fields === 'string' ? JSON.parse(formConfig.fields) : (formConfig.fields || []);
-        } catch { fields = []; }
-
-        const dynamicQuestions = [];
-        let qIdx = 1;
-
-        // Extract candidate details if present
-        const nameField = fields.find(f => f.type === 'NAME');
-        const idField = fields.find(f => (f.label || '').toLowerCase().includes('roll') || (f.label || '').toLowerCase().includes('id'));
-        if (nameField || idField) {
-          document.getElementById('candidateBar').style.display = 'flex';
-          if (nameField) document.getElementById('candName').textContent = nameField.defaultValue || 'Registered Candidate';
-          if (idField) document.getElementById('candId').textContent = idField.defaultValue || 'Verified';
-        }
-
-        // Filter question fields
-        fields.forEach(f => {
-          const typeStr = String(f.type || '').toUpperCase();
-          const label = f.label || '';
-          const options = Array.isArray(f.options) ? f.options : [];
-
-          // Skip pure contact collection fields in the question list if they are on page 0
-          if (typeStr === 'PHONE' || (typeStr === 'NAME' && qIdx === 1 && (label.toLowerCase().includes('candidate') || label.toLowerCase().includes('student')))) {
-            return;
-          }
-
-          if (typeStr === 'RADIO') {
-            if (options.length === 2 && options.some(o => o.toLowerCase() === 'true') && options.some(o => o.toLowerCase() === 'false')) {
-              dynamicQuestions.push({ id: qIdx++, type: 'truefalse', prompt: label });
-            } else {
-              dynamicQuestions.push({ id: qIdx++, type: 'mcq', prompt: label, options: options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D'] });
-            }
-          } else if (typeStr === 'CHECKBOX' || typeStr === 'MULTI_SELECT') {
-            dynamicQuestions.push({ id: qIdx++, type: 'multi', prompt: label, options: options.length > 0 ? options : ['Option 1', 'Option 2', 'Option 3'] });
-          } else if (typeStr === 'DROPDOWN') {
-            dynamicQuestions.push({ id: qIdx++, type: 'mcq', prompt: label, options });
-          } else if (typeStr === 'NOTES' || typeStr === 'CODE') {
-            dynamicQuestions.push({ id: qIdx++, type: 'code', prompt: label });
-          } else if (typeStr === 'FILE_UPLOAD' || typeStr === 'CAMERA_UPLOAD') {
-            dynamicQuestions.push({ id: qIdx++, type: 'file', prompt: label });
-          } else if (typeStr === 'NAME' || typeStr === 'EMAIL' || typeStr === 'TEXT') {
-            dynamicQuestions.push({ id: qIdx++, type: 'blank', prompt: label, pre: label, post: '' });
-          }
-        });
-
-        if (dynamicQuestions.length > 0) {
-          questions = dynamicQuestions;
-        }
-
-        // Restore saved answers from localStorage if available
-        try {
-          const savedAns = localStorage.getItem(`exam_answers_${formIdentifier}`);
-          if (savedAns) {
-            Object.assign(answers, JSON.parse(savedAns));
-            Object.keys(answers).forEach(k => touched.add(Number(k)));
-          }
-          const savedFlags = localStorage.getItem(`exam_flagged_${formIdentifier}`);
-          if (savedFlags) {
-            JSON.parse(savedFlags).forEach(fId => flagged.add(Number(fId)));
-          }
-        } catch {}
-      }
+      if (data && data.ok && data.form) rawData = data.form;
     }
   } catch (err) {
-    console.warn('[Exam] Error loading dynamic config:', err.message);
+    console.warn('[Exam] Primary endpoint lookup notice:', err.message);
   }
+
+  // 2. Alternate endpoint lookup
+  if (!rawData) {
+    try {
+      const res = await fetch(`/v1/hosted-forms/${encodeURIComponent(formIdentifier)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.form || data.fields)) rawData = data.form || data;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Production origin fallback lookup
+  if (!rawData) {
+    const fallbackHosts = ["https://swapnopay.top", "https://api.swapnopay.top"];
+    for (const host of fallbackHosts) {
+      if (!window.location.origin.includes(host.replace('https://', ''))) {
+        try {
+          const res = await fetch(`${host}/v1/forms/${encodeURIComponent(formIdentifier)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.ok && data.form) { rawData = data.form; break; }
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  if (!rawData) {
+    showErrorState("Assessment Not Found", "We were unable to locate this assessment. The link may have expired or been deactivated.");
+    return;
+  }
+
+  formConfig = rawData;
+  initExamFromConfig(formConfig);
+}
+
+// ── Initialize Form & Parse Questions ───────────────────────────────────────
+function initExamFromConfig(config) {
+  document.getElementById('loadingState').style.display = 'none';
+
+  // Check Closing Status
+  if (config.closing_status && config.closing_status.closed) {
+    showClosedState(config.closing_status.message || "This assessment is no longer accepting submissions.");
+    return;
+  }
+
+  const theme = (config.theme_config && typeof config.theme_config === 'object')
+    ? config.theme_config
+    : (config.theme && typeof config.theme === 'object' ? config.theme : {});
+
+  applyThemeConfig(theme);
+
+  // Set Page & Header Titles
+  const examTitle = config.title || 'Online Assessment';
+  document.title = `${examTitle} — Exam Portal`;
+  document.getElementById('examTitle').textContent = examTitle;
+  document.getElementById('gateTitle').textContent = examTitle;
+  if (config.description) {
+    document.getElementById('gateDesc').textContent = config.description;
+  }
+
+  const logoUrl = config.logo_url || theme.logo_url || theme.logoUrl;
+  if (logoUrl) {
+    const l = document.getElementById('headerLogo');
+    l.src = logoUrl;
+    l.style.display = 'block';
+  }
+
+  // Parse Duration / Timer
+  const timerMins = Number(theme.timerMinutes || theme.timer_minutes || theme.duration_minutes || theme.exam_duration || config.duration || 0);
+  if (timerMins > 0) {
+    isCountDown = true;
+    totalExamSeconds = timerMins * 60;
+    seconds = totalExamSeconds;
+    document.getElementById('metaDuration').textContent = `${timerMins} mins`;
+    const m = String(timerMins).padStart(2, '0');
+    document.getElementById('timerVal').textContent = `${m}:00`;
+  } else {
+    isCountDown = false;
+    seconds = 0;
+    document.getElementById('metaDuration').textContent = 'Self-Paced';
+    document.getElementById('timerVal').textContent = `00:00`;
+  }
+
+  // Parse Fee
+  const amount = Number(config.amount || 0);
+  if (amount > 0 || theme.enable_payment) {
+    const feeBox = document.getElementById('metaFeeBox');
+    const feeVal = document.getElementById('metaFeeVal');
+    feeBox.style.display = 'block';
+    feeVal.textContent = `৳${amount}`;
+  }
+
+  // Extract all fields from fields array and all pages
+  let allFields = [];
+  try {
+    const rootFields = typeof config.fields === 'string' ? JSON.parse(config.fields) : (config.fields || []);
+    allFields.push(...rootFields);
+  } catch {}
+
+  if (Array.isArray(config.pages)) {
+    config.pages.forEach(p => {
+      let pageFields = [];
+      try {
+        pageFields = typeof p.fields === 'string' ? JSON.parse(p.fields) : (p.fields || []);
+      } catch {}
+      if (Array.isArray(pageFields)) allFields.push(...pageFields);
+    });
+  }
+
+  // Deduplicate fields by ID or label
+  const seenIds = new Set();
+  const dedupedFields = [];
+  allFields.forEach(f => {
+    const idKey = f.id || f.name || f.label;
+    if (idKey && !seenIds.has(idKey)) {
+      seenIds.add(idKey);
+      dedupedFields.push(f);
+    }
+  });
+
+  // Separate Candidate Fields vs Exam Questions
+  const parsedQuestions = [];
+  let qNumber = 1;
+
+  dedupedFields.forEach(f => {
+    const typeStr = String(f.type || '').toUpperCase();
+    const label = String(f.label || f.prompt || '').trim();
+    const lowerLabel = label.toLowerCase();
+    const options = Array.isArray(f.options) ? f.options.map(o => typeof o === 'object' ? (o.label || o.value || '') : String(o)) : [];
+
+    // Identify candidate profile fields
+    const isCandidateName = typeStr === 'NAME' || (typeStr === 'TEXT' && (lowerLabel.includes('candidate name') || lowerLabel.includes('student name')));
+    const isCandidatePhone = typeStr === 'PHONE' || (typeStr === 'TEXT' && (lowerLabel.includes('phone') || lowerLabel.includes('mobile')));
+    const isCandidateId = lowerLabel.includes('roll') || lowerLabel.includes('student id') || lowerLabel.includes('reg no') || lowerLabel.includes('registration');
+    const isCandidateEmail = typeStr === 'EMAIL' || lowerLabel.includes('email');
+
+    if (isCandidateName || isCandidatePhone || isCandidateId || isCandidateEmail) {
+      candidateFieldsConfig.push(f);
+      if (isCandidateEmail) document.getElementById('groupEmail').style.display = 'block';
+      return;
+    }
+
+    // Question extraction
+    if (typeStr === 'RADIO' || typeStr === 'MCQ' || typeStr === 'SINGLE_SELECT') {
+      const isTF = options.length === 2 && options.some(o => o.toLowerCase() === 'true') && options.some(o => o.toLowerCase() === 'false');
+      if (isTF) {
+        parsedQuestions.push({ id: f.id || `q_${qNumber}`, qNum: qNumber++, type: 'truefalse', prompt: label });
+      } else {
+        parsedQuestions.push({
+          id: f.id || `q_${qNumber}`,
+          qNum: qNumber++,
+          type: 'mcq',
+          prompt: label,
+          options: options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D']
+        });
+      }
+    } else if (typeStr === 'CHECKBOX' || typeStr === 'MULTI_SELECT') {
+      parsedQuestions.push({
+        id: f.id || `q_${qNumber}`,
+        qNum: qNumber++,
+        type: 'multi',
+        prompt: label,
+        options: options.length > 0 ? options : ['Option 1', 'Option 2', 'Option 3']
+      });
+    } else if (typeStr === 'DROPDOWN' || typeStr === 'SELECT') {
+      parsedQuestions.push({
+        id: f.id || `q_${qNumber}`,
+        qNum: qNumber++,
+        type: 'mcq',
+        prompt: label,
+        options: options
+      });
+    } else if (typeStr === 'NOTES' || typeStr === 'TEXTAREA' || typeStr === 'CODE' || typeStr === 'PARAGRAPH') {
+      parsedQuestions.push({
+        id: f.id || `q_${qNumber}`,
+        qNum: qNumber++,
+        type: 'code',
+        prompt: label
+      });
+    } else if (typeStr === 'FILE_UPLOAD' || typeStr === 'CAMERA_UPLOAD') {
+      parsedQuestions.push({
+        id: f.id || `q_${qNumber}`,
+        qNum: qNumber++,
+        type: 'file',
+        prompt: label
+      });
+    } else {
+      // Default to short answer
+      parsedQuestions.push({
+        id: f.id || `q_${qNumber}`,
+        qNum: qNumber++,
+        type: 'blank',
+        prompt: label
+      });
+    }
+  });
+
+  if (parsedQuestions.length === 0) {
+    showErrorState("No Questions Available", "This assessment does not contain any published questions yet. Please contact the administrator.");
+    return;
+  }
+
+  questions = parsedQuestions;
+  document.getElementById('metaQuestionCount').textContent = `${questions.length}`;
+
+  // Pre-fill candidate info from URL params if available
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('name')) document.getElementById('inputName').value = urlParams.get('name');
+  if (urlParams.get('phone')) document.getElementById('inputPhone').value = urlParams.get('phone');
+  if (urlParams.get('id') && urlParams.get('id') !== formIdentifier) document.getElementById('inputId').value = urlParams.get('id');
+  if (urlParams.get('roll')) document.getElementById('inputId').value = urlParams.get('roll');
+  if (urlParams.get('email')) {
+    document.getElementById('inputEmail').value = urlParams.get('email');
+    document.getElementById('groupEmail').style.display = 'block';
+  }
+
+  // Show Entrance Gate
+  document.getElementById('gateWrap').style.display = 'block';
+
+  // Restore saved progress if any
+  try {
+    const savedAns = localStorage.getItem(`exam_ans_${formIdentifier}`);
+    if (savedAns) {
+      Object.assign(answers, JSON.parse(savedAns));
+      Object.keys(answers).forEach(k => touched.add(isNaN(Number(k)) ? k : Number(k)));
+    }
+    const savedFlg = localStorage.getItem(`exam_flg_${formIdentifier}`);
+    if (savedFlg) {
+      JSON.parse(savedFlg).forEach(k => flagged.add(isNaN(Number(k)) ? k : Number(k)));
+    }
+  } catch {}
+}
+
+// ── Entrance Gate Handler ───────────────────────────────────────────────────
+document.getElementById('startExamBtn').addEventListener('click', () => {
+  const name = document.getElementById('inputName').value.trim();
+  const phone = document.getElementById('inputPhone').value.trim();
+  const roll = document.getElementById('inputId').value.trim();
+  const email = document.getElementById('inputEmail').value.trim();
+
+  if (!name) {
+    alert('Please enter your full name to proceed with the assessment.');
+    document.getElementById('inputName').focus();
+    return;
+  }
+  if (!phone) {
+    alert('Please enter your phone number to secure your response.');
+    document.getElementById('inputPhone').focus();
+    return;
+  }
+
+  candidateInfo = { name, phone, id: roll, email };
+
+  // Set candidate bar
+  document.getElementById('candNameDisplay').textContent = name;
+  if (roll) {
+    document.getElementById('candIdDisplay').textContent = roll;
+    document.getElementById('candIdSection').style.display = 'block';
+  } else {
+    document.getElementById('candIdSection').style.display = 'none';
+  }
+
+  // Switch to active exam view
+  document.getElementById('gateWrap').style.display = 'none';
+  document.getElementById('examHeader').style.display = 'flex';
+  document.getElementById('candidateBar').style.display = 'flex';
+  document.getElementById('examLayout').style.display = 'flex';
+  document.getElementById('actionBar').style.display = 'flex';
 
   window._timerInt = setInterval(tick, 1000);
   renderQuestion();
+});
+
+// ── State Screens ───────────────────────────────────────────────────────────
+function showErrorState(title, desc) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('gateWrap').style.display = 'none';
+  document.getElementById('examLayout').style.display = 'none';
+  document.getElementById('actionBar').style.display = 'none';
+  document.getElementById('examHeader').style.display = 'none';
+  
+  const fb = document.getElementById('feedbackContainer');
+  fb.style.display = 'block';
+  fb.innerHTML = `
+    <div class="state-screen">
+      <div class="state-icon err">✕</div>
+      <h2>${title}</h2>
+      <p>${desc}</p>
+      <a href="/" class="btn btn-primary" style="text-decoration:none;">Return to Home</a>
+    </div>
+  `;
 }
 
+function showClosedState(msg) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('gateWrap').style.display = 'none';
+  document.getElementById('examLayout').style.display = 'none';
+  document.getElementById('actionBar').style.display = 'none';
+  document.getElementById('examHeader').style.display = 'none';
+
+  const fb = document.getElementById('feedbackContainer');
+  fb.style.display = 'block';
+  fb.innerHTML = `
+    <div class="state-screen">
+      <div class="state-icon warn">🔒</div>
+      <h2>Assessment Closed</h2>
+      <p>${msg}</p>
+    </div>
+  `;
+}
+
+// ── Kickoff ─────────────────────────────────────────────────────────────────
 loadDynamicExamConfig();
 </script>
 </body>

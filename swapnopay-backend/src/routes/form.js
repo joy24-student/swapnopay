@@ -274,10 +274,96 @@ export function formRouter(io = null) {
   router.delete('/forms/:id', handleDeleteFormRoute)
 
   // ──────────────────────────────────────────────────────────────────────────
+  // PATCH /v1/forms/:slugOrId & POST /v1/forms/:slugOrId/update
+  // Allows customizing style, uploading product image, toggling/removing sections,
+  // editing fields, swatches, specs, and prices dynamically
+  // ──────────────────────────────────────────────────────────────────────────
+  async function handleUpdateForm(req, res) {
+    try {
+      const identifier = String(req.params.slugOrId || '').trim()
+      const normalizedIdentifier = identifier.toLowerCase()
+      const compactId = normalizedIdentifier.replace(/-/g, '')
+
+      let route = routeBySlug.get(normalizedIdentifier) || routeById.get(compactId) || routeById.get(normalizedIdentifier)
+      const existingPayload = (route && route.payload) ? { ...route.payload } : { id: identifier, slug: identifier }
+
+      const updates = req.body || {}
+
+      const updatedPayload = {
+        ...existingPayload,
+        ...updates,
+        theme: {
+          ...(existingPayload.theme || existingPayload.theme_config || {}),
+          ...(updates.theme || updates.theme_config || {})
+        },
+        theme_config: {
+          ...(existingPayload.theme_config || existingPayload.theme || {}),
+          ...(updates.theme_config || updates.theme || {})
+        },
+        updated_at: new Date().toISOString()
+      }
+
+      if (updates.image_url) updatedPayload.image_url = updates.image_url
+      if (updates.products) updatedPayload.products = updates.products
+      if (updates.fields) updatedPayload.fields = updates.fields
+      if (updates.title) updatedPayload.title = updates.title
+      if (updates.description !== undefined) updatedPayload.description = updates.description
+      if (updates.amount !== undefined) updatedPayload.amount = Number(updates.amount)
+
+      const cleanFormId = updatedPayload.id || identifier
+      const cleanSlug = updatedPayload.slug || identifier
+
+      const routeRecord = {
+        form_id: cleanFormId,
+        slug: cleanSlug.toLowerCase(),
+        merchant_id: updatedPayload.merchant_id || route?.merchant_id || null,
+        payload: updatedPayload,
+        updated_at: new Date().toISOString()
+      }
+
+      if (cleanSlug) routeBySlug.set(cleanSlug.toLowerCase(), routeRecord)
+      if (cleanFormId) {
+        routeById.set(cleanFormId.toLowerCase().replace(/-/g, ''), routeRecord)
+        routeById.set(cleanFormId.toLowerCase(), routeRecord)
+      }
+
+      saveRoutesToDisk()
+
+      // Also sync to Supabase payment_forms if available
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          const effectiveFormUuid = normalizeUuid(cleanFormId) || deterministicUuid(cleanFormId)
+          await admin.from('payment_forms').update({
+            title: updatedPayload.title,
+            description: updatedPayload.description,
+            amount: Number(updatedPayload.amount || 0),
+            image_url: updatedPayload.image_url || null,
+            fields: typeof updatedPayload.fields === 'string' ? updatedPayload.fields : JSON.stringify(updatedPayload.fields || []),
+            products: typeof updatedPayload.products === 'string' ? updatedPayload.products : JSON.stringify(updatedPayload.products || []),
+            theme: updatedPayload.theme,
+            updated_at: new Date().toISOString()
+          }).eq('id', effectiveFormUuid)
+        }
+      } catch (dbErr) {
+        console.warn('[form-router] Update DB sync notice:', dbErr.message)
+      }
+
+      return res.json({ ok: true, form: updatedPayload })
+    } catch (err) {
+      console.error('[form-router] Error updating form:', err.message)
+      return res.status(500).json({ ok: false, error: err.message })
+    }
+  }
+
+  router.patch('/forms/:slugOrId', handleUpdateForm)
+  router.post('/forms/:slugOrId/update', handleUpdateForm)
+
+  // ──────────────────────────────────────────────────────────────────────────
   // GET /v1/forms/:slugOrId
   // Resolves form config, fields, products, theme, and closing status
   // ──────────────────────────────────────────────────────────────────────────
-  router.get('/forms/:slugOrId', async (req, res) => {
+  router.get(['/forms/:slugOrId', '/hosted-forms/:slugOrId'], async (req, res) => {
     const identifier = String(req.params.slugOrId || '').trim()
     const normalizedIdentifier = identifier.toLowerCase()
     const compactId = normalizedIdentifier.replace(/-/g, '')
@@ -465,10 +551,10 @@ export function formRouter(io = null) {
   })
 
   // ──────────────────────────────────────────────────────────────────────────
-  // POST /v1/forms/:slugOrId/submit
+  // POST /v1/forms/:slugOrId/submit & /submissions
   // Secure Form Submission Handler
   // ──────────────────────────────────────────────────────────────────────────
-  router.post('/forms/:slugOrId/submit', async (req, res) => {
+  router.post(['/forms/:slugOrId/submit', '/forms/:slugOrId/submissions', '/hosted-forms/:slugOrId/submit', '/hosted-forms/:slugOrId/submissions'], async (req, res) => {
     try {
       const identifier = String(req.params.slugOrId || '').trim()
       const normalizedIdentifier = identifier.toLowerCase()
@@ -971,7 +1057,7 @@ export function formRouter(io = null) {
   // GET /v1/forms/:slugOrId/submissions
   // Fetch responses for a form
   // ──────────────────────────────────────────────────────────────────────────
-  router.get('/forms/:slugOrId/submissions', async (req, res) => {
+  router.get(['/forms/:slugOrId/submissions', '/hosted-forms/:slugOrId/submissions'], async (req, res) => {
     const identifier = String(req.params.slugOrId || '').trim()
     const memoryList = formSubmissionsMemory.get(identifier) || []
 

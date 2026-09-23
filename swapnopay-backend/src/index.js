@@ -337,10 +337,30 @@ app.get(['/voice-call', '/call', '/voice-calling', '/voice-agent'], (req, res) =
   res.redirect(301, `/voice-call.html${queryStr}`)
 })
 
-// Online MCQ & Quiz Exam Portal (/exam, /quiz, /assessment)
+// Online MCQ & Quiz Exam Portal (/exam, /exams, /quiz, /assessment, /exam/:slug)
 app.get(['/exam', '/exams', '/quiz', '/assessment'], (req, res) => {
   const queryStr = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
   res.redirect(301, `/exam.html${queryStr}`)
+})
+app.get(['/e/:slug', '/exam/:slug', '/exams/:slug', '/quiz/:slug', '/assessment/:slug'], (req, res) => {
+  const examHtml = path.join(webDir, 'exam.html')
+  if (fs.existsSync(examHtml)) {
+    return res.sendFile(examHtml)
+  }
+  res.redirect(`/exam.html?slug=${encodeURIComponent(req.params.slug)}`)
+})
+
+// Flagship Product Showcase & Express Checkout (/product, /products, /p/:slug, /product/:slug)
+app.get(['/product', '/products'], (req, res) => {
+  const queryStr = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+  res.redirect(301, `/product.html${queryStr}`)
+})
+app.get(['/p/:slug', '/product/:slug'], (req, res) => {
+  const productHtml = path.join(webDir, 'product.html')
+  if (fs.existsSync(productHtml)) {
+    return res.sendFile(productHtml)
+  }
+  res.redirect(`/product.html?slug=${encodeURIComponent(req.params.slug)}`)
 })
 
 // Hosted Checkout Form Dynamic Slugs (/f/:slug, /forms/:slug, /form/:slug)

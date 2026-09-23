@@ -5153,7 +5153,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             notificationSmsNumber = themeJson.optString("notification_sms_number"),
             enablePaymentCallback = themeJson.optBoolean("payment_callback_enabled", false),
             paymentCallbackUrl = themeJson.optString("payment_callback_url"),
-            customVariables = customVariables.filter { it.key.isNotBlank() }
+            customVariables = customVariables.filter { it.key.isNotBlank() },
+            productImageUrl = themeJson.optString("product_image_url", themeJson.optString("productImageUrl", json.optString("image_url", ""))),
+            wasPrice = themeJson.optDouble("was_price", themeJson.optDouble("wasPrice", 0.0)),
+            eyebrowText = themeJson.optString("eyebrow_text", themeJson.optString("eyebrowText", "")),
+            badgeText = themeJson.optString("badge_text", themeJson.optString("badgeText", "")),
+            ratingScore = themeJson.optDouble("rating_score", themeJson.optDouble("ratingScore", 0.0)),
+            ratingCount = themeJson.optInt("rating_count", themeJson.optInt("ratingCount", 0)),
+            hideHeader = themeJson.optBoolean("hide_header", themeJson.optBoolean("hideHeader", false)),
+            hideEyebrow = themeJson.optBoolean("hide_eyebrow", themeJson.optBoolean("hideEyebrow", false)),
+            hideRating = themeJson.optBoolean("hide_rating", themeJson.optBoolean("hideRating", false)),
+            hidePrice = themeJson.optBoolean("hide_price", themeJson.optBoolean("hidePrice", false)),
+            hideSwatches = themeJson.optBoolean("hide_swatches", themeJson.optBoolean("hideSwatches", false)),
+            hideChips = themeJson.optBoolean("hide_chips", themeJson.optBoolean("hideChips", false)),
+            hideQty = themeJson.optBoolean("hide_qty", themeJson.optBoolean("hideQty", false)),
+            hideSummary = themeJson.optBoolean("hide_summary", themeJson.optBoolean("hideSummary", false)),
+            hidePromo = themeJson.optBoolean("hide_promo", themeJson.optBoolean("hidePromo", false)),
+            hideAssurances = themeJson.optBoolean("hide_assurances", themeJson.optBoolean("hideAssurances", false)),
+            hideDetails = themeJson.optBoolean("hide_details", themeJson.optBoolean("hideDetails", false)),
+            hideMobileDock = themeJson.optBoolean("hide_mobile_dock", themeJson.optBoolean("hideMobileDock", false))
         )
         val model = HostedFormModel(
             id = id,
@@ -5686,12 +5704,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             put("notification_sms_number", theme.notificationSmsNumber)
             put("payment_callback_enabled", theme.enablePaymentCallback)
             put("payment_callback_url", theme.paymentCallbackUrl)
+            // Flagship & Single Product Showcase Configurations
+            put("is_dark_mode", theme.isDarkMode)
+            put("product_image_url", theme.productImageUrl)
+            put("was_price", theme.wasPrice)
+            put("eyebrow_text", theme.eyebrowText)
+            put("badge_text", theme.badgeText)
+            put("rating_score", theme.ratingScore)
+            put("rating_count", theme.ratingCount)
+            put("hide_header", theme.hideHeader)
+            put("hide_eyebrow", theme.hideEyebrow)
+            put("hide_rating", theme.hideRating)
+            put("hide_price", theme.hidePrice)
+            put("hide_swatches", theme.hideSwatches)
+            put("hide_chips", theme.hideChips)
+            put("hide_qty", theme.hideQty)
+            put("hide_summary", theme.hideSummary)
+            put("hide_promo", theme.hidePromo)
+            put("hide_assurances", theme.hideAssurances)
+            put("hide_details", theme.hideDetails)
+            put("hide_mobile_dock", theme.hideMobileDock)
             if (theme.customVariables.isNotEmpty()) {
                 val cvArr = org.json.JSONArray()
                 theme.customVariables.forEach { cv -> cvArr.put(org.json.JSONObject().apply { put("key", cv.key); put("example_value", cv.exampleValue); put("source", cv.source) }) }
                 put("custom_variables", cvArr)
             }
+        }.also { themeJsonObj ->
+            put("theme_config", themeJsonObj)
         })
+        if (form.themeConfig.productImageUrl.isNotBlank()) {
+            put("image_url", form.themeConfig.productImageUrl)
+        }
         put("logo_url", form.themeConfig.logoUrl)
         put("banner_url", form.themeConfig.bannerUrl)
     }
@@ -7039,6 +7082,39 @@ function executePayment() {
         pushFormStateToUndo()
         formTemplateKey.value = templateKey
         when (templateKey) {
+            "FLAGSHIP_PRODUCT" -> {
+                formTitle.value = "Aura Pro Wireless Headphones"
+                formDescription.value = "Engineered for acoustic depth with bespoke aerospace-grade magnesium dynamics, active noise cancellation, and high-fidelity sound."
+                formFieldsList.value = listOf(
+                    FormFieldItem(type = FormFieldType.NAME, label = "Customer Full Name", placeholder = "Recipient's full name", isRequired = true),
+                    FormFieldItem(type = FormFieldType.PHONE, label = "bKash / Nagad Contact Number", placeholder = "01XXXXXXXXX", isRequired = true),
+                    FormFieldItem(type = FormFieldType.ADDRESS, label = "Delivery Street Address", placeholder = "House, Road, Area, Thana", isRequired = true),
+                    FormFieldItem(type = FormFieldType.SHIPPING, label = "Delivery Area & Speed", options = listOf("Standard Courier — 3-5 days (৳60)", "Express Courier — 24-48 hrs (৳120)", "Store Pickup — Banani, Dhaka (Free)")),
+                    FormFieldItem(type = FormFieldType.COUPON, label = "Promo / Voucher Code", placeholder = "e.g. AURA10", isRequired = false),
+                    FormFieldItem(type = FormFieldType.NOTES, label = "Delivery Instructions (Optional)", placeholder = "e.g. Call before delivery, leave with concierge", isRequired = false)
+                )
+                formProductsList.value = listOf(
+                    FormProductItem(
+                        title = "Aura Pro Wireless Headphones",
+                        description = "Engineered for acoustic depth with bespoke aerospace-grade magnesium dynamics and 40h playtime.",
+                        price = 2490.0,
+                        salePrice = 3290.0,
+                        stock = 18,
+                        sku = "AURA-PRO-01",
+                        category = "Audio & Electronics"
+                    )
+                )
+                formThemeConfig.value = FormThemeConfig(
+                    primaryColorHex = "#0D0F12",
+                    buttonShape = "ROUNDED",
+                    fontFamily = "Inter",
+                    eyebrowText = "Flagship Audio • 2026 Collection",
+                    badgeText = "Best Seller",
+                    wasPrice = 3290.0,
+                    ratingScore = 4.9,
+                    ratingCount = 248
+                )
+            }
             "SINGLE_PRODUCT" -> {
                 formTitle.value = "Single Product Direct Checkout"
                 formDescription.value = "Instant 1-page checkout for your featured product."
@@ -7265,6 +7341,7 @@ function executePayment() {
         val isFood = listOf("food", "restaurant", "burger", "pizza", "cafe", "catering", "bakery", "meal", "lunch", "dinner", "snack").any { lc.contains(it) }
         val isSub = listOf("membership", "subscription", "gym", "fitness", "club", "monthly", "annual").any { lc.contains(it) }
         val isClothing = listOf("shirt", "pant", "dress", "panjabi", "shoe", "cloth", "fashion", "tshirt", "hoodie", "saree").any { lc.contains(it) }
+        val isFlagship = listOf("headphone", "earphone", "airpods", "aura", "gadget", "watch", "smartwatch", "flagship", "electronics").any { lc.contains(it) }
 
         val amountRegex = Regex("(?:৳|tk|bdt|\\$)\\s*(\\d+(?:,\\d+)*(?:\\.\\d+)?)")
         val amountRegex2 = Regex("(\\d+(?:,\\d+)*(?:\\.\\d+)?)\\s*(?:৳|tk|bdt|taka|dollars|\\$)")
@@ -7535,6 +7612,40 @@ function executePayment() {
                     put("fields", fieldsArr)
                 }
                 pagesArr.put(p1)
+            }
+            isFlagship -> {
+                templateKey = "FLAGSHIP_PRODUCT"
+                primaryColor = "#0D0F12"
+                buttonShape = "ROUNDED"
+                val price = extractedAmount ?: 2490
+                desc = "Engineered for acoustic depth and unmatched performance. Order $cleanTitle with instant checkout."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Delivery & Details")
+                    put("subtitle", "Fill in your delivery address for instant fulfillment")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Recipient Full Name"); put("placeholder", "e.g. Tanvir Ahmed"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "bKash / Nagad Contact Phone"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "ADDRESS"); put("label", "Delivery Street Address"); put("placeholder", "House, Road, Area, Thana"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "SHIPPING"); put("label", "Delivery Speed & Area"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Standard Courier — 3-5 days (৳60)", "Express Courier — 24-48 hrs (৳120)", "Store Pickup (Banani, Dhaka - Free)")))
+                        })
+                        if (hasCoupon) put(org.json.JSONObject().apply { put("type", "COUPON"); put("label", "Promo / Voucher Code"); put("placeholder", "e.g. AURA10"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply { put("type", "NOTES"); put("label", "Delivery Instructions (Optional)"); put("placeholder", "e.g. Call before delivery"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Order Received")
+                    put("subtitle", "Thank you for shopping with us")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 54px; margin-bottom: 12px;">🎧</div><h2 style="color: #0D0F12; margin: 0 0 8px 0; font-size: 24px;">Order Placed Successfully!</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">Your order for $cleanTitle has been recorded and will be dispatched promptly.</p></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
             }
             else -> {
                 // E-Commerce / Physical Goods / General Form
@@ -8106,8 +8217,11 @@ function executePayment() {
         if (listOf(theme.primaryColorHex, theme.backgroundColorHex).any { !it.matches(Regex("^#[0-9A-Fa-f]{6}$")) }) {
             publishErrors["theme_colors"] = "Primary and background colors must use six-digit hex values."
         }
-        if (theme.fontFamily.uppercase() !in setOf("INTER", "SYSTEM", "SERIF", "MONOSPACE")) {
+        if (theme.fontFamily.uppercase() !in setOf("INTER", "SYSTEM", "SERIF", "MONOSPACE", "OUTFIT", "POPPINS", "ROBOTO", "PLUS JAKARTA SANS", "PLAYFAIR DISPLAY")) {
             publishErrors["font_family"] = "Choose a supported hosted-form font family."
+        }
+        if (theme.productImageUrl.isNotBlank() && !theme.productImageUrl.matches(Regex("^(https://|data:image/)[^\\s]+$"))) {
+            publishErrors["product_image_url"] = "Product image URL must use HTTPS or data URI."
         }
         if (theme.buttonShape.uppercase() !in setOf("ROUNDED", "PILL", "SQUARE")) {
             publishErrors["button_shape"] = "Choose a supported button shape."
@@ -15847,7 +15961,26 @@ data class FormThemeConfig(
     var taxPercent: Double = 0.0,
     var requirePaymentBeforeSubmit: Boolean = true,
     // Custom variables defined per-form for substitution in hosted HTML/CSS
-    var customVariables: List<CustomVariable> = emptyList()
+    var customVariables: List<CustomVariable> = emptyList(),
+    // Flagship & Single Product Showcase Configurations
+    var productImageUrl: String = "",
+    var wasPrice: Double = 0.0,
+    var eyebrowText: String = "",
+    var badgeText: String = "",
+    var ratingScore: Double = 0.0,
+    var ratingCount: Int = 0,
+    var hideHeader: Boolean = false,
+    var hideEyebrow: Boolean = false,
+    var hideRating: Boolean = false,
+    var hidePrice: Boolean = false,
+    var hideSwatches: Boolean = false,
+    var hideChips: Boolean = false,
+    var hideQty: Boolean = false,
+    var hideSummary: Boolean = false,
+    var hidePromo: Boolean = false,
+    var hideAssurances: Boolean = false,
+    var hideDetails: Boolean = false,
+    var hideMobileDock: Boolean = false
 )
 
 data class CustomVariable(
