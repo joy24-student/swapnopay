@@ -224,7 +224,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.observeMerchantProfile().collect { profile ->
                 if (profile != null && profile.businessName.isNotBlank()) {
-                    _activeProfile.value = profile
+                    val isPlaceholder = profile.id == "merchant_default" ||
+                        profile.id == repository.installationId ||
+                        profile.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE))
+                    if (!isPlaceholder) {
+                        _activeProfile.value = profile
+                    }
                 }
             }
         }
@@ -1082,10 +1087,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val account = checkMerchantAccountOnBackend(session.email.orEmpty(), session.uid)
                 if (account != null) {
                     applyRestoredMerchantSetup(account)
-                    setOnboarded(account.isOnboarded)
                     val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
                     setOnboarded(isEffectivelyOnboarded)
                     syncPinFromCloud()
+                    fetchMerchantApiKey()
+                    refreshGatewayConfig()
                 } else {
                     // Fallback to local profile if offline or server temporarily unavailable
                     val local = session.uid?.let { repository.getMerchantProfileById(it) } ?: repository.getMerchantProfileById(session.email.orEmpty())
@@ -2328,7 +2334,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             isRefreshingKyc.value = true
             try {
                 val email = _userEmail.value.orEmpty()
-                val merchantId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" }
+                val merchantId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" && it != repository.installationId }
                 val result = checkMerchantAccountOnBackend(email, merchantId)
                     ?: error("Platform account could not be loaded. Please retry.")
                 val rawKyc = result.kycStatus.trim().uppercase()
@@ -2521,10 +2527,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun checkMerchantAccountOnBackend(email: String, merchantId: String? = null): MerchantBackendCheckResult? {
         val cleanEmail = email.trim().lowercase()
-        val effectiveId = merchantId?.trim()?.takeIf { it.isNotBlank() }
-            ?: _activeProfile.value.id.takeIf { it.isNotBlank() && it != "default_merchant" }
+        val effectiveId = merchantId?.trim()?.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" && it != repository.installationId }
+            ?: _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" && it != repository.installationId }
             ?: getOrCreatePlatformSupabaseProfile().authEmail.takeIf { it.equals(cleanEmail, true) }?.let {
-                repository.observeMerchantProfile().firstOrNull()?.id
+                repository.observeMerchantProfile().firstOrNull()?.id?.takeIf { id -> id != "merchant_default" && id != "default_merchant" && id != repository.installationId }
             }
 
         // 1. Attempt backend account lookup if reachable (non-blocking on failure)
@@ -2730,8 +2736,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _activeProfile.value = restored
         repository.insertMerchantProfile(restored)
         repository.switchProfile(restored.id)
+        repository.deletePlaceholderMerchantProfiles()
         repository.reassignMerchantData("merchant_default", restored.id)
         repository.reassignMerchantData("00000000-0000-0000-0000-000000000001", restored.id)
+        repository.reassignMerchantData(repository.installationId, restored.id)
         syncAllCachedFormsToVps()
         startObservingPaymentFormsCache()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -2803,8 +2811,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _supabaseAnonKeyInput.value = profile.anonKey
             supabaseConnected.value = true
         } else {
-            _activeSupabaseProfile.value = null
-            repository.deactivateSupabaseProfiles()
+            val platform = getOrCreatePlatformSupabaseProfile().copy(
+                isActive = true,
+                businessName = result.businessName.ifBlank { "SwapnoPay Main Cloud" }
+            )
+            repository.insertSupabaseProfile(platform)
+            repository.selectActiveSupabaseProfile(platform.id)
+            _activeSupabaseProfile.value = platform
+            supabaseUrl.value = platform.supabaseUrl
+            supabaseAnonKey.value = platform.anonKey
+            _supabaseUrlInput.value = platform.supabaseUrl
+            _supabaseAnonKeyInput.value = platform.anonKey
+            supabaseConnected.value = true
         }
         fetchSystemConfigFromSupabase()
         listenToSupportChatFromPlatformOwner()
@@ -2986,7 +3004,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 fetchMerchantApiKey()
                 refreshGatewayConfig()
-                pullAllMerchantDataFromRemote(_activeProfile.value.id)
+                pullAllMerchantDataFromRemote(account.merchantId)
                 val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
                 setOnboarded(isEffectivelyOnboarded)
                 // Sync PIN hash from Supabase (cloud-synced PIN system)
@@ -3393,13 +3411,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 applyRestoredMerchantSetup(account)
                 saveEncryptedSessionToken(userEmail, authUserId, "Supabase OAuth")
                 securityPrefs.edit().remove("supabase_pkce_verifier").apply()
-                setOnboarded(account.isOnboarded)
                 val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
                 setOnboarded(isEffectivelyOnboarded)
                 syncPinFromCloud()
+                fetchMerchantApiKey()
+                refreshGatewayConfig()
+                pullAllMerchantDataFromRemote(account.merchantId)
                 _isAuthenticating.value = false
                 _authError.value = null
-                navigateTo(if (!account.isOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
                 navigateTo(if (!isEffectivelyOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
 
             }
@@ -3592,7 +3611,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val payload = org.json.JSONObject().apply {
-                    val mId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" }
+                    val mId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" && it != repository.installationId }
                     if (!mId.isNullOrBlank()) put("merchant_id", mId)
                     val email = _userEmail.value ?: _activeProfile.value.email
                     if (!email.isNullOrBlank()) put("email", email)
@@ -8454,6 +8473,27 @@ function executePayment() {
 
     fun deleteFormProduct(productId: String) {
         formProductsList.value = formProductsList.value.filter { it.id != productId }
+        saveActiveFormToHostedList()
+    }
+
+    fun updateFormProduct(product: FormProductItem) {
+        pushFormStateToUndo()
+        formProductsList.value = formProductsList.value.map { if (it.id == product.id) product else it }
+        saveActiveFormToHostedList()
+    }
+
+    fun saveOrUpdateShowcaseProduct(product: FormProductItem) {
+        pushFormStateToUndo()
+        val list = formProductsList.value.toMutableList()
+        val idx = list.indexOfFirst { it.id == product.id }
+        if (idx != -1) {
+            list[idx] = product
+        } else if (list.isNotEmpty()) {
+            list[0] = product
+        } else {
+            list.add(product)
+        }
+        formProductsList.value = list
         saveActiveFormToHostedList()
     }
 

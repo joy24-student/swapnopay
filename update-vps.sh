@@ -68,10 +68,37 @@ fi
 if [ -d "$TARGET_DIR/admin" ]; then
     echo -e "${YELLOW}🖥️  Verifying Admin Control Panel...${NC}"
     cd "$TARGET_DIR/admin"
-    if [ ! -d dist ] || [ -f package.json ]; then
-        npm install --no-audit --no-fund 2>/dev/null || true
-        npm run build 2>/dev/null || true
+    if [ -f package.json ]; then
+        if [ ! -f dist/index.html ]; then
+            npm install --no-audit --no-fund 2>/dev/null || true
+            npm run build 2>/dev/null || true
+        fi
     fi
+    # If dist/index.html is missing, auto-generate it from dist/assets
+    if [ -d "$TARGET_DIR/admin/dist/assets" ] && [ ! -f "$TARGET_DIR/admin/dist/index.html" ]; then
+        JS_FILE=$(basename $(ls "$TARGET_DIR/admin/dist/assets"/*.js 2>/dev/null | head -n 1) 2>/dev/null || true)
+        CSS_FILE=$(basename $(ls "$TARGET_DIR/admin/dist/assets"/*.css 2>/dev/null | head -n 1) 2>/dev/null || true)
+        if [ -n "$JS_FILE" ]; then
+            echo -e "${YELLOW}Auto-generating missing dist/index.html for Admin panel...${NC}"
+            cat << EOF > "$TARGET_DIR/admin/dist/index.html"
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SwapnoPay Admin</title>
+    <script type="module" crossorigin src="/assets/${JS_FILE}"></script>
+    <link rel="stylesheet" crossorigin href="/assets/${CSS_FILE}">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+EOF
+        fi
+    fi
+    chown -R www-data:www-data "$TARGET_DIR/admin" 2>/dev/null || true
+    chmod -R 755 "$TARGET_DIR/admin" 2>/dev/null || true
 fi
 
 # 6. Check Storefront permissions

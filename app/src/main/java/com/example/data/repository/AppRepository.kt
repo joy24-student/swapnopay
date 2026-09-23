@@ -574,13 +574,28 @@ class AppRepository(private val context: Context) {
 
     suspend fun insertAppeals(appeals: List<AppealEntity>) = dao.insertAppeals(appeals)
 
+    suspend fun deletePlaceholderMerchantProfiles() {
+        dao.deletePlaceholderMerchantProfiles(installationId)
+        profiles.removeAll { it.id == installationId || it.id == "merchant_default" || it.businessName == "Business setup required" }
+    }
+
     suspend fun insertMerchantProfile(profile: MerchantProfileEntity) {
+        val isReal = profile.id != "merchant_default" && profile.id != installationId &&
+            profile.businessName.isNotBlank() && profile.businessName != "Business setup required"
+        if (isReal) {
+            dao.deletePlaceholderMerchantProfiles(installationId)
+            profiles.removeAll { it.id == installationId || it.id == "merchant_default" || it.businessName == "Business setup required" }
+            activeProfileId = profile.id
+        }
         dao.insertMerchantProfile(profile)
         val idx = profiles.indexOfFirst { it.id == profile.id }
         if (idx != -1) {
             profiles[idx] = profile
         } else {
             profiles.add(profile)
+        }
+        if (isReal) {
+            activeProfileId = profile.id
         }
     }
 

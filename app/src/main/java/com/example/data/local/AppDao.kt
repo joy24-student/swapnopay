@@ -99,10 +99,36 @@ interface AppDao {
     suspend fun updateAppealStatus(id: String, status: String)
 
     // Merchant Profile
-    @Query("SELECT * FROM merchant_profile LIMIT 1")
+    @Query("""
+        SELECT * FROM merchant_profile 
+        ORDER BY 
+            CASE 
+                WHEN id NOT IN ('merchant_default') 
+                     AND businessName != '' 
+                     AND businessName != 'Business setup required' 
+                     AND LOWER(businessName) NOT IN ('my store', 'my business', 'google user', 'facebook user', 'demo store') 
+                THEN 0 
+                ELSE 1 
+            END ASC, 
+            rowid DESC 
+        LIMIT 1
+    """)
     fun observeMerchantProfile(): Flow<MerchantProfileEntity?>
 
-    @Query("SELECT * FROM merchant_profile LIMIT 1")
+    @Query("""
+        SELECT * FROM merchant_profile 
+        ORDER BY 
+            CASE 
+                WHEN id NOT IN ('merchant_default') 
+                     AND businessName != '' 
+                     AND businessName != 'Business setup required' 
+                     AND LOWER(businessName) NOT IN ('my store', 'my business', 'google user', 'facebook user', 'demo store') 
+                THEN 0 
+                ELSE 1 
+            END ASC, 
+            rowid DESC 
+        LIMIT 1
+    """)
     suspend fun getMerchantProfile(): MerchantProfileEntity?
 
     @Query("SELECT * FROM merchant_profile WHERE id = :id LIMIT 1")
@@ -110,6 +136,9 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMerchantProfile(profile: MerchantProfileEntity)
+
+    @Query("DELETE FROM merchant_profile WHERE id IN ('merchant_default', :installationId) OR businessName = 'Business setup required'")
+    suspend fun deletePlaceholderMerchantProfiles(installationId: String)
 
     @Query("UPDATE customers SET merchantId = :newId WHERE merchantId = :oldId")
     suspend fun reassignCustomers(oldId: String, newId: String)
