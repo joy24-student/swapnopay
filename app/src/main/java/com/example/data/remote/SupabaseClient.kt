@@ -340,36 +340,91 @@ object SupabaseClient {
                     }
                 }
 
-                // Query merchant_gateway_settings for own database credentials
+                // Query own database credentials:
+                // 1. Direct from merchants table row if provisioned there
                 var hasOwnDb = false
                 var ownUrl = ""
                 var ownKey = ""
-                try {
-                    val gwReq = Request.Builder()
-                        .url("$cleanUrl/rest/v1/merchant_gateway_settings?merchant_id=eq.$merchantId&limit=1")
-                        .addHeader("apikey", anonKey)
-                        .addHeader("Authorization", authHeader)
-                        .addHeader("Accept", "application/json")
-                        .get()
-                        .build()
-                    val gwResp = client.newCall(gwReq).execute()
-                    val gwBody = gwResp.body?.string().orEmpty()
-                    if (gwResp.isSuccessful && gwBody.isNotBlank()) {
-                        val gwArr = runCatching { JSONArray(gwBody) }.getOrNull()
-                        if (gwArr != null && gwArr.length() > 0) {
-                            val gw = gwArr.getJSONObject(0)
-                            val candUrl = gw.optString("supabase_url")
-                            val candKey = gw.optString("supabase_anon_key")
-                            if (candUrl.isNotBlank() && candKey.isNotBlank() && !candUrl.contains("tldubojeokgyoclxnzkb")) {
-                                hasOwnDb = true
-                                ownUrl = candUrl
-                                ownKey = candKey
+
+                val mUrl = m.optString("supabase_url")
+                val mKey = m.optString("supabase_anon_key")
+                if (mUrl.isNotBlank() && mKey.isNotBlank() && !mUrl.contains("tldubojeokgyoclxnzkb") && !mUrl.contains("abc123xyz")) {
+                    hasOwnDb = true
+                    ownUrl = mUrl
+                    ownKey = mKey
+                }
+
+                // 2. Query merchant_gateway_settings if not on merchant row
+                if (!hasOwnDb) {
+                    try {
+                        val idFilters = mutableListOf("merchant_id.eq.$merchantId")
+                        if (!userId.isNullOrBlank() && userId != merchantId) {
+                            idFilters.add("merchant_id.eq.$userId")
+                            idFilters.add("user_id.eq.$userId")
+                        }
+                        val gwQuery = if (idFilters.size > 1) "or=(${idFilters.joinToString(",")})&limit=1" else "${idFilters[0]}&limit=1"
+                        val gwReq = Request.Builder()
+                            .url("$cleanUrl/rest/v1/merchant_gateway_settings?$gwQuery")
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", authHeader)
+                            .addHeader("Accept", "application/json")
+                            .get()
+                            .build()
+                        val gwResp = client.newCall(gwReq).execute()
+                        val gwBody = gwResp.body?.string().orEmpty()
+                        if (gwResp.isSuccessful && gwBody.isNotBlank()) {
+                            val gwArr = runCatching { JSONArray(gwBody) }.getOrNull()
+                            if (gwArr != null && gwArr.length() > 0) {
+                                val gw = gwArr.getJSONObject(0)
+                                val candUrl = gw.optString("supabase_url")
+                                val candKey = gw.optString("supabase_anon_key")
+                                if (candUrl.isNotBlank() && candKey.isNotBlank() && !candUrl.contains("tldubojeokgyoclxnzkb") && !candUrl.contains("abc123xyz")) {
+                                    hasOwnDb = true
+                                    ownUrl = candUrl
+                                    ownKey = candKey
+                                }
                             }
                         }
+                        gwResp.close()
+                    } catch (gwErr: Exception) {
+                        Log.w("SupabaseClient", "Gateway settings lookup notice: ${gwErr.message}")
                     }
-                    gwResp.close()
-                } catch (gwErr: Exception) {
-                    Log.w("SupabaseClient", "Gateway settings lookup notice: ${gwErr.message}")
+                }
+
+                // 3. Query supabase_connections if still not found
+                if (!hasOwnDb) {
+                    try {
+                        val connFilter = if (!userId.isNullOrBlank() && userId != merchantId) {
+                            "or=(user_id.eq.$merchantId,user_id.eq.$userId)&limit=1"
+                        } else {
+                            "user_id=eq.$merchantId&limit=1"
+                        }
+                        val scReq = Request.Builder()
+                            .url("$cleanUrl/rest/v1/supabase_connections?$connFilter")
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", authHeader)
+                            .addHeader("Accept", "application/json")
+                            .get()
+                            .build()
+                        val scResp = client.newCall(scReq).execute()
+                        val scBody = scResp.body?.string().orEmpty()
+                        if (scResp.isSuccessful && scBody.isNotBlank()) {
+                            val scArr = runCatching { JSONArray(scBody) }.getOrNull()
+                            if (scArr != null && scArr.length() > 0) {
+                                val sc = scArr.getJSONObject(0)
+                                val candUrl = sc.optString("project_url")
+                                val candKey = sc.optString("publishable_key")
+                                if (candUrl.isNotBlank() && candKey.isNotBlank() && !candUrl.contains("tldubojeokgyoclxnzkb") && !candUrl.contains("abc123xyz")) {
+                                    hasOwnDb = true
+                                    ownUrl = candUrl
+                                    ownKey = candKey
+                                }
+                            }
+                        }
+                        scResp.close()
+                    } catch (scErr: Exception) {
+                        Log.w("SupabaseClient", "supabase_connections lookup notice: ${scErr.message}")
+                    }
                 }
 
                 // Check merchant_kyc_submissions if kyc_status is not yet VERIFIED/APPROVED
@@ -765,7 +820,7 @@ object SupabaseClient {
         val request = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer $token")
+            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
             .addHeader("Content-Type", "application/json")
             .addHeader("Prefer", "return=representation")
             .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
@@ -869,7 +924,7 @@ object SupabaseClient {
         val request = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer $token")
+            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
             .addHeader("Content-Type", "application/json")
             .addHeader("Prefer", "resolution=merge-duplicates")
             .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))

@@ -2209,20 +2209,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val m = json.getJSONObject("merchant")
                 val db = json.getJSONObject("database")
                 fun value(key: String) = if (m.isNull(key)) "" else m.optString(key)
+                val mId = m.getString("id")
+                val mEmail = value("email").ifBlank { cleanEmail }
+                var hasOwn = db.optBoolean("has_own_database", false)
+                var sUrl = db.optString("supabase_url")
+                var sKey = db.optString("supabase_anon_key")
+                if (!hasOwn || sUrl.isBlank() || sKey.isBlank()) {
+                    val directAdmin = fetchSupabaseConfigFromAdminDirect(mId, mEmail)
+                    if (directAdmin != null) {
+                        hasOwn = true
+                        sUrl = directAdmin.first
+                        sKey = directAdmin.second
+                    }
+                }
                 return MerchantBackendCheckResult(
                     exists = json.getBoolean("exists"),
                     isNew = json.getBoolean("is_new"),
                     isOnboarded = json.getBoolean("is_onboarded"),
-                    merchantId = m.getString("id"),
+                    merchantId = mId,
                     businessName = value("business_name"),
-                    email = value("email").ifBlank { cleanEmail },
+                    email = mEmail,
                     phone = value("phone"),
                     businessType = value("business_type").ifBlank { "Retail Store" },
                     photoUrl = value("photo_url"),
                     accountHolder = value("account_holder"),
-                    hasOwnDatabase = db.getBoolean("has_own_database"),
-                    supabaseUrl = db.optString("supabase_url"),
-                    supabaseAnonKey = db.optString("supabase_anon_key"),
+                    hasOwnDatabase = hasOwn,
+                    supabaseUrl = sUrl,
+                    supabaseAnonKey = sKey,
                     projectRef = db.optString("project_ref"),
                     kycStatus = value("kyc_status").ifBlank { "UNVERIFIED" },
                     kycRejectionReason = value("kyc_rejection_reason"),
@@ -2256,20 +2269,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val onboardedAt = value("onboarded_at")
                 val placeholder = busName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE))
                 val isOnboarded = onboardedAt.isNotBlank() || (busName.isNotBlank() && !placeholder && phone.isNotBlank())
+                val mId = m.optString("id", effectiveId.orEmpty())
+                val mEmail = value("email").ifBlank { cleanEmail }
+                var hasOwn = db.optBoolean("has_own_database", false)
+                var sUrl = db.optString("supabase_url")
+                var sKey = db.optString("supabase_anon_key")
+                if (!hasOwn || sUrl.isBlank() || sKey.isBlank()) {
+                    val directAdmin = fetchSupabaseConfigFromAdminDirect(mId, mEmail)
+                    if (directAdmin != null) {
+                        hasOwn = true
+                        sUrl = directAdmin.first
+                        sKey = directAdmin.second
+                    }
+                }
                 return MerchantBackendCheckResult(
                     exists = true,
                     isNew = !isOnboarded,
                     isOnboarded = isOnboarded,
-                    merchantId = m.optString("id", effectiveId.orEmpty()),
+                    merchantId = mId,
                     businessName = busName,
-                    email = value("email").ifBlank { cleanEmail },
+                    email = mEmail,
                     phone = phone,
                     businessType = value("business_type").ifBlank { "Retail Store" },
                     photoUrl = value("photo_url").ifBlank { value("logo_url") },
                     accountHolder = value("account_holder").ifBlank { busName },
-                    hasOwnDatabase = db.optBoolean("has_own_database", false),
-                    supabaseUrl = db.optString("supabase_url"),
-                    supabaseAnonKey = db.optString("supabase_anon_key"),
+                    hasOwnDatabase = hasOwn,
+                    supabaseUrl = sUrl,
+                    supabaseAnonKey = sKey,
                     projectRef = db.optString("project_ref"),
                     kycStatus = value("kyc_status").ifBlank { "UNVERIFIED" },
                     kycRejectionReason = value("kyc_rejection_reason"),
@@ -2290,6 +2316,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (localProfile != null && localProfile.businessName.isNotBlank()) {
             val placeholder = localProfile.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE))
             val isOnboarded = !placeholder && localProfile.phone.isNotBlank()
+            val savedSupabase = repository.getSupabaseProfileById(localProfile.id)
+                ?: repository.getActiveSupabaseProfile()
+            var sUrl = savedSupabase?.supabaseUrl.orEmpty()
+            var sKey = savedSupabase?.anonKey.orEmpty()
+            var hasOwn = sUrl.isNotBlank() && sKey.isNotBlank() && !sUrl.contains("tldubojeokgyoclxnzkb") && !sUrl.contains("abc123xyz")
+            if (!hasOwn) {
+                val directAdmin = fetchSupabaseConfigFromAdminDirect(localProfile.id, localProfile.email.ifBlank { cleanEmail })
+                if (directAdmin != null) {
+                    hasOwn = true
+                    sUrl = directAdmin.first
+                    sKey = directAdmin.second
+                }
+            }
             return MerchantBackendCheckResult(
                 exists = true,
                 isNew = !isOnboarded,
@@ -2301,9 +2340,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 businessType = localProfile.businessType.ifBlank { "Retail Store" },
                 photoUrl = localProfile.photoUrl,
                 accountHolder = localProfile.accountHolder.ifBlank { localProfile.businessName },
-                hasOwnDatabase = _activeSupabaseProfile.value != null,
-                supabaseUrl = _activeSupabaseProfile.value?.supabaseUrl.orEmpty(),
-                supabaseAnonKey = _activeSupabaseProfile.value?.anonKey.orEmpty(),
+                hasOwnDatabase = hasOwn,
+                supabaseUrl = sUrl,
+                supabaseAnonKey = sKey,
                 projectRef = "",
                 kycStatus = localProfile.kycStatus.ifBlank { "UNVERIFIED" },
                 kycRejectionReason = localProfile.kycRejectionReason,
@@ -2315,6 +2354,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         // 4. Default result for new account or un-onboarded user (never lock out authenticated user!)
         val finalUserId = effectiveId ?: java.util.UUID.randomUUID().toString()
+        val directAdmin = fetchSupabaseConfigFromAdminDirect(finalUserId, cleanEmail)
         return MerchantBackendCheckResult(
             exists = false,
             isNew = true,
@@ -2326,9 +2366,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             businessType = "Retail Store",
             photoUrl = "",
             accountHolder = "",
-            hasOwnDatabase = false,
-            supabaseUrl = "",
-            supabaseAnonKey = "",
+            hasOwnDatabase = directAdmin != null,
+            supabaseUrl = directAdmin?.first.orEmpty(),
+            supabaseAnonKey = directAdmin?.second.orEmpty(),
             projectRef = "",
             kycStatus = "UNVERIFIED"
         )
@@ -2385,12 +2425,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         setUserEmail(result.email)
         _onboardingBusinessName.value = result.businessName
         _onboardingPhone.value = result.phone
-        if (result.hasOwnDatabase) {
-            val existing = repository.getSupabaseProfileById(result.merchantId)?.takeIf {
-                it.supabaseUrl.trimEnd('/') == result.supabaseUrl.trimEnd('/') && it.authEmail.equals(result.email, true)
+
+        var finalHasOwn = result.hasOwnDatabase
+        var finalUrl = result.supabaseUrl
+        var finalKey = result.supabaseAnonKey
+
+        if (!finalHasOwn || finalUrl.isBlank() || finalKey.isBlank()) {
+            val adminCfg = fetchSupabaseConfigFromAdminDirect(result.merchantId, result.email)
+            if (adminCfg != null) {
+                finalHasOwn = true
+                finalUrl = adminCfg.first
+                finalKey = adminCfg.second
             }
-            val profile = (existing ?: SupabaseProfileEntity(id = result.merchantId, businessName = result.businessName,
-                supabaseUrl = result.supabaseUrl, anonKey = result.supabaseAnonKey)).copy(isActive = true)
+        }
+
+        if (!finalHasOwn || finalUrl.isBlank() || finalKey.isBlank()) {
+            val localProfile = repository.getSupabaseProfileById(result.merchantId)
+                ?: repository.getActiveSupabaseProfile()
+            if (localProfile != null && localProfile.supabaseUrl.isNotBlank() && localProfile.anonKey.isNotBlank()
+                && !localProfile.supabaseUrl.contains("tldubojeokgyoclxnzkb") && !localProfile.supabaseUrl.contains("abc123xyz")) {
+                finalHasOwn = true
+                finalUrl = localProfile.supabaseUrl
+                finalKey = localProfile.anonKey
+            }
+        }
+
+        if (finalHasOwn && finalUrl.isNotBlank() && finalKey.isNotBlank()) {
+            val existing = repository.getSupabaseProfileById(result.merchantId)?.takeIf {
+                it.supabaseUrl.trimEnd('/') == finalUrl.trimEnd('/') && (it.authEmail.isBlank() || it.authEmail.equals(result.email, true))
+            }
+            val profile = (existing ?: SupabaseProfileEntity(
+                id = result.merchantId,
+                businessName = result.businessName.ifBlank { "My Store Backend" },
+                supabaseUrl = finalUrl,
+                anonKey = finalKey
+            )).copy(
+                isActive = true,
+                businessName = result.businessName.ifBlank { "My Store Backend" },
+                supabaseUrl = finalUrl,
+                anonKey = finalKey
+            )
             repository.insertSupabaseProfile(profile)
             repository.selectActiveSupabaseProfile(profile.id)
             _activeSupabaseProfile.value = profile
@@ -2398,6 +2472,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             supabaseAnonKey.value = profile.anonKey
             _supabaseUrlInput.value = profile.supabaseUrl
             _supabaseAnonKeyInput.value = profile.anonKey
+            supabaseConnected.value = true
         } else {
             _activeSupabaseProfile.value = null
             repository.deactivateSupabaseProfiles()
@@ -2580,12 +2655,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         scheduleSupabaseSessionRefresh(connected)
                     }
                 }
-                setOnboarded(account.isOnboarded)
+                fetchMerchantApiKey()
+                refreshGatewayConfig()
+                pullAllMerchantDataFromRemote(_activeProfile.value.id)
                 val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
                 setOnboarded(isEffectivelyOnboarded)
                 // Sync PIN hash from Supabase (cloud-synced PIN system)
                 syncPinFromCloud()
-                navigateTo(if (!account.isOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
                 navigateTo(if (!isEffectivelyOnboarded) "Onboarding" else if (_isBiometricLocked.value) "LockScreen" else "Main")
                 onSuccess()
             } catch (error: Exception) {
@@ -4583,47 +4659,60 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun fetchSupabaseConfigFromAdminDirect(merchantId: String?, email: String?): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val candidateEndpoints = listOf(
+            "https://api.swapnopay.top",
+            "https://swapnopay.top"
+        )
+        val queryParams = mutableListOf<String>()
+        if (!merchantId.isNullOrBlank() && merchantId != "00000000-0000-0000-0000-000000000001") {
+            queryParams.add("merchant_id=${java.net.URLEncoder.encode(merchantId.trim(), "UTF-8")}")
+            queryParams.add("user_id=${java.net.URLEncoder.encode(merchantId.trim(), "UTF-8")}")
+        }
+        if (!email.isNullOrBlank()) {
+            queryParams.add("email=${java.net.URLEncoder.encode(email.trim().lowercase(), "UTF-8")}")
+        }
+        if (queryParams.isEmpty()) return@withContext null
+
+        val queryString = queryParams.joinToString("&")
+        for (baseUrl in candidateEndpoints) {
+            try {
+                val urlObj = java.net.URL("$baseUrl/v1/payment/config?$queryString")
+                val conn = urlObj.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                if (conn.responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = org.json.JSONObject(body)
+                    val sUrl = json.optString("supabase_url", "").trim()
+                    val sKey = json.optString("supabase_anon_key", "").trim()
+                    if (sUrl.isNotBlank() && sKey.isNotBlank() && !sUrl.contains("tldubojeokgyoclxnzkb") && !sUrl.contains("abc123xyz")) {
+                        return@withContext Pair(sUrl, sKey)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.d("AppViewModel", "fetchSupabaseConfigFromAdminDirect notice from $baseUrl: ${e.message}")
+            }
+        }
+        null
+    }
+
     fun fetchSupabaseConfigFromAdmin(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
         viewModelScope.launch(Dispatchers.IO) {
             val merchantId = activeProfile.value.id
-            val candidateUrls = listOf("http://10.0.2.2:5000", "http://10.0.2.2:4000", "https://api.swapnopay.top")
-            var fetched = false
-            var errorMessage = "Failed to reach Admin server"
-            for (backendUrl in candidateUrls) {
-                if (fetched) break
-                try {
-                    val urlObj = java.net.URL("$backendUrl/v1/payment/config?merchant_id=$merchantId")
-                    val conn = urlObj.openConnection() as java.net.HttpURLConnection
-                    conn.requestMethod = "GET"
-                    conn.connectTimeout = 3000
-                    conn.readTimeout = 3000
-                    if (conn.responseCode in 200..299) {
-                        val body = conn.inputStream.bufferedReader().readText()
-                        val json = org.json.JSONObject(body)
-                        val sUrl = json.optString("supabase_url", "")
-                        val sKey = json.optString("supabase_anon_key", "")
-                        if (sUrl.isNotEmpty() && sKey.isNotEmpty()) {
-                            withContext(Dispatchers.Main) {
-                                setSupabaseUrlInput(sUrl)
-                                setSupabaseAnonKeyInput(sKey)
-                                connectSupabase(sUrl, sKey, "Admin Provisioned Supabase")
-                                onResult(true, "Fetched credentials from Admin Panel!")
-                            }
-                            fetched = true
-                            break
-                        } else {
-                            errorMessage = "No custom Supabase credentials found on Admin Panel."
-                        }
-                    } else {
-                        errorMessage = "Admin server returned HTTP ${conn.responseCode}"
-                    }
-                } catch (e: Exception) {
-                    errorMessage = e.localizedMessage ?: "Failed to reach Admin server"
-                }
-            }
-            if (!fetched) {
+            val email = userEmail.value ?: activeProfile.value.email
+            val config = fetchSupabaseConfigFromAdminDirect(merchantId, email)
+            if (config != null) {
                 withContext(Dispatchers.Main) {
-                    onResult(false, errorMessage)
+                    setSupabaseUrlInput(config.first)
+                    setSupabaseAnonKeyInput(config.second)
+                    connectSupabase(config.first, config.second, activeProfile.value.businessName.ifBlank { "Admin Provisioned Supabase" })
+                    onResult(true, "Fetched credentials from Admin Panel!")
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "No custom Supabase credentials found on Admin Panel.")
                 }
             }
         }
@@ -9449,7 +9538,7 @@ function executePayment() {
         com.example.data.remote.SupabaseClient.fetchRecords(
             profile.supabaseUrl,
             profile.anonKey,
-            profile.authSessionToken,
+            profile.authSessionToken.ifBlank { profile.anonKey },
             table,
             onSuccess = { result = it },
             onFailure = { failure = it }

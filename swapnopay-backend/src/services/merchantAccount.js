@@ -44,6 +44,7 @@ export async function lookupMerchantInAdminDb(email, userId, admin = getAdminCli
   }
   const platformOrigin = databaseOrigin(process.env.ADMIN_SUPABASE_URL)
   const candidates = [
+    { url: merchant?.supabase_url, key: merchant?.supabase_anon_key },
     { url: gateway?.supabase_url, key: gateway?.supabase_anon_key },
     { url: connection?.project_url, key: connection?.publishable_key },
   ]

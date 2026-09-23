@@ -97,11 +97,15 @@ class AppRepository(private val context: Context) {
     private suspend fun getAuthenticatedSupabaseProfile(): SupabaseProfileEntity? {
         val profile = getActiveSupabaseProfile() ?: return null
         activeProfileId = profile.id
-        if (profile.authSessionToken.isBlank()) return null
+        if (profile.authSessionToken.isBlank()) {
+            return if (profile.supabaseUrl.isNotBlank() && profile.anonKey.isNotBlank()) profile else null
+        }
         if (profile.authTokenExpiresAt == 0L || profile.authTokenExpiresAt > System.currentTimeMillis() + 60_000L) {
             return profile
         }
-        if (profile.authRefreshToken.isBlank()) return null
+        if (profile.authRefreshToken.isBlank()) {
+            return if (profile.supabaseUrl.isNotBlank() && profile.anonKey.isNotBlank()) profile.copy(authSessionToken = "") else null
+        }
         var refreshed: com.example.data.remote.SupabaseClient.AuthSession? = null
         withContext(Dispatchers.IO) {
             com.example.data.remote.SupabaseClient.refreshSession(
@@ -112,7 +116,10 @@ class AppRepository(private val context: Context) {
                 onFailure = { android.util.Log.e("AppRepository", "Session refresh failed: $it") }
             )
         }
-        val session = refreshed ?: return null
+        val session = refreshed
+        if (session == null) {
+            return if (profile.supabaseUrl.isNotBlank() && profile.anonKey.isNotBlank()) profile.copy(authSessionToken = "") else null
+        }
         return profile.copy(
             authEmail = session.email.ifBlank { profile.authEmail },
             authSessionToken = session.accessToken,
@@ -241,14 +248,14 @@ class AppRepository(private val context: Context) {
 
     suspend fun syncOrdersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var resultData: org.json.JSONArray? = null
         try {
             com.example.data.remote.SupabaseClient.fetchOrders(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 merchantId = active.id,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
@@ -286,13 +293,13 @@ class AppRepository(private val context: Context) {
         val active = getAuthenticatedSupabaseProfile()
         var didSyncAny = false
 
-        if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty() && active.authSessionToken.isNotEmpty()) {
+        if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
             var resultData: org.json.JSONArray? = null
             try {
                 com.example.data.remote.SupabaseClient.fetchPayments(
                     url = active.supabaseUrl,
                     anonKey = active.anonKey,
-                    token = active.authSessionToken,
+                    token = active.authSessionToken.ifBlank { active.anonKey },
                     merchantId = active.id,
                     onSuccess = { jsonArray -> resultData = jsonArray },
                     onFailure = { err ->
@@ -368,14 +375,14 @@ class AppRepository(private val context: Context) {
 
     suspend fun syncAppealsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var resultData: org.json.JSONArray? = null
         try {
             com.example.data.remote.SupabaseClient.fetchAppeals(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch appeals: $err")
@@ -410,14 +417,14 @@ class AppRepository(private val context: Context) {
 
     suspend fun syncDevicesFromSupabase(): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var resultData: org.json.JSONArray? = null
         try {
             com.example.data.remote.SupabaseClient.fetchDevices(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch devices: $err")
@@ -511,14 +518,14 @@ class AppRepository(private val context: Context) {
 
     suspend fun syncMerchantNumbersToSupabase(number: String, type: String, isDefault: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var success = false
         try {
             com.example.data.remote.SupabaseClient.upsertMerchantNumber(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 merchantId = active.id,
                 number = number,
                 type = type,
@@ -687,14 +694,14 @@ class AppRepository(private val context: Context) {
         if (backendReported) return@withContext true
 
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty() || active.authSessionToken.isEmpty()) return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         
         var success = false
         try {
             com.example.data.remote.SupabaseClient.insertSmsLog(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 merchantId = sms.merchantId,
                 deviceId = installationId,
                 rawSms = sms.rawBody,
@@ -1051,7 +1058,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "products",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1067,7 +1074,7 @@ class AppRepository(private val context: Context) {
             val products = mutableListOf<ProductItemEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     products.add(
                         ProductItemEntity(
@@ -1125,7 +1132,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.upsertRecord(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "products",
                 payload = payload,
                 onSuccess = { success = true },
@@ -1146,7 +1153,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.deleteRecord(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "products",
                 primaryKeyCol = "id",
                 primaryKeyVal = productId,
@@ -1168,7 +1175,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "customers",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1184,7 +1191,7 @@ class AppRepository(private val context: Context) {
             val customers = mutableListOf<CustomerEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     customers.add(
                         CustomerEntity(
@@ -1221,7 +1228,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "suppliers",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1237,7 +1244,7 @@ class AppRepository(private val context: Context) {
             val suppliers = mutableListOf<SupplierEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     suppliers.add(
                         SupplierEntity(
@@ -1273,7 +1280,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "ledger_transactions",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1289,7 +1296,7 @@ class AppRepository(private val context: Context) {
             val txs = mutableListOf<LedgerTransactionEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     txs.add(
                         LedgerTransactionEntity(
@@ -1329,7 +1336,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "pos_sales",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1345,7 +1352,7 @@ class AppRepository(private val context: Context) {
             val sales = mutableListOf<PosSaleEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     sales.add(
                         PosSaleEntity(
@@ -1388,7 +1395,7 @@ class AppRepository(private val context: Context) {
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken,
+                token = active.authSessionToken.ifBlank { active.anonKey },
                 tableName = "merchant_numbers",
                 selectQuery = "*",
                 onSuccess = { jsonArray -> resultData = jsonArray },
@@ -1403,7 +1410,7 @@ class AppRepository(private val context: Context) {
         if (resultData != null) {
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id", active.id)
+                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
                 if (merchantId == active.id) {
                     val numStr = obj.optString("number")
                     if (numStr.isNotBlank()) {

@@ -77,13 +77,15 @@ export async function getMerchantCredentials(merchantId) {
     data = res.data
   } catch (_) {}
 
-  // 2. Query merchants table for business_name, photo_url, phone, default_number, status
+  // 2. Query merchants table for business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key
   let merchantRow = null
   try {
     const isIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantId)
-    let mQuery = admin.from('merchants').select('id, user_id, business_name, photo_url, phone, default_number, status')
+    let mQuery = admin.from('merchants').select('id, user_id, email, business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key')
     if (isIdUuid) {
       mQuery = mQuery.or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
+    } else if (merchantId.includes('@')) {
+      mQuery = mQuery.ilike('email', merchantId.trim().toLowerCase())
     } else {
       mQuery = mQuery.eq('id', merchantId)
     }
@@ -91,15 +93,45 @@ export async function getMerchantCredentials(merchantId) {
     merchantRow = mData
   } catch (_) {}
 
+  // If merchantRow was not found and merchantId is UUID or string, try matching by user_id or email
+  if (!merchantRow && merchantId) {
+    try {
+      const { data: fallbackM } = await admin
+        .from('merchants')
+        .select('id, user_id, email, business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key')
+        .or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
+        .limit(1)
+        .maybeSingle()
+      if (fallbackM) merchantRow = fallbackM
+    } catch (_) {}
+  }
+
+  // Also if data (merchant_gateway_settings) was not found by merchantId, try with merchantRow?.id or merchantRow?.user_id
+  if (!data && merchantRow) {
+    try {
+      const targetIds = [merchantRow.id, merchantRow.user_id].filter(Boolean)
+      const res = await admin
+        .from('merchant_gateway_settings')
+        .select('supabase_url, supabase_anon_key, merchant_name, merchant_logo_url, receiving_numbers')
+        .in('merchant_id', targetIds)
+        .limit(1)
+        .maybeSingle()
+      if (res.data) data = res.data
+    } catch (_) {}
+  }
+
   const effectiveName = data?.merchant_name || merchantRow?.business_name || null
   const effectiveLogo = data?.merchant_logo_url || merchantRow?.photo_url || null
   const receiving = data?.receiving_numbers || (merchantRow?.default_number ? { bKash: merchantRow.default_number } : {})
   const mStatus = merchantRow?.status || 'ACTIVE'
 
-  if (data?.supabase_url) {
+  const effectiveSupabaseUrl = data?.supabase_url || merchantRow?.supabase_url || null
+  const effectiveSupabaseAnonKey = data?.supabase_anon_key || merchantRow?.supabase_anon_key || null
+
+  if (effectiveSupabaseUrl && effectiveSupabaseAnonKey) {
     return {
-      supabase_url: data.supabase_url,
-      supabase_anon_key: data.supabase_anon_key,
+      supabase_url: effectiveSupabaseUrl,
+      supabase_anon_key: effectiveSupabaseAnonKey,
       merchant_name: effectiveName,
       merchant_logo_url: effectiveLogo,
       receiving_numbers: receiving,

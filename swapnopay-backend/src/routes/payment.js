@@ -50,8 +50,13 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   // ──────────────────────────────────────────────────────────────────────────
   router.get('/config', async (req, res) => {
     try {
-      let merchantId = req.query.merchant_id || null
+      let merchantId = req.query.merchant_id || req.query.user_id || req.headers['x-merchant-id'] || null
+      const email = req.query.email || null
       const orderId = req.query.order_id || null
+
+      if (!merchantId && email) {
+        merchantId = email
+      }
 
       // If merchant_id is missing but order_id is present, resolve merchant_id from order/events/forms
       if (!merchantId && orderId && orderId !== 'demo_order_id') {
@@ -89,7 +94,15 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         }
       }
 
-      const config = await getMerchantGatewayConfig(merchantId, heartbeatMap)
+      let config = await getMerchantGatewayConfig(merchantId, heartbeatMap)
+      if ((!config?.supabase_url) && email && merchantId !== email) {
+        try {
+          const emailConfig = await getMerchantGatewayConfig(email, heartbeatMap)
+          if (emailConfig?.supabase_url) {
+            config = { ...config, ...emailConfig }
+          }
+        } catch (_) {}
+      }
 
       res.json({
         ok: true,
