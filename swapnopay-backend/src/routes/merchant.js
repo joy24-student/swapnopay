@@ -65,20 +65,95 @@ merchantRouter.post('/support/chat', async (req, res) => {
   }
 })
 
+// Public / Direct Support Tickets endpoints for merchant mobile app & admin helpdesk sync
+merchantRouter.get('/support/tickets', async (req, res) => {
+  try {
+    const merchantId = req.headers['x-merchant-id'] || req.query.merchant_id || req.headers['x-device-id']
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Merchant identifier is required' })
+    }
+    const admin = getAdminClient()
+    const { data: tickets, error } = await admin
+      .from('support_tickets')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) throw error
+    res.json({ ok: true, tickets: tickets || [] })
+  } catch (error) {
+    res.status(503).json({ error: error.message })
+  }
+})
+
+merchantRouter.post('/support/tickets', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const merchantId = req.headers['x-merchant-id'] || body.merchant_id || req.headers['x-device-id']
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Merchant identifier is required' })
+    }
+    const subject = body.subject
+    const description = body.description
+    if (typeof subject !== 'string' || !subject.trim() || typeof description !== 'string' || !description.trim()) {
+      return res.status(400).json({ error: 'Subject and description are required' })
+    }
+    const admin = getAdminClient()
+    const row = {
+      merchant_id: merchantId,
+      business_name: body.business_name || 'My Business',
+      email: body.email || null,
+      phone: body.phone || null,
+      category: body.category || 'GENERAL',
+      subject: subject.trim(),
+      description: description.trim(),
+      status: 'OPEN',
+      created_at: new Date().toISOString()
+    }
+    const { data: saved, error } = await admin
+      .from('support_tickets')
+      .insert(row)
+      .select('*')
+      .single()
+    if (error) throw error
+    res.status(201).json({ ok: true, record: saved })
+  } catch (error) {
+    res.status(503).json({ error: error.message })
+  }
+})
+
 merchantRouter.use(requirePlatformUser)
 merchantRouter.use(requirePlatformMerchant)
+
 merchantRouter.get('/support', async (req, res) => {
   try {
     const admin = getAdminClient()
     const id = req.platformAccount.merchantId
-    const tickets = requireData(await admin.from('support_tickets').select('*').eq('merchant_id', id)
-      .order('created_at', { ascending: false }).limit(100), 'Load support tickets')
-    const messages = requireData(await admin.from('live_chat_messages').select('*').eq('merchant_id', id)
-      .order('created_at', { ascending: false }).limit(200), 'Load support replies')
-    res.json({ ok: true, tickets, messages: (messages || []).reverse() })
+    const userId = req.platformAccount.merchant?.user_id || req.platformUser?.id
+
+    let ticketQuery = admin.from('support_tickets').select('*')
+    if (id && userId && id !== userId) {
+      ticketQuery = ticketQuery.or(`merchant_id.eq.${id},merchant_id.eq.${userId}`)
+    } else {
+      ticketQuery = ticketQuery.eq('merchant_id', id)
+    }
+    const { data: tickets, error: ticketErr } = await ticketQuery.order('created_at', { ascending: false }).limit(100)
+    if (ticketErr) throw ticketErr
+
+    let messageQuery = admin.from('live_chat_messages').select('*')
+    if (id && userId && id !== userId) {
+      messageQuery = messageQuery.or(`merchant_id.eq.${id},merchant_id.eq.${userId}`)
+    } else {
+      messageQuery = messageQuery.eq('merchant_id', id)
+    }
+    const { data: messages, error: msgErr } = await messageQuery.order('created_at', { ascending: false }).limit(200)
+    if (msgErr) throw msgErr
+
+    res.json({ ok: true, tickets: tickets || [], messages: (messages || []).reverse() })
   } catch (error) { res.status(503).json({ error: error.message }) }
 })
-for (const [route, table] of [['tickets', 'support_tickets'], ['messages', 'live_chat_messages'], ['features', 'feature_requests']]) {
+
+for (const [route, table] of [['messages', 'live_chat_messages'], ['features', 'feature_requests']]) {
   merchantRouter.post(`/support/${route}`, async (req, res) => {
     try {
       const body = req.body || {}

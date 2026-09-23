@@ -131,12 +131,21 @@ export async function requirePlatformUser(req, res, next) {
   }
   const xAdminSecret = req.headers['x-admin-secret']
   const adminSecret = process.env.ADMIN_SECRET
-  if (xAdminSecret && adminSecret && xAdminSecret === adminSecret) {
-    req.isAdmin = true
-    req.platformUser = { id: 'admin_secret', email: 'admin@swapnopay.top' }
-    return next()
+  const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+
+  if (adminSecret) {
+    if (xAdminSecret && xAdminSecret === adminSecret) {
+      req.isAdmin = true
+      req.platformUser = { id: 'admin_secret', email: 'admin@swapnopay.top' }
+      return next()
+    }
+    if (token && token === adminSecret) {
+      req.isAdmin = true
+      req.platformUser = { id: 'admin_secret', email: 'admin@swapnopay.top' }
+      return next()
+    }
   }
-  const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
+
   if (!token) return res.status(401).json({ error: 'Sign in to your platform account first' })
   try {
     const { data, error } = await getAdminClient().auth.getUser(token)

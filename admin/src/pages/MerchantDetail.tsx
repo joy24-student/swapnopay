@@ -134,7 +134,8 @@ export default function MerchantDetail() {
 
       // 5. Load merchant PIN status
       try {
-        const status = await getMerchantPinStatus(id);
+        const targetId = mData?.id || id;
+        const status = await getMerchantPinStatus(targetId);
         setPinStatus(status);
       } catch (e) {
         console.warn('[MerchantDetail] PIN status fetch error:', e);
@@ -779,12 +780,13 @@ export default function MerchantDetail() {
             <button
               disabled={pinActionLoading || !pinStatus?.pin_set}
               onClick={async () => {
-                if (!id || !window.confirm('Clear this merchant\'s PIN? They will need to set a new PIN on next login.')) return;
+                const targetId = merchant?.id || id;
+                if (!targetId || !window.confirm('Clear this merchant\'s PIN? They will need to set a new PIN on next login.')) return;
                 setPinActionLoading(true);
                 setPinActionResult(null);
                 try {
-                  await clearMerchantPin(id);
-                  setPinStatus({ pin_set: false, pin_reset_requested: false });
+                  await clearMerchantPin(targetId);
+                  setPinStatus({ pin_set: false, pin_reset_requested: true });
                   setPinActionResult('✅ PIN cleared. Merchant must set a new PIN on next login.');
                 } catch (err: any) {
                   setPinActionResult('❌ ' + err.message);
@@ -803,11 +805,12 @@ export default function MerchantDetail() {
             <button
               disabled={pinActionLoading || !pinStatus?.pin_set || pinStatus?.pin_reset_requested}
               onClick={async () => {
-                if (!id) return;
+                const targetId = merchant?.id || id;
+                if (!targetId) return;
                 setPinActionLoading(true);
                 setPinActionResult(null);
                 try {
-                  await forceRequestPinReset(id);
+                  await forceRequestPinReset(targetId);
                   setPinStatus(prev => prev ? { ...prev, pin_reset_requested: true } : prev);
                   setPinActionResult('✅ PIN marked for forced reset. It will be cleared on next merchant sync.');
                 } catch (err: any) {

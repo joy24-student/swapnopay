@@ -1,7 +1,7 @@
-﻿// SwapnoPay Backend — Merchant App PIN Routes
+// SwapnoPay Backend — Merchant App PIN Routes
 // POST /v1/pin/set            — Set or change PIN hash (authenticated merchant)
 // GET  /v1/pin/sync           — Fetch PIN hash + reset flag (authenticated merchant)
-// POST /v1/pin/request-reset  — Merchant requests admin to clear their PIN
+// POST /v1/pin/request-reset  — Merchant requests admin to clear their PIN (auth or identifier)
 // POST /v1/pin/admin-clear    — Admin clears a merchant PIN (admin auth only)
 //
 // SECURITY: Raw PINs are NEVER sent to this server.
@@ -9,8 +9,9 @@
 
 import { Router } from 'express'
 import { requirePlatformUser, lookupMerchantInAdminDb } from '../services/merchantAccount.js'
-import { requireMerchantOrAdminAuth } from '../middleware/auth.js'
+import { requireAdminSecret } from '../middleware/auth.js'
 import {
+  getAdminClient,
   setPinHash,
   getPinHash,
   clearPinHash,
@@ -19,12 +20,88 @@ import {
 
 export const pinRouter = Router()
 
-// All PIN endpoints require a valid platform auth token
-pinRouter.use(requirePlatformUser)
-
 function isValidSha256Hex(str) {
   return typeof str === 'string' && /^[0-9a-f]{64}$/i.test(str)
 }
+
+// POST /v1/pin/admin-clear
+// Admin-only: immediately clear a merchant PIN hash.
+// Body: { merchant_id: "..." }
+pinRouter.post('/admin-clear', requireAdminSecret, async (req, res) => {
+  try {
+    const { merchant_id } = req.body || {}
+    if (!merchant_id) return res.status(400).json({ error: 'merchant_id is required' })
+    const result = await clearPinHash(merchant_id)
+    return res.json({
+      ok: true,
+      message: 'Merchant PIN cleared. Merchant must set a new PIN on next login.',
+      merchant_id: result?.id || merchant_id,
+      pin_set: false,
+      pin_reset_requested: true,
+    })
+  } catch (err) {
+    console.error('[pin] /admin-clear error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /v1/pin/request-reset
+// Merchant requests admin to clear their PIN.
+// Works both when authenticated (from settings/lockscreen) and unauthenticated (by email/merchant_id).
+pinRouter.post('/request-reset', async (req, res) => {
+  try {
+    let user = req.platformUser
+    if (!user) {
+      const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+      if (token) {
+        try {
+          const { data } = await getAdminClient().auth.getUser(token)
+          if (data?.user?.id) user = data.user
+        } catch (_) {}
+      }
+    }
+
+    const body = req.body || {}
+    let merchantId = user?.id || body.merchant_id || null
+    let email = user?.email || body.email || null
+    let userId = user?.id || null
+
+    if (!merchantId && !email) {
+      return res.status(400).json({ error: 'Merchant identifier or email is required' })
+    }
+
+    if (email && (!merchantId || merchantId === 'default_merchant')) {
+      try {
+        const lookup = await lookupMerchantInAdminDb(email, userId || '00000000-0000-0000-0000-000000000000')
+        if (lookup?.merchantId) {
+          merchantId = lookup.merchantId
+          userId = lookup.merchant?.user_id || userId
+        }
+      } catch (_) {}
+    } else if (merchantId && !email) {
+      try {
+        const admin = getAdminClient()
+        const { data: m } = await admin.from('merchants').select('email, user_id').eq('id', merchantId).maybeSingle()
+        if (m) {
+          email = m.email || email
+          userId = m.user_id || userId
+        }
+      } catch (_) {}
+    }
+
+    await requestPinReset(merchantId || email, email, userId)
+    return res.json({
+      ok: true,
+      message: 'PIN reset request sent to admin. Your PIN will be cleared once the admin approves.',
+    })
+  } catch (err) {
+    console.error('[pin] /request-reset error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// Merchant authenticated endpoints require a valid platform auth token
+pinRouter.use(requirePlatformUser)
 
 // POST /v1/pin/set
 // Body: { pin_hash: "<sha256-hex>" }
@@ -84,55 +161,6 @@ pinRouter.get('/sync', async (req, res) => {
     })
   } catch (err) {
     console.error('[pin] /sync error:', err.message)
-    return res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /v1/pin/request-reset
-// Merchant requests admin to clear their PIN.
-pinRouter.post('/request-reset', async (req, res) => {
-  try {
-    const user = req.platformUser
-    if (!user?.id) return res.status(401).json({ error: 'Merchant not authenticated' })
-
-    let merchantId = user.id
-    try {
-      const lookup = await lookupMerchantInAdminDb(user.email, user.id)
-      if (lookup?.merchantId) {
-        merchantId = lookup.merchantId
-      }
-    } catch (_) {}
-
-    await requestPinReset(merchantId, user.email, user.id)
-    return res.json({
-      ok: true,
-      message: 'PIN reset request sent to admin. Your PIN will be cleared once the admin approves.',
-    })
-  } catch (err) {
-    console.error('[pin] /request-reset error:', err.message)
-    return res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /v1/pin/admin-clear
-// Admin-only: immediately clear a merchant PIN hash.
-// Body: { merchant_id: "..." }
-pinRouter.post('/admin-clear', requireMerchantOrAdminAuth, async (req, res) => {
-  try {
-    if (!req.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required to clear another merchant PIN' })
-    }
-    const { merchant_id } = req.body || {}
-    if (!merchant_id) return res.status(400).json({ error: 'merchant_id is required' })
-    const result = await clearPinHash(merchant_id)
-    return res.json({
-      ok: true,
-      message: 'Merchant PIN cleared. Merchant must set a new PIN on next login.',
-      merchant_id: result?.id,
-      pin_set: false,
-    })
-  } catch (err) {
-    console.error('[pin] /admin-clear error:', err.message)
     return res.status(500).json({ error: err.message })
   }
 })

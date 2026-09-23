@@ -720,11 +720,23 @@ export async function getMerchantPinStatus(merchantId: string): Promise<{
   pin_set: boolean
   pin_reset_requested: boolean
 }> {
-  const { data, error } = await adminSupabase
+  let { data, error } = await adminSupabase
     .from('merchants')
     .select('app_pin_hash, pin_reset_requested')
     .eq('id', merchantId)
     .maybeSingle()
+
+  if (!data) {
+    const res = await adminSupabase
+      .from('merchants')
+      .select('app_pin_hash, pin_reset_requested')
+      .eq('user_id', merchantId)
+      .maybeSingle()
+    if (res.data) {
+      data = res.data
+      error = null
+    }
+  }
 
   if (error) throw new Error('Failed to get PIN status: ' + error.message)
   return {
@@ -735,29 +747,55 @@ export async function getMerchantPinStatus(merchantId: string): Promise<{
 
 /** Admin: clear a merchant's PIN hash (forces merchant to set a new PIN on next login) */
 export async function clearMerchantPin(merchantId: string): Promise<void> {
+  const nowIso = new Date().toISOString()
   const { error } = await adminSupabase
     .from('merchants')
     .update({
       app_pin_hash: null,
-      pin_reset_requested: false,
-      updated_at: new Date().toISOString(),
+      pin_reset_requested: true,
+      updated_at: nowIso,
     })
-    .eq('id', merchantId)
+    .or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
 
-  if (error) throw new Error('Failed to clear merchant PIN: ' + error.message)
+  if (error) {
+    const res1 = await adminSupabase
+      .from('merchants')
+      .update({ app_pin_hash: null, pin_reset_requested: true, updated_at: nowIso })
+      .eq('id', merchantId)
+    if (res1.error) {
+      const res2 = await adminSupabase
+        .from('merchants')
+        .update({ app_pin_hash: null, pin_reset_requested: true, updated_at: nowIso })
+        .eq('user_id', merchantId)
+      if (res2.error) throw new Error('Failed to clear merchant PIN: ' + res2.error.message)
+    }
+  }
 }
 
 /** Admin: set pin_reset_requested = true (marks PIN for forced reset) */
 export async function forceRequestPinReset(merchantId: string): Promise<void> {
+  const nowIso = new Date().toISOString()
   const { error } = await adminSupabase
     .from('merchants')
     .update({
       pin_reset_requested: true,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     })
-    .eq('id', merchantId)
+    .or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
 
-  if (error) throw new Error('Failed to set PIN reset flag: ' + error.message)
+  if (error) {
+    const res1 = await adminSupabase
+      .from('merchants')
+      .update({ pin_reset_requested: true, updated_at: nowIso })
+      .eq('id', merchantId)
+    if (res1.error) {
+      const res2 = await adminSupabase
+        .from('merchants')
+        .update({ pin_reset_requested: true, updated_at: nowIso })
+        .eq('user_id', merchantId)
+      if (res2.error) throw new Error('Failed to set PIN reset flag: ' + res2.error.message)
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

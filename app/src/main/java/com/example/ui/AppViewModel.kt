@@ -1466,9 +1466,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun submitSupportTicket(category: String, subject: String, description: String, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                val saved = platformRequest("/v1/merchant/support/tickets", org.json.JSONObject()
-                    .put("category", category).put("subject", subject).put("description", description))
-                lastSavedSupportTicketId.value = saved.getJSONObject("record").getString("id")
+                val merchantId = _activeProfile.value.id.ifBlank { "default_merchant" }
+                val businessName = _activeProfile.value.businessName
+                val email = _userEmail.value ?: _activeProfile.value.email
+                val phone = _activeProfile.value.phone
+
+                val payload = org.json.JSONObject()
+                    .put("merchant_id", merchantId)
+                    .put("business_name", businessName)
+                    .put("email", email)
+                    .put("phone", phone)
+                    .put("category", category)
+                    .put("subject", subject)
+                    .put("description", description)
+
+                val saved = platformRequest("/v1/merchant/support/tickets", payload)
+                val record = saved.optJSONObject("record")
+                if (record != null) {
+                    lastSavedSupportTicketId.value = record.optString("id", "")
+                }
                 onComplete?.invoke(true)
                 runCatching { refreshPlatformSupport() }
             } catch (error: Exception) {
@@ -1481,8 +1497,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun submitFeatureRequest(title: String, category: String, description: String, priority: String, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                platformRequest("/v1/merchant/support/features", org.json.JSONObject().put("title", title)
-                    .put("category", category).put("description", description).put("priority", priority))
+                val merchantId = _activeProfile.value.id.ifBlank { "default_merchant" }
+                val payload = org.json.JSONObject()
+                    .put("merchant_id", merchantId)
+                    .put("title", title)
+                    .put("category", category)
+                    .put("description", description)
+                    .put("priority", priority)
+                platformRequest("/v1/merchant/support/features", payload)
                 onComplete?.invoke(true)
             } catch (error: Exception) {
                 logFirebaseStatus("Feature request was not saved: ${error.message}")
@@ -1497,9 +1519,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         withContext(Dispatchers.IO) {
             // 1. Direct live chat endpoint on backend (connects to Supabase live_chat_messages)
             try {
-                val url = "https://api.swapnopay.top/v1/merchant/support/chat?merchant_id=${java.net.URLEncoder.encode(merchantId, "UTF-8")}"
+                val chatUrl = "https://api.swapnopay.top/v1/merchant/support/chat?merchant_id=${java.net.URLEncoder.encode(merchantId, "UTF-8")}"
                 val reqBuilder = okhttp3.Request.Builder()
-                    .url(url)
+                    .url(chatUrl)
                     .header("Accept", "application/json")
                     .header("x-merchant-id", merchantId)
 
@@ -1525,7 +1547,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 )
                             }
                             _supportChatList.value = fetched
-                            return@withContext
                         }
                     }
                 }
@@ -1533,35 +1554,80 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 logFirebaseStatus("Direct live chat sync notice: ${e.message}")
             }
 
-            // 2. Fallback to platformRequest("/v1/merchant/support")
+            // 2. Direct tickets endpoint on backend (connects to Supabase support_tickets)
+            var directTicketsLoaded = false
             try {
-                val response = platformRequest("/v1/merchant/support")
-                val tickets = response.optJSONArray("tickets")
-                if (tickets != null) {
-                    _mySupportTicketsList.value = (0 until tickets.length()).map { index ->
-                        val t = tickets.getJSONObject(index)
-                        SupportTicket(
-                            id = t.getString("id"), merchantId = merchantId,
-                            businessName = t.optString("business_name"), subject = t.optString("subject"),
-                            description = t.optString("description"), category = t.optString("category"),
-                            status = t.optString("status"), adminReply = if (t.isNull("admin_reply")) "" else t.optString("admin_reply"),
-                            createdAt = parseRemoteTimestamp(t.optString("created_at"))
-                        )
+                val ticketsUrl = "https://api.swapnopay.top/v1/merchant/support/tickets?merchant_id=${java.net.URLEncoder.encode(merchantId, "UTF-8")}"
+                val ticketReqBuilder = okhttp3.Request.Builder()
+                    .url(ticketsUrl)
+                    .header("Accept", "application/json")
+                    .header("x-merchant-id", merchantId)
+
+                val token = runCatching { getOrCreatePlatformSupabaseProfile().authSessionToken }.getOrNull()
+                if (!token.isNullOrBlank()) {
+                    ticketReqBuilder.header("Authorization", "Bearer $token")
+                }
+
+                platformHttpClient.newCall(ticketReqBuilder.build()).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful && body.isNotBlank()) {
+                        val json = org.json.JSONObject(body)
+                        if (json.optBoolean("ok")) {
+                            val tickets = json.getJSONArray("tickets")
+                            val fetchedTickets = (0 until tickets.length()).map { index ->
+                                val t = tickets.getJSONObject(index)
+                                SupportTicket(
+                                    id = t.optString("id", java.util.UUID.randomUUID().toString()),
+                                    merchantId = t.optString("merchant_id", merchantId),
+                                    businessName = t.optString("business_name", ""),
+                                    subject = t.optString("subject", ""),
+                                    description = t.optString("description", ""),
+                                    category = t.optString("category", "GENERAL"),
+                                    status = t.optString("status", "OPEN"),
+                                    adminReply = if (t.isNull("admin_reply")) "" else t.optString("admin_reply", ""),
+                                    createdAt = parseRemoteTimestamp(t.optString("created_at"))
+                                )
+                            }
+                            _mySupportTicketsList.value = fetchedTickets
+                            directTicketsLoaded = true
+                        }
                     }
                 }
-                val messages = response.optJSONArray("messages")
-                if (messages != null) {
-                    _supportChatList.value = (0 until messages.length()).map { index ->
-                        val m = messages.getJSONObject(index)
-                        SupportChatMessage(
-                            id = m.getString("id"), merchantId = merchantId,
-                            sender = m.getString("sender"), message = m.getString("message"),
-                            timestamp = parseRemoteTimestamp(m.optString("created_at"))
-                        )
+            } catch (e: Exception) {
+                logFirebaseStatus("Direct tickets sync notice: ${e.message}")
+            }
+
+            // 3. Fallback to platformRequest("/v1/merchant/support")
+            if (!directTicketsLoaded) {
+                try {
+                    val response = platformRequest("/v1/merchant/support")
+                    val tickets = response.optJSONArray("tickets")
+                    if (tickets != null) {
+                        _mySupportTicketsList.value = (0 until tickets.length()).map { index ->
+                            val t = tickets.getJSONObject(index)
+                            SupportTicket(
+                                id = t.getString("id"), merchantId = merchantId,
+                                businessName = t.optString("business_name"), subject = t.optString("subject"),
+                                description = t.optString("description"), category = t.optString("category"),
+                                status = t.optString("status"), adminReply = if (t.isNull("admin_reply")) "" else t.optString("admin_reply"),
+                                createdAt = parseRemoteTimestamp(t.optString("created_at"))
+                            )
+                        }
                     }
+                    val messages = response.optJSONArray("messages")
+                    if (messages != null && _supportChatList.value.isEmpty()) {
+                        _supportChatList.value = (0 until messages.length()).map { index ->
+                            val m = messages.getJSONObject(index)
+                            SupportChatMessage(
+                                id = m.getString("id"), merchantId = merchantId,
+                                sender = m.getString("sender"), message = m.getString("message"),
+                                timestamp = parseRemoteTimestamp(m.optString("created_at"))
+                            )
+                        }
+                    }
+                } catch (error: Exception) {
+                    logFirebaseStatus("Support refresh fallback notice: ${error.message}")
                 }
-            } catch (error: Exception) {
-                logFirebaseStatus("Support refresh fallback notice: ${error.message}")
             }
         }
     }
@@ -3234,23 +3300,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val resp = platformRequest("/v1/pin/sync")
                 val pinHash = if (resp.isNull("pin_hash")) null else resp.optString("pin_hash", null)
                 val resetRequested = resp.optBoolean("pin_reset_requested", false)
+                val pinSet = resp.optBoolean("pin_set", !pinHash.isNullOrBlank())
 
-                if (resetRequested) {
-                    // Admin explicitly requested reset — clear local hash so user sets new PIN
+                if (resetRequested || !pinSet || pinHash.isNullOrBlank()) {
+                    // Admin explicitly cleared the PIN or requested reset — clear local hash so user sets new PIN
                     _appPin.value = ""
                     securityPrefs.edit().remove("app_pin_hash").remove("app_pin").apply()
-                    logFirebaseStatus("PIN reset requested by admin. Local PIN cleared.")
-                } else if (!pinHash.isNullOrBlank()) {
+                    logFirebaseStatus("PIN cleared or reset required by admin. Local PIN cleared.")
+                } else {
                     // Update local cache with cloud hash
                     _appPin.value = pinHash
                     securityPrefs.edit().putString("app_pin_hash", pinHash).apply()
                     logFirebaseStatus("PIN hash synced from Supabase and stored locally.")
-                } else {
-                    // Cloud has no PIN hash yet. If this device has a local PIN hash (e.g. from onboarding), upload it!
-                    val localHash = _appPin.value.ifBlank { securityPrefs.getString("app_pin_hash", "") ?: "" }
-                    if (localHash.isNotBlank()) {
-                        uploadPinHashToCloud(localHash)
-                    }
                 }
             } catch (e: Exception) {
                 logFirebaseStatus("PIN sync skipped (offline or error): ${e.message}")
@@ -3267,7 +3328,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun requestPinReset(onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
-                val resp = platformRequest("/v1/pin/request-reset")
+                val payload = org.json.JSONObject().apply {
+                    val mId = _activeProfile.value.id.takeIf { it.isNotBlank() && it != "merchant_default" && it != "default_merchant" }
+                    if (!mId.isNullOrBlank()) put("merchant_id", mId)
+                    val email = _userEmail.value ?: _activeProfile.value.email
+                    if (!email.isNullOrBlank()) put("email", email)
+                }
+                val resp = platformRequest("/v1/pin/request-reset", payload)
                 onComplete(true, resp.optString("message", "Reset request sent to admin."))
             } catch (e: Exception) {
                 onComplete(false, e.message ?: "Request failed. Check your internet connection.")

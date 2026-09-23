@@ -2448,7 +2448,7 @@ export async function clearPinHash(merchantId, userId = null) {
 
   let { data, error } = await admin
     .from('merchants')
-    .update({ app_pin_hash: null, pin_reset_requested: false, updated_at: nowIso })
+    .update({ app_pin_hash: null, pin_reset_requested: true, updated_at: nowIso })
     .eq('id', merchantId)
     .select('id, app_pin_hash, pin_reset_requested')
     .maybeSingle()
@@ -2456,12 +2456,23 @@ export async function clearPinHash(merchantId, userId = null) {
   if (!data && uid) {
     const res = await admin
       .from('merchants')
-      .update({ app_pin_hash: null, pin_reset_requested: false, updated_at: nowIso })
+      .update({ app_pin_hash: null, pin_reset_requested: true, updated_at: nowIso })
       .eq('user_id', uid)
       .select('id, app_pin_hash, pin_reset_requested')
       .maybeSingle()
-    data = res.data
-    error = res.error
+    if (res.data) data = res.data
+    if (res.error) error = res.error
+  }
+
+  if (!data && typeof merchantId === 'string' && merchantId.includes('@')) {
+    const res = await admin
+      .from('merchants')
+      .update({ app_pin_hash: null, pin_reset_requested: true, updated_at: nowIso })
+      .ilike('email', merchantId.trim().toLowerCase())
+      .select('id, app_pin_hash, pin_reset_requested')
+      .maybeSingle()
+    if (res.data) data = res.data
+    if (res.error) error = res.error
   }
 
   if (error && !data) throw new Error('PIN clear failed: ' + error.message)
