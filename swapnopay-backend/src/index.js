@@ -26,7 +26,7 @@ import { requirePlatformUser } from './services/merchantAccount.js'
 import oauthRouter from './routes/oauth.js'
 import { smsGatewayRouter } from './routes/smsGateway.js'
 import { startShopWorker } from './services/shopService.js'
-import { formRouter } from './routes/form.js'
+import { formRouter, isProductRoute } from './routes/form.js'
 import { aiVoiceRouter } from './routes/aiVoice.js'
 import { subscriptionRouter } from './routes/subscription.js'
 import employeeRouter from './routes/employee.js'
@@ -365,11 +365,21 @@ app.get(['/p/:slug', '/product/:slug'], (req, res) => {
 
 // Hosted Checkout Form Dynamic Slugs (/f/:slug, /forms/:slug, /form/:slug)
 app.get(['/f/:slug', '/forms/:slug', '/form/:slug'], (req, res) => {
+  const slug = req.params.slug
+  const isProduct = isProductRoute(slug) || req.query.view === 'product' || req.query.layout === 'ecommerce'
+
+  if (isProduct) {
+    const productHtml = path.join(webDir, 'product.html')
+    if (fs.existsSync(productHtml)) {
+      return res.sendFile(productHtml)
+    }
+  }
+
   const formHtml = path.join(webDir, 'form.html')
   if (fs.existsSync(formHtml)) {
     return res.sendFile(formHtml)
   }
-  res.redirect(`/form.html?slug=${encodeURIComponent(req.params.slug)}`)
+  res.redirect(`/form.html?slug=${encodeURIComponent(slug)}`)
 })
 
 // Public health check

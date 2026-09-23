@@ -22,10 +22,65 @@ const ROUTES_FILE = path.join(DATA_DIR, 'form_routes.json')
 const SUBMISSIONS_FILE = path.join(DATA_DIR, 'form_submissions.json')
 
 // In-memory route and form cache
-const routeBySlug = new Map()
-const routeById = new Map()
+export const routeBySlug = new Map()
+export const routeById = new Map()
 const formSubmissionsMemory = new Map() // formId or formSlug -> array of submissions
 export const orderToFormSubmissionMap = new Map() // orderId -> { form_id, submission_id, merchant_id, form_slug }
+
+/**
+ * Checks whether a given slug or ID corresponds to an eCommerce / product showcase form
+ */
+export function isProductRoute(identifier) {
+  if (!identifier) return false
+  const cleanId = String(identifier).trim().toLowerCase()
+  const compactId = cleanId.replace(/-/g, '')
+
+  // 1. Look up in memory cache
+  let route = routeBySlug.get(cleanId) ||
+              routeById.get(compactId) ||
+              routeById.get(cleanId)
+  if (!route) {
+    const altSlug = cleanId.startsWith('pay-') ? cleanId.replace(/^pay-/, '') : `pay-${cleanId}`
+    route = routeBySlug.get(altSlug)
+  }
+
+  // 2. If not found in memory, try reading from disk cache if available
+  if (!route) {
+    try {
+      if (fs.existsSync(ROUTES_FILE)) {
+        const raw = fs.readFileSync(ROUTES_FILE, 'utf8')
+        const items = JSON.parse(raw || '[]')
+        for (const item of items) {
+          const s = (item.slug || '').toLowerCase()
+          const fId = (item.form_id || '').toLowerCase()
+          if (s === cleanId || s === `pay-${cleanId}` || `pay-${s}` === cleanId || fId === cleanId || fId.replace(/-/g, '') === compactId) {
+            route = item
+            break
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (route && route.payload) {
+    const p = route.payload
+    const theme = p.theme_config || p.theme || {}
+    const tType = String(p.template_type || p.templateType || theme.template_type || theme.templateType || '').toUpperCase()
+    if (['FLAGSHIP_PRODUCT', 'SINGLE_PRODUCT', 'PRODUCT', 'PRODUCT_SHOWCASE', 'ECOMMERCE', 'CART'].includes(tType)) {
+      return true
+    }
+    if (Array.isArray(p.products) && p.products.length > 0) {
+      return true
+    }
+  }
+
+  // 3. Fallback heuristic on slug keywords
+  if (cleanId.includes('aura-pro') || cleanId.includes('product') || cleanId.includes('flagship') || cleanId.includes('headphones')) {
+    return true
+  }
+
+  return false
+}
 
 /**
  * Robust currency and price parser for option labels

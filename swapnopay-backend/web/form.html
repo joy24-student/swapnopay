@@ -1217,6 +1217,29 @@
       });
     }
 
+    function checkAndRedirectProductForm(config) {
+      if (!config) return false;
+      const theme = config.theme_config || config.theme || {};
+      const tType = String(config.template_type || config.templateType || theme.template_type || theme.templateType || '').toUpperCase();
+      const isProduct = ['FLAGSHIP_PRODUCT', 'SINGLE_PRODUCT', 'PRODUCT', 'PRODUCT_SHOWCASE', 'ECOMMERCE', 'CART'].includes(tType) ||
+                        (Array.isArray(config.products) && config.products.length > 0) ||
+                        (typeof formIdentifier === 'string' && (formIdentifier.toLowerCase().includes('aura-pro') || formIdentifier.toLowerCase().includes('flagship')));
+      if (isProduct) {
+        const search = window.location.search || '';
+        const cleanSlug = config.slug || formIdentifier;
+        let target = `/product.html?slug=${encodeURIComponent(cleanSlug)}`;
+        if (search) {
+          const sp = new URLSearchParams(search);
+          if (!sp.has('slug') && !sp.has('id')) sp.set('slug', cleanSlug);
+          target = `/product.html?${sp.toString()}`;
+        }
+        console.log('[form] Detected eCommerce / Flagship Product form. Redirecting to product showcase:', target);
+        window.location.replace(target);
+        return true;
+      }
+      return false;
+    }
+
     async function loadPaymentFormDetails() {
       // 1. Try Backend API first (/v1/forms/:slugOrId)
       try {
@@ -1225,6 +1248,7 @@
           const data = await res.json();
           if (data && data.ok && data.form) {
             formConfig = data.form;
+            if (checkAndRedirectProductForm(formConfig)) return;
             renderConfiguredFields(formConfig);
             return;
           }
@@ -1243,6 +1267,7 @@
               const data = await res.json();
               if (data && data.ok && data.form) {
                 formConfig = data.form;
+                if (checkAndRedirectProductForm(formConfig)) return;
                 renderConfiguredFields(formConfig);
                 return;
               }
@@ -1270,6 +1295,7 @@
       .then(data => {
         if (data && data.length > 0) {
           formConfig = data[0];
+          if (checkAndRedirectProductForm(formConfig)) return;
           renderConfiguredFields(formConfig);
         } else {
           document.getElementById("form-wrap").innerHTML = `

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
-import { formRouter, handleFormPaymentPaid, parseAmountFromText, orderToFormSubmissionMap } from './form.js'
+import { formRouter, handleFormPaymentPaid, parseAmountFromText, orderToFormSubmissionMap, isProductRoute } from './form.js'
 
 function createTestApp() {
   const app = express()
@@ -295,6 +295,40 @@ test('Form Router: Registration, Resolution, and Submissions', async (t) => {
     assert.ok(updated)
     assert.equal(updated.payment_status, 'PAID')
     assert.equal(updated.trx_id, mockTrxId)
+  })
+
+  await t.test('11. isProductRoute accurately detects flagship product and eCommerce forms', async () => {
+    // Register a flagship product form
+    const regRes = await fetch(`${baseUrl}/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        form_id: 'flagship-product-uuid-005',
+        slug: 'flagship-aura-pro-live',
+        merchant_id: 'merchant-test-123',
+        payload: {
+          id: 'flagship-product-uuid-005',
+          title: 'Aura Pro Wireless Headphones',
+          slug: 'flagship-aura-pro-live',
+          template_type: 'FLAGSHIP_PRODUCT',
+          amount: 2490,
+          products: [
+            { title: 'Aura Pro Headphones', price: 2490, stock: 10 }
+          ],
+          fields: [
+            { id: 'f_name', type: 'NAME', label: 'Full Name', required: true }
+          ]
+        }
+      })
+    })
+    assert.equal(regRes.status, 200)
+
+    // Verify detection
+    assert.equal(isProductRoute('flagship-aura-pro-live'), true)
+    assert.equal(isProductRoute('pay-aura-pro'), true)
+    assert.equal(isProductRoute('aura-pro'), true)
+    assert.equal(isProductRoute('flagship-product-uuid-005'), true)
+    assert.equal(isProductRoute('conference-2026'), false)
   })
 })
 
