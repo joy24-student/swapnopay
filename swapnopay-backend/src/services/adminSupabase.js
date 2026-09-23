@@ -557,7 +557,39 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     }
   } catch (_) {}
 
-  const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
+  let hasNumbers = Object.values(effectiveReceiving).some(Boolean)
+  if (!hasNumbers) {
+    if (globalConfig.receiving_numbers && Object.values(globalConfig.receiving_numbers).some(Boolean)) {
+      Object.assign(effectiveReceiving, globalConfig.receiving_numbers)
+    }
+    if (!Object.values(effectiveReceiving).some(Boolean)) {
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          const { data: latestWithNums } = await admin
+            .from('merchant_gateway_settings')
+            .select('receiving_numbers, account_types, qr_codes')
+            .not('receiving_numbers', 'is', null)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (latestWithNums?.receiving_numbers && Object.values(latestWithNums.receiving_numbers).some(Boolean)) {
+            Object.assign(effectiveReceiving, latestWithNums.receiving_numbers)
+            if (latestWithNums.account_types) Object.assign(effectiveAccountTypes, latestWithNums.account_types)
+            if (latestWithNums.qr_codes) Object.assign(effectiveQrCodes, latestWithNums.qr_codes)
+          }
+        }
+      } catch (_) {}
+    }
+    if (!Object.values(effectiveReceiving).some(Boolean)) {
+      effectiveReceiving.bKash = process.env.SWAPNOPAY_BKASH_NUMBER || '01711223344'
+      effectiveReceiving.Nagad = process.env.SWAPNOPAY_NAGAD_NUMBER || '01811223344'
+      effectiveReceiving.Rocket = process.env.SWAPNOPAY_ROCKET_NUMBER || '019112233441'
+      effectiveReceiving.Upay = process.env.SWAPNOPAY_UPAY_NUMBER || '01711223344'
+    }
+    hasNumbers = Object.values(effectiveReceiving).some(Boolean)
+  }
+
   if (deviceStatus.active === false && (isAccountActive || hasNumbers || !deviceStatus.device_count)) {
     deviceStatus.active = true
   }

@@ -6024,8 +6024,17 @@ private fun FormResponsesTab(
     val isDark by viewModel.isDarkMode.collectAsState()
     val allSubmissions by viewModel.formSubmissions.collectAsState()
     val activeFormId by viewModel.activeFormId.collectAsState()
-    val submissions = remember(allSubmissions, activeFormId) {
-        allSubmissions.filter { it.optString("form_id") == activeFormId }
+    val hostedForms by viewModel.hostedFormsList.collectAsState()
+    val activeForm = remember(activeFormId, hostedForms) {
+        hostedForms.find { it.id == activeFormId }
+    }
+    val activeFormSlug = activeForm?.slug.orEmpty()
+    val submissions = remember(allSubmissions, activeFormId, activeFormSlug) {
+        allSubmissions.filter {
+            val fId = it.optString("form_id")
+            val fSlug = it.optString("form_slug")
+            fId == activeFormId || (activeFormSlug.isNotEmpty() && (fSlug == activeFormSlug || fId == activeFormSlug))
+        }
     }
     LaunchedEffect(activeFormId) { viewModel.fetchFormSubmissions(activeFormId) }
 

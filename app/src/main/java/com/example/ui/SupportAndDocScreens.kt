@@ -2418,6 +2418,7 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val templates = listOf(
+                    Triple("Flagship Product Showcase", "High-end 2-column e-commerce layout with gallery, swatches, chips, stock pulse & checkout", "FLAGSHIP_PRODUCT"),
                     Triple("Online MCQ & Exam Quiz", "Interactive timed exam with question palette, autosave, flagging & scoring", "ONLINE_MCQ_EXAM"),
                     Triple("Product Sales Form", "Pre-configured with product choices & bKash/Nagad checkout", "SINGLE_PRODUCT"),
                     Triple("Event Registration", "Includes participant details & automated QR pass", "EVENT_TICKETING"),

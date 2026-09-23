@@ -16,14 +16,15 @@ import { getAdminClient, getMerchantCredentials, getMerchantGatewayConfig, recor
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Persistent route storage file path
+// Persistent route & submissions storage file paths
 const DATA_DIR = path.resolve(__dirname, '../../data')
 const ROUTES_FILE = path.join(DATA_DIR, 'form_routes.json')
+const SUBMISSIONS_FILE = path.join(DATA_DIR, 'form_submissions.json')
 
 // In-memory route and form cache
 const routeBySlug = new Map()
 const routeById = new Map()
-const formSubmissionsMemory = new Map() // formId -> array of submissions
+const formSubmissionsMemory = new Map() // formId or formSlug -> array of submissions
 export const orderToFormSubmissionMap = new Map() // orderId -> { form_id, submission_id, merchant_id, form_slug }
 
 /**
@@ -71,7 +72,7 @@ export function parseAmountFromText(val) {
   return 0
 }
 
-// Ensure data directory and persistent file exist
+// Ensure data directory and persistent files exist
 function initPersistence() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
@@ -93,6 +94,35 @@ function initPersistence() {
       }
     } else {
       fs.writeFileSync(ROUTES_FILE, JSON.stringify([], null, 2), 'utf8')
+    }
+
+    if (fs.existsSync(SUBMISSIONS_FILE)) {
+      const rawSub = fs.readFileSync(SUBMISSIONS_FILE, 'utf8')
+      const subItems = JSON.parse(rawSub || '[]')
+      if (Array.isArray(subItems)) {
+        for (const sub of subItems) {
+          if (sub.form_id) {
+            if (!formSubmissionsMemory.has(sub.form_id)) formSubmissionsMemory.set(sub.form_id, [])
+            formSubmissionsMemory.get(sub.form_id).push(sub)
+          }
+          if (sub.form_slug) {
+            if (!formSubmissionsMemory.has(sub.form_slug)) formSubmissionsMemory.set(sub.form_slug, [])
+            formSubmissionsMemory.get(sub.form_slug).push(sub)
+          }
+          if (sub.order_id) {
+            orderToFormSubmissionMap.set(sub.order_id, {
+              form_id: sub.form_id,
+              submission_id: sub.id || sub.submission_id,
+              merchant_id: sub.merchant_id,
+              form_slug: sub.form_slug,
+              amount: sub.amount
+            })
+          }
+        }
+        console.log(`[form-router] Loaded ${subItems.length} persistent form submissions from disk.`)
+      }
+    } else {
+      fs.writeFileSync(SUBMISSIONS_FILE, JSON.stringify([], null, 2), 'utf8')
     }
   } catch (err) {
     console.warn('[form-router] Failed to initialize persistent storage:', err.message)
@@ -127,6 +157,31 @@ function saveRoutesToDisk() {
     fs.renameSync(tempFile, ROUTES_FILE)
   } catch (err) {
     console.error('[form-router] Error saving routes to disk:', err.message)
+  }
+}
+
+function saveSubmissionsToDisk() {
+  try {
+    const all = []
+    const seen = new Set()
+    for (const list of formSubmissionsMemory.values()) {
+      if (Array.isArray(list)) {
+        for (const item of list) {
+          if (item && item.id && !seen.has(item.id)) {
+            seen.add(item.id)
+            all.push(item)
+          }
+        }
+      }
+    }
+    const tempFile = `${SUBMISSIONS_FILE}.tmp.${Date.now()}`
+    fs.writeFileSync(tempFile, JSON.stringify(all, null, 2), 'utf8')
+    try {
+      if (fs.existsSync(SUBMISSIONS_FILE)) fs.unlinkSync(SUBMISSIONS_FILE)
+    } catch (_) {}
+    fs.renameSync(tempFile, SUBMISSIONS_FILE)
+  } catch (err) {
+    console.error('[form-router] Error saving submissions to disk:', err.message)
   }
 }
 
@@ -230,6 +285,23 @@ export function formRouter(io = null) {
             if (error) console.warn('[form-router] Admin DB upsert warning:', error.message)
             else console.log('[form-router] Form synced to Admin DB payment_forms:', normalizedSlug)
           }).catch(e => console.warn('[form-router] DB sync caught:', e.message))
+
+          // If form carries receiving numbers or gateway config, sync to merchant_gateway_settings
+          const recNumbers = formSnapshot.receiving_numbers || formSnapshot.gateway_config?.receiving_numbers
+          const accTypes = formSnapshot.account_types || formSnapshot.gateway_config?.account_types
+          const qrCodes = formSnapshot.qr_codes || formSnapshot.gateway_config?.qr_codes
+          if (recNumbers && typeof recNumbers === 'object' && Object.keys(recNumbers).length > 0) {
+            try {
+              const { setMerchantGatewayConfig } = await import('../services/adminSupabase.js')
+              setMerchantGatewayConfig(effectiveMerchantUuid, {
+                merchant_name: formSnapshot.merchant_name || formSnapshot.title,
+                merchant_logo_url: formSnapshot.logo_url || null,
+                receiving_numbers: recNumbers,
+                account_types: accTypes || {},
+                qr_codes: qrCodes || {}
+              }).catch(e => console.warn('[form-router] setMerchantGatewayConfig notice:', e.message))
+            } catch (_) {}
+          }
         }
       } catch (dbErr) {
         console.warn('[form-router] Admin DB sync error:', dbErr.message)
@@ -738,13 +810,17 @@ export function formRouter(io = null) {
       const paymentRequired = isPaymentEnabled && calculatedAmount > 0
 
       // 5. Build submission payload
+      const orderUuid = crypto.randomUUID()
+      const tranId = 'TRX-' + Date.now()
+      const submissionUuid = crypto.randomUUID()
       const submissionId = 'sub_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)
       const clientName = customer_name || answers['name'] || answers['customer_name'] || 'Customer'
       const clientPhone = customer_phone || answers['phone'] || answers['mobile'] || 'N/A'
       const clientEmail = customer_email || answers['email'] || ''
 
       const submissionRecord = {
-        id: submissionId,
+        id: submissionUuid,
+        submission_id: submissionId,
         form_id: form.id,
         form_slug: form.slug,
         merchant_id: form.merchant_id,
@@ -753,40 +829,89 @@ export function formRouter(io = null) {
         customer_email: clientEmail,
         answers: answers,
         amount: calculatedAmount,
+        amount_bdt: calculatedAmount,
         payment_required: paymentRequired,
-        payment_method: payment_method,
+        payment_method: payment_method || (paymentRequired ? 'bKash' : 'Free'),
+        payment_status: paymentRequired ? 'PENDING' : 'FREE',
+        order_id: orderUuid,
+        tran_id: tranId,
         created_at: new Date().toISOString()
       }
 
-      // Store submission in memory and try DB
-      if (!formSubmissionsMemory.has(form.id)) formSubmissionsMemory.set(form.id, [])
-      formSubmissionsMemory.get(form.id).unshift(submissionRecord)
+      // Store submission in memory under both form.id and form.slug
+      if (form.id) {
+        if (!formSubmissionsMemory.has(form.id)) formSubmissionsMemory.set(form.id, [])
+        formSubmissionsMemory.get(form.id).unshift(submissionRecord)
+      }
+      if (form.slug) {
+        if (!formSubmissionsMemory.has(form.slug)) formSubmissionsMemory.set(form.slug, [])
+        formSubmissionsMemory.get(form.slug).unshift(submissionRecord)
+      }
+      orderToFormSubmissionMap.set(orderUuid, {
+        form_id: form.id,
+        submission_id: submissionUuid,
+        merchant_id: form.merchant_id,
+        form_slug: form.slug,
+        amount: calculatedAmount
+      })
+      orderToFormSubmissionMap.set(submissionId, {
+        form_id: form.id,
+        submission_id: submissionUuid,
+        merchant_id: form.merchant_id,
+        form_slug: form.slug,
+        amount: calculatedAmount
+      })
+      orderToFormSubmissionMap.set(tranId, {
+        form_id: form.id,
+        submission_id: submissionUuid,
+        merchant_id: form.merchant_id,
+        form_slug: form.slug,
+        amount: calculatedAmount
+      })
+      saveSubmissionsToDisk()
 
       // Increment form submission count
       form.submissions_count = (form.submissions_count || 0) + 1
       try {
         const admin = getAdminClient()
-        admin.from('payment_forms')
-          .update({ submissions_count: form.submissions_count })
-          .eq('id', form.id)
-          .then(() => {})
-          .catch(() => {})
+        if (admin) {
+          admin.from('payment_forms')
+            .update({ submissions_count: form.submissions_count })
+            .eq('id', form.id)
+            .then(() => {})
+            .catch(() => {})
 
-        admin.from('form_submissions')
-          .insert({
-            id: normalizeUuid(submissionId) || undefined,
-            form_id: form.id,
-            request_id: request_id || normalizeUuid(submissionId) || undefined,
-            customer_name: clientName,
-            customer_phone: clientPhone,
-            customer_email: clientEmail,
+          // Pre-insert order so form_submissions foreign key succeeds
+          const preOrderRecord = {
+            id: orderUuid,
+            tran_id: tranId,
+            merchant_id: form.merchant_id,
             amount: calculatedAmount,
-            answers: answers,
-            payment_method: payment_method,
-            payment_status: paymentRequired ? 'PENDING' : 'FREE'
-          })
-          .then(() => {})
-          .catch(() => {})
+            status: paymentRequired ? 'PENDING' : 'PAID',
+            cus_name: clientName,
+            cus_phone: clientPhone,
+            cus_email: clientEmail,
+            product_name: productName,
+            payment_method: payment_method || (paymentRequired ? 'bKash' : 'Free'),
+            created_at: new Date().toISOString()
+          }
+          await admin.from('orders').insert(preOrderRecord).catch(() => {})
+
+          await admin.from('form_submissions')
+            .insert({
+              id: submissionUuid,
+              form_id: normalizeUuid(form.id) || undefined,
+              order_id: orderUuid,
+              request_id: request_id || submissionId,
+              customer_name: clientName,
+              customer_phone: clientPhone,
+              customer_email: clientEmail,
+              amount: calculatedAmount,
+              answers: answers,
+              payment_method: payment_method || (paymentRequired ? 'bKash' : 'Free'),
+              payment_status: paymentRequired ? 'PENDING' : 'FREE'
+            }).catch(subErr => console.warn('[form-router] Admin form_submissions insert notice:', subErr.message))
+        }
       } catch {}
 
       // Mirror submission to merchant's own Supabase DB so Android app can read it
@@ -904,9 +1029,6 @@ export function formRouter(io = null) {
 
       // 6. Handle Payment Order Creation if required
       if (paymentRequired) {
-        const orderUuid = crypto.randomUUID()
-        const tranId = 'TRX-' + Date.now()
-
         const orderRecord = {
           id: orderUuid,
           tran_id: tranId,
@@ -917,14 +1039,16 @@ export function formRouter(io = null) {
           cus_phone: clientPhone,
           cus_email: clientEmail,
           product_name: productName,
-          payment_method: payment_method,
+          payment_method: payment_method || 'bKash',
           created_at: new Date().toISOString()
         }
 
-        // Create order in platform admin DB
+        // Create or update order in platform admin DB
         try {
           const admin = getAdminClient()
-          await admin.from('orders').insert(orderRecord)
+          if (admin) {
+            await admin.from('orders').upsert(orderRecord, { onConflict: 'id' }).catch(() => {})
+          }
         } catch (ordErr) {
           console.warn('[form-router] Admin order insert notice:', ordErr.message)
         }
@@ -940,7 +1064,7 @@ export function formRouter(io = null) {
             sender_number: clientPhone,
             cus_email: clientEmail,
             product_name: productName,
-            payment_method: payment_method
+            payment_method: payment_method || 'bKash'
           })
         } catch (evtErr) {
           console.warn('[form-router] Payment event record notice:', evtErr.message)
@@ -955,7 +1079,7 @@ export function formRouter(io = null) {
               const mClient = createClient(creds.supabase_url, creds.supabase_anon_key, {
                 auth: { persistSession: false, autoRefreshToken: false }
               })
-              await mClient.from('orders').insert(orderRecord)
+              await mClient.from('orders').upsert(orderRecord, { onConflict: 'id' }).catch(() => {})
             }
           }
         } catch (mOrdErr) {
@@ -964,14 +1088,14 @@ export function formRouter(io = null) {
 
         orderToFormSubmissionMap.set(orderUuid, {
           form_id: form.id,
-          submission_id: submissionId,
+          submission_id: submissionUuid,
           merchant_id: form.merchant_id,
           form_slug: form.slug,
           amount: calculatedAmount
         })
         orderToFormSubmissionMap.set(tranId, {
           form_id: form.id,
-          submission_id: submissionId,
+          submission_id: submissionUuid,
           merchant_id: form.merchant_id,
           form_slug: form.slug,
           amount: calculatedAmount
@@ -994,11 +1118,28 @@ export function formRouter(io = null) {
               merchantParam = `&merchant_id=${encodeURIComponent(mConfig.merchant_id)}`
             }
             const activeMethod = payment_method || 'bKash'
-            const activeNum = (mConfig.receiving_numbers && mConfig.receiving_numbers[activeMethod]) || (mConfig.receiving_numbers && Object.values(mConfig.receiving_numbers)[0])
+            let activeNum = (mConfig.receiving_numbers && mConfig.receiving_numbers[activeMethod]) || (mConfig.receiving_numbers && Object.values(mConfig.receiving_numbers)[0])
+            if (!activeNum) {
+              const formNums = form.receiving_numbers || form.gateway_config?.receiving_numbers || (form.theme && form.theme.receiving_numbers)
+              if (formNums && formNums[activeMethod]) activeNum = formNums[activeMethod]
+              else if (formNums && Object.values(formNums)[0]) activeNum = Object.values(formNums)[0]
+            }
+            if (!activeNum) {
+              const envNumbers = {
+                bKash: process.env.SWAPNOPAY_BKASH_NUMBER || '01711223344',
+                Nagad: process.env.SWAPNOPAY_NAGAD_NUMBER || '01811223344',
+                Rocket: process.env.SWAPNOPAY_ROCKET_NUMBER || '019112233441',
+                Upay: process.env.SWAPNOPAY_UPAY_NUMBER || '01711223344',
+              }
+              activeNum = envNumbers[activeMethod] || envNumbers.bKash
+            }
             if (activeNum) {
               numberParam = `&merchant_number=${encodeURIComponent(activeNum)}`
             }
-            const activeType = (mConfig.account_types && mConfig.account_types[activeMethod]) || 'personal'
+            const activeType = (mConfig.account_types && mConfig.account_types[activeMethod]) ||
+              (form.account_types && form.account_types[activeMethod]) ||
+              (form.gateway_config && form.gateway_config.account_types && form.gateway_config.account_types[activeMethod]) ||
+              'personal'
             if (activeType) {
               accTypeParam = `&account_type=${encodeURIComponent(activeType)}`
             }
@@ -1059,21 +1200,61 @@ export function formRouter(io = null) {
   // ──────────────────────────────────────────────────────────────────────────
   router.get(['/forms/:slugOrId/submissions', '/hosted-forms/:slugOrId/submissions'], async (req, res) => {
     const identifier = String(req.params.slugOrId || '').trim()
-    const memoryList = formSubmissionsMemory.get(identifier) || []
+    const route = routeBySlug.get(identifier) || routeById.get(identifier) || routeBySlug.get(identifier.toLowerCase())
+    const formId = route?.form_id || identifier
+    const formSlug = route?.slug || identifier
 
+    // Gather from memory (both ID and slug)
+    const memMap = new Map()
+    const addMem = (key) => {
+      if (!key) return
+      const list = formSubmissionsMemory.get(key)
+      if (Array.isArray(list)) {
+        for (const item of list) {
+          if (item && (item.id || item.submission_id)) {
+            const sid = String(item.id || item.submission_id)
+            memMap.set(sid, item)
+          }
+        }
+      }
+    }
+    addMem(identifier)
+    addMem(formId)
+    addMem(formSlug)
+
+    // Also gather from admin DB
     try {
       const admin = getAdminClient()
-      const parsedUuid = normalizeUuid(identifier)
-      let q = admin.from('form_submissions').select('*').order('created_at', { ascending: false }).limit(100)
-      if (parsedUuid) q = q.eq('form_id', parsedUuid)
-
-      const { data, error } = await q
-      if (!error && data && data.length > 0) {
-        return res.json({ ok: true, submissions: data })
+      if (admin) {
+        const parsedUuid = normalizeUuid(formId) || normalizeUuid(identifier)
+        if (parsedUuid) {
+          const { data, error } = await admin
+            .from('form_submissions')
+            .select('*')
+            .eq('form_id', parsedUuid)
+            .order('created_at', { ascending: false })
+            .limit(100)
+          if (!error && Array.isArray(data)) {
+            for (const item of data) {
+              if (item && item.id) {
+                const existing = memMap.get(String(item.id))
+                memMap.set(String(item.id), { ...item, ...(existing || {}) })
+              }
+            }
+          }
+        }
       }
-    } catch {}
+    } catch (dbErr) {
+      console.warn('[form-router] submissions DB fetch error:', dbErr.message)
+    }
 
-    return res.json({ ok: true, submissions: memoryList })
+    const merged = Array.from(memMap.values()).sort((a, b) => {
+      const tA = new Date(a.created_at || 0).getTime()
+      const tB = new Date(b.created_at || 0).getTime()
+      return tB - tA
+    })
+
+    return res.json({ ok: true, submissions: merged })
   })
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1180,6 +1361,21 @@ export async function handleFormPaymentPaid(orderId, trxId, amount, io = null) {
     }
     formSubmissionsMemory.get(form_id).unshift(updatedRecord)
   }
+
+  if (form_slug) {
+    if (!formSubmissionsMemory.has(form_slug)) {
+      formSubmissionsMemory.set(form_slug, [])
+    }
+    const slugList = formSubmissionsMemory.get(form_slug)
+    const existingIdx = slugList.findIndex(item => item.id === submission_id || item.order_id === cleanId)
+    if (existingIdx >= 0) {
+      slugList[existingIdx] = updatedRecord
+    } else {
+      slugList.unshift(updatedRecord)
+    }
+  }
+
+  saveSubmissionsToDisk()
 
   // 1. Update form_submissions and payment_forms in admin DB
   try {

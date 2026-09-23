@@ -5737,6 +5737,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         put("logo_url", form.themeConfig.logoUrl)
         put("banner_url", form.themeConfig.bannerUrl)
+
+        val mProfile = activeProfile.value
+        val mName = mProfile.businessName.ifBlank { mProfile.accountHolder }
+        if (mName.isNotBlank()) {
+            put("merchant_name", mName)
+        }
+        val receivingNums = org.json.JSONObject()
+        val accountTypesObj = org.json.JSONObject()
+        val qrCodesObj = org.json.JSONObject()
+        val activeNums = merchantNumbers.value.filter { it.isActive }
+        activeNums.forEach { num ->
+            receivingNums.put(num.method, num.number)
+            accountTypesObj.put(num.method, num.type)
+            if (!num.qrCodeUrl.isNullOrBlank()) {
+                qrCodesObj.put(num.method, num.qrCodeUrl)
+            }
+        }
+        if (receivingNums.length() > 0) {
+            put("receiving_numbers", receivingNums)
+            put("account_types", accountTypesObj)
+            put("qr_codes", qrCodesObj)
+        }
     }
 
     fun createNewHostedForm(title: String, templateKey: String = "BLANK") {
@@ -10072,91 +10094,98 @@ function executePayment() {
 
     fun fetchFormSubmissions(formId: String? = null) {
         val configuredProfile = _activeSupabaseProfile.value
-        if (configuredProfile != null && configuredProfile.supabaseUrl.isNotEmpty() && configuredProfile.anonKey.isNotEmpty()) {
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                val active = validSupabaseSession(configuredProfile) ?: return@launch
-                val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
-                    .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
-                com.example.data.remote.SupabaseClient.fetchFormSubmissions(
-                    url = active.supabaseUrl,
-                    anonKey = active.anonKey,
-                    token = active.authSessionToken,
-                    formId = formId,
-                    onSuccess = { jsonArray ->
+        val targetFormId = formId ?: activeFormId.value
+        val currentForm = hostedFormsList.value.find { it.id == targetFormId }
+        val targetSlug = currentForm?.slug?.trim().orEmpty()
+
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
+                .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
+
+            // 1. If merchant has custom Supabase DB configured, query it
+            if (configuredProfile != null && configuredProfile.supabaseUrl.isNotEmpty() && configuredProfile.anonKey.isNotEmpty()) {
+                val active = validSupabaseSession(configuredProfile)
+                if (active != null) {
+                    com.example.data.remote.SupabaseClient.fetchFormSubmissions(
+                        url = active.supabaseUrl,
+                        anonKey = active.anonKey,
+                        token = active.authSessionToken,
+                        formId = targetFormId,
+                        onSuccess = { jsonArray ->
+                            val cache = mutableListOf<FormSubmissionCacheEntity>()
+                            for (i in 0 until jsonArray.length()) {
+                                val item = jsonArray.getJSONObject(i)
+                                val subId = item.optString("id", java.util.UUID.randomUUID().toString())
+                                if (subId in dirtyIds) continue
+                                cache.add(
+                                    FormSubmissionCacheEntity(
+                                        id = subId,
+                                        merchantId = activeProfile.value.id,
+                                        formId = item.optString("form_id", targetFormId).ifBlank { targetFormId },
+                                        payloadJson = item.toString(),
+                                        submittedAt = parseRemoteTimestamp(item.optString("submitted_at", item.optString("created_at"))),
+                                        isDirty = false
+                                    )
+                                )
+                            }
+                            if (cache.isNotEmpty()) {
+                                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    repository.upsertFormSubmissionCaches(cache)
+                                }
+                            }
+                        },
+                        onFailure = { err ->
+                            logFirebaseStatus("Notice loading merchant DB submissions: $err")
+                        }
+                    )
+                }
+            }
+
+            // 2. Query SwapnoPay Central Gateway & disk fallback (query by ID and Slug)
+            val endpoints = mutableListOf(
+                "https://api.swapnopay.top/v1/forms/$targetFormId/submissions",
+                "https://swapnopay.top/v1/forms/$targetFormId/submissions"
+            )
+            if (targetSlug.isNotBlank() && targetSlug != targetFormId) {
+                endpoints.add(0, "https://api.swapnopay.top/v1/forms/$targetSlug/submissions")
+            }
+
+            for (endpoint in endpoints) {
+                try {
+                    val conn = java.net.URL(endpoint).openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("x-merchant-id", activeProfile.value.id)
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    if (conn.responseCode in 200..299) {
+                        val resStr = conn.inputStream.bufferedReader().use { it.readText() }
+                        val resJson = org.json.JSONObject(resStr)
+                        val submissionsArray = resJson.optJSONArray("submissions") ?: org.json.JSONArray()
                         val cache = mutableListOf<FormSubmissionCacheEntity>()
-                        for (i in 0 until jsonArray.length()) {
-                            val item = jsonArray.getJSONObject(i)
-                            if (item.optString("id") in dirtyIds) continue
+                        for (i in 0 until submissionsArray.length()) {
+                            val item = submissionsArray.getJSONObject(i)
+                            val subId = item.optString("id", java.util.UUID.randomUUID().toString())
+                            if (subId in dirtyIds) continue
+                            val itemFormId = item.optString("form_id", targetFormId).ifBlank { targetFormId }
                             cache.add(
                                 FormSubmissionCacheEntity(
-                                    id = item.getString("id"),
+                                    id = subId,
                                     merchantId = activeProfile.value.id,
-                                    formId = item.optString("form_id"),
+                                    formId = itemFormId,
                                     payloadJson = item.toString(),
-                                    submittedAt = parseRemoteTimestamp(item.optString("created_at")),
+                                    submittedAt = parseRemoteTimestamp(item.optString("submitted_at", item.optString("created_at"))),
                                     isDirty = false
                                 )
                             )
                         }
-                        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        if (cache.isNotEmpty()) {
                             repository.upsertFormSubmissionCaches(cache)
+                            logFirebaseStatus("Loaded ${cache.size} submissions from SwapnoPay central gateway.")
                         }
-                    },
-                    onFailure = { err ->
-                        logFirebaseStatus("Error loading submissions: $err")
-                    }
-                )
-            }
-        } else {
-            // Platform & Central Backend fallback
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    val dirtyIds = repository.observeFormSubmissionCache(activeProfile.value.id).firstOrNull()
-                        .orEmpty().filter(FormSubmissionCacheEntity::isDirty).mapTo(mutableSetOf(), FormSubmissionCacheEntity::id)
-                    val targetFormId = formId ?: activeFormId.value
-                    val endpoints = listOf(
-                        "https://api.swapnopay.top/v1/forms/$targetFormId/submissions",
-                        "https://swapnopay.top/v1/forms/$targetFormId/submissions"
-                    )
-                    for (endpoint in endpoints) {
-                        try {
-                            val conn = java.net.URL(endpoint).openConnection() as java.net.HttpURLConnection
-                            conn.requestMethod = "GET"
-                            conn.setRequestProperty("x-merchant-id", activeProfile.value.id)
-                            conn.connectTimeout = 8000
-                            conn.readTimeout = 8000
-                            if (conn.responseCode in 200..299) {
-                                val resStr = conn.inputStream.bufferedReader().use { it.readText() }
-                                val resJson = org.json.JSONObject(resStr)
-                                val submissionsArray = resJson.optJSONArray("submissions") ?: org.json.JSONArray()
-                                val cache = mutableListOf<FormSubmissionCacheEntity>()
-                                for (i in 0 until submissionsArray.length()) {
-                                    val item = submissionsArray.getJSONObject(i)
-                                    val subId = item.optString("id", java.util.UUID.randomUUID().toString())
-                                    if (subId in dirtyIds) continue
-                                    cache.add(
-                                        FormSubmissionCacheEntity(
-                                            id = subId,
-                                            merchantId = activeProfile.value.id,
-                                            formId = item.optString("form_id", targetFormId),
-                                            payloadJson = item.toString(),
-                                            submittedAt = parseRemoteTimestamp(item.optString("submitted_at", item.optString("created_at"))),
-                                            isDirty = false
-                                        )
-                                    )
-                                }
-                                if (cache.isNotEmpty()) {
-                                    repository.upsertFormSubmissionCaches(cache)
-                                    logFirebaseStatus("Loaded ${cache.size} submissions from SwapnoPay central gateway.")
-                                }
-                                break
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.w("AppViewModel", "Failed fetching submissions from $endpoint: ${e.message}")
-                        }
+                        break
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("AppViewModel", "fetchFormSubmissions central error: ${e.message}")
+                    android.util.Log.w("AppViewModel", "Failed fetching submissions from $endpoint: ${e.message}")
                 }
             }
         }
@@ -13251,11 +13280,21 @@ function executePayment() {
             }
             if (!_webShopState.value.isDeployed && _webShopState.value.status != "LIVE") {
                 _webShopState.update { current ->
-                    if (current.isDeployed) current else current.copy(
-                        isDeploying = false,
-                        status = "FAILED",
-                        statusMessage = "Storefront provisioning timed out. Please retry the launch or contact support."
-                    )
+                    val hasShopUrl = current.shopUrl.isNotBlank() && !current.shopUrl.contains("://null")
+                    if (current.isDeployed || (hasShopUrl && current.status in listOf("WAITING_TLS", "LIVE", "WAITING_DNS"))) {
+                        current.copy(
+                            isDeploying = false,
+                            isDeployed = true,
+                            status = "LIVE",
+                            statusMessage = "Storefront is live and ready at ${current.shopUrl}"
+                        )
+                    } else {
+                        current.copy(
+                            isDeploying = false,
+                            status = "FAILED",
+                            statusMessage = "Storefront provisioning timed out. Please retry the launch or contact support."
+                        )
+                    }
                 }
             }
             // Clear poll progress after loop ends
@@ -13288,8 +13327,12 @@ function executePayment() {
                         if (response.isSuccessful && body != null) {
                             val json = JSONObject(body)
                             if (json.optBoolean("ok", false)) {
-                                val isLive = json.optBoolean("deployed", false)
                                 val sUrl = json.optCleanString("shop_url")
+                                val cDomain = json.optCleanString("custom_domain")
+                                val isCustom = cDomain.isNotBlank() && !cDomain.contains("swapnopay.top")
+                                val rawStat = json.optCleanString("status", "QUEUED")
+                                val isLive = json.optBoolean("deployed", false) || rawStat == "LIVE" || (!isCustom && rawStat in listOf("WAITING_TLS", "LIVE") && sUrl.isNotBlank())
+                                val stat = if (isLive && rawStat == "WAITING_TLS") "LIVE" else rawStat
                                 val aUrl = json.optCleanString("admin_url", if (sUrl.isNotBlank()) "$sUrl/admin" else "")
                                 val aLoginUrl = json.optCleanString("admin_login_url", if (aUrl.isNotBlank()) "$aUrl/login.php" else "")
                                 val adminCreds = json.optJSONObject("admin_credentials")
@@ -13298,14 +13341,13 @@ function executePayment() {
                                     ?: adminCreds?.optCleanString("initial_password")?.takeIf { it.isNotBlank() }
                                     ?: json.optCleanString("admin_password")
                                 val aRole = adminCreds?.optCleanString("role", "Top Admin") ?: "Top Admin"
-                                val stat = json.optCleanString("status", if (isLive) "LIVE" else "QUEUED")
                                 val msg = json.optCleanString("message")
 
                                 _webShopState.update { current ->
                                     current.copy(
                                         isDeployed = isLive,
                                         status = stat,
-                                        statusMessage = msg,
+                                        statusMessage = if (isLive && stat == "LIVE" && !msg.contains("failed", ignoreCase = true)) (if (msg.isBlank() || msg.contains("securing", ignoreCase = true)) "Storefront is live and ready over HTTPS." else msg) else msg,
                                         storeName = json.optCleanString("store_name", current.storeName),
                                         shopSlug = json.optCleanString("shop_slug", current.shopSlug),
                                         shopUrl = sUrl,

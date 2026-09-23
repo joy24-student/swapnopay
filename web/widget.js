@@ -177,8 +177,11 @@ window.onload = function () {
 
   const amount         = params.get("amount")          || "1,500.00";
   const merchantName   = params.get("merchant_name")   || "DreamMart";
-  const receiverNumber = params.get("merchant_number") || "017XXXXXXXX";
-  merchantDefaultNumber = receiverNumber;
+  const rawReceiver    = params.get("merchant_number") || "";
+  const receiverNumber = (rawReceiver && !rawReceiver.includes("XXXX")) ? rawReceiver : "";
+  if (receiverNumber) {
+    merchantDefaultNumber = receiverNumber;
+  }
 
   const initialAccountType = params.get("account_type");
   if (initialAccountType) {
@@ -200,11 +203,13 @@ window.onload = function () {
 
   setAmountDisplay(amount);
   setMerchantNameDisplay(merchantName);
-  document.getElementById("merchant-num-display").value = receiverNumber;
+  if (receiverNumber) {
+    document.getElementById("merchant-num-display").value = receiverNumber;
+    updateQrCode(receiverNumber);
+  }
   document.getElementById("summary-order-id").innerText =
     orderId !== "demo_order_id" ? `#${orderId.slice(0, 8)}...` : "#DEMO-9912";
 
-  updateQrCode(receiverNumber);
   setLanguage("en");
   selectMFS(initialMethod, methodColorMap[initialMethod] || "#E2125A");
   goToStep(1);
@@ -399,17 +404,20 @@ function loadGatewayConfig(merchantIdParam) {
       }
 
       // ── Receiving numbers per MFS method ──
-      if (config.receiving_numbers) {
-        merchantReceivingNumbers = config.receiving_numbers;
-        if (merchantReceivingNumbers[selectedMethod]) {
-          document.getElementById("merchant-num-display").value = merchantReceivingNumbers[selectedMethod];
-          updateQrCode(merchantReceivingNumbers[selectedMethod]);
+      if (config.receiving_numbers && typeof config.receiving_numbers === 'object') {
+        merchantReceivingNumbers = { ...merchantReceivingNumbers, ...config.receiving_numbers };
+        const num = merchantReceivingNumbers[selectedMethod] || Object.values(merchantReceivingNumbers).find(v => v && !String(v).includes('XXXX')) || config.default_number;
+        if (num && !String(num).includes('XXXX')) {
+          merchantDefaultNumber = num;
+          const numInput = document.getElementById("merchant-num-display");
+          if (numInput) numInput.value = num;
+          updateQrCode(num);
         }
       }
 
       // ── Account types (Personal vs Merchant) ──
-      if (config.account_types) {
-        merchantAccountTypes = config.account_types;
+      if (config.account_types && typeof config.account_types === 'object') {
+        merchantAccountTypes = { ...merchantAccountTypes, ...config.account_types };
       }
       updateLabelsForMfs(selectedMethod);
 
@@ -1034,7 +1042,16 @@ function updateLabelsForMfs(method) {
   const urlAccType = new URLSearchParams(window.location.search).get("account_type") || "";
   const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : urlAccType.trim().toLowerCase();
   const isPersonal = accType.includes("personal");
-  const currentReceiverNum = (merchantReceivingNumbers && merchantReceivingNumbers[method]) ? merchantReceivingNumbers[method] : (document.getElementById("merchant-num-display")?.value || "");
+  const targetNum = (merchantReceivingNumbers && merchantReceivingNumbers[method] && !merchantReceivingNumbers[method].includes("XXXX"))
+    ? merchantReceivingNumbers[method]
+    : ((document.getElementById("merchant-num-display")?.value && !document.getElementById("merchant-num-display")?.value.includes("XXXX")) ? document.getElementById("merchant-num-display")?.value : (merchantDefaultNumber && !merchantDefaultNumber.includes("XXXX") ? merchantDefaultNumber : ""));
+
+  if (targetNum) {
+    const disp = document.getElementById("merchant-num-display");
+    if (disp) disp.value = targetNum;
+    updateQrCode(targetNum);
+  }
+  const currentReceiverNum = targetNum || "";
 
   if (qrCard) {
     if (isPersonal) {
@@ -1116,7 +1133,6 @@ function copyNumber() {
   const num = document.getElementById("merchant-num-display").value;
   const isPersonal = (merchantAccountTypes[selectedMethod] || '').toLowerCase() === 'personal';
   navigator.clipboard.writeText(num).then(() => {
-    alert(currentLang === "en" ? "Merchant number copied!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!");
     alert(currentLang === "en" ? (isPersonal ? "Personal number copied!" : "Merchant number copied!") : (isPersonal ? "ব্যক্তিগত নম্বরটি কপি করা হয়েছে!" : "মার্চেন্ট নম্বরটি কপি করা হয়েছে!"));
   });
 }

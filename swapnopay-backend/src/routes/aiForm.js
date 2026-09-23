@@ -137,7 +137,7 @@ REQUIRED JSON SCHEMA (return exactly this structure):
 {
   "title": "Form title (concise, under 60 chars)",
   "description": "1-2 sentence description of the form",
-  "template_key": "EVENT | EDUCATION | DONATION | APPOINTMENT | DIGITAL | CART | SINGLE_PRODUCT | MULTI_PRODUCT",
+  "template_key": "FLAGSHIP_PRODUCT | EVENT | EDUCATION | DONATION | APPOINTMENT | DIGITAL | CART | SINGLE_PRODUCT | MULTI_PRODUCT | ONLINE_MCQ_EXAM",
   "theme": {
     "primaryColorHex": "#RRGGBB",
     "backgroundColorHex": "#RRGGBB",
@@ -294,6 +294,7 @@ function generateSemanticFallbackForm(prompt, feedback = null, currentForm = nul
   const isService = /service|repair|cleaning|design|development|photography|video|agency/i.test(lc)
   const isSub = /membership|subscription|gym|fitness|club|monthly|annual/i.test(lc)
   const isClothing = /shirt|pant|dress|panjabi|shoe|cloth|fashion|tshirt|hoodie|saree/i.test(lc)
+  const isFlagship = /headphone|earphone|airpods|aura|gadget|watch|smartwatch|flagship|electronics|audio/i.test(lc)
 
   // Extract amount if present in prompt
   const amountMatch = lc.match(/(?:৳|tk|bdt|\$)\s*(\d+(?:,\d+)*(?:\.\d+)?)/i) || lc.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:৳|tk|bdt|taka|dollars|\$)/i)
@@ -582,6 +583,37 @@ function generateSemanticFallbackForm(prompt, feedback = null, currentForm = nul
           { type: 'COUPON', label: 'Voucher / Discount Code', placeholder: 'e.g. LAUNCH50', isRequired: false }
         ],
         customHtmlContent: '',
+        customCssContent: ''
+      }
+    ]
+  } else if (isFlagship) {
+    templateKey = 'FLAGSHIP_PRODUCT'
+    primaryColor = '#0D0F12'
+    buttonShape = 'ROUNDED'
+    description = `Order ${cleanTitle} online with active noise cancellation, high-fidelity sound, and instant checkout.`
+    const price = extractedAmount || 2490
+    pages = [
+      {
+        title: 'Delivery & Customer Details',
+        subtitle: 'Fill in your delivery address for instant fulfillment',
+        isCustomHtml: false,
+        fields: [
+          { type: 'NAME', label: 'Recipient Full Name', placeholder: 'e.g. Tanvir Ahmed', isRequired: true },
+          { type: 'PHONE', label: 'bKash / Nagad Contact Phone', placeholder: '01XXXXXXXXX', isRequired: true },
+          { type: 'ADDRESS', label: 'Delivery Street Address', placeholder: 'House, Road, Area, Thana', isRequired: true },
+          { type: 'SHIPPING', label: 'Delivery Speed & Area', options: ['Standard Courier — 3-5 days (৳60)', 'Express Courier — 24-48 hrs (৳120)', 'Store Pickup (Banani, Dhaka - Free)'], isRequired: true },
+          ...(hasCoupon ? [{ type: 'COUPON', label: 'Promo / Voucher Code', placeholder: 'e.g. AURA10', isRequired: false }] : []),
+          { type: 'NOTES', label: 'Delivery Instructions (Optional)', placeholder: 'e.g. Call before delivery', isRequired: false }
+        ],
+        customHtmlContent: '',
+        customCssContent: ''
+      },
+      {
+        title: 'Order Received',
+        subtitle: 'Thank you for shopping with us',
+        isCustomHtml: true,
+        fields: [],
+        customHtmlContent: `<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 54px; margin-bottom: 12px;">🎧</div><h2 style="color: #0D0F12; margin: 0 0 8px 0; font-size: 24px;">Order Placed Successfully!</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">Your order for ${cleanTitle} has been recorded and will be dispatched promptly.</p></div>`,
         customCssContent: ''
       }
     ]
