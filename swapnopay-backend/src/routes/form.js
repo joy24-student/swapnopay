@@ -215,6 +215,25 @@ function saveRoutesToDisk() {
   }
 }
 
+function loadRoutesFromDisk() {
+  try {
+    if (fs.existsSync(ROUTES_FILE)) {
+      const raw = fs.readFileSync(ROUTES_FILE, 'utf8')
+      const items = JSON.parse(raw || '[]')
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item.slug) routeBySlug.set(item.slug.toLowerCase(), item)
+          if (item.form_id) {
+            const cleanId = item.form_id.toLowerCase().replace(/-/g, '')
+            routeById.set(cleanId, item)
+            routeById.set(item.form_id.toLowerCase(), item)
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+
 function saveSubmissionsToDisk() {
   try {
     const all = []
@@ -485,6 +504,127 @@ export function formRouter(io = null) {
 
   router.patch('/forms/:slugOrId', handleUpdateForm)
   router.post('/forms/:slugOrId/update', handleUpdateForm)
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /v1/forms or GET /forms
+  // Lists payment forms for a given merchant_id (or all if omitted/admin).
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get(['/forms', '/hosted-forms'], async (req, res) => {
+    try {
+      const merchantId = String(req.query.merchant_id || req.headers['x-merchant-id'] || '').trim()
+      const formsMap = new Map()
+
+      // 1. Ensure routes loaded from disk
+      loadRoutesFromDisk()
+
+      // 2. Query in-memory route cache
+      for (const route of routeById.values()) {
+        if (!route) continue
+        const rMid = route.merchant_id || (route.payload && route.payload.merchant_id)
+        if (!merchantId || rMid === merchantId) {
+          const formId = route.form_id || (route.payload && route.payload.id)
+          if (formId && !formsMap.has(formId)) {
+            const p = route.payload || {}
+            const formObj = {
+              id: formId,
+              slug: route.slug || p.slug,
+              title: p.title || 'Hosted Payment Form',
+              description: p.description || '',
+              amount: Number(p.amount || 0),
+              status: p.status || 'PUBLISHED',
+              fields: p.fields || [],
+              products: p.products || [],
+              pages: p.pages || [],
+              theme: p.theme || {},
+              logo_url: p.logo_url || (p.theme && p.theme.logo_url) || null,
+              banner_url: p.banner_url || (p.theme && p.theme.banner_url) || null,
+              merchant_id: rMid || merchantId,
+              updated_at: route.updated_at || new Date().toISOString()
+            }
+            formsMap.set(formId, formObj)
+          }
+        }
+      }
+
+      // Also check routeBySlug for any forms not indexed by ID
+      for (const route of routeBySlug.values()) {
+        if (!route) continue
+        const rMid = route.merchant_id || (route.payload && route.payload.merchant_id)
+        if (!merchantId || rMid === merchantId) {
+          const formId = route.form_id || (route.payload && route.payload.id)
+          if (formId && !formsMap.has(formId)) {
+            const p = route.payload || {}
+            const formObj = {
+              id: formId,
+              slug: route.slug || p.slug,
+              title: p.title || 'Hosted Payment Form',
+              description: p.description || '',
+              amount: Number(p.amount || 0),
+              status: p.status || 'PUBLISHED',
+              fields: p.fields || [],
+              products: p.products || [],
+              pages: p.pages || [],
+              theme: p.theme || {},
+              logo_url: p.logo_url || (p.theme && p.theme.logo_url) || null,
+              banner_url: p.banner_url || (p.theme && p.theme.banner_url) || null,
+              merchant_id: rMid || merchantId,
+              updated_at: route.updated_at || new Date().toISOString()
+            }
+            formsMap.set(formId, formObj)
+          }
+        }
+      }
+
+      // 3. Query Admin Supabase payment_forms table if available
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          let query = admin.from('payment_forms').select('*')
+          if (merchantId) {
+            const normalizedM = normalizeUuid(merchantId) || merchantId
+            query = query.or(`merchant_id.eq.${normalizedM},merchant_id.eq.${merchantId}`)
+          }
+          const { data: dbForms, error } = await query
+          if (!error && Array.isArray(dbForms)) {
+            const parseJson = (v, fallback) => {
+              if (typeof v === 'string') {
+                try { return JSON.parse(v) } catch (_) { return fallback }
+              }
+              return v || fallback
+            }
+            for (const row of dbForms) {
+              const formObj = {
+                id: row.id,
+                slug: row.slug,
+                title: row.title || 'Hosted Payment Form',
+                description: row.description || '',
+                amount: Number(row.amount || 0),
+                status: row.status || 'PUBLISHED',
+                fields: parseJson(row.fields, []),
+                products: parseJson(row.products, []),
+                pages: parseJson(row.pages, []),
+                theme: parseJson(row.theme, {}),
+                logo_url: row.logo_url || null,
+                banner_url: row.banner_url || null,
+                merchant_id: row.merchant_id || merchantId,
+                updated_at: row.updated_at || new Date().toISOString()
+              }
+              formsMap.set(row.id, formObj)
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[form-router] Admin DB forms query notice:', dbErr.message)
+      }
+
+      const result = Array.from(formsMap.values())
+      console.log(`[form-router] Listing forms for merchant ${merchantId || 'all'}: ${result.length} found`)
+      return res.json(result)
+    } catch (err) {
+      console.error('[form-router] GET /forms Error:', err.message)
+      return res.status(500).json({ error: 'Failed to retrieve forms: ' + err.message })
+    }
+  })
 
   // ──────────────────────────────────────────────────────────────────────────
   // GET /v1/forms/:slugOrId

@@ -83,7 +83,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun getActiveSupabaseProfile(): SupabaseProfileEntity? {
-        val profile = dao.getActiveSupabaseProfile() ?: return null
+        val profile = dao.getActiveSupabaseProfile()
+            ?: dao.getSupabaseProfileById("00000000-0000-0000-0000-000000000001")
+            ?: run {
+                val platform = SupabaseProfileEntity(
+                    id = "00000000-0000-0000-0000-000000000001",
+                    businessName = "SwapnoPay Main Cloud",
+                    supabaseUrl = "https://tldubojeokgyoclxnzkb.supabase.co",
+                    anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0",
+                    serviceRoleKey = "",
+                    isActive = false
+                )
+                insertSupabaseProfile(platform)
+                return platform
+            }
         return profile.copy(
             supabaseUrl = CryptoManager.decrypt(profile.supabaseUrl),
             anonKey = CryptoManager.decrypt(profile.anonKey),
@@ -96,7 +109,6 @@ class AppRepository(private val context: Context) {
 
     private suspend fun getAuthenticatedSupabaseProfile(): SupabaseProfileEntity? {
         val profile = getActiveSupabaseProfile() ?: return null
-        activeProfileId = profile.id
         if (profile.authSessionToken.isBlank()) {
             return if (profile.supabaseUrl.isNotBlank() && profile.anonKey.isNotBlank()) profile else null
         }
@@ -246,9 +258,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncOrdersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncOrdersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -256,7 +269,7 @@ class AppRepository(private val context: Context) {
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
                 token = active.authSessionToken.ifBlank { active.anonKey },
-                merchantId = active.id,
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch orders: $err")
@@ -271,7 +284,7 @@ class AppRepository(private val context: Context) {
                 val obj = resultData!!.getJSONObject(i)
                 val order = CachedOrderEntity(
                     id = obj.getString("id"),
-                    merchantId = active.id,
+                    merchantId = effectiveMid,
                     customerName = obj.optString("cus_name", "Anonymous"),
                     customerPhone = obj.getString("cus_phone"),
                     amount = obj.getDouble("amount"),
@@ -289,9 +302,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncPaymentsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncPaymentsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile()
         var didSyncAny = false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
             var resultData: org.json.JSONArray? = null
@@ -300,7 +314,7 @@ class AppRepository(private val context: Context) {
                     url = active.supabaseUrl,
                     anonKey = active.anonKey,
                     token = active.authSessionToken.ifBlank { active.anonKey },
-                    merchantId = active.id,
+                    merchantId = effectiveMid,
                     onSuccess = { jsonArray -> resultData = jsonArray },
                     onFailure = { err ->
                         android.util.Log.e("AppRepository", "Failed to fetch payments: $err")
@@ -315,7 +329,7 @@ class AppRepository(private val context: Context) {
                     val obj = resultData!!.getJSONObject(i)
                     val payment = CachedPaymentEntity(
                         id = obj.optString("trx_id", obj.getString("id")),
-                        merchantId = active.id,
+                        merchantId = effectiveMid,
                         amount = obj.getDouble("amount"),
                         sender = obj.optString("sender_number", "Unknown"),
                         timestamp = parseIsoDateToMillis(obj.optString("sms_timestamp", obj.optString("created_at"))),
@@ -373,9 +387,10 @@ class AppRepository(private val context: Context) {
         didSyncAny
     }
 
-    suspend fun syncAppealsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncAppealsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -398,7 +413,7 @@ class AppRepository(private val context: Context) {
                 val order = obj.optJSONObject("orders")
                 val appeal = AppealEntity(
                     id = obj.getString("id"),
-                    merchantId = active.id,
+                    merchantId = effectiveMid,
                     orderId = obj.optString("order_id", ""),
                     amount = order?.optDouble("amount", 0.0) ?: 0.0,
                     customerName = order?.optString("cus_name", "Payer") ?: "Payer",
@@ -415,9 +430,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncDevicesFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncDevicesFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -441,7 +457,7 @@ class AppRepository(private val context: Context) {
                 devices.add(
                     DeviceInfoEntity(
                         id = obj.getString("id"),
-                        merchantId = active.id,
+                        merchantId = effectiveMid,
                         deviceName = obj.optString("device_model", "Unknown Device"),
                         status = if (obj.optBoolean("online", true)) "ONLINE" else "OFFLINE",
                         batteryLevel = obj.optInt("battery_level", 100),
@@ -449,7 +465,7 @@ class AppRepository(private val context: Context) {
                     )
                 )
             }
-            dao.clearDevices(active.id)
+            dao.clearDevices(effectiveMid)
             dao.insertDevices(devices)
             true
         } else {
@@ -1049,9 +1065,10 @@ class AppRepository(private val context: Context) {
         uploadProductToSupabase(product)
     }
 
-    suspend fun syncProductsFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncProductsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1074,12 +1091,12 @@ class AppRepository(private val context: Context) {
             val products = mutableListOf<ProductItemEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     products.add(
                         ProductItemEntity(
                             id = obj.getString("id"),
-                            merchantId = active.id,
+                            merchantId = effectiveMid,
                             name = obj.getString("name"),
                             code = obj.optString("code", null),
                             category = obj.optString("category", "General"),
@@ -1166,9 +1183,10 @@ class AppRepository(private val context: Context) {
         success
     }
 
-    suspend fun syncCustomersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncCustomersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1191,12 +1209,12 @@ class AppRepository(private val context: Context) {
             val customers = mutableListOf<CustomerEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     customers.add(
                         CustomerEntity(
                             id = obj.getString("id"),
-                            merchantId = active.id,
+                            merchantId = effectiveMid,
                             name = obj.getString("name"),
                             phone = obj.optString("phone", ""),
                             email = if (obj.isNull("email")) null else obj.optString("email"),
@@ -1219,9 +1237,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncSuppliersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncSuppliersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1244,12 +1263,12 @@ class AppRepository(private val context: Context) {
             val suppliers = mutableListOf<SupplierEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     suppliers.add(
                         SupplierEntity(
                             id = obj.getString("id"),
-                            merchantId = active.id,
+                            merchantId = effectiveMid,
                             name = obj.getString("name"),
                             phone = obj.optString("phone", ""),
                             email = if (obj.isNull("email")) null else obj.optString("email"),
@@ -1271,9 +1290,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncLedgerFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncLedgerFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1296,12 +1316,12 @@ class AppRepository(private val context: Context) {
             val txs = mutableListOf<LedgerTransactionEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     txs.add(
                         LedgerTransactionEntity(
                             id = obj.getString("id"),
-                            merchantId = active.id,
+                            merchantId = effectiveMid,
                             customerId = if (obj.isNull("customer_id") || obj.optString("customer_id").isBlank()) null else obj.optString("customer_id"),
                             supplierId = if (obj.isNull("supplier_id") || obj.optString("supplier_id").isBlank()) null else obj.optString("supplier_id"),
                             type = obj.optString("type", "credit"),
@@ -1327,9 +1347,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncPosSalesFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncPosSalesFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1352,12 +1373,12 @@ class AppRepository(private val context: Context) {
             val sales = mutableListOf<PosSaleEntity>()
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
                     sales.add(
                         PosSaleEntity(
                             id = obj.getString("id"),
-                            merchantId = active.id,
+                            merchantId = effectiveMid,
                             invoiceNo = obj.optString("invoice_no", "INV-${obj.optString("id").takeLast(6)}"),
                             customerId = if (obj.isNull("customer_id") || obj.optString("customer_id").isBlank()) null else obj.optString("customer_id"),
                             customerName = obj.optString("customer_name", "Walk-in Customer"),
@@ -1386,9 +1407,10 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncMerchantNumbersFromSupabase(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun syncMerchantNumbersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
@@ -1410,19 +1432,20 @@ class AppRepository(private val context: Context) {
         if (resultData != null) {
             for (i in 0 until resultData!!.length()) {
                 val obj = resultData!!.getJSONObject(i)
-                val merchantId = obj.optString("merchant_id").ifBlank { active.id }
-                if (merchantId == active.id) {
-                    val numStr = obj.optString("number")
-                    if (numStr.isNotBlank()) {
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
+                    val rawNum = obj.optString("number")
+                    val numStr = rawNum.filter(Char::isDigit)
+                    if (numStr.length in 10..15) {
                         dao.upsertMerchantNumber(
                             MerchantNumberEntity(
                                 number = numStr,
-                                merchantId = active.id,
-                                method = obj.optString("type", "bKash"),
+                                merchantId = effectiveMid,
+                                method = obj.optString("type").ifBlank { obj.optString("method", "bKash") },
                                 accountType = obj.optString("account_type", "Personal"),
                                 isActive = obj.optBoolean("active", true),
                                 isDefault = obj.optBoolean("is_default", false),
-                                qrCodeUrl = if (obj.isNull("qr_code_url")) null else obj.optString("qr_code_url"),
+                                qrCodeUrl = if (obj.isNull("qr_code_url")) null else obj.optString("qr_code_url").takeIf { it.isNotBlank() },
                                 updatedAt = parseIsoDateToMillis(obj.optString("created_at"))
                             )
                         )

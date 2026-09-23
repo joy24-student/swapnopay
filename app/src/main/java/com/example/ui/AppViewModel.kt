@@ -666,6 +666,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshGatewayConfig() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            pullMerchantConfigFromBackendDirect(_activeProfile.value.id)
             val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) }
                 ?: _activeSupabaseProfile.value
                 ?: repository.getActiveSupabaseProfile()
@@ -737,6 +738,116 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 onFailure = { _gatewayServiceStatus.value = "Receipt worker health check unavailable: $it" }
             )
             fetchMerchantApiKey()
+        }
+    }
+
+    suspend fun pullMerchantConfigFromBackendDirect(merchantId: String = activeProfile.value.id) {
+        val effectiveMid = merchantId.ifBlank { activeProfile.value.id }
+        if (effectiveMid.isBlank()) return
+        try {
+            val encMid = java.net.URLEncoder.encode(effectiveMid, "UTF-8")
+            val endpoints = listOf(
+                "https://api.swapnopay.top/v1/payment/merchant-config?merchant_id=$encMid",
+                "https://api.swapnopay.top/v1/payment/config?merchant_id=$encMid"
+            )
+            for (endpoint in endpoints) {
+                try {
+                    val url = java.net.URL(endpoint)
+                    val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        connectTimeout = 8000
+                        readTimeout = 8000
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("x-merchant-id", effectiveMid)
+                        setRequestProperty("x-device-id", installationId)
+                        if (_merchantApiKey.value.isNotBlank()) {
+                            setRequestProperty("x-api-key", _merchantApiKey.value)
+                        }
+                        val token = _activeSupabaseProfile.value?.authSessionToken
+                        if (!token.isNullOrBlank()) {
+                            setRequestProperty("Authorization", "Bearer $token")
+                        }
+                    }
+                    if (conn.responseCode in 200..299) {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        val root = org.json.JSONObject(body)
+                        val configObj = if (root.has("config")) root.optJSONObject("config") else root
+                        if (configObj != null) {
+                            val receivingNums = configObj.optJSONObject("receiving_numbers")
+                            val accountTypes = configObj.optJSONObject("account_types")
+                            val qrCodes = configObj.optJSONObject("qr_codes")
+
+                            if (receivingNums != null && receivingNums.length() > 0) {
+                                val keys = receivingNums.keys()
+                                while (keys.hasNext()) {
+                                    val methodKey = keys.next()
+                                    val rawNumber = receivingNums.optString(methodKey, "")
+                                    val normalized = rawNumber.filter(Char::isDigit)
+                                    if (normalized.length in 10..15) {
+                                        val normMethod = when (methodKey.lowercase()) {
+                                            "bkash" -> "bKash"
+                                            "nagad" -> "Nagad"
+                                            "rocket" -> "Rocket"
+                                            "upay" -> "Upay"
+                                            else -> methodKey
+                                        }
+                                        val accType = accountTypes?.optString(methodKey, "Personal")?.ifBlank { "Personal" } ?: "Personal"
+                                        val qrUrl = qrCodes?.optNullableString(methodKey)
+                                        val isMethodActive = when (normMethod.lowercase()) {
+                                            "bkash" -> configObj.optBoolean("bkash_enabled", true)
+                                            "nagad" -> configObj.optBoolean("nagad_enabled", true)
+                                            "rocket" -> configObj.optBoolean("rocket_enabled", true)
+                                            "upay" -> configObj.optBoolean("upay_enabled", true)
+                                            else -> true
+                                        }
+                                        val entity = MerchantNumberEntity(
+                                            number = normalized,
+                                            merchantId = effectiveMid,
+                                            method = normMethod,
+                                            accountType = accType,
+                                            isActive = isMethodActive,
+                                            isDefault = false,
+                                            qrCodeUrl = qrUrl,
+                                            updatedAt = System.currentTimeMillis()
+                                        )
+                                        repository.upsertMerchantNumber(entity)
+                                    }
+                                }
+                            }
+
+                            // Update GatewayConfig from backend
+                            val current = _gatewayConfig.value
+                            val minAmt = configObj.optDouble("min_amount", current.minAmount)
+                            val maxAmt = configObj.optDouble("max_amount", current.maxAmount)
+                            val dailyLim = configObj.optDouble("daily_limit", current.dailyLimit)
+                            val updatedMethods = current.activeMethods.toMutableMap().apply {
+                                if (configObj.has("bkash_enabled")) put("bKash", configObj.optBoolean("bkash_enabled"))
+                                if (configObj.has("nagad_enabled")) put("Nagad", configObj.optBoolean("nagad_enabled"))
+                                if (configObj.has("rocket_enabled")) put("Rocket", configObj.optBoolean("rocket_enabled"))
+                                if (configObj.has("upay_enabled")) put("Upay", configObj.optBoolean("upay_enabled"))
+                            }
+                            val newGatewayConfig = current.copy(
+                                minAmount = minAmt,
+                                maxAmount = maxAmt,
+                                dailyLimit = dailyLim,
+                                activeMethods = updatedMethods
+                            )
+                            _gatewayConfig.value = newGatewayConfig
+                            break
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("AppViewModel", "Endpoint $endpoint fetch notice: ${e.message}")
+                }
+            }
+        } catch (outer: Exception) {
+            android.util.Log.e("AppViewModel", "pullMerchantConfigFromBackend error: ${outer.message}")
+        }
+    }
+
+    fun pullMerchantConfigFromBackend(merchantId: String = activeProfile.value.id) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            pullMerchantConfigFromBackendDirect(merchantId)
         }
     }
 
@@ -3515,7 +3626,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val merchantNumbers: StateFlow<List<MerchantNumber>> = activeProfile
         .flatMapLatest { profile -> repository.observeMerchantNumbers(profile.id) }
         .map { rows ->
-            rows.map { MerchantNumber(it.number, it.method, it.accountType, it.isActive, it.isDefault) }
+            rows.distinctBy { it.number }.map { MerchantNumber(it.number, it.method, it.accountType, it.isActive, it.isDefault, it.qrCodeUrl) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -9414,11 +9525,13 @@ function executePayment() {
     }
 
     private suspend fun syncMerchantNumberToSupabase(entity: MerchantNumberEntity) {
-        val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) } ?: return
+        val rawActive = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+        val active = validSupabaseSession(rawActive) ?: rawActive
         if (active.supabaseUrl.isBlank() || active.anonKey.isBlank()) return
         val id = merchantNumberRemoteId(entity.merchantId, entity.number)
         val payload = org.json.JSONObject().apply {
             put("id", id)
+            put("merchant_id", entity.merchantId)
             put("number", entity.number)
             put("type", entity.method)
             put("account_type", entity.accountType)
@@ -9989,11 +10102,13 @@ function executePayment() {
                 for (number in numbers) {
                     val json = org.json.JSONObject().apply {
                         put("id", merchantNumberRemoteId(number.merchantId, number.number))
+                        put("merchant_id", number.merchantId)
                         put("number", number.number)
                         put("type", number.method)
                         put("account_type", number.accountType)
                         put("active", number.isActive)
                         put("is_default", number.isDefault)
+                        put("qr_code_url", number.qrCodeUrl ?: org.json.JSONObject.NULL)
                     }
                     upsertRemoteOrThrow(url, key, token, "merchant_numbers", json)
                 }
@@ -10056,39 +10171,92 @@ function executePayment() {
     }
 
     fun fetchPaymentForms() {
-        val configuredProfile = _activeSupabaseProfile.value ?: return
-        if (configuredProfile.supabaseUrl.isEmpty() || configuredProfile.anonKey.isEmpty()) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val active = validSupabaseSession(configuredProfile) ?: return@launch
+            val configuredProfile = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+            val active = if (configuredProfile.supabaseUrl.isNotBlank() && configuredProfile.anonKey.isNotBlank()) {
+                validSupabaseSession(configuredProfile) ?: configuredProfile
+            } else null
+
             val dirtyIds = repository.observePaymentFormCache(activeProfile.value.id).firstOrNull()
                 .orEmpty().filter(PaymentFormCacheEntity::isDirty).mapTo(mutableSetOf(), PaymentFormCacheEntity::id)
-            com.example.data.remote.SupabaseClient.fetchPaymentForms(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
-                token = active.authSessionToken,
-                onSuccess = { jsonArray ->
-                    val cache = mutableListOf<PaymentFormCacheEntity>()
-                    for (i in 0 until jsonArray.length()) {
-                        val item = jsonArray.getJSONObject(i)
-                        if (item.optString("id") in dirtyIds) continue
-                        cache.add(
-                            PaymentFormCacheEntity(
-                                id = item.getString("id"),
-                                merchantId = activeProfile.value.id,
-                                payloadJson = item.toString(),
-                                updatedAt = parseRemoteTimestamp(item.optString("updated_at")),
-                                isDirty = false
+
+            // 1. If custom or platform Supabase profile exists, query payment_forms table
+            if (active != null && active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+                com.example.data.remote.SupabaseClient.fetchPaymentForms(
+                    url = active.supabaseUrl,
+                    anonKey = active.anonKey,
+                    token = active.authSessionToken.ifBlank { active.anonKey },
+                    merchantId = activeProfile.value.id,
+                    onSuccess = { jsonArray ->
+                        val cache = mutableListOf<PaymentFormCacheEntity>()
+                        for (i in 0 until jsonArray.length()) {
+                            val item = jsonArray.getJSONObject(i)
+                            if (item.optString("id") in dirtyIds) continue
+                            cache.add(
+                                PaymentFormCacheEntity(
+                                    id = item.getString("id"),
+                                    merchantId = activeProfile.value.id,
+                                    payloadJson = item.toString(),
+                                    updatedAt = parseRemoteTimestamp(item.optString("updated_at")),
+                                    isDirty = false
+                                )
                             )
-                        )
+                            viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                loadCachedPaymentForm(item, autoSelect = false)
+                            }
+                        }
+                        if (cache.isNotEmpty()) {
+                            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                repository.upsertPaymentFormCaches(cache)
+                            }
+                        }
+                    },
+                    onFailure = { err ->
+                        logFirebaseStatus("Notice loading payment forms: $err")
                     }
-                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                )
+            }
+
+            // 2. Central VPS Router query: GET https://api.swapnopay.top/v1/forms?merchant_id=${activeProfile.value.id}
+            try {
+                val vpsUrl = "https://api.swapnopay.top/v1/forms?merchant_id=${activeProfile.value.id}"
+                val conn = java.net.URL(vpsUrl).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty("x-merchant-id", activeProfile.value.id)
+                if (active?.authSessionToken?.isNotBlank() == true) {
+                    conn.setRequestProperty("Authorization", "Bearer ${active.authSessionToken}")
+                }
+                if (conn.responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val arr = org.json.JSONArray(body)
+                    val cache = mutableListOf<PaymentFormCacheEntity>()
+                    for (i in 0 until arr.length()) {
+                        val formObj = arr.getJSONObject(i)
+                        val fid = formObj.optString("id")
+                        if (fid.isNotBlank() && fid !in dirtyIds) {
+                            cache.add(
+                                PaymentFormCacheEntity(
+                                    id = fid,
+                                    merchantId = activeProfile.value.id,
+                                    payloadJson = formObj.toString(),
+                                    updatedAt = parseRemoteTimestamp(formObj.optString("updated_at")),
+                                    isDirty = false
+                                )
+                            )
+                            viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                loadCachedPaymentForm(formObj, autoSelect = false)
+                            }
+                        }
+                    }
+                    if (cache.isNotEmpty()) {
                         repository.upsertPaymentFormCaches(cache)
                     }
-                },
-                onFailure = { err ->
-                    logFirebaseStatus("Error loading payment forms: $err")
                 }
-            )
+            } catch (vpsErr: Exception) {
+                android.util.Log.w("AppViewModel", "VPS forms fetch note: ${vpsErr.message}")
+            }
         }
     }
 
@@ -10209,8 +10377,8 @@ function executePayment() {
     }
 
     /** Pulls every Room-backed business screen from the authenticated tenant. */
-    private suspend fun pullAllBusinessDataFromSupabase(profile: SupabaseProfileEntity): Int {
-        val merchantId = activeProfile.value.id
+    private suspend fun pullAllBusinessDataFromSupabase(profile: SupabaseProfileEntity, targetMerchantId: String = activeProfile.value.id): Int {
+        val merchantId = targetMerchantId.ifBlank { activeProfile.value.id }
         var failures = 0
 
         suspend fun syncTable(name: String, applyRows: suspend (org.json.JSONArray) -> Unit) {
@@ -10417,14 +10585,25 @@ function executePayment() {
         }
         syncTable("merchant_numbers") { rows ->
             rows.forEachJsonObject { item ->
-                repository.upsertMerchantNumber(
-                    MerchantNumberEntity(
-                        number = item.optString("number"), merchantId = merchantId, method = item.optString("type"),
-                        accountType = item.optString("account_type", "Personal"), isActive = item.optBoolean("active", true),
-                        isDefault = item.optBoolean("is_default", false), qrCodeUrl = item.optNullableString("qr_code_url"),
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
+                val rowMid = item.optString("merchant_id")
+                if (rowMid.isBlank() || rowMid == merchantId) {
+                    val rawNum = item.optString("number")
+                    val numStr = rawNum.filter(Char::isDigit)
+                    if (numStr.length in 10..15) {
+                        repository.upsertMerchantNumber(
+                            MerchantNumberEntity(
+                                number = numStr,
+                                merchantId = merchantId,
+                                method = item.optString("type").ifBlank { item.optString("method", "bKash") },
+                                accountType = item.optString("account_type", "Personal"),
+                                isActive = item.optBoolean("active", true),
+                                isDefault = item.optBoolean("is_default", false),
+                                qrCodeUrl = item.optNullableString("qr_code_url"),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
             }
         }
         return failures
@@ -10440,6 +10619,7 @@ function executePayment() {
     fun pullAllMerchantDataFromRemote(merchantId: String = activeProfile.value.id) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                val effectiveMid = merchantId.ifBlank { activeProfile.value.id }
                 logFirebaseStatus("Pulling merchant data from cloud databases...")
                 // 1. Refresh merchant KYC status from backend and Supabase
                 refreshMerchantKycStatus()
@@ -10448,23 +10628,27 @@ function executePayment() {
                 fetchPaymentForms()
                 fetchFormSubmissions()
 
-                // 3. Pull business data from Supabase (customers, suppliers, products, ledgers, pos, etc.)
-                val targetProfile = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+                // 3. Pull merchant config and receiving numbers from SwapnoPay central backend
+                pullMerchantConfigFromBackendDirect(effectiveMid)
+
+                // 4. Pull business data from Supabase (customers, suppliers, products, ledgers, pos, etc.)
+                val rawTarget = _activeSupabaseProfile.value ?: getOrCreatePlatformSupabaseProfile()
+                val targetProfile = validSupabaseSession(rawTarget) ?: rawTarget
                 if (targetProfile.supabaseUrl.isNotBlank() && targetProfile.anonKey.isNotBlank()) {
-                    pullAllBusinessDataFromSupabase(targetProfile)
+                    pullAllBusinessDataFromSupabase(targetProfile, effectiveMid)
                 }
 
-                // 4. Also run repository sync routines as resilient fallbacks
-                repository.syncCustomersFromSupabase()
-                repository.syncSuppliersFromSupabase()
-                repository.syncProductsFromSupabase()
-                repository.syncLedgerFromSupabase()
-                repository.syncPosSalesFromSupabase()
-                repository.syncMerchantNumbersFromSupabase()
-                repository.syncOrdersFromSupabase()
-                repository.syncPaymentsFromSupabase()
-                repository.syncAppealsFromSupabase()
-                repository.syncDevicesFromSupabase()
+                // 5. Also run repository sync routines as resilient fallbacks
+                repository.syncCustomersFromSupabase(effectiveMid)
+                repository.syncSuppliersFromSupabase(effectiveMid)
+                repository.syncProductsFromSupabase(effectiveMid)
+                repository.syncLedgerFromSupabase(effectiveMid)
+                repository.syncPosSalesFromSupabase(effectiveMid)
+                repository.syncMerchantNumbersFromSupabase(effectiveMid)
+                repository.syncOrdersFromSupabase(effectiveMid)
+                repository.syncPaymentsFromSupabase(effectiveMid)
+                repository.syncAppealsFromSupabase(effectiveMid)
+                repository.syncDevicesFromSupabase(effectiveMid)
 
                 logFirebaseStatus("Merchant data synchronization complete.")
             } catch (e: Exception) {

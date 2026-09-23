@@ -2,11 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { formRouter, handleFormPaymentPaid, parseAmountFromText, orderToFormSubmissionMap, isProductRoute } from './form.js'
+import { paymentRouter } from './payment.js'
 
 function createTestApp() {
   const app = express()
   app.use(express.json())
   app.use('/v1', formRouter(null))
+  app.use('/v1/payment', paymentRouter(null))
   return app
 }
 
@@ -329,6 +331,25 @@ test('Form Router: Registration, Resolution, and Submissions', async (t) => {
     assert.equal(isProductRoute('aura-pro'), true)
     assert.equal(isProductRoute('flagship-product-uuid-005'), true)
     assert.equal(isProductRoute('conference-2026'), false)
+  })
+
+  await t.test('12. GET /forms and GET /payment/merchant-config return merchant forms and receiving numbers dynamically', async () => {
+    // 1. Fetch forms for merchant-test-123
+    const formsRes = await fetch(`${baseUrl}/forms?merchant_id=merchant-test-123`)
+    assert.equal(formsRes.status, 200)
+    const forms = await formsRes.json()
+    assert.ok(Array.isArray(forms))
+    const found = forms.find(f => f.id === 'flagship-product-uuid-005' || f.slug === 'flagship-aura-pro-live')
+    assert.ok(found, 'Merchant form should be listed by GET /forms')
+    assert.equal(found.title, 'Aura Pro Wireless Headphones')
+
+    // 2. Fetch merchant gateway config
+    const configRes = await fetch(`${baseUrl}/payment/merchant-config?merchant_id=merchant-test-123`)
+    assert.equal(configRes.status, 200)
+    const configData = await configRes.json()
+    assert.equal(configData.ok, true)
+    assert.equal(configData.merchant_id, 'merchant-test-123')
+    assert.ok(configData.config !== undefined)
   })
 })
 

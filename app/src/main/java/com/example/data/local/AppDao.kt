@@ -139,7 +139,7 @@ interface AppDao {
     suspend fun reassignAnalytics(oldId: String, newId: String)
     @Query("UPDATE employees SET merchantId = :newId WHERE merchantId = :oldId")
     suspend fun reassignEmployees(oldId: String, newId: String)
-    @Query("UPDATE merchant_numbers SET merchantId = :newId WHERE merchantId = :oldId")
+    @Query("UPDATE OR IGNORE merchant_numbers SET merchantId = :newId WHERE merchantId = :oldId")
     suspend fun reassignMerchantNumbers(oldId: String, newId: String)
     @Query("UPDATE payment_form_cache SET merchantId = :newId WHERE merchantId = :oldId")
     suspend fun reassignPaymentForms(oldId: String, newId: String)
@@ -631,10 +631,10 @@ interface AppDao {
     suspend fun deleteEmployee(id: String)
 
     // Merchant payment numbers
-    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId ORDER BY isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     fun observeMerchantNumbers(merchantId: String): Flow<List<MerchantNumberEntity>>
 
-    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId ORDER BY isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

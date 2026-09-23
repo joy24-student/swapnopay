@@ -14624,6 +14624,10 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
     var selectedTab by remember { mutableStateOf("All") }
     var showAddNumberDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        viewModel.pullMerchantConfigFromBackend()
+    }
+
     // Filtered numbers based on selection
     val filteredNumbers = remember(numbers, selectedTab) {
         if (selectedTab == "All") {

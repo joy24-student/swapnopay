@@ -363,6 +363,41 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   })
 
   // ──────────────────────────────────────────────────────────────────────────
+  // GET /v1/payment/merchant-config
+  // Retrieves merchant gateway setup, receiving numbers, account types,
+  // and QR codes for mobile app and web setup screen.
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get('/merchant-config', async (req, res) => {
+    try {
+      const merchantId = String(req.query.merchant_id || req.headers['x-merchant-id'] || '').trim()
+      if (!merchantId) {
+        return res.status(400).json({ ok: false, error: 'merchant_id is required' })
+      }
+
+      let config = {}
+      try {
+        config = await getMerchantGatewayConfig(merchantId, heartbeatMap)
+      } catch (cfgErr) {
+        console.warn('[merchant-config] Config load notice:', cfgErr.message)
+        config = {
+          merchant_id: merchantId,
+          receiving_numbers: {},
+          account_types: {},
+          qr_codes: {},
+          bkash_enabled: true,
+          nagad_enabled: true,
+          rocket_enabled: true,
+          upay_enabled: true
+        }
+      }
+      return res.json({ ok: true, merchant_id: merchantId, config })
+    } catch (err) {
+      console.error('[merchant-config] GET Error:', err.message)
+      return res.status(500).json({ ok: false, error: 'Failed to fetch merchant config: ' + err.message })
+    }
+  })
+
+  // ──────────────────────────────────────────────────────────────────────────
   // POST /v1/payment/merchant-config
   // Merchant Gateway Setup Screen — customise receiving numbers, enabled
   // payment options, redirect URLs, and auto-appeal settings.
