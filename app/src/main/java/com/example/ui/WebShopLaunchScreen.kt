@@ -62,34 +62,78 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
     }
 
     LaunchedEffect(webShopState, activeProfile) {
-        if (webShopState.storeName.isNotBlank()) {
-            storeName = webShopState.storeName
-        } else if (storeName.isBlank()) {
+        val sName = webShopState.storeName.trim()
+        if (sName.isNotBlank() && !sName.equals("null", ignoreCase = true)) {
+            storeName = sName
+        } else if (storeName.isBlank() || storeName.equals("null", ignoreCase = true)) {
             storeName = activeProfile.businessName.ifBlank { "My Web Store" }
         }
-        if (webShopState.shopSlug.isNotBlank()) {
-            storeSubdomain = webShopState.shopSlug
-        } else if (storeSubdomain.isBlank()) {
+        val sSlug = webShopState.shopSlug.trim().lowercase()
+        if (sSlug.isNotBlank() && !sSlug.equals("null", ignoreCase = true)) {
+            storeSubdomain = sSlug
+        } else if (storeSubdomain.isBlank() || storeSubdomain.equals("null", ignoreCase = true)) {
             storeSubdomain = activeProfile.businessName.lowercase().replace(Regex("[^a-z0-9]"), "").take(16).ifBlank { "myshop" }
         }
-        if (webShopState.customDomain.isNotBlank()) {
-            customDomain = webShopState.customDomain
+        val cDomain = webShopState.customDomain.trim()
+        if (cDomain.isNotBlank() && !cDomain.equals("null", ignoreCase = true) && !cDomain.equals("undefined", ignoreCase = true)) {
+            customDomain = cDomain
+        } else if (customDomain.equals("null", ignoreCase = true) || customDomain.equals("undefined", ignoreCase = true)) {
+            customDomain = ""
         }
-        if (webShopState.adminEmail.isNotBlank()) {
-            adminEmailInput = webShopState.adminEmail
-        } else if (adminEmailInput.isBlank()) {
+        val aEmail = webShopState.adminEmail.trim()
+        if (aEmail.isNotBlank() && !aEmail.equals("null", ignoreCase = true)) {
+            adminEmailInput = aEmail
+        } else if (adminEmailInput.isBlank() || adminEmailInput.equals("null", ignoreCase = true)) {
             adminEmailInput = activeProfile.email.ifBlank { "admin@myshop.com" }
         }
-        if (webShopState.adminPassword.isNotBlank()) {
-            adminPasswordInput = webShopState.adminPassword
+        val aPass = webShopState.adminPassword.trim()
+        if (aPass.isNotBlank() && !aPass.equals("null", ignoreCase = true)) {
+            adminPasswordInput = aPass
         }
     }
 
-    val freePlatformUrl = "https://shop.swapnopay.top/${storeSubdomain.ifBlank { "store" }}"
-    val isPlatformDomain = customDomain.isBlank() || customDomain.contains("swapnopay.top")
+    val cleanCustomDomain = remember(customDomain) {
+        val trimmed = customDomain.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .trim('/')
+        if (trimmed.isBlank() ||
+            trimmed.equals("null", ignoreCase = true) ||
+            trimmed.equals("undefined", ignoreCase = true) ||
+            trimmed.contains("swapnopay.top") ||
+            !trimmed.contains(".")
+        ) {
+            ""
+        } else {
+            trimmed
+        }
+    }
+
+    val cleanShopUrl = remember(webShopState.shopUrl) {
+        val trimmed = webShopState.shopUrl.trim()
+        if (trimmed.isBlank() ||
+            trimmed.equals("null", ignoreCase = true) ||
+            trimmed.contains("://null") ||
+            trimmed.equals("https://", ignoreCase = true) ||
+            trimmed.equals("http://", ignoreCase = true) ||
+            trimmed.equals("undefined", ignoreCase = true)
+        ) {
+            ""
+        } else {
+            trimmed
+        }
+    }
+
+    val cleanSubdomain = remember(storeSubdomain) {
+        val trimmed = storeSubdomain.trim().lowercase()
+        if (trimmed.isBlank() || trimmed.equals("null", ignoreCase = true)) "store" else trimmed
+    }
+
+    val freePlatformUrl = "https://shop.swapnopay.top/$cleanSubdomain"
+    val isPlatformDomain = cleanCustomDomain.isBlank()
     val effectiveUrl = when {
-        customDomain.isNotBlank() && !customDomain.contains("swapnopay.top") -> "https://${customDomain.trim()}"
-        webShopState.shopUrl.isNotBlank() -> webShopState.shopUrl
+        cleanCustomDomain.isNotBlank() -> "https://$cleanCustomDomain"
+        cleanShopUrl.isNotBlank() -> cleanShopUrl
         else -> freePlatformUrl
     }
 
@@ -245,7 +289,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                         viewModel.deployWebShop(
                                             storeName = storeName.ifBlank { "My Store" },
                                             shopSlug = storeSubdomain.ifBlank { "store" },
-                                            customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
+                                            customDomain = if (cleanCustomDomain.contains(".") && !cleanCustomDomain.contains("swapnopay.top")) cleanCustomDomain else "",
                                             primaryCurrency = primaryCurrency,
                                             adminEmail = adminEmailInput,
                                             adminPassword = adminPasswordInput
@@ -314,7 +358,100 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                 }
                             }
 
-                            if (webShopState.statusMessage.isNotBlank()) {
+                            val isLaunchFailed = webShopState.status == "FAILED" ||
+                                (!webShopState.isDeployed && !webShopState.isDeploying && webShopState.statusMessage.isNotBlank() &&
+                                    (webShopState.statusMessage.contains("fail", ignoreCase = true) ||
+                                     webShopState.statusMessage.contains("error", ignoreCase = true) ||
+                                     webShopState.statusMessage.contains("timed out", ignoreCase = true) ||
+                                     webShopState.statusMessage.contains("timeout", ignoreCase = true) ||
+                                     webShopState.statusMessage.contains("sign in", ignoreCase = true) ||
+                                     webShopState.statusMessage.contains("registered merchant", ignoreCase = true)))
+
+                            if (isLaunchFailed) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFEF4444).copy(alpha = 0.10f),
+                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = Color(0xFFDC2626),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Text(
+                                                text = "Launch Issue Detected",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.5.sp,
+                                                color = Color(0xFFDC2626)
+                                            )
+                                        }
+
+                                        Text(
+                                            text = webShopState.statusMessage.ifBlank { "Could not complete web shop launch. Please check your credentials or try again." },
+                                            fontSize = 12.sp,
+                                            color = primaryText,
+                                            lineHeight = 17.sp
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    viewModel.deployWebShop(
+                                                        storeName = storeName.ifBlank { "My Store" },
+                                                        shopSlug = storeSubdomain.ifBlank { "store" },
+                                                        customDomain = if (cleanCustomDomain.contains(".") && !cleanCustomDomain.contains("swapnopay.top")) cleanCustomDomain else "",
+                                                        primaryCurrency = primaryCurrency,
+                                                        adminEmail = adminEmailInput,
+                                                        adminPassword = adminPasswordInput
+                                                    ) { _, msg ->
+                                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                                    }
+                                                },
+                                                enabled = !webShopState.isDeploying,
+                                                modifier = Modifier.weight(1f).height(38.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = Color(0xFFDC2626)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp)
+                                            ) {
+                                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = Color.White)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Retry Launch", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.navigateTo("Support")
+                                                },
+                                                modifier = Modifier.weight(1f).height(38.dp),
+                                                border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.5f)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp)
+                                            ) {
+                                                Icon(Icons.Default.Headphones, null, modifier = Modifier.size(15.dp), tint = Color(0xFFDC2626))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Contact Support", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (webShopState.statusMessage.isNotBlank()) {
                                 val displayBannerMsg = if (webShopState.status == "WAITING_DNS" && isPlatformDomain) {
                                     "⚡ Free instant hosting active! Securing SSL certificate for $effectiveUrl..."
                                 } else {
@@ -390,7 +527,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                         viewModel.deployWebShop(
                                             storeName = storeName.ifBlank { "My Store" },
                                             shopSlug = storeSubdomain.ifBlank { "store" },
-                                            customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
+                                            customDomain = if (cleanCustomDomain.contains(".") && !cleanCustomDomain.contains("swapnopay.top")) cleanCustomDomain else "",
                                             primaryCurrency = primaryCurrency,
                                             adminEmail = adminEmailInput,
                                             adminPassword = adminPasswordInput
@@ -415,14 +552,14 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
 
             // ── DEDICATED CUSTOM DOMAIN CARD (নিজস্ব ডোমেইন সংযোগ) ──
             item {
-                var domainInput by remember(customDomain) { mutableStateOf(customDomain) }
+                var domainInput by remember(cleanCustomDomain) { mutableStateOf(cleanCustomDomain) }
                 var isBindingDomain by remember { mutableStateOf(false) }
                 var showDnsGuide by remember { mutableStateOf(false) }
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = cardBg,
-                    border = BorderStroke(1.dp, if (domainInput.isNotBlank()) Color(0xFF10B981) else cardBorder),
+                    border = BorderStroke(1.dp, if (cleanCustomDomain.isNotBlank()) Color(0xFF10B981) else cardBorder),
                     shadowElevation = 2.dp
                 ) {
                     Column(
@@ -465,9 +602,9 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = if (customDomain.isNotBlank()) "Connected: https://${customDomain.trim()}" else "Connect your own domain (e.g. mystore.com)",
+                                        text = if (cleanCustomDomain.isNotBlank()) "Connected: https://${cleanCustomDomain.trim()}" else "Connect your own domain (e.g. mystore.com)",
                                         fontSize = 11.5.sp,
-                                        color = if (customDomain.isNotBlank()) Color(0xFF10B981) else secondaryText,
+                                        color = if (cleanCustomDomain.isNotBlank()) Color(0xFF10B981) else secondaryText,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -476,14 +613,14 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (customDomain.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f),
-                                border = BorderStroke(1.dp, if (customDomain.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f))
+                                color = if (cleanCustomDomain.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, if (cleanCustomDomain.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f))
                             ) {
                                 Text(
-                                    text = if (customDomain.isNotBlank()) "CONNECTED" else "OPTIONAL",
+                                    text = if (cleanCustomDomain.isNotBlank()) "CONNECTED" else "OPTIONAL",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (customDomain.isNotBlank()) Color(0xFF10B981) else Color(0xFFD97706),
+                                    color = if (cleanCustomDomain.isNotBlank()) Color(0xFF10B981) else Color(0xFFD97706),
                                     maxLines = 1,
                                     softWrap = false,
                                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
@@ -1116,7 +1253,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                 viewModel.deployWebShop(
                                     storeName = storeName.ifBlank { "My Store" },
                                     shopSlug = storeSubdomain.ifBlank { "store" },
-                                    customDomain = if (customDomain.contains(".") && !customDomain.contains("swapnopay.top")) customDomain else "",
+                                    customDomain = if (cleanCustomDomain.contains(".") && !cleanCustomDomain.contains("swapnopay.top")) cleanCustomDomain else "",
                                     primaryCurrency = primaryCurrency,
                                     adminEmail = adminEmailInput,
                                     adminPassword = adminPasswordInput

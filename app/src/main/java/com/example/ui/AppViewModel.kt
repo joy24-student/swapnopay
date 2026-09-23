@@ -12497,6 +12497,18 @@ function executePayment() {
 
     private var pollJob: kotlinx.coroutines.Job? = null
 
+    private fun JSONObject.optCleanString(key: String, fallback: String = ""): String {
+        if (isNull(key)) return fallback
+        val v = optString(key, fallback).trim()
+        return if (v.isEmpty() ||
+            v.equals("null", ignoreCase = true) ||
+            v.equals("undefined", ignoreCase = true) ||
+            v.equals("https://null", ignoreCase = true) ||
+            v.equals("http://null", ignoreCase = true) ||
+            v.contains("://null")
+        ) fallback else v
+    }
+
     fun pollWebShopUntilLive() {
         pollJob?.cancel()
         pollJob = viewModelScope.launch(Dispatchers.IO) {
@@ -12513,6 +12525,15 @@ function executePayment() {
                 // Per-attempt 10-second timeout — won't block IO for >10s regardless of server lag
                 kotlinx.coroutines.withTimeoutOrNull(10_000L) {
                     loadWebShopStatusInternal()
+                }
+            }
+            if (!_webShopState.value.isDeployed && _webShopState.value.status != "LIVE") {
+                _webShopState.update { current ->
+                    if (current.isDeployed) current else current.copy(
+                        isDeploying = false,
+                        status = "FAILED",
+                        statusMessage = "Storefront provisioning timed out. Please retry the launch or contact support."
+                    )
                 }
             }
             // Clear poll progress after loop ends
@@ -12546,37 +12567,39 @@ function executePayment() {
                             val json = JSONObject(body)
                             if (json.optBoolean("ok", false)) {
                                 val isLive = json.optBoolean("deployed", false)
-                                val sUrl = json.optString("shop_url", "")
-                                val aUrl = json.optString("admin_url", if (sUrl.isNotBlank()) "$sUrl/admin" else "")
-                                val aLoginUrl = json.optString("admin_login_url", if (aUrl.isNotBlank()) "$aUrl/login.php" else "")
+                                val sUrl = json.optCleanString("shop_url")
+                                val aUrl = json.optCleanString("admin_url", if (sUrl.isNotBlank()) "$sUrl/admin" else "")
+                                val aLoginUrl = json.optCleanString("admin_login_url", if (aUrl.isNotBlank()) "$aUrl/login.php" else "")
                                 val adminCreds = json.optJSONObject("admin_credentials")
-                                val aEmail = adminCreds?.optString("email") ?: json.optString("admin_email", "")
-                                val aPass = adminCreds?.optString("default_password") ?: adminCreds?.optString("initial_password") ?: json.optString("admin_password", "")
-                                val aRole = adminCreds?.optString("role") ?: "Top Admin"
-                                val stat = json.optString("status", if (isLive) "LIVE" else "QUEUED")
-                                val msg = json.optString("message", "")
+                                val aEmail = adminCreds?.optCleanString("email")?.takeIf { it.isNotBlank() } ?: json.optCleanString("admin_email")
+                                val aPass = adminCreds?.optCleanString("default_password")?.takeIf { it.isNotBlank() }
+                                    ?: adminCreds?.optCleanString("initial_password")?.takeIf { it.isNotBlank() }
+                                    ?: json.optCleanString("admin_password")
+                                val aRole = adminCreds?.optCleanString("role", "Top Admin") ?: "Top Admin"
+                                val stat = json.optCleanString("status", if (isLive) "LIVE" else "QUEUED")
+                                val msg = json.optCleanString("message")
 
                                 _webShopState.update { current ->
                                     current.copy(
                                         isDeployed = isLive,
                                         status = stat,
                                         statusMessage = msg,
-                                        storeName = json.optString("store_name", current.storeName),
-                                        shopSlug = json.optString("shop_slug", current.shopSlug),
+                                        storeName = json.optCleanString("store_name", current.storeName),
+                                        shopSlug = json.optCleanString("shop_slug", current.shopSlug),
                                         shopUrl = sUrl,
                                         adminUrl = aUrl,
                                         adminLoginUrl = aLoginUrl,
                                         adminEmail = if (aEmail.isNotBlank()) aEmail else current.adminEmail,
                                         adminPassword = if (aPass.isNotBlank()) aPass else current.adminPassword,
                                         adminRole = aRole,
-                                        customDomain = json.optString("custom_domain", current.customDomain),
-                                        primaryCurrency = json.optString("currency", current.primaryCurrency.ifBlank { "BDT" }),
-                                        themeColor = json.optString("theme_color", current.themeColor.ifBlank { "#4F46E5" }),
+                                        customDomain = json.optCleanString("custom_domain", current.customDomain),
+                                        primaryCurrency = json.optCleanString("currency", current.primaryCurrency.ifBlank { "BDT" }),
+                                        themeColor = json.optCleanString("theme_color", current.themeColor.ifBlank { "#4F46E5" }),
                                         productsCount = json.optInt("products_count", current.productsCount),
                                         ordersCount = json.optInt("orders_count", current.ordersCount),
                                         totalRevenue = json.optDouble("total_revenue", current.totalRevenue),
                                         sslActive = json.optBoolean("ssl_active", isLive),
-                                        lastSyncedAt = json.optString("last_updated", null)
+                                        lastSyncedAt = json.optCleanString("last_updated").takeIf { it.isNotBlank() }
                                     )
                                 }
                                 return
@@ -12594,12 +12617,15 @@ function executePayment() {
             if (lastResponseCode > 0 && lastResponseCode !in 200..299) {
                 val errMsg = try {
                     val json = JSONObject(lastResponseBody ?: "{}")
-                    json.optString("error", json.optString("message", "Status check notice: HTTP $lastResponseCode"))
+                    json.optCleanString("error", json.optCleanString("message", "Status check notice: HTTP $lastResponseCode"))
                 } catch (_: Exception) {
                     "Status check notice: HTTP $lastResponseCode"
                 }
                 _webShopState.update { current ->
-                    if (current.isDeployed) current else current.copy(statusMessage = errMsg)
+                    if (current.isDeployed) current else current.copy(
+                        status = if (current.status in listOf("QUEUED", "PROVISIONING", "WAITING_DNS", "WAITING_TLS")) current.status else "FAILED",
+                        statusMessage = errMsg
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -12691,20 +12717,22 @@ function executePayment() {
 
                             if (isSuccess) {
                                 val isLive = json.optBoolean("deployed", false) || response.code == 200
-                                val respStatus = json.optString("status", if (isLive) "LIVE" else "QUEUED")
-                                val targetUrl = json.optString("shop_url", "https://shop.swapnopay.top/${cleanSlug}")
-                                val adminUrl = json.optString("admin_url", "$targetUrl/admin")
-                                val adminLoginUrl = json.optString("admin_login_url", "$adminUrl/login.php")
+                                val respStatus = json.optCleanString("status", if (isLive) "LIVE" else "QUEUED")
+                                val targetUrl = json.optCleanString("shop_url", "https://shop.swapnopay.top/${cleanSlug}")
+                                val adminUrl = json.optCleanString("admin_url", "$targetUrl/admin")
+                                val adminLoginUrl = json.optCleanString("admin_login_url", "$adminUrl/login.php")
                                 val adminCreds = json.optJSONObject("admin_credentials")
-                                val finalEmail = adminCreds?.optString("email") ?: effectiveAdminEmail
-                                val finalPass = adminCreds?.optString("default_password") ?: adminCreds?.optString("initial_password") ?: effectivePassword
+                                val finalEmail = adminCreds?.optCleanString("email")?.takeIf { it.isNotBlank() } ?: effectiveAdminEmail
+                                val finalPass = adminCreds?.optCleanString("default_password")?.takeIf { it.isNotBlank() }
+                                    ?: adminCreds?.optCleanString("initial_password")?.takeIf { it.isNotBlank() }
+                                    ?: effectivePassword
 
                                 _webShopState.update { current ->
                                     current.copy(
                                         isDeploying = false,
                                         isDeployed = isLive,
                                         status = respStatus,
-                                        statusMessage = json.optString("message", if (isLive) "Your storefront is live!" else "Storefront queued on VPS"),
+                                        statusMessage = json.optCleanString("message", if (isLive) "Your storefront is live!" else "Storefront queued on VPS"),
                                         storeName = storeName.ifBlank { "My Web Store" },
                                         shopSlug = cleanSlug,
                                         shopUrl = targetUrl,
@@ -12712,7 +12740,7 @@ function executePayment() {
                                         adminLoginUrl = adminLoginUrl,
                                         adminEmail = finalEmail,
                                         adminPassword = finalPass,
-                                        customDomain = if (isUsableCustomDomain) cleanDomain else json.optString("custom_domain", ""),
+                                        customDomain = if (isUsableCustomDomain) cleanDomain else json.optCleanString("custom_domain"),
                                         primaryCurrency = primaryCurrency,
                                         themeColor = themeColor,
                                         lastSyncedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
@@ -12725,7 +12753,7 @@ function executePayment() {
                                 pollWebShopUntilLive()
                                 return@launch
                             } else {
-                                lastErrorMessage = json.optString("error", json.optString("message", "Deployment failed (HTTP ${response.code})"))
+                                lastErrorMessage = json.optCleanString("error", json.optCleanString("message", "Deployment failed (HTTP ${response.code})"))
                             }
                         }
                     } catch (netEx: Exception) {
@@ -12734,12 +12762,12 @@ function executePayment() {
                     }
                 }
 
-                _webShopState.update { it.copy(isDeploying = false, statusMessage = lastErrorMessage) }
+                _webShopState.update { it.copy(isDeploying = false, status = "FAILED", statusMessage = lastErrorMessage) }
                 withContext(Dispatchers.Main) {
                     onComplete(false, lastErrorMessage)
                 }
             } catch (e: Exception) {
-                _webShopState.update { it.copy(isDeploying = false) }
+                _webShopState.update { it.copy(isDeploying = false, status = "FAILED", statusMessage = e.message ?: "Failed to deploy website") }
                 withContext(Dispatchers.Main) {
                     onComplete(false, e.message ?: "Failed to deploy website")
                 }
