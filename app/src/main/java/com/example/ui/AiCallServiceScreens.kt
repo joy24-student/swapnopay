@@ -263,7 +263,45 @@ fun AiCallCenterScreen(viewModel: AppViewModel) {
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
-            // ── Top Bar: Back arrow, Title & Refresh Icon ──
+            // ── C5: Demo Mode Banner ─────────────────────────────────────────────
+            // AI Call telephony integration (VoIP/SIP) is not yet active.
+            // This banner is shown until a real telephony provider (e.g. Twilio/Vonage) is integrated.
+            item {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFF59E0B).copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "ডেমো মোড — কল সংযোগ প্রক্রিয়াধীন",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFF59E0B)
+                            )
+                            Text(
+                                text = "VoIP/SIP ইন্টিগ্রেশন শীঘ্রই আসছে। এই স্ক্রিনটি বর্তমানে ডেমো ডেটা দেখাচ্ছে।",
+                                fontSize = 11.sp,
+                                color = if (isDarkMode) Color(0xFFD1D5DB) else Color(0xFF374151)
+                            )
+                        }
+                    }
+                }
+            }
+
+
             item {
                 Row(
                     modifier = Modifier

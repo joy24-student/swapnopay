@@ -264,7 +264,13 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                     if (webShopState.isDeploying || webShopState.status in listOf("QUEUED", "PROVISIONING")) {
                                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Provisioning Cloud Storefront...", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                        // C2: Show per-attempt poll progress so user isn't left waiting with no feedback
+                                        val pollAttempt = webShopState.pollAttempt
+                                        val maxPoll = webShopState.maxPollAttempts
+                                        Text(
+                                            text = if (pollAttempt > 0) "Checking status… $pollAttempt/$maxPoll" else "Provisioning Cloud Storefront...",
+                                            fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp
+                                        )
                                     } else {
                                         Icon(Icons.Default.RocketLaunch, null, modifier = Modifier.size(18.dp), tint = Color.White)
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -274,13 +280,19 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                             } else {
                                 Button(
                                     onClick = {
-                                        if (effectiveUrl.isNotBlank()) {
+                                        // H3: Validate URL before launching browser intent
+                                        val urlToOpen = effectiveUrl.trim()
+                                        val isValidUrl = urlToOpen.isNotBlank() &&
+                                            android.util.Patterns.WEB_URL.matcher(urlToOpen).matches()
+                                        if (isValidUrl) {
                                             runCatching {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(effectiveUrl))
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToOpen))
                                                 context.startActivity(intent)
                                             }.onFailure {
-                                                Toast.makeText(context, "Could not open browser for: $effectiveUrl", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Could not open browser. Please check your network.", Toast.LENGTH_SHORT).show()
                                             }
+                                        } else {
+                                            Toast.makeText(context, "Store URL is not yet configured. Please deploy first.", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     enabled = effectiveUrl.isNotBlank(),
@@ -596,13 +608,13 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                                         color = if (isDarkMode) Color(0xFF6EE7B7) else Color(0xFF065F46)
                                     )
                                     Text(
-                                        text = "1. CNAME Record: Host '@' or 'www' points to 'shop.swapnopay.top'",
+                                        text = "1. CNAME Record: Host '@' or 'www' points to '${webShopState.vpsHost.ifBlank { "vps.swapnopay.top" }}'",
                                         fontSize = 11.5.sp,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         color = primaryText
                                     )
                                     Text(
-                                        text = "2. Or A Record: Host '@' points to '159.65.132.85' (VPS IP)",
+                                        text = "2. Or CNAME Record: Points to Server Host '${webShopState.vpsHost.ifBlank { "vps.swapnopay.top" }}'",
                                         fontSize = 11.5.sp,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         color = primaryText
@@ -621,8 +633,13 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
 
             // Store Admin Panel & Control Center Card
             item {
-                val adminUrl = if (effectiveUrl.endsWith("/")) effectiveUrl + "admin" else "$effectiveUrl/admin"
-                val adminLoginUrl = if (effectiveUrl.endsWith("/")) effectiveUrl + "admin/login.php" else "$effectiveUrl/admin/login.php"
+                // Use backend-provided admin URLs from ViewModel state; fall back to appended path only if not yet set
+                val adminUrl = webShopState.adminUrl.ifBlank {
+                    if (effectiveUrl.endsWith("/")) effectiveUrl + "admin" else "$effectiveUrl/admin"
+                }
+                val adminLoginUrl = webShopState.adminLoginUrl.ifBlank {
+                    if (adminUrl.endsWith("/")) adminUrl + "login.php" else "$adminUrl/login.php"
+                }
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -695,13 +712,18 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
                         // Prominent Launch Admin Button
                         Button(
                             onClick = {
-                                if (adminLoginUrl.isNotBlank()) {
+                                val urlToOpen = adminLoginUrl.trim()
+                                val isValidUrl = urlToOpen.isNotBlank() &&
+                                    android.util.Patterns.WEB_URL.matcher(urlToOpen).matches()
+                                if (isValidUrl) {
                                     runCatching {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(adminLoginUrl))
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToOpen))
                                         context.startActivity(intent)
                                     }.onFailure {
-                                        Toast.makeText(context, "Opening admin panel: $adminLoginUrl", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Could not open admin panel. Please check your network.", Toast.LENGTH_SHORT).show()
                                     }
+                                } else {
+                                    Toast.makeText(context, "Admin panel URL not configured. Deploy your store first.", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             enabled = webShopState.isDeployed && adminLoginUrl.isNotBlank(),

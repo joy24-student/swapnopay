@@ -276,6 +276,7 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
     val totalSupplierPayable = suppliers.sumOf { if (it.currentBalance < 0) Math.abs(it.currentBalance) else 0.0 }
     val supplierCount = suppliers.count { it.currentBalance < 0 }
     val totalSupplierPaid = transactions.filter { it.supplierId != null && it.type == "payment" }.sumOf { it.amount }
+    val supplierPaymentCount = transactions.count { it.supplierId != null && it.type == "payment" }
 
     val totalCustomerDues = customers.sumOf { if (it.currentBalance > 0) it.currentBalance else 0.0 }
     val customerCount = customers.count { it.currentBalance > 0 }
@@ -597,7 +598,7 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("5 Payments", fontSize = 11.sp, color = textMuted, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 48.dp))
+                                    Text("$supplierPaymentCount ${if (supplierPaymentCount == 1) "Payment" else "Payments"}", fontSize = 11.sp, color = textMuted, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 48.dp))
                                 }
                             }
                         } else {
@@ -622,7 +623,7 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                                         }
                                         Column {
                                             Text("NEW DUES", fontSize = 11.sp, color = textMuted, fontWeight = FontWeight.Bold)
-                                            Text("৳ 5,000.00", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textWhite)
+                                            Text("৳ ${String.format("%,.2f", totalCustomerDues)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textWhite)
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -634,7 +635,7 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(containerColor = cardDark),
-                                border = BorderStroke(1.dp, goldBorder)
+                                border = BorderStroke(1.dp, if (isDark) Color(0xFF1B3D2B) else Color(0xFFE2E8F0))
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -650,11 +651,12 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                                         }
                                         Column {
                                             Text("COLLECTED", fontSize = 11.sp, color = textMuted, fontWeight = FontWeight.Bold)
-                                            Text("৳ 3,200.00", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textWhite)
+                                            Text("৳ ${String.format("%,.2f", totalCustomerCollected)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textWhite)
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("2 Payments", fontSize = 11.sp, color = textMuted, modifier = Modifier.padding(start = 48.dp))
+                                    val paymentCount = transactions.count { it.customerId != null && it.type == "payment" }
+                                    Text("$paymentCount Payment${if (paymentCount != 1) "s" else ""}", fontSize = 11.sp, color = textMuted, modifier = Modifier.padding(start = 48.dp))
                                 }
                             }
                         }
@@ -1315,7 +1317,11 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("💡 Customer Collection Target:", fontWeight = FontWeight.Bold, color = goldLight, fontSize = 12.sp)
-                        Text("3 customers have overdue payments totaling ৳17,750. Sending WhatsApp reminders today can speed up cash recovery by 48%.", fontSize = 11.5.sp, color = textWhite)
+                        if (customerCount > 0) {
+                            Text("$customerCount customer${if (customerCount != 1) "s" else ""} have overdue payments totaling ৳${String.format("%,.2f", totalCustomerDues)}. Sending reminders can speed up cash recovery.", fontSize = 11.5.sp, color = textWhite)
+                        } else {
+                            Text("No outstanding customer dues at the moment. All payments are up to date.", fontSize = 11.5.sp, color = textWhite)
+                        }
                     }
                 }
                 Surface(
@@ -1325,7 +1331,13 @@ fun LedgersDashboardScreen(viewModel: AppViewModel) {
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("💼 Supplier Payable Summary:", fontWeight = FontWeight.Bold, color = goldLight, fontSize = 12.sp)
-                        Text("Total supplier payables stand at ৳82,450.00 across 8 suppliers. Rahim Textile Ltd. is due ৳8,500.", fontSize = 11.5.sp, color = textWhite)
+                        if (supplierCount > 0) {
+                            val topSupplier = suppliers.filter { it.currentBalance < 0 }.maxByOrNull { Math.abs(it.currentBalance) }
+                            val topStr = if (topSupplier != null) " ${topSupplier.name} is due ৳${String.format("%,.2f", Math.abs(topSupplier.currentBalance))}." else ""
+                            Text("Total supplier payables stand at ৳${String.format("%,.2f", totalSupplierPayable)} across $supplierCount supplier${if (supplierCount != 1) "s" else ""}.$topStr", fontSize = 11.5.sp, color = textWhite)
+                        } else {
+                            Text("No outstanding supplier payables at the moment.", fontSize = 11.5.sp, color = textWhite)
+                        }
                     }
                 }
 

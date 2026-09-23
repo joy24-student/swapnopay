@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CustomerEntity
@@ -218,98 +221,97 @@ fun ProductionLedgersScreen(viewModel: AppViewModel, initialTab: String = "CUSTO
                 }
             }
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Due filter options (All vs Dues Only)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val countWithDue = remember(baseParties, tab) {
-                        baseParties.count { p ->
-                            if (tab == "CUSTOMER") p.currentBalance > 0.01 else p.currentBalance < -0.01
-                        }
-                    }
-
-                    // "All" pill
-                    Surface(
-                        modifier = Modifier
-                            .height(34.dp)
-                            .clickable { dueFilter = "ALL" },
-                        shape = RoundedCornerShape(50),
-                        color = if (dueFilter == "ALL") {
-                            if (dark) Color(0xFF1C180E) else Color(0xFFFFFDE7)
-                        } else {
-                            if (dark) Color(0xFF1E1E1E) else Color(0xFFF1F5F9)
-                        },
-                        border = BorderStroke(
-                            1.5.dp,
-                            if (dueFilter == "ALL") accent else if (dark) Color(0xFF2D2D2D) else Color(0xFFE2E8F0)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (dueFilter == "ALL") Icon(Icons.Default.Check, null, tint = accent, modifier = Modifier.size(12.dp))
-                            Text(
-                                if (isBangla) "সকল (${baseParties.size})" else "All (${baseParties.size})",
-                                fontSize = 11.5.sp,
-                                fontWeight = if (dueFilter == "ALL") FontWeight.Bold else FontWeight.Normal,
-                                color = if (dueFilter == "ALL") accent else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                            )
-                        }
-                    }
-
-                    // "Dues Only" pill
-                    Surface(
-                        modifier = Modifier
-                            .height(34.dp)
-                            .clickable { dueFilter = "DUES_ONLY" },
-                        shape = RoundedCornerShape(50),
-                        color = if (dueFilter == "DUES_ONLY") {
-                            if (dark) Color(0xFF3B1E1E) else Color(0xFFFEE2E2)
-                        } else {
-                            if (dark) Color(0xFF1E1E1E) else Color(0xFFF1F5F9)
-                        },
-                        border = BorderStroke(
-                            1.5.dp,
-                            if (dueFilter == "DUES_ONLY") {
-                                if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
-                            } else if (dark) Color(0xFF2D2D2D) else Color(0xFFE2E8F0)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (dueFilter == "DUES_ONLY") Icon(Icons.Default.Check, null, tint = if (dark) Color(0xFFF87171) else Color(0xFFDC2626), modifier = Modifier.size(12.dp))
-                            Text(
-                                if (tab == "CUSTOMER") {
-                                    if (isBangla) "শুধু বাকি ($countWithDue)" else "Only Dues ($countWithDue)"
-                                } else {
-                                    if (isBangla) "শুধু প্রদেয় ($countWithDue)" else "Only Payables ($countWithDue)"
-                                },
-                                fontSize = 11.5.sp,
-                                fontWeight = if (dueFilter == "DUES_ONLY") FontWeight.Bold else FontWeight.Normal,
-                                color = if (dueFilter == "DUES_ONLY") {
-                                    if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
-                                } else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                            )
-                        }
+                val countWithDue = remember(baseParties, tab) {
+                    baseParties.count { p ->
+                        if (tab == "CUSTOMER") p.currentBalance > 0.01 else p.currentBalance < -0.01
                     }
                 }
 
-                // Range Filter
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("ALL" to (if (isBangla) "সব" else "All"), "TODAY" to (if (isBangla) "আজ" else "Today"), "7_DAYS" to "7D", "MONTH" to (if (isBangla) "মাস" else "1M")).forEach { (value, label) ->
-                        FilterChip(
-                            selected = range == value,
-                            onClick = { range = value },
-                            label = { Text(label, fontSize = 10.5.sp) }
+                // "All" pill
+                Surface(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clickable { dueFilter = "ALL" },
+                    shape = RoundedCornerShape(50),
+                    color = if (dueFilter == "ALL") {
+                        if (dark) Color(0xFF1C180E) else Color(0xFFFFFDE7)
+                    } else {
+                        if (dark) Color(0xFF1E1E1E) else Color(0xFFF1F5F9)
+                    },
+                    border = BorderStroke(
+                        1.5.dp,
+                        if (dueFilter == "ALL") accent else if (dark) Color(0xFF2D2D2D) else Color(0xFFE2E8F0)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (dueFilter == "ALL") Icon(Icons.Default.Check, null, tint = accent, modifier = Modifier.size(12.dp))
+                        Text(
+                            if (isBangla) "সকল (${baseParties.size})" else "All (${baseParties.size})",
+                            fontSize = 11.5.sp,
+                            fontWeight = if (dueFilter == "ALL") FontWeight.Bold else FontWeight.Normal,
+                            color = if (dueFilter == "ALL") accent else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B)
                         )
                     }
+                }
+
+                // "Dues Only" pill
+                Surface(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clickable { dueFilter = "DUES_ONLY" },
+                    shape = RoundedCornerShape(50),
+                    color = if (dueFilter == "DUES_ONLY") {
+                        if (dark) Color(0xFF3B1E1E) else Color(0xFFFEE2E2)
+                    } else {
+                        if (dark) Color(0xFF1E1E1E) else Color(0xFFF1F5F9)
+                    },
+                    border = BorderStroke(
+                        1.5.dp,
+                        if (dueFilter == "DUES_ONLY") {
+                            if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
+                        } else if (dark) Color(0xFF2D2D2D) else Color(0xFFE2E8F0)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (dueFilter == "DUES_ONLY") Icon(Icons.Default.Check, null, tint = if (dark) Color(0xFFF87171) else Color(0xFFDC2626), modifier = Modifier.size(12.dp))
+                        Text(
+                            if (tab == "CUSTOMER") {
+                                if (isBangla) "শুধু বাকি ($countWithDue)" else "Only Dues ($countWithDue)"
+                            } else {
+                                if (isBangla) "শুধু প্রদেয় ($countWithDue)" else "Only Payables ($countWithDue)"
+                            },
+                            fontSize = 11.5.sp,
+                            fontWeight = if (dueFilter == "DUES_ONLY") FontWeight.Bold else FontWeight.Normal,
+                            color = if (dueFilter == "DUES_ONLY") {
+                                if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
+                            } else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                        )
+                    }
+                }
+
+                Box(modifier = Modifier.width(1.dp).height(20.dp).background(if (dark) Color(0xFF333333) else Color(0xFFE2E8F0)))
+
+                // Range Filter
+                listOf("ALL" to (if (isBangla) "সব" else "All"), "TODAY" to (if (isBangla) "আজ" else "Today"), "7_DAYS" to "7D", "MONTH" to (if (isBangla) "মাস" else "1M")).forEach { (value, label) ->
+                    FilterChip(
+                        selected = range == value,
+                        onClick = { range = value },
+                        label = { Text(label, fontSize = 11.sp) }
+                    )
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -352,7 +354,15 @@ fun ProductionLedgersScreen(viewModel: AppViewModel, initialTab: String = "CUSTO
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(party.name, color = text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(
+                                            party.name,
+                                            color = text,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
                                         if (party.code.isNotBlank()) {
                                             Surface(
                                                 shape = RoundedCornerShape(4.dp),
@@ -369,28 +379,75 @@ fun ProductionLedgersScreen(viewModel: AppViewModel, initialTab: String = "CUSTO
                                             }
                                         }
                                     }
-                                    Text(party.phone, color = muted, fontSize = 12.sp)
+                                    Text(party.phone, color = muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
+                                Spacer(Modifier.width(8.dp))
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("BDT ${ledgerMoney(due)}", color = if (due > 0) Color(0xFFEF4444) else Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text(if (tab == "CUSTOMER") "Current due" else "Current payable", color = muted, fontSize = 10.sp)
+                                    Text("BDT ${ledgerMoney(due)}", color = if (due > 0) Color(0xFFEF4444) else Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                                    Text(if (tab == "CUSTOMER") "Current due" else "Current payable", color = muted, fontSize = 10.sp, maxLines = 1)
                                 }
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedButton(onClick = { entryParty = party; entryType = "credit" }, modifier = Modifier.weight(1f)) { Text("Add charge") }
-                                Button(onClick = { entryParty = party; entryType = "payment" }, enabled = due > 0.0, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = accent)) { Text("Record payment", color = Color.Black) }
-                                IconButton(
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { entryParty = party; entryType = "credit" },
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, border),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = text),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(Icons.Default.AddCircleOutline, contentDescription = null, modifier = Modifier.size(15.dp), tint = text)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(if (tab == "CUSTOMER") "Charge" else "Purchase", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                }
+                                Button(
+                                    onClick = { entryParty = party; entryType = "payment" },
+                                    enabled = due > 0.0,
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF10B981),
+                                        disabledContainerColor = if (dark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Payment", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+                                }
+                                Surface(
                                     onClick = {
                                         if (tab == "CUSTOMER") {
                                             selectedCustomerForDetail = customers.find { it.id == party.id }
                                         } else {
                                             selectedSupplierForDetail = suppliers.find { it.id == party.id }
                                         }
-                                    }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (dark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                                    border = BorderStroke(1.dp, border),
+                                    modifier = Modifier.size(38.dp)
                                 ) {
-                                    Icon(Icons.Default.Visibility, "View Profile & Ledger", tint = accent)
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Visibility, contentDescription = "View Profile & Ledger", tint = accent, modifier = Modifier.size(18.dp))
+                                    }
                                 }
-                                IconButton(onClick = { shareLedgerReminder(context, profile.businessName, party, due) }, enabled = due > 0.0) { Icon(Icons.Default.Share, "Share reminder") }
+                                Surface(
+                                    onClick = { shareLedgerReminder(context, profile.businessName, party, due) },
+                                    enabled = due > 0.0,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (dark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                                    border = BorderStroke(1.dp, border),
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share reminder", tint = if (due > 0.0) text else muted, modifier = Modifier.size(18.dp))
+                                    }
+                                }
                             }
                             if (expandedParty == party.id) {
                                 HorizontalDivider(color = border)
@@ -565,9 +622,28 @@ private fun LedgerEntryDialog(
         onDismissRequest = onDismiss, title = { Text("${party.name} ledger entry") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("credit" to "Charge", "payment" to "Payment").forEach { (value,label) -> FilterChip(selected=type==value,onClick={type=value},label={Text(label)}) } }
-            OutlinedTextField(amount, { amount = it.filter { ch -> ch.isDigit() || ch=='.' } }, label = { Text("Amount (BDT)") }, singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("Cash","MFS","Bank","Card").forEach { value -> FilterChip(selected=method==value,onClick={method=value},label={Text(value)}) } }
-            OutlinedTextField(note, { note=it }, label={Text("Note / reference")}, maxLines=2)
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch=='.' } },
+                label = { Text("Amount (BDT)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("Cash","MFS","Bank","Card").forEach { value ->
+                    FilterChip(selected=method==value,onClick={method=value},label={Text(value)})
+                }
+            }
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note=it },
+                label = { Text("Note / reference") },
+                maxLines = 2,
+                modifier = Modifier.fillMaxWidth()
+            )
             Text(if (partyType=="CUSTOMER") "Customer current balance: BDT ${ledgerMoney(party.currentBalance)}" else "Supplier current balance: BDT ${ledgerMoney(party.currentBalance)}", fontSize=11.sp)
             error?.let { Text(it,color=MaterialTheme.colorScheme.error,fontSize=11.sp) }
         } },

@@ -2600,6 +2600,7 @@ private fun AdvancedFieldSettingsEditor(
     val textPrimary = if (isDark) Color(0xFFF3F4F6) else Color(0xFF111827)
     val cardBorder = if (isDark) Color(0xFF2C2213) else Color(0xFFE2E8F0)
     val surfaceColor = if (isDark) Color(0xFF1F1A0E) else Color.White
+    val cardBg = surfaceColor
     val goldPrimary = Color(0xFFFFC800)
     val goldText = if (isDark) Color(0xFFFACC15) else Color(0xFF705D00)
     var isUploadingProductImage by remember(field.id) { mutableStateOf(false) }
@@ -6948,7 +6949,7 @@ private fun LivePreviewModal(
                         Text("Next Page →", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 } else {
-                    Button(
+                     Button(
                         onClick = {
                             if (isClosedForm) {
                                 Toast.makeText(context, themeConfig.closedMessage, Toast.LENGTH_LONG).show()
@@ -6966,8 +6967,15 @@ private fun LivePreviewModal(
                                 Toast.makeText(context, validation.summaryMessage as CharSequence, Toast.LENGTH_SHORT).show()
                             } else {
                                 previewErrors = emptyMap()
-                                Toast.makeText(context, "Preview validation passed! All pages and fields validated successfully.", Toast.LENGTH_LONG).show()
-                                onDismiss()
+                                // C6 Fix: Submit real form data to Room DB + Supabase instead of just showing a Toast
+                                val formId = viewModel.activeFormId.value
+                                viewModel.submitFormFieldAnswers(
+                                    formId = formId,
+                                    answers = previewDynamicValues
+                                ) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    if (success) onDismiss()
+                                }
                             }
                         },
                         enabled = !isClosedForm,

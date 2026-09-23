@@ -1189,6 +1189,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val apiPortalUrl: String = "https://swapnopay.top/portal.html#credentials",
         val webhookDocsUrl: String = "https://swapnopay.top/docs.html#webhooks",
         val supportHotline: String = "+880 1794 827103",
+        val supportHelpline: String = "+880 1794 827103",
         val supportEmail: String = "support@swapnopay.top",
         val supportWhatsapp: String = "+8801712963652",
         val supportAddress: String = "Level 14, Banani Tower, Dhaka, Bangladesh",
@@ -1692,7 +1693,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         logFirebaseStatus("Platform permissions updated: Gateway: $gatewayPerm, Fee: $feeRate%, Suspended: $suspended")
                     }
-                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                        Log.e("PlatformPermissions", "Firebase permissions listener cancelled: ${error.message}", error.toException())
+                        logFirebaseStatus("Firebase permissions listener cancelled: ${error.message}")
+                    }
                 })
         } catch (e: Exception) {
             Log.d("PlatformPermissions", "Listener error: ${e.message}")
@@ -2376,7 +2380,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
         }
         setUserEmail(result.email)
         _onboardingBusinessName.value = result.businessName
@@ -5292,7 +5296,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             withContext(kotlinx.coroutines.Dispatchers.Main) {
                                 loadCachedPaymentForm(json, autoSelect = false)
                             }
-                        } catch (_: Exception) {}
+                        } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                     }
                 }
             } catch (e: Exception) {
@@ -5785,7 +5789,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addFormField(type: FormFieldType, label: String? = null, placeholder: String? = null) {
         if (formFieldsList.value.size >= 200) return
         val defaultOptions = when (type) {
-            FormFieldType.COUPON -> listOf("SAVE10:10%", "FLAT50:50", "SWAPNO20:20%")
+            FormFieldType.COUPON -> listOf("DISCOUNT10:10%", "PROMO50:50")
             else -> listOf("Option 1", "Option 2")
         }
         val newField = FormFieldItem(
@@ -6440,7 +6444,7 @@ function executePayment() {
         try {
             val sims = com.example.service.SmsGatewayEngine.getAvailableSimCards(getApplication())
             _availableSimCards.value = sims
-        } catch (_: Exception) {}
+        } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
     }
 
     fun setSelectedSimSlot(slot: Int) {
@@ -6567,6 +6571,10 @@ function executePayment() {
         onResult: (Int, String) -> Unit
     ) {
         viewModelScope.launch {
+            if (!canAccessFeature("bulk_sms")) {
+                onResult(0, "Marketing SMS campaign requires an active subscription.")
+                return@launch
+            }
             val merchantId = activeProfile.value.id
             val storeName = activeProfile.value.businessName.ifBlank { "SwapnoPay Merchant" }
             val allCusts = repository.getAllCustomersList(merchantId)
@@ -6884,7 +6892,7 @@ function executePayment() {
                     FormFieldItem(type = FormFieldType.ADDRESS, label = "Delivery Address", placeholder = "Full shipping address", isRequired = true),
                     FormFieldItem(type = FormFieldType.PRODUCT, label = "Selected Product", isRequired = true),
                     FormFieldItem(type = FormFieldType.QUANTITY, label = "Quantity", isRequired = true),
-                    FormFieldItem(type = FormFieldType.SHIPPING, label = "Delivery Option", options = listOf("Inside Dhaka (৳60)", "Outside Dhaka (৳120)")),
+                    FormFieldItem(type = FormFieldType.SHIPPING, label = "Delivery Option", options = listOf("Standard Delivery (৳60)", "Express Delivery (৳120)")),
                     FormFieldItem(type = FormFieldType.COUPON, label = "Promo Code", isRequired = false)
                 )
                 formProductsList.value = emptyList()
@@ -7231,7 +7239,7 @@ function executePayment() {
                             responseStr = res
                             break
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 if (!responseStr.isNullOrBlank()) {
@@ -7711,6 +7719,74 @@ function executePayment() {
         logFirebaseStatus("New customer form submission saved as pending: BDT $amount via $method")
     }
 
+    // C6 Fix: General form field answers submission — saves all field values to Room + Supabase
+    fun submitFormFieldAnswers(
+        formId: String,
+        answers: Map<String, String>,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        if (formId.isBlank()) {
+            onResult(false, "No active form selected.")
+            return
+        }
+        val submissionId = java.util.UUID.randomUUID().toString()
+        val answersJson = org.json.JSONObject()
+        answers.forEach { (k, v) -> answersJson.put(k, v) }
+        val nowMs = System.currentTimeMillis()
+        val payload = org.json.JSONObject().apply {
+            put("id", submissionId)
+            put("form_id", formId)
+            put("merchant_id", activeProfile.value.id)
+            put("answers", answersJson)
+            put("submitted_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                .format(java.util.Date(nowMs)))
+            put("source", "preview")
+        }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Save locally first (works offline)
+                repository.upsertFormSubmissionCache(
+                    FormSubmissionCacheEntity(
+                        id = submissionId,
+                        merchantId = activeProfile.value.id,
+                        formId = formId,
+                        payloadJson = payload.toString(),
+                        submittedAt = nowMs,
+                        isDirty = true
+                    )
+                )
+                // Attempt cloud sync
+                val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) }
+                if (active != null) {
+                    try {
+                        upsertRemoteOrThrow(active.supabaseUrl, active.anonKey, active.authSessionToken, "form_submissions", payload)
+                        repository.upsertFormSubmissionCache(
+                            FormSubmissionCacheEntity(
+                                id = submissionId,
+                                merchantId = activeProfile.value.id,
+                                formId = formId,
+                                payloadJson = payload.toString(),
+                                submittedAt = nowMs,
+                                isDirty = false
+                            )
+                        )
+                    } catch (syncEx: Exception) {
+                        Log.w("AppViewModel", "Form answer sync queued (offline): ${syncEx.message}")
+                    }
+                }
+                // Update analytics count
+                formAnalyticsData.value = formAnalyticsData.value.copy(
+                    totalSubmissions = formAnalyticsData.value.totalSubmissions + 1
+                )
+                onResult(true, "Form submitted successfully!")
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "submitFormFieldAnswers failed", e)
+                onResult(false, "Failed to save submission: ${e.message}")
+            }
+        }
+    }
+
     // Dynamic configuration lists and specs for Supabase Setup
     val stepBgColorHexes = listOf(
         0xFF5D45FFL, // Intro: Indigo
@@ -8128,11 +8204,16 @@ function executePayment() {
     }
 
     fun navigateTo(screen: String) {
+        val trimmed = screen.trim()
+        if (trimmed.isBlank()) {
+            Log.w("AppViewModel", "navigateTo ignored blank screen")
+            return
+        }
         val currentNavState = NavState(_currentScreen.value, _currentTab.value)
         val targetScreen: String
         val targetTab: String
 
-        when (screen) {
+        when (trimmed) {
             "Main", "Dashboard" -> {
                 targetScreen = "Main"
                 targetTab = "Dashboard"
@@ -8299,7 +8380,7 @@ function executePayment() {
                     if (!exists()) mkdirs()
                 }
                 photosDir.listFiles()?.filter { it.name.startsWith("merchant_${merchantId}_") }?.forEach {
-                    try { it.delete() } catch (_: Exception) {}
+                    try { it.delete() } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
                 val photoFile = java.io.File(photosDir, "merchant_${merchantId}_${System.currentTimeMillis()}.jpg")
                 photoFile.outputStream().use { it.write(imageBytes) }
@@ -8335,7 +8416,7 @@ function executePayment() {
                                     break
                                 }
                             }
-                        } catch (_: Exception) {}
+                        } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                     }
                 } catch (e: Exception) {
                     android.util.Log.w("AppViewModel", "Logo upload to CDN error: ${e.message}")
@@ -8368,7 +8449,7 @@ function executePayment() {
             try {
                 val photosDir = java.io.File(context.filesDir, "merchant_photos")
                 photosDir.listFiles()?.filter { it.name.startsWith("merchant_${merchantId}_") }?.forEach {
-                    try { it.delete() } catch (_: Exception) {}
+                    try { it.delete() } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
                 val updated = _activeProfile.value.copy(photoUrl = "")
                 repository.insertMerchantProfile(updated)
@@ -9971,6 +10052,10 @@ function executePayment() {
         onSuccess: (orderId: String, totalAmount: Double, sale: PosSaleEntity) -> Unit,
         onError: (String) -> Unit
     ) {
+        if (!hasPremiumAccess()) {
+            onError("সাবস্ক্রিপশনের মেয়াদ শেষ। POS সেল সম্পন্ন করতে অনুগ্রহ করে সাবস্ক্রিপশন রিনিউ করুন।")
+            return
+        }
         val cartItems = _posCart.value
         if (cartItems.isEmpty()) {
             onError("POS Cart is empty. Please scan items before checkout.")
@@ -10537,6 +10622,44 @@ function executePayment() {
         }
     }
 
+    fun updateCustomer(
+        customer: CustomerEntity,
+        onResult: ((Boolean, String) -> Unit)? = null
+    ) {
+        if (customer.name.isBlank()) {
+            onResult?.invoke(false, "Customer name cannot be blank")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.insertCustomer(customer)
+                logFirebaseStatus("Updated customer: ${customer.name} (${customer.code})")
+
+                val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) }
+                if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
+                    val json = org.json.JSONObject().apply {
+                        put("id", customer.id)
+                        put("name", customer.name)
+                        put("phone", customer.phone)
+                        put("code", customer.code)
+                        put("address", customer.address ?: org.json.JSONObject.NULL)
+                        put("email", customer.email ?: org.json.JSONObject.NULL)
+                        put("opening_balance", customer.openingBalance)
+                        put("current_balance", customer.currentBalance)
+                        put("status", customer.status)
+                    }
+                    com.example.data.remote.SupabaseClient.upsertRecord(
+                        active.supabaseUrl, active.anonKey, active.authSessionToken, "customers", json, {},
+                        { logFirebaseStatus("Customer updated locally; cloud sync failed: $it") }
+                    )
+                }
+                onResult?.invoke(true, "Customer updated successfully")
+            } catch (e: Exception) {
+                onResult?.invoke(false, e.localizedMessage ?: "Failed to update customer")
+            }
+        }
+    }
+
     // Supplier operations
 
     fun deleteSupplier(id: String) {
@@ -10550,6 +10673,43 @@ function executePayment() {
                     active.supabaseUrl, active.anonKey, active.authSessionToken, "suppliers", "id", id, {},
                     { logFirebaseStatus("Supplier deleted locally; cloud delete failed: $it") }
                 )
+            }
+        }
+    }
+
+    fun updateSupplier(
+        supplier: SupplierEntity,
+        onResult: ((Boolean, String) -> Unit)? = null
+    ) {
+        if (supplier.name.isBlank()) {
+            onResult?.invoke(false, "Supplier name cannot be blank")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.insertSupplier(supplier)
+                logFirebaseStatus("Updated supplier: ${supplier.name} (${supplier.code})")
+
+                val active = _activeSupabaseProfile.value?.let { validSupabaseSession(it) }
+                if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
+                    val json = org.json.JSONObject().apply {
+                        put("id", supplier.id)
+                        put("name", supplier.name)
+                        put("phone", supplier.phone)
+                        put("code", supplier.code)
+                        if (supplier.address != null) put("address", supplier.address)
+                        if (supplier.email != null) put("email", supplier.email)
+                        put("opening_balance", supplier.openingBalance)
+                        put("current_balance", supplier.currentBalance)
+                    }
+                    com.example.data.remote.SupabaseClient.upsertRecord(
+                        active.supabaseUrl, active.anonKey, active.authSessionToken, "suppliers", json, {},
+                        { logFirebaseStatus("Supplier updated locally; cloud sync failed: $it") }
+                    )
+                }
+                onResult?.invoke(true, "Supplier updated successfully")
+            } catch (e: Exception) {
+                onResult?.invoke(false, e.localizedMessage ?: "Failed to update supplier")
             }
         }
     }
@@ -10700,7 +10860,7 @@ function executePayment() {
                                 return@launch
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
             } catch (e: Exception) {
                 logFirebaseStatus("uploadProductImageToBackend error: ${e.message}")
@@ -12284,7 +12444,9 @@ function executePayment() {
         val sslActive: Boolean = false,
         val lastSyncedAt: String? = null,
         val syncMessage: String = "",
-        val statusMessage: String = ""
+        val statusMessage: String = "",
+        val pollAttempt: Int = 0,
+        val maxPollAttempts: Int = 15
     )
 
     private val webShopHttpClient by lazy {
@@ -12338,12 +12500,23 @@ function executePayment() {
     fun pollWebShopUntilLive() {
         pollJob?.cancel()
         pollJob = viewModelScope.launch(Dispatchers.IO) {
+            val maxAttempts = 15
+            _webShopState.update { it.copy(pollAttempt = 0, maxPollAttempts = maxAttempts) }
             var attempts = 0
-            while (attempts < 15 && !_webShopState.value.isDeployed && _webShopState.value.status != "FAILED") {
-                kotlinx.coroutines.delay(4000)
+            while (attempts < maxAttempts && !_webShopState.value.isDeployed && _webShopState.value.status != "FAILED") {
+                // Exponential backoff: 4s, 5s, 6s … capped at 12s
+                val delayMs = (4000L + attempts * 1000L).coerceAtMost(12000L)
+                kotlinx.coroutines.delay(delayMs)
+                if (!isActive) break
                 attempts++
-                loadWebShopStatusInternal()
+                _webShopState.update { it.copy(pollAttempt = attempts) }
+                // Per-attempt 10-second timeout — won't block IO for >10s regardless of server lag
+                kotlinx.coroutines.withTimeoutOrNull(10_000L) {
+                    loadWebShopStatusInternal()
+                }
             }
+            // Clear poll progress after loop ends
+            _webShopState.update { it.copy(pollAttempt = 0) }
         }
     }
 
@@ -12445,6 +12618,13 @@ function executePayment() {
         onComplete: (Boolean, String) -> Unit = { _, _ -> }
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            if (!canAccessFeature("webshop")) {
+                _webShopState.update { it.copy(isDeploying = false) }
+                withContext(Dispatchers.Main) {
+                    onComplete(false, "WebShop deployment requires an active subscription or trial. Please activate a plan.")
+                }
+                return@launch
+            }
             _webShopState.update { it.copy(isDeploying = true) }
             try {
                 val effectiveAdminEmail = adminEmail.trim().ifBlank {
@@ -13041,7 +13221,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 if (successJson != null) {
@@ -13158,7 +13338,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 val localRecord = AiCallRecord(
@@ -13256,7 +13436,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 val localRecord = AiCallRecord(
@@ -13335,7 +13515,7 @@ function executePayment() {
                             client.newCall(req).execute().use { }
                         }
                         break
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
                 onResult(true)
             } catch (e: Exception) {
@@ -13368,7 +13548,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 if (successJson != null) {
@@ -13475,9 +13655,9 @@ function executePayment() {
                             val req = okhttp3.Request.Builder().url("$base/v1/voice/record-to-ai").post(body).build()
                             withContext(Dispatchers.IO) { client.newCall(req).execute().use { } }
                             break
-                        } catch (_: Exception) {}
+                        } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                     }
-                } catch (_: Exception) {}
+                } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
             }
             return
         }
@@ -13529,7 +13709,7 @@ function executePayment() {
                             if (!backendReply.isNullOrBlank()) break
                         }
                     }
-                } catch (_: Exception) {}
+                } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
             }
 
             if (!backendReply.isNullOrBlank()) {
@@ -13672,7 +13852,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 if (successJson != null) {
@@ -13714,6 +13894,10 @@ function executePayment() {
         recipients: List<Pair<String, String>>,
         onComplete: (Boolean, String) -> Unit
     ) {
+        if (!canAccessFeature("mass_voice")) {
+            onComplete(false, "ভয়েস কল ক্যাম্পেইনের জন্য সক্রিয় সাবস্ক্রিপশন আবশ্যক।")
+            return
+        }
         if (recipients.isEmpty()) {
             onComplete(false, "প্রাপকের তালিকা খালি। অনুগ্রহ করে অন্তত একজন গ্রাহক যোগ করুন।")
             return
@@ -13760,7 +13944,7 @@ function executePayment() {
                                 break
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                 }
 
                 if (!broadcastSuccess) {
@@ -13825,6 +14009,32 @@ function executePayment() {
     // ──────────────────────────────────────────────────────────────────────────
     private val _subscriptionStatus = MutableStateFlow(SubscriptionStatusState())
     val subscriptionStatus: StateFlow<SubscriptionStatusState> = _subscriptionStatus.asStateFlow()
+
+    fun hasPremiumAccess(): Boolean {
+        val sub = _subscriptionStatus.value
+        if (!sub.canAccessService || sub.status.equals("LOCKED", ignoreCase = true) || sub.status.equals("EXPIRED", ignoreCase = true)) {
+            return false
+        }
+        if (sub.isSubscriptionActive) return true
+        if (sub.isTrialActive && sub.trialRemainingDays > 0) return true
+        if (sub.status.equals("ACTIVE", ignoreCase = true) || sub.status.equals("TRIAL", ignoreCase = true)) return true
+        if (sub.isKycVerified || sub.subscriptionPlan?.uppercase() in listOf("FREE_TRIAL", "ENTERPRISE", "PRO", "PREMIUM", "STARTER")) return true
+        return sub.canAccessService
+    }
+
+    fun canAccessFeature(featureName: String): Boolean {
+        val sub = _subscriptionStatus.value
+        if (!sub.canAccessService || sub.status.equals("LOCKED", ignoreCase = true) || sub.status.equals("EXPIRED", ignoreCase = true)) {
+            return false
+        }
+        return when (featureName.lowercase()) {
+            "webshop", "ai_calls", "mass_voice", "bulk_sms" -> {
+                sub.isSubscriptionActive || sub.isTrialActive || sub.isKycVerified || sub.status in listOf("ACTIVE", "TRIAL")
+            }
+            else -> sub.canAccessService
+        }
+    }
+
 
     private val _isSubscriptionLoading = MutableStateFlow(false)
     val isSubscriptionLoading: StateFlow<Boolean> = _isSubscriptionLoading.asStateFlow()
@@ -14011,7 +14221,7 @@ function executePayment() {
                                         }
                                     }
                                 }
-                            } catch (_: Exception) {}
+                            } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
                         }
 
                         val updated = SubscriptionStatusState(
@@ -14179,7 +14389,7 @@ function executePayment() {
         try {
             val prefs = getApplication<Application>().getSharedPreferences("swapnopay_sub", Context.MODE_PRIVATE)
             prefs.edit().putBoolean("auto_renew", enabled).apply()
-        } catch (_: Exception) {}
+        } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
         onResult(true, if (enabled) "Auto-renewal enabled" else "Auto-renewal disabled")
     }
 
@@ -14203,7 +14413,7 @@ function executePayment() {
                     .build()
                 try {
                     client.newCall(request).execute().close()
-                } catch (_: Exception) {}
+                } catch (e_: Exception) { android.util.Log.w("AppViewModel", "Suppressed: ${e_.message}") }
 
                 _subscriptionStatus.value = _subscriptionStatus.value.copy(
                     subscriptionPlan = "FREE",
