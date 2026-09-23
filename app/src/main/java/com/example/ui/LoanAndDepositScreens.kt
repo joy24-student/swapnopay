@@ -293,36 +293,6 @@ fun DpsAndLoansScreen(viewModel: AppViewModel, initialTab: String = "DPS") {
                     }
                 }
 
-                // DPS Calculator Shortcut Banner
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDpsCalculator = true },
-                    colors = CardDefaults.cardColors(containerColor = goldPill),
-                    border = BorderStroke(1.dp, gold.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Outlined.Savings, null, tint = gold, modifier = Modifier.size(24.dp))
-                            Column {
-                                Text("DPS Maturity Calculator", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = text)
-                                Text("Simulate future deposit growth & compound returns", fontSize = 11.sp, color = muted)
-                            }
-                        }
-                        Icon(Icons.Default.ChevronRight, null, tint = gold)
-                    }
-                }
-
                 // DPS Filter Chips
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("ALL" to "All DPS", "ACTIVE" to "Active", "MATURED" to "Matured").forEach { (key, label) ->
@@ -503,36 +473,6 @@ fun DpsAndLoansScreen(viewModel: AppViewModel, initialTab: String = "DPS") {
                             Text("৳ ${formatMoney(totalLoanOutstanding)}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                             Text("Paid: ৳ ${formatMoney(totalLoanPaid)}", fontSize = 10.sp, color = Color(0xFF10B981))
                         }
-                    }
-                }
-
-                // Quick Calculator Shortcut Banner
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showLoanCalculator = true },
-                    colors = CardDefaults.cardColors(containerColor = goldPill),
-                    border = BorderStroke(1.dp, gold.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Outlined.Calculate, null, tint = gold, modifier = Modifier.size(24.dp))
-                            Column {
-                                Text("Loan EMI Calculator", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = text)
-                                Text("Simulate monthly payments & interest breakdown", fontSize = 11.sp, color = muted)
-                            }
-                        }
-                        Icon(Icons.Default.ChevronRight, null, tint = gold)
                     }
                 }
 

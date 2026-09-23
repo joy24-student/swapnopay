@@ -86,45 +86,22 @@ fun InventoryScreen(viewModel: AppViewModel) {
                 subtitle = "পণ্যের হিসাব ও স্টক ম্যানেজমেন্ট",
                 onBack = { viewModel.goBack() },
                 actions = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Scan QR Camera Button
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFFFFBEB))
+                            .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFFDE68A)), CircleShape)
+                            .clickable { viewModel.navigateTo("QrScanner") },
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Scan QR Camera Button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFFFFBEB))
-                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFFDE68A)), CircleShape)
-                                .clickable { viewModel.navigateTo("QrScanner") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = "Scan QR",
-                                tint = yellowText,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Add Product Button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFF59E0B))
-                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFF59E0B)), CircleShape)
-                                .clickable { showAddDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Product",
-                                tint = if (isDarkMode) Color(0xFFF5C518) else Color.Black,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan QR",
+                            tint = yellowText,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             )

@@ -15502,6 +15502,8 @@ fun DeviceManagerScreen(viewModel: AppViewModel) {
 
 @Composable
 fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
+    val languageState by viewModel.language.collectAsState()
+    val isBangla = languageState == "bn" || languageState.equals("Bangla", ignoreCase = true) || languageState == "বাংলা"
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val isTestingConnection by viewModel.isRunningSystemTest.collectAsState()
     val gatewayTestError by viewModel.systemTestError.collectAsState()
@@ -15905,7 +15907,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Dynamic API Key (গেটওয়ে এক্সেস কি)",
+                            text = if (isBangla) "Dynamic API Key (গেটওয়ে এক্সেস কি)" else "Dynamic API Key",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = textMain
@@ -15950,7 +15952,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                         color = textMain
                                     )
                                     Text(
-                                        text = "ওয়েবসাইট বা অ্যাপে পেমেন্ট প্রসেস করতে এই ডায়নামিক কী ব্যবহার করুন",
+                                        text = if (isBangla) "ওয়েবসাইট বা অ্যাপে পেমেন্ট প্রসেস করতে এই ডায়নামিক কী ব্যবহার করুন" else "Use this dynamic key to process payments on your website or app",
                                         fontSize = 11.5.sp,
                                         color = textMuted
                                     )
@@ -16063,7 +16065,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = "💡 Header: x-api-key: sp_live_... দিয়ে যেকোনো ওয়েবসাইট বা কাস্টম ব্যাকএন্ডে SwapnoPay চেকআউট ইন্টিগ্রেশন চালু করুন।",
+                                    text = if (isBangla) "💡 Header: x-api-key: sp_live_... দিয়ে যেকোনো ওয়েবসাইট বা কাস্টম ব্যাকএন্ডে SwapnoPay চেকআউট ইন্টিগ্রেশন চালু করুন।" else "💡 Header: Pass 'x-api-key: sp_live_...' to integrate SwapnoPay checkout on any website or custom backend.",
                                     fontSize = 11.sp,
                                     color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFF92400E),
                                     modifier = Modifier.padding(10.dp)
@@ -16079,7 +16081,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(testCheckoutUrl))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        android.widget.Toast.makeText(context, "ওয়েব গেটওয়ে খোলা সম্ভব হয়নি", android.widget.Toast.LENGTH_SHORT).show()
+                                        android.widget.Toast.makeText(context, if (isBangla) "ওয়েব গেটওয়ে খোলা সম্ভব হয়নি" else "Could not open web gateway preview", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(42.dp),
@@ -16094,7 +16096,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "🌐 Preview Web Gateway (ওয়েব চেকআউট টেস্ট করুন)",
+                                    text = if (isBangla) "🌐 Preview Web Gateway (ওয়েব চেকআউট টেস্ট করুন)" else "🌐 Preview Web Gateway (Test Checkout)",
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = goldColor
@@ -16210,113 +16212,6 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                     }
                 }
 
-                // 3. SERVER-MANAGED SECURITY SECTION
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Security & Verification",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = textMain
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                        ) {
-                            Text(
-                                text = "Server managed",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = goldColor
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = goldColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = cardBg),
-                        border = BorderStroke(1.dp, cardBorder)
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            val creds = listOf(
-                                Triple("Payment truth", "Merchant Supabase database", Icons.Outlined.Storage),
-                                Triple("Automatic verification", "Atomic SMS match", Icons.Outlined.VerifiedUser),
-                                Triple("Manual verification", "Approved appeal transaction", Icons.Outlined.FactCheck),
-                                Triple("Receipt delivery", "Durable database outbox", Icons.Outlined.Email),
-                                Triple("Secrets", "Never stored on this device", Icons.Outlined.Shield)
-                            )
-
-                            creds.forEachIndexed { index, (label, valStr, icon) ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = label,
-                                            tint = goldColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Text(
-                                            text = label,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = textMain
-                                        )
-                                    }
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = valStr,
-                                            fontSize = 12.5.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = textMuted
-                                        )
-                                        IconButton(
-                                            onClick = {
-                                                clipboardManager.setText(AnnotatedString(valStr))
-                                                android.widget.Toast.makeText(context, "$label copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-                                            },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.ContentCopy,
-                                                contentDescription = "Copy",
-                                                tint = textMuted,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                if (index < creds.size - 1) {
-                                    HorizontalDivider(color = cardBorder, thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 14.dp))
-                                }
-                            }
-                        }
-                    }
-                }
 
                 // 4. TRANSACTION RULES SECTION
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
