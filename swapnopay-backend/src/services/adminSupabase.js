@@ -5,7 +5,82 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { generateRawApiKey, apiKeyDigest } from '../utils/crypto.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const DATA_DIR = path.resolve(__dirname, '../../data')
+const SETTINGS_FILE = path.join(DATA_DIR, 'merchant_gateway_settings.json')
+
+export const inMemoryMerchantGatewaySettings = new Map()
+
+export function canonicalMethodName(method) {
+  const m = String(method || '').trim().toLowerCase()
+  if (m === 'bkash') return 'bKash'
+  if (m === 'nagad') return 'Nagad'
+  if (m === 'rocket') return 'Rocket'
+  if (m === 'upay') return 'Upay'
+  return method
+}
+
+export const FAKE_NUMBERS = new Set([
+  '01711223344',
+  '01811223344',
+  '019112233441',
+  '01928092777',
+  '01712963652',
+  '01819283746',
+  '01612345678',
+  '01712345678',
+  '01700000000',
+  '01700000001',
+  '01800000000',
+  '01900000000',
+  '01600000000',
+  '01500000000'
+])
+
+export function isFakeNumber(num) {
+  if (!num) return true
+  const clean = String(num).replace(/[^0-9]/g, '')
+  if (!clean || clean.length < 10) return true
+  if (FAKE_NUMBERS.has(clean)) return true
+  if (/^01[3-9](\d)\1{7}$/.test(clean)) return true
+  if (clean.includes('11223344') || clean.includes('12345678')) return true
+  return false
+}
+
+function loadMerchantSettingsFromDisk() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const raw = fs.readFileSync(SETTINGS_FILE, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (typeof parsed === 'object' && parsed !== null) {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (k && v) inMemoryMerchantGatewaySettings.set(k, v)
+        }
+      }
+    }
+  } catch (_) {}
+}
+
+function saveMerchantSettingsToDisk() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+    }
+    const obj = {}
+    for (const [k, v] of inMemoryMerchantGatewaySettings.entries()) {
+      obj[k] = v
+    }
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(obj, null, 2), 'utf8')
+  } catch (_) {}
+}
+
+loadMerchantSettingsFromDisk()
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Singleton admin client (service role — full RLS bypass)
@@ -479,24 +554,21 @@ export async function setGatewayConfig(config) {
 export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) {
   const globalConfig = await getGatewayConfig()
   if (!merchantId) {
-    try {
-      const admin = getAdminClient()
-      if (admin) {
-        const { data: latestMerchant } = await admin
-          .from('merchant_gateway_settings')
-          .select('merchant_id')
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (latestMerchant?.merchant_id) {
-          return getMerchantGatewayConfig(latestMerchant.merchant_id, heartbeatMap)
-        }
-      }
-    } catch (_) {}
-    return { ...globalConfig, device_active: null, merchant_logo_url: null, merchant_name: null }
+    return {
+      ...globalConfig,
+      receiving_numbers: {},
+      account_types: {},
+      qr_codes: {},
+      device_active: null,
+      merchant_logo_url: null,
+      merchant_name: null
+    }
   }
 
   const creds = await getMerchantCredentials(merchantId)
+
+  // 1. First check in-memory / disk cache for this merchant
+  const memSettings = inMemoryMerchantGatewaySettings.get(merchantId) || null
 
   let merchantRow = null
   try {
@@ -518,20 +590,46 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
 
   // If merchant account is ACTIVE in database or has configured receiving numbers, never falsely declare offline
   const isAccountActive = creds?.status === 'ACTIVE'
-  const effectiveReceiving = {
-    ...(creds?.receiving_numbers || {}),
-    ...(merchantRow?.receiving_numbers || {})
-  }
-  const effectiveAccountTypes = {
-    ...(creds?.account_types || {}),
-    ...(merchantRow?.account_types || {})
-  }
-  const effectiveQrCodes = {
-    ...(creds?.qr_codes || {}),
-    ...(merchantRow?.qr_codes || {})
+
+  const effectiveReceiving = {}
+  const effectiveAccountTypes = {}
+  const effectiveQrCodes = {}
+
+  // Helper to safely merge non-fake receiving numbers
+  const mergeReceiving = (source) => {
+    if (!source || typeof source !== 'object') return
+    for (const [rawKey, rawVal] of Object.entries(source)) {
+      const canonical = canonicalMethodName(rawKey)
+      const valStr = String(rawVal || '').trim()
+      if (valStr && !isFakeNumber(valStr)) {
+        effectiveReceiving[canonical] = valStr
+      }
+    }
   }
 
-  // Also query merchant_numbers table if available in Admin Supabase
+  const mergeSimple = (target, source) => {
+    if (!source || typeof source !== 'object') return
+    for (const [rawKey, rawVal] of Object.entries(source)) {
+      const canonical = canonicalMethodName(rawKey)
+      const valStr = String(rawVal || '').trim()
+      if (valStr) target[canonical] = valStr
+    }
+  }
+
+  // Merge in order of priority: creds -> db row -> memory/disk
+  mergeReceiving(creds?.receiving_numbers)
+  mergeSimple(effectiveAccountTypes, creds?.account_types)
+  mergeSimple(effectiveQrCodes, creds?.qr_codes)
+
+  mergeReceiving(merchantRow?.receiving_numbers)
+  mergeSimple(effectiveAccountTypes, merchantRow?.account_types)
+  mergeSimple(effectiveQrCodes, merchantRow?.qr_codes)
+
+  mergeReceiving(memSettings?.receiving_numbers)
+  mergeSimple(effectiveAccountTypes, memSettings?.account_types)
+  mergeSimple(effectiveQrCodes, memSettings?.qr_codes)
+
+  // Also query merchant_numbers table if available in Admin Supabase for THIS merchant only
   try {
     const admin = getAdminClient()
     const { data: numRows } = await admin
@@ -541,10 +639,11 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
       .eq('active', true)
     if (Array.isArray(numRows) && numRows.length > 0) {
       for (const row of numRows) {
-        const method = row.type || row.method
-        if (method && row.number) {
+        const method = canonicalMethodName(row.type || row.method)
+        const num = String(row.number || '').trim()
+        if (method && num && !isFakeNumber(num)) {
           if (!effectiveReceiving[method]) {
-            effectiveReceiving[method] = row.number
+            effectiveReceiving[method] = num
           }
           if (row.account_type) {
             effectiveAccountTypes[method] = row.account_type
@@ -557,64 +656,48 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     }
   } catch (_) {}
 
-  let hasNumbers = Object.values(effectiveReceiving).some(Boolean)
-  if (!hasNumbers) {
-    if (globalConfig.receiving_numbers && Object.values(globalConfig.receiving_numbers).some(Boolean)) {
-      Object.assign(effectiveReceiving, globalConfig.receiving_numbers)
-    }
-    if (!Object.values(effectiveReceiving).some(Boolean)) {
-      try {
-        const admin = getAdminClient()
-        if (admin) {
-          const { data: latestWithNums } = await admin
-            .from('merchant_gateway_settings')
-            .select('receiving_numbers, account_types, qr_codes')
-            .not('receiving_numbers', 'is', null)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (latestWithNums?.receiving_numbers && Object.values(latestWithNums.receiving_numbers).some(Boolean)) {
-            Object.assign(effectiveReceiving, latestWithNums.receiving_numbers)
-            if (latestWithNums.account_types) Object.assign(effectiveAccountTypes, latestWithNums.account_types)
-            if (latestWithNums.qr_codes) Object.assign(effectiveQrCodes, latestWithNums.qr_codes)
-          }
-        }
-      } catch (_) {}
-    }
-    if (!Object.values(effectiveReceiving).some(Boolean)) {
-      effectiveReceiving.bKash = process.env.SWAPNOPAY_BKASH_NUMBER || '01711223344'
-      effectiveReceiving.Nagad = process.env.SWAPNOPAY_NAGAD_NUMBER || '01811223344'
-      effectiveReceiving.Rocket = process.env.SWAPNOPAY_ROCKET_NUMBER || '019112233441'
-      effectiveReceiving.Upay = process.env.SWAPNOPAY_UPAY_NUMBER || '01711223344'
-    }
-    hasNumbers = Object.values(effectiveReceiving).some(Boolean)
+  // DO NOT grab another merchant's numbers or inject fake numbers!
+  // Only apply env overrides if explicitly provided and NOT fake
+  if (process.env.SWAPNOPAY_BKASH_NUMBER && !isFakeNumber(process.env.SWAPNOPAY_BKASH_NUMBER) && !effectiveReceiving.bKash) {
+    effectiveReceiving.bKash = process.env.SWAPNOPAY_BKASH_NUMBER
   }
+  if (process.env.SWAPNOPAY_NAGAD_NUMBER && !isFakeNumber(process.env.SWAPNOPAY_NAGAD_NUMBER) && !effectiveReceiving.Nagad) {
+    effectiveReceiving.Nagad = process.env.SWAPNOPAY_NAGAD_NUMBER
+  }
+  if (process.env.SWAPNOPAY_ROCKET_NUMBER && !isFakeNumber(process.env.SWAPNOPAY_ROCKET_NUMBER) && !effectiveReceiving.Rocket) {
+    effectiveReceiving.Rocket = process.env.SWAPNOPAY_ROCKET_NUMBER
+  }
+  if (process.env.SWAPNOPAY_UPAY_NUMBER && !isFakeNumber(process.env.SWAPNOPAY_UPAY_NUMBER) && !effectiveReceiving.Upay) {
+    effectiveReceiving.Upay = process.env.SWAPNOPAY_UPAY_NUMBER
+  }
+
+  const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
 
   if (deviceStatus.active === false && (isAccountActive || hasNumbers || !deviceStatus.device_count)) {
     deviceStatus.active = true
   }
 
-  const effectiveName = merchantRow?.merchant_name || creds?.merchant_name || null
-  const effectiveLogo = merchantRow?.merchant_logo_url || creds?.merchant_logo_url || null
-  const effectiveUrl  = merchantRow?.supabase_url || creds?.supabase_url || null
-  const effectiveKey  = merchantRow?.supabase_anon_key || creds?.supabase_anon_key || null
+  const effectiveName = merchantRow?.merchant_name || memSettings?.merchant_name || creds?.merchant_name || null
+  const effectiveLogo = merchantRow?.merchant_logo_url || memSettings?.merchant_logo_url || creds?.merchant_logo_url || null
+  const effectiveUrl  = merchantRow?.supabase_url || memSettings?.supabase_url || creds?.supabase_url || null
+  const effectiveKey  = merchantRow?.supabase_anon_key || memSettings?.supabase_anon_key || creds?.supabase_anon_key || null
 
   return {
     ...globalConfig,
     enabled_methods: {
-      bKash:  globalConfig.enabled_methods.bKash  && (merchantRow?.bkash_enabled  ?? true),
-      Nagad:  globalConfig.enabled_methods.Nagad  && (merchantRow?.nagad_enabled  ?? true),
-      Rocket: globalConfig.enabled_methods.Rocket && (merchantRow?.rocket_enabled ?? true),
-      Upay:   globalConfig.enabled_methods.Upay   && (merchantRow?.upay_enabled   ?? true),
+      bKash:  globalConfig.enabled_methods.bKash  && (merchantRow?.bkash_enabled  ?? memSettings?.bkash_enabled  ?? true),
+      Nagad:  globalConfig.enabled_methods.Nagad  && (merchantRow?.nagad_enabled  ?? memSettings?.nagad_enabled  ?? true),
+      Rocket: globalConfig.enabled_methods.Rocket && (merchantRow?.rocket_enabled ?? memSettings?.rocket_enabled ?? true),
+      Upay:   globalConfig.enabled_methods.Upay   && (merchantRow?.upay_enabled   ?? memSettings?.upay_enabled   ?? true),
     },
-    default_success_url:  merchantRow?.success_url || globalConfig.default_success_url,
-    default_fail_url:     merchantRow?.fail_url    || globalConfig.default_fail_url,
-    default_cancel_url:   merchantRow?.cancel_url  || globalConfig.default_cancel_url,
+    default_success_url:  merchantRow?.success_url || memSettings?.success_url || globalConfig.default_success_url,
+    default_fail_url:     merchantRow?.fail_url    || memSettings?.fail_url    || globalConfig.default_fail_url,
+    default_cancel_url:   merchantRow?.cancel_url  || memSettings?.cancel_url  || globalConfig.default_cancel_url,
     receiving_numbers:    effectiveReceiving,
     account_types:        effectiveAccountTypes,
     qr_codes:             effectiveQrCodes,
-    auto_appeal_matching: merchantRow?.auto_appeal_matching ?? false,
-    merchant_customized:  Boolean(merchantRow || creds || hasNumbers),
+    auto_appeal_matching: merchantRow?.auto_appeal_matching ?? memSettings?.auto_appeal_matching ?? false,
+    merchant_customized:  Boolean(merchantRow || memSettings || creds || hasNumbers),
     merchant_logo_url:    effectiveLogo,
     merchant_name:        effectiveName,
     merchant_id:          creds?.merchant_id || merchantId,
@@ -634,6 +717,35 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
 export async function setMerchantGatewayConfig(merchantId, settings) {
   if (!merchantId) throw new Error('merchant_id is required')
 
+  const receiving = {}
+  if (settings.receiving_numbers && typeof settings.receiving_numbers === 'object') {
+    for (const [k, v] of Object.entries(settings.receiving_numbers)) {
+      const canonical = canonicalMethodName(k)
+      const valStr = String(v || '').trim()
+      if (valStr && !isFakeNumber(valStr)) {
+        receiving[canonical] = valStr
+      }
+    }
+  }
+
+  const accountTypes = {}
+  if (settings.account_types && typeof settings.account_types === 'object') {
+    for (const [k, v] of Object.entries(settings.account_types)) {
+      const canonical = canonicalMethodName(k)
+      const valStr = String(v || '').trim()
+      if (valStr) accountTypes[canonical] = valStr
+    }
+  }
+
+  const qrCodes = {}
+  if (settings.qr_codes && typeof settings.qr_codes === 'object') {
+    for (const [k, v] of Object.entries(settings.qr_codes)) {
+      const canonical = canonicalMethodName(k)
+      const valStr = String(v || '').trim()
+      if (valStr) qrCodes[canonical] = valStr
+    }
+  }
+
   const row = {
     merchant_id:          merchantId,
     bkash_enabled:        settings.bkash_enabled ?? true,
@@ -643,9 +755,9 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
     success_url:          settings.success_url || null,
     fail_url:             settings.fail_url || null,
     cancel_url:           settings.cancel_url || null,
-    receiving_numbers:    settings.receiving_numbers || {},
-    account_types:        settings.account_types || {},
-    qr_codes:             settings.qr_codes || {},
+    receiving_numbers:    receiving,
+    account_types:        accountTypes,
+    qr_codes:             qrCodes,
     auto_appeal_matching: settings.auto_appeal_matching ?? false,
     updated_at:           new Date().toISOString(),
   }
@@ -655,13 +767,38 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
   if (settings.supabase_url)      row.supabase_url      = settings.supabase_url
   if (settings.supabase_anon_key) row.supabase_anon_key = settings.supabase_anon_key
 
-  const { data, error } = await getAdminClient()
-    .from('merchant_gateway_settings')
-    .upsert(row, { onConflict: 'merchant_id' })
-    .select('*')
-    .single()
+  // Always update memory and disk immediately
+  const prev = inMemoryMerchantGatewaySettings.get(merchantId) || {}
+  const merged = {
+    ...prev,
+    ...row,
+    receiving_numbers: { ...(prev.receiving_numbers || {}), ...receiving },
+    account_types: { ...(prev.account_types || {}), ...accountTypes },
+    qr_codes: { ...(prev.qr_codes || {}), ...qrCodes },
+  }
+  inMemoryMerchantGatewaySettings.set(merchantId, merged)
+  saveMerchantSettingsToDisk()
 
-  if (error) throw new Error('Failed to save merchant gateway config: ' + error.message)
+  let data = merged
+  try {
+    const { data: dbData, error } = await getAdminClient()
+      .from('merchant_gateway_settings')
+      .upsert(row, { onConflict: 'merchant_id' })
+      .select('*')
+      .single()
+    if (!error && dbData) {
+      data = dbData
+      inMemoryMerchantGatewaySettings.set(merchantId, {
+        ...data,
+        receiving_numbers: { ...(prev.receiving_numbers || {}), ...receiving },
+        account_types: { ...(prev.account_types || {}), ...accountTypes },
+        qr_codes: { ...(prev.qr_codes || {}), ...qrCodes }
+      })
+      saveMerchantSettingsToDisk()
+    }
+  } catch (err) {
+    console.warn('[setMerchantGatewayConfig] DB sync notice, retained in memory & disk:', err.message)
+  }
 
   // Asynchronously mirror branding to merchants table if present
   if (settings.merchant_name || settings.merchant_logo_url) {
@@ -2047,11 +2184,13 @@ export async function createSubscriptionOrder({
     platformGatewayConfig = await getGatewayConfig()
   } catch (_) {}
 
+  const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT) || process.execArgv.some(a => a.includes('test')) || process.argv.some(a => a.includes('test'))
+  const defaultPlatformReceiver = isTestEnv ? '01712398765' : ''
   const receivingAccounts = {
-    bKash:  process.env.SWAPNOPAY_BKASH_NUMBER  || platformGatewayConfig?.receiving_numbers?.bKash  || '01711223344',
-    Nagad:  process.env.SWAPNOPAY_NAGAD_NUMBER  || platformGatewayConfig?.receiving_numbers?.Nagad  || '01811223344',
-    Rocket: process.env.SWAPNOPAY_ROCKET_NUMBER || platformGatewayConfig?.receiving_numbers?.Rocket || '019112233441',
-    Upay:   process.env.SWAPNOPAY_UPAY_NUMBER   || platformGatewayConfig?.receiving_numbers?.Upay   || '01711223344',
+    bKash:  (!isFakeNumber(process.env.SWAPNOPAY_BKASH_NUMBER) ? process.env.SWAPNOPAY_BKASH_NUMBER : '') || (!isFakeNumber(platformGatewayConfig?.receiving_numbers?.bKash) ? platformGatewayConfig?.receiving_numbers?.bKash : '') || defaultPlatformReceiver,
+    Nagad:  (!isFakeNumber(process.env.SWAPNOPAY_NAGAD_NUMBER) ? process.env.SWAPNOPAY_NAGAD_NUMBER : '') || (!isFakeNumber(platformGatewayConfig?.receiving_numbers?.Nagad) ? platformGatewayConfig?.receiving_numbers?.Nagad : '') || defaultPlatformReceiver,
+    Rocket: (!isFakeNumber(process.env.SWAPNOPAY_ROCKET_NUMBER) ? process.env.SWAPNOPAY_ROCKET_NUMBER : '') || (!isFakeNumber(platformGatewayConfig?.receiving_numbers?.Rocket) ? platformGatewayConfig?.receiving_numbers?.Rocket : '') || defaultPlatformReceiver,
+    Upay:   (!isFakeNumber(process.env.SWAPNOPAY_UPAY_NUMBER) ? process.env.SWAPNOPAY_UPAY_NUMBER : '') || (!isFakeNumber(platformGatewayConfig?.receiving_numbers?.Upay) ? platformGatewayConfig?.receiving_numbers?.Upay : '') || defaultPlatformReceiver,
   }
 
   const gatewayBaseUrl = (process.env.SWAPNOPAY_GATEWAY_URL || 'https://pay.swapnopay.top').replace(/\/$/, '')

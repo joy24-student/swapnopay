@@ -30,6 +30,35 @@ let procSeconds = 300;
 let procInterval = null;
 let currentLang  = "en";
 
+const FAKE_NUMBERS = [
+  '01711223344', '01811223344', '019112233441', '01928092777',
+  '01712963652', '01819283746', '01612345678', '01712345678',
+  '01700000000', '01700000001', '01800000000', '01900000000',
+  '01600000000', '01500000000'
+];
+
+function isFakeNumber(num) {
+  if (!num) return true;
+  const clean = String(num).replace(/[^0-9]/g, '');
+  if (!clean || clean.length < 10) return true;
+  if (FAKE_NUMBERS.includes(clean)) return true;
+  if (/^01[3-9](\d)\1{7}$/.test(clean)) return true;
+  if (clean.includes('11223344') || clean.includes('12345678') || clean.includes('0000000')) return true;
+  return false;
+}
+
+function getMethodValue(map, method) {
+  if (!map || typeof map !== 'object') return null;
+  const target = String(method || '').trim().toLowerCase();
+  for (const [k, v] of Object.entries(map)) {
+    if (k.toLowerCase() === target && v) {
+      const valStr = String(v).trim();
+      if (!isFakeNumber(valStr)) return valStr;
+    }
+  }
+  return null;
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Multi-language translation database
 // ──────────────────────────────────────────────────────────────────────────────
@@ -177,8 +206,8 @@ window.onload = function () {
 
   const amount         = params.get("amount")          || "1,500.00";
   const merchantName   = params.get("merchant_name")   || "DreamMart";
-  const rawReceiver    = params.get("merchant_number") || "";
-  const receiverNumber = (rawReceiver && !rawReceiver.includes("XXXX")) ? rawReceiver : "";
+  const rawReceiver    = params.get("merchant_number") || params.get("number") || "";
+  const receiverNumber = (rawReceiver && !isFakeNumber(rawReceiver)) ? rawReceiver : "";
   if (receiverNumber) {
     merchantDefaultNumber = receiverNumber;
   }
@@ -406,8 +435,8 @@ function loadGatewayConfig(merchantIdParam) {
       // ── Receiving numbers per MFS method ──
       if (config.receiving_numbers && typeof config.receiving_numbers === 'object') {
         merchantReceivingNumbers = { ...merchantReceivingNumbers, ...config.receiving_numbers };
-        const num = merchantReceivingNumbers[selectedMethod] || Object.values(merchantReceivingNumbers).find(v => v && !String(v).includes('XXXX')) || config.default_number;
-        if (num && !String(num).includes('XXXX')) {
+        const num = getMethodValue(merchantReceivingNumbers, selectedMethod);
+        if (num) {
           merchantDefaultNumber = num;
           const numInput = document.getElementById("merchant-num-display");
           if (numInput) numInput.value = num;
@@ -917,7 +946,7 @@ function connectSupabaseRealtime(url, key, id) {
 function buildCallbackPayload() {
   const amountValue = Number((payableAmount || "1500").replace(/[^0-9.]/g, '')) || 1500;
   const orderValue = orderId && orderId !== 'demo_order_id' ? orderId : 'ORD-7845';
-  const userPhone = document.getElementById('customer-phone')?.value?.trim() || '01712345678';
+  const userPhone = document.getElementById('customer-phone')?.value?.trim() || '';
   const signature = `t=${Date.now()},v1=${[merchantId || 'merchant_01', orderValue, amountValue.toFixed(2), selectedMethod].join(':')}`;
 
   return {
@@ -1011,20 +1040,17 @@ function selectMFS(method, color) {
     activeCard.className = `border ${borderMap[method]} rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer shadow-sm mfs-option`;
   }
 
-  updateLabelsForMfs(method);
-
   const logoImg = document.getElementById("mfs-selected-logo");
   if (logoImg) {
     const logoSrc = { bKash: "BKash-Icon2-Logo.wine.svg", Nagad: "Nagad-Logo.wine.svg", Rocket: "Rocket.png", Upay: "upay-seeklogo.png" };
     logoImg.src = logoSrc[method] || "";
   }
 
-  if (merchantReceivingNumbers && merchantReceivingNumbers[method]) {
-    document.getElementById("merchant-num-display").value = merchantReceivingNumbers[method];
-  }
+  const methodNum = getMethodValue(merchantReceivingNumbers, method) || (!isFakeNumber(merchantDefaultNumber) ? merchantDefaultNumber : "");
+  const disp = document.getElementById("merchant-num-display");
+  if (disp) disp.value = methodNum;
 
-  const num = document.getElementById("merchant-num-display").value;
-  updateQrCode(num);
+  updateQrCode(methodNum);
   updateLabelsForMfs(method);
 }
 
@@ -1040,17 +1066,14 @@ function updateLabelsForMfs(method) {
   const instructionsHeader = document.querySelector('[data-translate="scanPay"]');
 
   const urlAccType = new URLSearchParams(window.location.search).get("account_type") || "";
-  const accType = (merchantAccountTypes && merchantAccountTypes[method]) ? String(merchantAccountTypes[method]).trim().toLowerCase() : urlAccType.trim().toLowerCase();
+  const accTypeVal = getMethodValue(merchantAccountTypes, method) || urlAccType;
+  const accType = String(accTypeVal).trim().toLowerCase();
   const isPersonal = accType.includes("personal");
-  const targetNum = (merchantReceivingNumbers && merchantReceivingNumbers[method] && !merchantReceivingNumbers[method].includes("XXXX"))
-    ? merchantReceivingNumbers[method]
-    : ((document.getElementById("merchant-num-display")?.value && !document.getElementById("merchant-num-display")?.value.includes("XXXX")) ? document.getElementById("merchant-num-display")?.value : (merchantDefaultNumber && !merchantDefaultNumber.includes("XXXX") ? merchantDefaultNumber : ""));
+  const targetNum = getMethodValue(merchantReceivingNumbers, method) || (!isFakeNumber(merchantDefaultNumber) ? merchantDefaultNumber : "");
 
-  if (targetNum) {
-    const disp = document.getElementById("merchant-num-display");
-    if (disp) disp.value = targetNum;
-    updateQrCode(targetNum);
-  }
+  const disp = document.getElementById("merchant-num-display");
+  if (disp) disp.value = targetNum;
+  updateQrCode(targetNum);
   const currentReceiverNum = targetNum || "";
 
   if (qrCard) {

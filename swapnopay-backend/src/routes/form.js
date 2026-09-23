@@ -1306,29 +1306,42 @@ export function formRouter(io = null) {
 
         // Resolve merchant receiving numbers, account types, and logo for instant display
         try {
-          const { getMerchantGatewayConfig } = await import('../services/adminSupabase.js')
-          const mConfig = await getMerchantGatewayConfig(form.merchant_id || null)
+          const { getMerchantGatewayConfig, isFakeNumber, canonicalMethodName } = await import('../services/adminSupabase.js')
+          const mConfig = form.merchant_id ? await getMerchantGatewayConfig(form.merchant_id) : null
           if (mConfig) {
             if (!merchantParam && mConfig.merchant_id) {
               merchantParam = `&merchant_id=${encodeURIComponent(mConfig.merchant_id)}`
             }
-            const activeMethod = payment_method || 'bKash'
-            let activeNum = (mConfig.receiving_numbers && mConfig.receiving_numbers[activeMethod]) || (mConfig.receiving_numbers && Object.values(mConfig.receiving_numbers)[0])
+            const activeMethod = canonicalMethodName(payment_method || 'bKash')
+            const findNum = (numMap) => {
+              if (!numMap || typeof numMap !== 'object') return null
+              for (const [k, v] of Object.entries(numMap)) {
+                if (canonicalMethodName(k).toLowerCase() === activeMethod.toLowerCase()) {
+                  const val = String(v || '').trim()
+                  if (val && !isFakeNumber(val)) return val
+                }
+              }
+              return null
+            }
+
+            let activeNum = findNum(mConfig.receiving_numbers)
             if (!activeNum) {
               const formNums = form.receiving_numbers || form.gateway_config?.receiving_numbers || (form.theme && form.theme.receiving_numbers)
-              if (formNums && formNums[activeMethod]) activeNum = formNums[activeMethod]
-              else if (formNums && Object.values(formNums)[0]) activeNum = Object.values(formNums)[0]
+              activeNum = findNum(formNums)
             }
             if (!activeNum) {
               const envNumbers = {
-                bKash: process.env.SWAPNOPAY_BKASH_NUMBER || '01711223344',
-                Nagad: process.env.SWAPNOPAY_NAGAD_NUMBER || '01811223344',
-                Rocket: process.env.SWAPNOPAY_ROCKET_NUMBER || '019112233441',
-                Upay: process.env.SWAPNOPAY_UPAY_NUMBER || '01711223344',
+                bKash: process.env.SWAPNOPAY_BKASH_NUMBER,
+                Nagad: process.env.SWAPNOPAY_NAGAD_NUMBER,
+                Rocket: process.env.SWAPNOPAY_ROCKET_NUMBER,
+                Upay: process.env.SWAPNOPAY_UPAY_NUMBER,
               }
-              activeNum = envNumbers[activeMethod] || envNumbers.bKash
+              const envVal = envNumbers[activeMethod]
+              if (envVal && !isFakeNumber(envVal)) {
+                activeNum = envVal
+              }
             }
-            if (activeNum) {
+            if (activeNum && !isFakeNumber(activeNum)) {
               numberParam = `&merchant_number=${encodeURIComponent(activeNum)}`
             }
             const activeType = (mConfig.account_types && mConfig.account_types[activeMethod]) ||
