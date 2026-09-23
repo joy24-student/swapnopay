@@ -337,6 +337,12 @@ app.get(['/voice-call', '/call', '/voice-calling', '/voice-agent'], (req, res) =
   res.redirect(301, `/voice-call.html${queryStr}`)
 })
 
+// Online MCQ & Quiz Exam Portal (/exam, /quiz, /assessment)
+app.get(['/exam', '/exams', '/quiz', '/assessment'], (req, res) => {
+  const queryStr = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+  res.redirect(301, `/exam.html${queryStr}`)
+})
+
 // Hosted Checkout Form Dynamic Slugs (/f/:slug, /forms/:slug, /form/:slug)
 app.get(['/f/:slug', '/forms/:slug', '/form/:slug'], (req, res) => {
   const formHtml = path.join(webDir, 'form.html')

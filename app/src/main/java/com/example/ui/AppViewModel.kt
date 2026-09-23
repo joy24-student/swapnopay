@@ -7147,49 +7147,489 @@ function executePayment() {
                 )
                 formThemeConfig.value = FormThemeConfig(primaryColorHex = "#8B5CF6", buttonShape = "ROUNDED")
             }
+            "ONLINE_MCQ_EXAM", "EXAM", "QUIZ", "MCQ_EXAM" -> {
+                formTitle.value = "Certified Professional Examination — Online Assessment"
+                formDescription.value = "Timed computer-based multiple choice examination with autosave and live progress tracking."
+                formFieldsList.value = listOf(
+                    FormFieldItem(type = FormFieldType.NAME, label = "Candidate Full Name", placeholder = "Enter full legal name", isRequired = true, pageIndex = 0),
+                    FormFieldItem(type = FormFieldType.NAME, label = "Roll / Student ID", placeholder = "e.g. REG-2026-8941", isRequired = true, pageIndex = 0),
+                    FormFieldItem(type = FormFieldType.EMAIL, label = "Registered Email Address", placeholder = "candidate@example.com", isRequired = true, pageIndex = 0),
+                    FormFieldItem(type = FormFieldType.PHONE, label = "Contact Phone", placeholder = "01XXXXXXXXX", isRequired = true, pageIndex = 0),
+                    FormFieldItem(
+                        type = FormFieldType.RADIO,
+                        label = "Which methodology emphasizes iterative delivery in short cycles?",
+                        options = listOf("Waterfall", "Agile", "Critical Path Method", "Six Sigma"),
+                        isRequired = true,
+                        pageIndex = 1
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.RADIO,
+                        label = "A risk register should be updated only at project closure.",
+                        options = listOf("True", "False"),
+                        isRequired = true,
+                        pageIndex = 1
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.CHECKBOX,
+                        label = "Select all elements typically found in a project charter.",
+                        options = listOf("Business case", "Stakeholder list", "Detailed Gantt chart", "High-level budget", "Vendor invoices"),
+                        isRequired = true,
+                        pageIndex = 1
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.NAME,
+                        label = "The process of identifying, analyzing, and responding to project risk is called risk ______.",
+                        placeholder = "Fill in the blank...",
+                        isRequired = true,
+                        pageIndex = 1
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.RADIO,
+                        label = "Which document formally authorizes a project to begin?",
+                        options = listOf("Project charter", "Status report", "Lessons learned register", "RACI matrix"),
+                        isRequired = true,
+                        pageIndex = 2
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.RADIO,
+                        label = "Earned Value Management can be used to forecast final project cost.",
+                        options = listOf("True", "False"),
+                        isRequired = true,
+                        pageIndex = 2
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.DROPDOWN,
+                        label = "Match: Uncontrolled expansion of project scope is known as...",
+                        options = listOf("Scope creep", "Critical path", "Milestone variance", "Sprint backlog"),
+                        isRequired = true,
+                        pageIndex = 2
+                    ),
+                    FormFieldItem(
+                        type = FormFieldType.FILE_UPLOAD,
+                        label = "Upload completed risk register or calculation sheet (PDF / Image)",
+                        isRequired = false,
+                        pageIndex = 2
+                    )
+                )
+                formPagesList.value = listOf(
+                    FormPageItem(id = "page_0", title = "Part 1: Candidate Verification", subtitle = "Verify your credentials before starting"),
+                    FormPageItem(id = "page_1", title = "Part 2: Core Project Management MCQs", subtitle = "Select the most accurate answer for each item"),
+                    FormPageItem(id = "page_2", title = "Part 3: Advanced Concepts & Scenarios", subtitle = "Applied risk and scheduling questions"),
+                    FormPageItem(
+                        id = "page_3",
+                        title = "Exam Submitted",
+                        subtitle = "Your assessment has been recorded",
+                        isCustomHtml = true,
+                        customHtmlContent = """<div style="max-width: 480px; margin: 30px auto; text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 24px;"><div style="width: 60px; height: 60px; border-radius: 50%; background: #E3F5EC; color: #1B8A5A; font-size: 28px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-weight: bold;">✓</div><h2 style="color: #1C1F26; margin: 0 0 8px 0; font-size: 22px;">Exam Submitted Successfully</h2><p style="color: #6B7280; font-size: 14.5px; margin: 0 0 16px 0; line-height: 1.6;">Your answers have been securely logged. The evaluation results will be published and sent to your registered email address.</p><div style="display: inline-block; padding: 8px 16px; background: #E8EDFC; color: #2856E0; font-weight: 700; border-radius: 6px; font-size: 13px;">Status: Response Locked</div></div>"""
+                    )
+                )
+                formProductsList.value = emptyList()
+                formThemeConfig.value = FormThemeConfig(
+                    primaryColorHex = "#2856E0",
+                    buttonShape = "ROUNDED",
+                    isMultiPageForm = true,
+                    enableTimer = true,
+                    timerMinutes = 25,
+                    progressTrackerStyle = "NUMBER",
+                    enablePayment = false,
+                    fontFamily = "Inter"
+                )
+            }
         }
         saveActiveFormToHostedList()
         logFirebaseStatus("Auto-configured Form Template: $templateKey")
     }
 
     // AI Form Generator Logic
-    fun generateFormWithAI(prompt: String) {
-        val lc = prompt.lowercase()
-        pushFormStateToUndo()
-        aiFormPromptInput.value = prompt
+    fun buildSemanticFormJson(prompt: String): org.json.JSONObject {
+        val p = prompt.trim()
+        val lc = p.lowercase()
+
+        var cleanTitle = p
+            .replace(Regex("^(create|make|build|generate|design)\\s+(a|an|the)?\\s*", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+(form|page|checkout|payment)\\s*$", RegexOption.IGNORE_CASE), "")
+            .trim()
+        if (cleanTitle.length > 50) cleanTitle = cleanTitle.take(50).trim()
+        if (cleanTitle.isNotEmpty()) {
+            cleanTitle = cleanTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        } else {
+            cleanTitle = "Payment & Order Form"
+        }
+
+        val isExam = listOf("exam", "quiz", "mcq", "test", "assessment", "questionnaire", "mock test").any { lc.contains(it) }
+        val isEdu = !isExam && listOf("course", "tuition", "student", "school", "college", "university", "academy", "batch", "class", "admission", "training", "bootcamp").any { lc.contains(it) }
+        val isDonation = listOf("donation", "mosque", "masjid", "madrasah", "ngo", "charity", "zakat", "sadaqah", "relief", "fundraiser", "waqf", "help").any { lc.contains(it) }
+        val isEvent = listOf("event", "ticket", "conference", "webinar", "seminar", "meetup", "summit", "workshop", "party", "concert", "fest").any { lc.contains(it) }
+        val isAppointment = listOf("appointment", "booking", "consult", "doctor", "clinic", "lawyer", "session", "slot", "schedule", "advisor").any { lc.contains(it) }
+        val isDigital = listOf("digital", "download", "ebook", "pdf", "software", "script", "template", "plugin", "license", "preset").any { lc.contains(it) }
+        val isFood = listOf("food", "restaurant", "burger", "pizza", "cafe", "catering", "bakery", "meal", "lunch", "dinner", "snack").any { lc.contains(it) }
+        val isSub = listOf("membership", "subscription", "gym", "fitness", "club", "monthly", "annual").any { lc.contains(it) }
+        val isClothing = listOf("shirt", "pant", "dress", "panjabi", "shoe", "cloth", "fashion", "tshirt", "hoodie", "saree").any { lc.contains(it) }
+
+        val amountRegex = Regex("(?:৳|tk|bdt|\\$)\\s*(\\d+(?:,\\d+)*(?:\\.\\d+)?)")
+        val amountRegex2 = Regex("(\\d+(?:,\\d+)*(?:\\.\\d+)?)\\s*(?:৳|tk|bdt|taka|dollars|\\$)")
+        val amountMatch = amountRegex.find(lc) ?: amountRegex2.find(lc)
+        val extractedAmount = amountMatch?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull()?.toInt()
+
+        val hasBkash = listOf("bkash", "nagad", "rocket", "trx", "transaction", "txn").any { lc.contains(it) }
+        val hasUpload = listOf("upload", "file", "pdf", "cv", "resume", "screenshot", "photo", "image").any { lc.contains(it) }
+        val hasAddress = listOf("address", "shipping", "delivery", "home delivery", "courier").any { lc.contains(it) }
+        val hasCoupon = listOf("coupon", "promo", "voucher", "discount").any { lc.contains(it) }
+
+        val root = org.json.JSONObject()
+        root.put("title", cleanTitle)
+
+        var templateKey = "SINGLE_PRODUCT"
+        var primaryColor = "#4F46E5"
+        var buttonShape = "ROUNDED"
+        var desc = "Online form for $cleanTitle. Please fill in your details below."
+
+        val pagesArr = org.json.JSONArray()
 
         when {
-            lc.contains("donation") || lc.contains("mosque") || lc.contains("school") || lc.contains("ngo") || lc.contains("charity") -> {
-                autoConfigureTemplate("DONATION")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isExam -> {
+                templateKey = "ONLINE_MCQ_EXAM"
+                primaryColor = "#2856E0"
+                buttonShape = "ROUNDED"
+                desc = "Official online assessment for $cleanTitle. Timed exam with autosave and live progress tracking."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Part 1: Candidate Verification")
+                    put("subtitle", "Verify your identity before starting the exam")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Candidate Full Name"); put("placeholder", "Enter full legal name"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Roll / Student ID"); put("placeholder", "e.g. REG-2026-8941"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Registered Email Address"); put("placeholder", "candidate@example.com"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Contact Phone"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Part 2: Multiple Choice Questions")
+                    put("subtitle", "Select the best answer for each question")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply {
+                            put("type", "RADIO")
+                            put("label", "Which methodology emphasizes iterative delivery in short cycles?")
+                            put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Waterfall", "Agile", "Critical Path Method", "Six Sigma")))
+                        })
+                        put(org.json.JSONObject().apply {
+                            put("type", "RADIO")
+                            put("label", "A risk register should be updated only at project closure.")
+                            put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("True", "False")))
+                        })
+                        put(org.json.JSONObject().apply {
+                            put("type", "CHECKBOX")
+                            put("label", "Select all elements typically found in a project charter.")
+                            put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Business case", "Stakeholder list", "Detailed Gantt chart", "High-level budget", "Vendor invoices")))
+                        })
+                        put(org.json.JSONObject().apply {
+                            put("type", "NAME")
+                            put("label", "The process of identifying, analyzing, and responding to project risk is called risk ______.")
+                            put("placeholder", "Fill in the blank...")
+                            put("isRequired", true)
+                        })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p3 = org.json.JSONObject().apply {
+                    put("title", "Part 3: Advanced Scenarios & Matching")
+                    put("subtitle", "Applied knowledge questions")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply {
+                            put("type", "RADIO")
+                            put("label", "Which document formally authorizes a project to begin?")
+                            put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Project charter", "Status report", "Lessons learned register", "RACI matrix")))
+                        })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DROPDOWN")
+                            put("label", "Match: Uncontrolled expansion of project scope is known as...")
+                            put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Scope creep", "Critical path", "Milestone variance", "Sprint backlog")))
+                        })
+                        put(org.json.JSONObject().apply {
+                            put("type", "FILE_UPLOAD")
+                            put("label", "Upload completed calculation sheet or supporting PDF (Optional)")
+                            put("isRequired", false)
+                        })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p4 = org.json.JSONObject().apply {
+                    put("title", "Exam Completed")
+                    put("subtitle", "Your assessment has been submitted")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="max-width: 480px; margin: 30px auto; text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 24px;"><div style="width: 60px; height: 60px; border-radius: 50%; background: #E3F5EC; color: #1B8A5A; font-size: 28px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-weight: bold;">✓</div><h2 style="color: #1C1F26; margin: 0 0 8px 0; font-size: 22px;">Exam Submitted Successfully</h2><p style="color: #6B7280; font-size: 14.5px; margin: 0 0 16px 0; line-height: 1.6;">Your responses have been recorded and locked for evaluation.</p><div style="display: inline-block; padding: 8px 16px; background: #E8EDFC; color: #2856E0; font-weight: 700; border-radius: 6px; font-size: 13px;">Reference ID: EXAM-LOCKED</div></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
+                pagesArr.put(p3)
+                pagesArr.put(p4)
             }
-            lc.contains("course") || lc.contains("tuition") || lc.contains("exam") || lc.contains("student") -> {
-                autoConfigureTemplate("EDUCATION")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isDonation -> {
+                templateKey = "DONATION"
+                primaryColor = "#059669"
+                buttonShape = "PILL"
+                desc = "Support our noble cause with your contribution. Select a donation tier or specify a custom amount."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Donation Details")
+                    put("subtitle", "Every contribution makes a significant difference")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Donor Name / দাতার নাম"); put("placeholder", "Optional / Anonymous"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Mobile Number / মোবাইল নম্বর"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Email Address (for receipt)"); put("placeholder", "your@email.com"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DONATION"); put("label", "Select Contribution Amount"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("৳100 (Sadaqah)", "৳500 (Supporter)", "৳1,000 (Generous)", "৳5,000 (Patron)")))
+                        })
+                        put(org.json.JSONObject().apply { put("type", "CUSTOM_AMOUNT"); put("label", "Or Enter Custom Amount (BDT / টাকা)"); put("placeholder", "e.g. 2500"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply { put("type", "NOTES"); put("label", "Prayer Request / Purpose"); put("placeholder", "Any message or prayer request..."); put("isRequired", false) })
+                        if (hasBkash) put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "bKash / Nagad TrxID"); put("placeholder", "e.g. 9J47KL89X"); put("isRequired", true) })
+                        if (hasUpload) put(org.json.JSONObject().apply { put("type", "FILE_UPLOAD"); put("label", "Payment Screenshot / Deposit Slip"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Thank You")
+                    put("subtitle", "Jazakallah Khair for your generosity")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 54px; margin-bottom: 12px;">🤲</div><h2 style="color: #059669; margin: 0 0 8px 0; font-size: 24px;">জাযাকাল্লাহু খাইরান!</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">আপনার অনুদানের জন্য আন্তরিক ধন্যবাদ। আল্লাহ আপনার দানকে কবুল করুন ও উত্তম প্রতিদান দান করুন।</p><div style="display: inline-block; padding: 10px 20px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 9999px; color: #065F46; font-size: 13px; font-weight: 600;">Donation Receipt Will Be Sent via SMS</div></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
             }
-            lc.contains("ticket") || lc.contains("event") || lc.contains("webinar") || lc.contains("conference") -> {
-                autoConfigureTemplate("EVENT")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isEdu -> {
+                templateKey = "EDUCATION"
+                primaryColor = "#7C3AED"
+                buttonShape = "ROUNDED"
+                val price = extractedAmount ?: 3500
+                desc = "Complete your course registration and fee payment to secure your seat in the batch."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Student Registration")
+                    put("subtitle", "Enter your academic and contact information")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Student Full Name / শিক্ষার্থীর নাম"); put("placeholder", "e.g. Tanvir Hasan"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Student WhatsApp / Phone Number"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Email Address (for course access)"); put("placeholder", "student@example.com"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DROPDOWN"); put("label", "Select Batch / ব্যাচ"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Upcoming Live Batch (৳$price)", "Weekend Intensive (৳$price)", "Self-Paced Portal (৳${(price * 0.7).toInt()})")))
+                        })
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Educational Institution / Background"); put("placeholder", "College / University"); put("isRequired", false) })
+                        if (hasBkash) put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "bKash / Nagad Transaction ID"); put("placeholder", "e.g. 8K42NX99"); put("isRequired", true) })
+                        if (hasUpload) put(org.json.JSONObject().apply { put("type", "FILE_UPLOAD"); put("label", "Upload Student ID / Payment Proof"); put("isRequired", false) })
+                        if (hasCoupon) put(org.json.JSONObject().apply { put("type", "COUPON"); put("label", "Scholarship / Promo Code"); put("placeholder", "e.g. PROMO20"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Registration Confirmed")
+                    put("subtitle", "Welcome to the class")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 52px; margin-bottom: 12px;">🎓</div><h2 style="color: #7C3AED; margin: 0 0 8px 0; font-size: 24px;">অভিনন্দন! রেজিস্ট্রেশন সম্পন্ন হয়েছে</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">আপনার আসনটি সফলভাবে নিশ্চিত করা হয়েছে। ব্যাচ শুরু হওয়ার পূর্বে ক্লাসের লিংক ও রুটিন পাঠানো হবে।</p></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
             }
-            lc.contains("appointment") || lc.contains("consultation") || lc.contains("booking") -> {
-                autoConfigureTemplate("APPOINTMENT")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isEvent -> {
+                templateKey = "EVENT"
+                primaryColor = "#EC4899"
+                buttonShape = "PILL"
+                val price = extractedAmount ?: 800
+                desc = "Register now for $cleanTitle and receive your official digital entry pass."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Attendee Registration")
+                    put("subtitle", "Reserve your seat for the event")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Attendee Full Name"); put("placeholder", "e.g. Sadia Islam"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Email Address (for QR Pass)"); put("placeholder", "sadia@example.com"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Phone Number"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "COMPANY"); put("label", "Organization / University"); put("placeholder", "Company or Institution"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "RADIO"); put("label", "Ticket Tier"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("General Pass (৳$price)", "VIP Pass (৳${price * 2})", "Student Pass (৳${(price * 0.5).toInt()})")))
+                        })
+                        put(org.json.JSONObject().apply { put("type", "QUANTITY"); put("label", "Number of Tickets"); put("defaultValue", "1"); put("isRequired", true) })
+                        if (hasBkash) put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "bKash / Nagad TrxID"); put("placeholder", "e.g. 9B88CL21"); put("isRequired", true) })
+                        if (hasCoupon) put(org.json.JSONObject().apply { put("type", "COUPON"); put("label", "Discount Code"); put("placeholder", "e.g. EARLYBIRD"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Pass Issued")
+                    put("subtitle", "Your digital ticket is ready")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 54px; margin-bottom: 12px;">🎟️</div><h2 style="color: #EC4899; margin: 0 0 8px 0; font-size: 24px;">Ticket Reserved Successfully!</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">Thank you for registering. Your QR verification code is ready.</p></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
             }
-            lc.contains("digital") || lc.contains("download") || lc.contains("software") || lc.contains("ebook") -> {
-                autoConfigureTemplate("DIGITAL")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isAppointment -> {
+                templateKey = "APPOINTMENT"
+                primaryColor = "#0284C7"
+                buttonShape = "ROUNDED"
+                val price = extractedAmount ?: 1000
+                desc = "Book a consultation slot. Select your convenient date and preferred time window."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Appointment Booking")
+                    put("subtitle", "Choose your desired consultation slot")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Client Name"); put("placeholder", "Full Name"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Contact Phone Number"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Email Address"); put("placeholder", "client@example.com"); put("isRequired", false) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DROPDOWN"); put("label", "Consultation Type"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("General Session (৳$price)", "In-Depth Consultation (৳${price * 2})", "Follow-up Review (৳${(price * 0.6).toInt()})")))
+                        })
+                        put(org.json.JSONObject().apply { put("type", "DATE"); put("label", "Preferred Date"); put("placeholder", "YYYY-MM-DD"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DROPDOWN"); put("label", "Time Window"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Morning Slot (10:00 AM - 12:00 PM)", "Afternoon Slot (02:30 PM - 05:00 PM)", "Evening Slot (06:30 PM - 09:00 PM)")))
+                        })
+                        put(org.json.JSONObject().apply { put("type", "NOTES"); put("label", "Reason / Notes"); put("placeholder", "Describe your requirements..."); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                pagesArr.put(p1)
             }
-            lc.contains("cart") || lc.contains("store") || lc.contains("catalog") || lc.contains("ecommerce") -> {
-                autoConfigureTemplate("CART")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+            isDigital -> {
+                templateKey = "DIGITAL"
+                primaryColor = "#D97706"
+                buttonShape = "ROUNDED"
+                val price = extractedAmount ?: 1200
+                desc = "Instant automated digital delivery. Download link and license sent upon payment."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Digital Order")
+                    put("subtitle", "Enter your email for instant automated file link delivery")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Buyer Full Name"); put("placeholder", "Your Name"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "EMAIL"); put("label", "Delivery Email (Required for file link)"); put("placeholder", "your@email.com"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "WhatsApp / Phone Number"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "DROPDOWN"); put("label", "License Tier"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Single License (৳$price)", "Commercial License (৳${price * 3})")))
+                        })
+                        if (hasCoupon) put(org.json.JSONObject().apply { put("type", "COUPON"); put("label", "Discount Code"); put("placeholder", "e.g. LAUNCH50"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                pagesArr.put(p1)
             }
             else -> {
-                autoConfigureTemplate("SINGLE_PRODUCT")
-                formTitle.value = "AI Generated: ${prompt.take(40)}"
+                // E-Commerce / Physical Goods / General Form
+                templateKey = if (hasAddress || isClothing || isFood) "SINGLE_PRODUCT" else "CART"
+                primaryColor = if (isFood) "#EA580C" else if (isClothing) "#0F172A" else "#2563EB"
+                buttonShape = "ROUNDED"
+                val price = extractedAmount ?: (if (isClothing) 950 else if (isFood) 450 else 1250)
+                desc = "Order $cleanTitle online with nationwide courier delivery and cash on delivery or online payment."
+
+                val p1 = org.json.JSONObject().apply {
+                    put("title", "Order & Shipping")
+                    put("subtitle", "Provide your delivery details to complete your order")
+                    put("isCustomHtml", false)
+                    val fieldsArr = org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "Customer Full Name / আপনার নাম"); put("placeholder", "e.g. Asif Mahmud"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "PHONE"); put("label", "Mobile Number / মোবাইল নম্বর"); put("placeholder", "01XXXXXXXXX"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply { put("type", "ADDRESS"); put("label", "Full Delivery Address / পূর্ণ ঠিকানা"); put("placeholder", "House/Road, Area, District/Thana"); put("isRequired", true) })
+                        if (isClothing) {
+                            put(org.json.JSONObject().apply {
+                                put("type", "DROPDOWN"); put("label", "Select Size / সাইজ"); put("isRequired", true)
+                                put("options", org.json.JSONArray(listOf("M (Medium)", "L (Large)", "XL (Extra Large)", "XXL")))
+                            })
+                            put(org.json.JSONObject().apply {
+                                put("type", "RADIO"); put("label", "Color Variant / কালার"); put("isRequired", false)
+                                put("options", org.json.JSONArray(listOf("Black", "Navy Blue", "Maroon", "White")))
+                            })
+                        }
+                        put(org.json.JSONObject().apply { put("type", "QUANTITY"); put("label", "Quantity / পরিমাণ"); put("defaultValue", "1"); put("isRequired", true) })
+                        put(org.json.JSONObject().apply {
+                            put("type", "SHIPPING"); put("label", "Delivery Area / ডেলিভারি এলাকা"); put("isRequired", true)
+                            put("options", org.json.JSONArray(listOf("Inside Dhaka (৳60)", "Sub-Dhaka / Savar / Gazipur (৳100)", "Outside Dhaka Nationwide (৳130)")))
+                        })
+                        if (hasCoupon) put(org.json.JSONObject().apply { put("type", "COUPON"); put("label", "Discount Voucher Code"); put("placeholder", "e.g. SAVE10"); put("isRequired", false) })
+                        if (hasBkash) put(org.json.JSONObject().apply { put("type", "NAME"); put("label", "bKash / Nagad TrxID (if paid)"); put("placeholder", "Leave empty for COD"); put("isRequired", false) })
+                        if (hasUpload) put(org.json.JSONObject().apply { put("type", "FILE_UPLOAD"); put("label", "Reference Image / Slip"); put("isRequired", false) })
+                    }
+                    put("fields", fieldsArr)
+                }
+                val p2 = org.json.JSONObject().apply {
+                    put("title", "Order Received")
+                    put("subtitle", "Thank you for shopping with us")
+                    put("isCustomHtml", true)
+                    put("fields", org.json.JSONArray())
+                    put("customHtmlContent", """<div style="text-align: center; padding: 32px 16px; font-family: sans-serif;"><div style="font-size: 54px; margin-bottom: 12px;">📦</div><h2 style="color: $primaryColor; margin: 0 0 8px 0; font-size: 24px;">অর্ডার সফলভাবে গ্রহণ করা হয়েছে!</h2><p style="color: #4B5563; font-size: 15px; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">আপনার অর্ডারটি সফলভাবে নিবন্ধিত হয়েছে। আমাদের টিম শিগগিরই কল বা এসএমএসের মাধ্যমে আপনার অর্ডার কনফার্ম করবে।</p></div>""")
+                }
+                pagesArr.put(p1)
+                pagesArr.put(p2)
             }
         }
-        saveActiveFormToHostedList()
-        logFirebaseStatus("AI Form Generator built form from prompt: '$prompt'")
+
+        root.put("description", desc)
+        root.put("template_key", templateKey)
+
+        val theme = org.json.JSONObject().apply {
+            put("primaryColorHex", primaryColor)
+            put("backgroundColorHex", "#F8FAFC")
+            put("buttonShape", buttonShape)
+            put("fontFamily", "Inter")
+            put("isDarkMode", false)
+            put("showHeader", true)
+            put("backgroundStyle", "SOLID")
+            put("enablePayment", true)
+            put("currencyCode", "BDT")
+            put("redirectType", "SUCCESS_MSG")
+            put("successMessage", "ধন্যবাদ! আপনার তথ্য সফলভাবে জমা হয়েছে।")
+            put("enableAntiSpam", true)
+            put("isMultiPageForm", pagesArr.length() > 1)
+            put("progressTrackerStyle", "BAR")
+        }
+        root.put("theme", theme)
+        root.put("pages", pagesArr)
+
+        val customVars = org.json.JSONArray().apply {
+            put(org.json.JSONObject().apply { put("key", "customer_name"); put("exampleValue", "Asif Mahmud"); put("source", "field") })
+            put(org.json.JSONObject().apply { put("key", "customer_phone"); put("exampleValue", "01712345678"); put("source", "field") })
+            put(org.json.JSONObject().apply { put("key", "form_title"); put("exampleValue", cleanTitle); put("source", "system") })
+        }
+        root.put("custom_variables", customVars)
+
+        return root
+    }
+
+    fun generateFormWithAI(prompt: String) {
+        pushFormStateToUndo()
+        aiFormPromptInput.value = prompt
+        try {
+            val json = buildSemanticFormJson(prompt)
+            applyGeminiGeneratedForm(json, prompt)
+            saveActiveFormToHostedList()
+            logFirebaseStatus("AI Semantic Form Generator built form from prompt: '$prompt'")
+        } catch (e: Exception) {
+            android.util.Log.e("AppViewModel", "Semantic form gen error: ${e.message}", e)
+            formTitle.value = prompt.take(40).ifBlank { "Custom Form" }
+            saveActiveFormToHostedList()
+        }
     }
 
     fun generateFormFromAiPrompt(prompt: String) {
@@ -7372,6 +7812,14 @@ function executePayment() {
                         put("current_form", currentFormJson)
                     }
                     put("merchant_id", merchantId)
+                    val gemKey = _geminiApiKey.value.trim()
+                    if (gemKey.isNotBlank()) {
+                        put("gemini_api_key", gemKey)
+                    }
+                    val gemModel = _selectedGeminiModel.value.trim()
+                    if (gemModel.isNotBlank()) {
+                        put("gemini_model", gemModel)
+                    }
                 }
 
                 val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -7382,10 +7830,14 @@ function executePayment() {
 
                 for (base in candidateBases) {
                     try {
-                        val request = okhttp3.Request.Builder()
+                        val reqBuilder = okhttp3.Request.Builder()
                             .url("$base/v1/ai/generate-form")
                             .post(body)
-                            .build()
+                        val gemKey = _geminiApiKey.value.trim()
+                        if (gemKey.isNotBlank()) {
+                            reqBuilder.addHeader("x-gemini-api-key", gemKey)
+                        }
+                        val request = reqBuilder.build()
                         val res = withContext(Dispatchers.IO) {
                             client.newCall(request).execute().use { resp ->
                                 if (resp.isSuccessful) resp.body?.string() else null
@@ -7400,12 +7852,12 @@ function executePayment() {
 
                 if (!responseStr.isNullOrBlank()) {
                     val json = runCatching { org.json.JSONObject(responseStr) }.getOrNull()
-                    if (json != null && json.optBoolean("success")) {
+                    if (json != null) {
                         val formObj = json.optJSONObject("form")
-                        if (formObj != null) {
+                        if (formObj != null && (json.optBoolean("success") || json.optBoolean("fallback"))) {
                             applyGeminiGeneratedForm(formObj, prompt)
                             success = true
-                            logFirebaseStatus("Gemini AI Form Builder generated full custom form from prompt: '$prompt'")
+                            logFirebaseStatus("AI Form Builder generated full custom form from prompt: '$prompt'")
                         }
                     }
                 }

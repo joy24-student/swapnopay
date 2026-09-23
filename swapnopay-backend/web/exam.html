@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Online Assessment — Exam Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAFA; --surface:#FFFFFF; --border:#E2E4E9; --text:#1C1F26; --muted:#6B7280;
+  --accent:#2856E0; --accent-soft:#E8EDFC;
+  --ok:#1B8A5A; --ok-soft:#E3F5EC;
+  --warn:#C77D0A; --warn-soft:#FCF0DF;
+  --danger:#C23B3B; --danger-soft:#FBE9E9;
+  --radius:8px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161B; --surface:#1C1F26; --border:#2C303A; --text:#EDEEF2; --muted:#9AA1AE;
+    --accent:#6B8CF0; --accent-soft:#22284A;
+    --ok:#3FC788; --ok-soft:#173229;
+    --warn:#E0A23B; --warn-soft:#3A2C10;
+    --danger:#E36A6A; --danger-soft:#3A1C1C;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161B; --surface:#1C1F26; --border:#2C303A; --text:#EDEEF2; --muted:#9AA1AE;
+  --accent:#6B8CF0; --accent-soft:#22284A;
+  --ok:#3FC788; --ok-soft:#173229;
+  --warn:#E0A23B; --warn-soft:#3A2C10;
+  --danger:#E36A6A; --danger-soft:#3A1C1C;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top,0px));
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.header-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+.exam-title{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress{font-size:12.5px;color:var(--muted);font-weight:500}
+.header-right{display:flex;align-items:center;gap:14px}
+.autosave{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.autosave-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);transition:background 0.3s}
+.autosave.saving .autosave-dot{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.timer{font-variant-numeric:tabular-nums;font-size:16px;font-weight:700;padding:5px 12px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;gap:6px}
+.timer.warn{background:var(--danger-soft);color:var(--danger);animation:timerPulse 1s infinite alternate}
+@keyframes timerPulse{from{transform:scale(1)}to{transform:scale(1.03)}}
+
+.theme-toggle{background:none;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:13px;display:flex;align-items:center;gap:4px}
+
+.candidate-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 18px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.candidate-tag{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--text)}
+
+.layout{display:flex;max-width:1120px;margin:0 auto;padding:20px 16px;gap:20px;padding-bottom:96px}
+.sidebar{flex:0 0 230px}
+.nav-title{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 10px 2px;text-transform:uppercase;letter-spacing:0.5px}
+.nav-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.nav-btn{position:relative;height:38px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;transition:all 0.15s ease}
+.nav-btn:hover{border-color:var(--accent)}
+.nav-btn.answered{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.nav-btn.flagged{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.nav-btn.current{outline:2.5px solid var(--accent);outline-offset:2px;font-weight:700}
+.legend{margin-top:16px;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);padding:12px;border:1px solid var(--border);border-radius:var(--radius)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+.main{flex:1;min-width:0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.03)}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+.q-type{font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px}
+.q-prompt{font-size:16.5px;font-weight:600;margin:4px 0 0;line-height:1.5}
+.flag-btn{display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);flex:0 0 auto;transition:all 0.2s}
+.flag-btn:hover{border-color:var(--warn);color:var(--warn)}
+.flag-btn.on{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+
+.passage-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.passage-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;color:var(--text);max-height:260px;overflow-y:auto;line-height:1.6}
+.passage-box h4{margin:0 0 8px;font-size:14px;color:var(--accent);font-weight:700}
+
+.options{display:flex;flex-direction:column;gap:9px;margin-top:10px}
+.option{display:flex;align-items:center;gap:12px;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:all 0.15s ease;background:var(--surface);cursor:pointer}
+.option:hover{border-color:var(--accent);background:var(--accent-soft)}
+.option input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.option label{flex:1;font-size:14.5px;cursor:pointer;user-select:none;color:var(--text)}
+
+.blank-line{font-size:15px;line-height:2;padding:12px 0}
+.blank-input{border:none;border-bottom:2px solid var(--accent);background:var(--bg);color:var(--text);font-size:15px;width:220px;padding:4px 8px;border-radius:4px 4px 0 0;font-weight:600}
+.blank-input:focus{outline:none;background:var(--accent-soft)}
+
+textarea.code{width:100%;min-height:160px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;resize:vertical;line-height:1.5}
+textarea.code:focus{outline:none;border-color:var(--accent)}
+
+.match-row{display:grid;grid-template-columns:1fr 1.2fr;gap:14px;align-items:center;margin-top:10px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.match-row:last-child{border-bottom:none}
+.match-row .term{font-size:14px;font-weight:600;color:var(--text)}
+.match-row select{width:100%;padding:9px 12px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13.5px}
+
+.order-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.order-item{display:flex;align-items:center;gap:12px;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:var(--surface);cursor:grab;transition:box-shadow 0.15s ease}
+.order-item:active{cursor:grabbing}
+.order-item.dragging{opacity:.4;box-shadow:0 8px 16px rgba(0,0,0,0.1)}
+.order-num{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.drag-handle{margin-left:auto;color:var(--muted);font-size:13px;letter-spacing:1px}
+
+.file-drop{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;color:var(--muted);font-size:13.5px;background:var(--bg);transition:border-color 0.2s}
+.file-drop:hover{border-color:var(--accent)}
+.file-drop input{margin-top:12px}
+.file-name{margin-top:10px;font-size:13px;color:var(--ok);font-weight:600}
+
+.action-bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);
+  padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  display:flex;gap:12px;align-items:center;justify-content:space-between;z-index:20;box-shadow:0 -2px 10px rgba(0,0,0,0.04)}
+.btn{border-radius:var(--radius);padding:10px 18px;font-size:14px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text);transition:all 0.15s}
+.btn:hover{filter:brightness(0.96)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent}
+.bar-nav{display:flex;gap:10px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:30;padding:20px;backdrop-filter:blur(3px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);padding:26px;max-width:380px;width:100%;border:1px solid var(--border);box-shadow:0 12px 32px rgba(0,0,0,0.15)}
+.modal h3{margin:0 0 10px;font-size:18px;color:var(--text)}
+.modal p{color:var(--muted);font-size:14px;margin:0 0 8px;line-height:1.5}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions .btn{flex:1}
+
+.done-screen{max-width:480px;margin:60px auto;text-align:center;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,0.04)}
+.done-icon{width:64px;height:64px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:32px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;font-weight:bold}
+.done-screen h2{margin:0 0 8px;font-size:22px;color:var(--text)}
+.done-screen p{color:var(--muted);margin:0 0 20px;line-height:1.6}
+.done-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0;text-align:left}
+.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px}
+.stat-box .val{font-size:18px;font-weight:700;color:var(--text)}
+.stat-box .lbl{font-size:11.5px;color:var(--muted)}
+
+@media (max-width:768px){
+  .layout{flex-direction:column;padding-bottom:100px}
+  .sidebar{flex:none;width:100%}
+  .nav-grid{grid-auto-flow:column;grid-template-columns:none;grid-template-rows:1fr;overflow-x:auto;padding-bottom:6px}
+  .nav-btn{min-width:42px}
+  .legend{display:none}
+  .passage-wrap{grid-template-columns:1fr}
+  .match-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="exam-title" id="examTitle">Certified Project Practitioner — Assessment</div>
+    <div class="progress" id="progress">Question 1 of 12</div>
+  </div>
+  <div class="header-right">
+    <button class="theme-toggle" id="themeToggleBtn" title="Toggle Dark/Light Mode">🌓</button>
+    <div class="autosave" id="autosave"><span class="autosave-dot"></span><span id="autosaveText">All changes saved</span></div>
+    <div class="timer" id="timer">⏱️ <span id="timerVal">25:00</span></div>
+  </div>
+</div>
+
+<div class="candidate-bar" id="candidateBar" style="display:none;">
+  <div>Candidate: <span class="candidate-tag" id="candName">—</span></div>
+  <div>ID / Roll: <span class="candidate-tag" id="candId">—</span></div>
+</div>
+
+<div class="layout" id="layout">
+  <div class="sidebar">
+    <p class="nav-title">Questions Palette</p>
+    <div class="nav-grid" id="navGrid"></div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--ok-soft);border:1px solid var(--ok)"></i>Answered</span>
+      <span><i class="swatch" style="background:var(--warn-soft);border:1px solid var(--warn)"></i>Flagged</span>
+      <span><i class="swatch" style="background:var(--surface);border:1px solid var(--border)"></i>Unanswered</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="q-type" id="qType">Multiple choice</div>
+          <p class="q-prompt" id="qPromptStatic"></p>
+        </div>
+        <button class="flag-btn" id="flagBtn">🔖 Flag</button>
+      </div>
+      <div id="qBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="action-bar">
+  <button class="btn btn-ghost" id="prevBtn">← Previous</button>
+  <div class="bar-nav">
+    <button class="btn btn-primary" id="nextBtn">Next →</button>
+    <button class="btn" id="submitBtn" style="display:none;background:var(--danger);border-color:var(--danger);color:#fff">Submit Exam</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Submit exam?</h3>
+    <p id="modalUnanswered"></p>
+    <p id="modalFlagged"></p>
+    <p style="font-size:13px;color:var(--text);margin-top:8px;">Once submitted, your answers will be locked and cannot be changed.</p>
+    <div class="modal-actions">
+      <button class="btn" id="modalReview">Review</button>
+      <button class="btn btn-primary" id="modalConfirm">Confirm & Submit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Default Fallback Exam Questions (Used when no dynamic form ID is supplied) ──
+const DEFAULT_QUESTIONS = [
+  {id:1, type:'mcq', prompt:'Which methodology emphasizes iterative delivery in short cycles?',
+    options:['Waterfall','Agile','Critical Path Method','Six Sigma']},
+  {id:2, type:'truefalse', prompt:'A risk register should be updated only at project closure.'},
+  {id:3, type:'multi', prompt:'Select all elements typically found in a project charter.',
+    options:['Business case','Stakeholder list','Detailed Gantt chart','High-level budget','Vendor invoices']},
+  {id:4, type:'blank', pre:'The process of identifying, analyzing, and responding to project risk is called risk', post:'.'},
+  {id:5, type:'passage', passageTitle:'Change Control Excerpt',
+    passage:'When a change request is submitted, the change control board reviews the impact on scope, schedule, and cost before approval. Emergency changes may bypass board review but require retroactive documentation within 48 hours.',
+    prompt:'According to the excerpt, what must happen within 48 hours of an emergency change?',
+    options:['Board pre-approval','Retroactive documentation','Budget reallocation','Stakeholder sign-off']},
+  {id:6, type:'code', prompt:'Write a function isOverBudget(actual, planned) that returns true if actual cost exceeds the planned budget.'},
+  {id:7, type:'match', prompt:'Match each term to its definition.',
+    left:['Scope creep','Critical path','Milestone'],
+    rightOptions:['Uncontrolled expansion of project scope','Longest sequence of dependent tasks','A significant point or event in the schedule']},
+  {id:8, type:'order', prompt:'Arrange the steps of the risk management process in the correct order.',
+    items:['Identify risks','Assess likelihood and impact','Plan responses','Monitor and control']},
+  {id:9, type:'file', prompt:'Upload your completed risk register (PDF or XLSX).'},
+  {id:10, type:'mcq', prompt:'Which document formally authorizes a project to begin?',
+    options:['Project charter','Status report','Lessons learned register','RACI matrix']},
+  {id:11, type:'truefalse', prompt:'Earned Value Management can be used to forecast final project cost.'},
+  {id:12, type:'blank', pre:'A project is considered complete when all deliverables are accepted and the project is formally', post:'.'}
+];
+
+let questions = [...DEFAULT_QUESTIONS];
+let current = 0;
+const answers = {};
+const flagged = new Set();
+const touched = new Set();
+let seconds = 25 * 60;
+let totalExamSeconds = 25 * 60;
+let submitted = false;
+let formIdentifier = '';
+let formConfig = null;
+
+const typeLabels = {
+  mcq: 'Multiple Choice',
+  truefalse: 'True / False',
+  multi: 'Multi-Select',
+  blank: 'Fill in the Blank',
+  passage: 'Reading Comprehension',
+  code: 'Code / Free Response',
+  match: 'Matching',
+  order: 'Sequencing / Ordering',
+  file: 'File Upload'
+};
+
+function orderState(q) {
+  if (!answers[q.id]) answers[q.id] = [...q.items];
+  return answers[q.id];
+}
+
+function markTouched(id) {
+  touched.add(id);
+  const autosave = document.getElementById('autosave');
+  autosave.classList.add('saving');
+  document.getElementById('autosaveText').textContent = 'Saving…';
+  
+  // Persist to local storage
+  if (formIdentifier) {
+    try {
+      localStorage.setItem(`exam_answers_${formIdentifier}`, JSON.stringify(answers));
+      localStorage.setItem(`exam_flagged_${formIdentifier}`, JSON.stringify([...flagged]));
+    } catch {}
+  }
+  
+  clearTimeout(window._saveT);
+  window._saveT = setTimeout(() => {
+    autosave.classList.remove('saving');
+    document.getElementById('autosaveText').textContent = 'All changes saved';
+  }, 600);
+  renderNav();
+}
+
+function renderNav() {
+  const grid = document.getElementById('navGrid');
+  grid.innerHTML = '';
+  questions.forEach((q, i) => {
+    const b = document.createElement('button');
+    b.textContent = i + 1;
+    b.className = 'nav-btn';
+    if (touched.has(q.id)) b.classList.add('answered');
+    if (flagged.has(q.id)) b.classList.add('flagged');
+    if (i === current) b.classList.add('current');
+    b.addEventListener('click', () => { current = i; renderQuestion(); });
+    grid.appendChild(b);
+  });
+}
+
+function renderQuestion() {
+  const q = questions[current];
+  document.getElementById('progress').textContent = `Question ${current + 1} of ${questions.length}`;
+  document.getElementById('qType').textContent = typeLabels[q.type] || 'Question';
+  document.getElementById('qPromptStatic').textContent = q.prompt || '';
+  const flagBtn = document.getElementById('flagBtn');
+  flagBtn.classList.toggle('on', flagged.has(q.id));
+  flagBtn.textContent = flagged.has(q.id) ? '🔖 Flagged' : '🔖 Flag';
+
+  const body = document.getElementById('qBody');
+  body.innerHTML = '';
+
+  if (q.type === 'mcq' || q.type === 'passage') {
+    if (q.type === 'passage') {
+      body.innerHTML = `<div class="passage-wrap">
+        <div class="passage-box"><h4>${q.passageTitle || 'Reference Passage'}</h4>${q.passage}</div>
+        <div id="mcqHost"></div></div>`;
+    }
+    const host = q.type === 'passage' ? body.querySelector('#mcqHost') : body;
+    const wrap = document.createElement('div');
+    wrap.className = 'options';
+    (q.options || []).forEach((opt, idx) => {
+      const row = document.createElement('div');
+      row.className = 'option';
+      row.innerHTML = `<input type="radio" name="q${q.id}" id="q${q.id}o${idx}" ${answers[q.id] === idx ? 'checked' : ''}>
+        <label for="q${q.id}o${idx}">${opt}</label>`;
+      row.querySelector('input').addEventListener('change', () => { answers[q.id] = idx; markTouched(q.id); });
+      row.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          const inp = row.querySelector('input');
+          inp.checked = true;
+          answers[q.id] = idx;
+          markTouched(q.id);
+        }
+      });
+      wrap.appendChild(row);
+    });
+    host.appendChild(wrap);
+  }
+  else if (q.type === 'truefalse') {
+    const wrap = document.createElement('div');
+    wrap.className = 'options';
+    ['True', 'False'].forEach((opt, idx) => {
+      const row = document.createElement('div');
+      row.className = 'option';
+      row.innerHTML = `<input type="radio" name="q${q.id}" id="q${q.id}o${idx}" ${answers[q.id] === idx ? 'checked' : ''}>
+        <label for="q${q.id}o${idx}">${opt}</label>`;
+      row.querySelector('input').addEventListener('change', () => { answers[q.id] = idx; markTouched(q.id); });
+      row.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          const inp = row.querySelector('input');
+          inp.checked = true;
+          answers[q.id] = idx;
+          markTouched(q.id);
+        }
+      });
+      wrap.appendChild(row);
+    });
+    body.appendChild(wrap);
+  }
+  else if (q.type === 'multi') {
+    if (!answers[q.id]) answers[q.id] = [];
+    const wrap = document.createElement('div');
+    wrap.className = 'options';
+    (q.options || []).forEach((opt, idx) => {
+      const row = document.createElement('div');
+      row.className = 'option';
+      const checked = answers[q.id].includes(idx);
+      row.innerHTML = `<input type="checkbox" id="q${q.id}o${idx}" ${checked ? 'checked' : ''}>
+        <label for="q${q.id}o${idx}">${opt}</label>`;
+      row.querySelector('input').addEventListener('change', (e) => {
+        const arr = answers[q.id];
+        if (e.target.checked) { arr.push(idx); } else { answers[q.id] = arr.filter(v => v !== idx); }
+        markTouched(q.id);
+      });
+      wrap.appendChild(row);
+    });
+    body.appendChild(wrap);
+  }
+  else if (q.type === 'blank') {
+    const wrap = document.createElement('div');
+    wrap.className = 'blank-line';
+    wrap.innerHTML = `${q.pre || ''} <input class="blank-input" type="text" placeholder="type your answer..." value="${answers[q.id] || ''}"> ${q.post || ''}`;
+    wrap.querySelector('input').addEventListener('input', (e) => { answers[q.id] = e.target.value; markTouched(q.id); });
+    body.appendChild(wrap);
+  }
+  else if (q.type === 'code') {
+    const ta = document.createElement('textarea');
+    ta.className = 'code';
+    ta.placeholder = '// Type your response or code solution here...';
+    ta.value = answers[q.id] || '';
+    ta.addEventListener('input', (e) => { answers[q.id] = e.target.value; markTouched(q.id); });
+    body.appendChild(ta);
+  }
+  else if (q.type === 'match') {
+    if (!answers[q.id]) answers[q.id] = {};
+    (q.left || []).forEach((term, idx) => {
+      const row = document.createElement('div');
+      row.className = 'match-row';
+      const sel = document.createElement('select');
+      sel.innerHTML = `<option value="">Choose a match…</option>` +
+        (q.rightOptions || []).map((r, ri) => `<option value="${ri}" ${answers[q.id][idx] == ri ? 'selected' : ''}>${r}</option>`).join('');
+      sel.addEventListener('change', (e) => { answers[q.id][idx] = e.target.value; markTouched(q.id); });
+      row.innerHTML = `<div class="term">${term}</div>`;
+      row.appendChild(sel);
+      body.appendChild(row);
+    });
+  }
+  else if (q.type === 'order') {
+    const list = document.createElement('ul');
+    list.className = 'order-list';
+    const items = orderState(q);
+    items.forEach((item, idx) => {
+      const li = document.createElement('li');
+      li.className = 'order-item';
+      li.draggable = true;
+      li.dataset.idx = idx;
+      li.innerHTML = `<span class="order-num">${idx + 1}</span><span>${item}</span><span class="drag-handle">⠿ drag</span>`;
+      li.addEventListener('dragstart', () => { li.classList.add('dragging'); });
+      li.addEventListener('dragend', () => { li.classList.remove('dragging'); markTouched(q.id); renderQuestion(); });
+      li.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = list.querySelector('.dragging');
+        if (dragging && dragging !== li) {
+          const rect = li.getBoundingClientRect();
+          const before = (e.clientY - rect.top) < rect.height / 2;
+          list.insertBefore(dragging, before ? li : li.nextSibling);
+        }
+      });
+      list.appendChild(li);
+    });
+    list.addEventListener('drop', () => {
+      const newOrder = [...list.children].map(li => li.querySelector('span:nth-child(2)').textContent);
+      answers[q.id] = newOrder;
+    });
+    body.appendChild(list);
+  }
+  else if (q.type === 'file') {
+    const wrap = document.createElement('div');
+    wrap.className = 'file-drop';
+    wrap.innerHTML = `Drag a file here, or browse from device<br><input type="file">
+      <div class="file-name" id="fname">${answers[q.id] ? ('Uploaded: ' + answers[q.id]) : ''}</div>`;
+    wrap.querySelector('input').addEventListener('change', (e) => {
+      const name = e.target.files[0]?.name;
+      if (name) { answers[q.id] = name; wrap.querySelector('#fname').textContent = 'Uploaded: ' + name; markTouched(q.id); }
+    });
+    body.appendChild(wrap);
+  }
+
+  document.getElementById('prevBtn').disabled = current === 0;
+  document.getElementById('prevBtn').style.opacity = current === 0 ? .4 : 1;
+  const isLast = current === questions.length - 1;
+  document.getElementById('nextBtn').style.display = isLast ? 'none' : 'inline-block';
+  document.getElementById('submitBtn').style.display = isLast ? 'inline-block' : 'none';
+  renderNav();
+}
+
+document.getElementById('flagBtn').addEventListener('click', () => {
+  const id = questions[current].id;
+  flagged.has(id) ? flagged.delete(id) : flagged.add(id);
+  renderQuestion();
+});
+document.getElementById('prevBtn').addEventListener('click', () => { if (current > 0) { current--; renderQuestion(); } });
+document.getElementById('nextBtn').addEventListener('click', () => { if (current < questions.length - 1) { current++; renderQuestion(); } });
+
+function openModal() {
+  const unanswered = questions.filter(q => !touched.has(q.id)).length;
+  document.getElementById('modalUnanswered').textContent = `${unanswered} of ${questions.length} questions are unanswered.`;
+  document.getElementById('modalFlagged').textContent = `${flagged.size} question(s) flagged for review.`;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+document.getElementById('submitBtn').addEventListener('click', openModal);
+document.getElementById('modalReview').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('open');
+  const firstUnanswered = questions.findIndex(q => !touched.has(q.id));
+  if (firstUnanswered !== -1) { current = firstUnanswered; renderQuestion(); }
+});
+document.getElementById('modalConfirm').addEventListener('click', finishExam);
+
+async function finishExam() {
+  submitted = true;
+  clearInterval(window._timerInt);
+  document.getElementById('modalOverlay').classList.remove('open');
+
+  const answeredCount = touched.size;
+  const totalCount = questions.length;
+  const timeSpentSec = totalExamSeconds - seconds;
+  const timeSpentMins = Math.floor(timeSpentSec / 60);
+  const timeSpentRemSec = timeSpentSec % 60;
+  const refId = 'EXAM-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+
+  // If connected to a real form, submit results to backend
+  if (formIdentifier) {
+    try {
+      await fetch(`/v1/hosted-forms/${encodeURIComponent(formIdentifier)}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          answers,
+          answered_count: answeredCount,
+          total_questions: totalCount,
+          time_taken_seconds: timeSpentSec,
+          reference_id: refId,
+          submitted_at: new Date().toISOString()
+        })
+      });
+      localStorage.removeItem(`exam_answers_${formIdentifier}`);
+      localStorage.removeItem(`exam_flagged_${formIdentifier}`);
+    } catch (e) {
+      console.warn('[Exam] Submit error:', e.message);
+    }
+  }
+
+  document.body.innerHTML = `
+    <div class="done-screen">
+      <div class="done-icon">✓</div>
+      <h2>Exam Submitted Successfully</h2>
+      <p>Your responses have been recorded and locked for evaluation. Confirmation has been logged.</p>
+      
+      <div class="done-stats">
+        <div class="stat-box">
+          <div class="val">${answeredCount} / ${totalCount}</div>
+          <div class="lbl">Questions Answered</div>
+        </div>
+        <div class="stat-box">
+          <div class="val">${timeSpentMins}m ${timeSpentRemSec}s</div>
+          <div class="lbl">Time Taken</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding:12px;background:var(--accent-soft);color:var(--accent);font-weight:700;border-radius:6px;font-size:14px;">
+        Reference ID: ${refId}
+      </div>
+    </div>
+  `;
+}
+
+function tick() {
+  if (submitted) return;
+  seconds--;
+  if (seconds <= 0) {
+    seconds = 0;
+    finishExam();
+    return;
+  }
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  const t = document.getElementById('timerVal');
+  if (t) t.textContent = `${m}:${s}`;
+  const timerCard = document.getElementById('timer');
+  if (timerCard) timerCard.classList.toggle('warn', seconds < 300);
+}
+
+// ── Theme toggle logic ─────────────────────────────────────────────────────────
+const themeBtn = document.getElementById('themeToggleBtn');
+if (themeBtn) {
+  themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('exam_theme', next); } catch {}
+  });
+  try {
+    const savedTheme = localStorage.getItem('exam_theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  } catch {}
+}
+
+// ── Dynamic Form Config Loader (Loads from SwapnoPay API or URL param) ────────
+async function loadDynamicExamConfig() {
+  const urlParams = new URLSearchParams(window.location.search);
+  formIdentifier = urlParams.get('id') || urlParams.get('form') || urlParams.get('slug') || '';
+
+  if (!formIdentifier) {
+    // Run default exam questions
+    window._timerInt = setInterval(tick, 1000);
+    renderQuestion();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/v1/hosted-forms/${encodeURIComponent(formIdentifier)}`);
+    if (res.ok) {
+      const data = await res.json();
+      formConfig = data?.form || data;
+      if (formConfig) {
+        document.getElementById('examTitle').textContent = formConfig.title || 'Online Assessment';
+        document.title = (formConfig.title || 'Exam') + ' — Exam Portal';
+
+        // Parse timer
+        const theme = formConfig.theme || {};
+        if (theme.timerMinutes && Number(theme.timerMinutes) > 0) {
+          totalExamSeconds = Number(theme.timerMinutes) * 60;
+          seconds = totalExamSeconds;
+        }
+
+        // Map form fields to questions
+        let fields = [];
+        try {
+          fields = typeof formConfig.fields === 'string' ? JSON.parse(formConfig.fields) : (formConfig.fields || []);
+        } catch { fields = []; }
+
+        const dynamicQuestions = [];
+        let qIdx = 1;
+
+        // Extract candidate details if present
+        const nameField = fields.find(f => f.type === 'NAME');
+        const idField = fields.find(f => (f.label || '').toLowerCase().includes('roll') || (f.label || '').toLowerCase().includes('id'));
+        if (nameField || idField) {
+          document.getElementById('candidateBar').style.display = 'flex';
+          if (nameField) document.getElementById('candName').textContent = nameField.defaultValue || 'Registered Candidate';
+          if (idField) document.getElementById('candId').textContent = idField.defaultValue || 'Verified';
+        }
+
+        // Filter question fields
+        fields.forEach(f => {
+          const typeStr = String(f.type || '').toUpperCase();
+          const label = f.label || '';
+          const options = Array.isArray(f.options) ? f.options : [];
+
+          // Skip pure contact collection fields in the question list if they are on page 0
+          if (typeStr === 'PHONE' || (typeStr === 'NAME' && qIdx === 1 && (label.toLowerCase().includes('candidate') || label.toLowerCase().includes('student')))) {
+            return;
+          }
+
+          if (typeStr === 'RADIO') {
+            if (options.length === 2 && options.some(o => o.toLowerCase() === 'true') && options.some(o => o.toLowerCase() === 'false')) {
+              dynamicQuestions.push({ id: qIdx++, type: 'truefalse', prompt: label });
+            } else {
+              dynamicQuestions.push({ id: qIdx++, type: 'mcq', prompt: label, options: options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D'] });
+            }
+          } else if (typeStr === 'CHECKBOX' || typeStr === 'MULTI_SELECT') {
+            dynamicQuestions.push({ id: qIdx++, type: 'multi', prompt: label, options: options.length > 0 ? options : ['Option 1', 'Option 2', 'Option 3'] });
+          } else if (typeStr === 'DROPDOWN') {
+            dynamicQuestions.push({ id: qIdx++, type: 'mcq', prompt: label, options });
+          } else if (typeStr === 'NOTES' || typeStr === 'CODE') {
+            dynamicQuestions.push({ id: qIdx++, type: 'code', prompt: label });
+          } else if (typeStr === 'FILE_UPLOAD' || typeStr === 'CAMERA_UPLOAD') {
+            dynamicQuestions.push({ id: qIdx++, type: 'file', prompt: label });
+          } else if (typeStr === 'NAME' || typeStr === 'EMAIL' || typeStr === 'TEXT') {
+            dynamicQuestions.push({ id: qIdx++, type: 'blank', prompt: label, pre: label, post: '' });
+          }
+        });
+
+        if (dynamicQuestions.length > 0) {
+          questions = dynamicQuestions;
+        }
+
+        // Restore saved answers from localStorage if available
+        try {
+          const savedAns = localStorage.getItem(`exam_answers_${formIdentifier}`);
+          if (savedAns) {
+            Object.assign(answers, JSON.parse(savedAns));
+            Object.keys(answers).forEach(k => touched.add(Number(k)));
+          }
+          const savedFlags = localStorage.getItem(`exam_flagged_${formIdentifier}`);
+          if (savedFlags) {
+            JSON.parse(savedFlags).forEach(fId => flagged.add(Number(fId)));
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn('[Exam] Error loading dynamic config:', err.message);
+  }
+
+  window._timerInt = setInterval(tick, 1000);
+  renderQuestion();
+}
+
+loadDynamicExamConfig();
+</script>
+</body>
+</html>

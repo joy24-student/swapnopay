@@ -2310,7 +2310,55 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                val merchantGeminiKey by viewModel.geminiApiKey.collectAsState()
+                val selectedModel by viewModel.selectedGeminiModel.collectAsState()
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFF6366F1).copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.35f) else Color(0xFF6366F1).copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = if (merchantGeminiKey.isNotBlank()) Icons.Default.VpnKey else Icons.Default.AutoFixHigh,
+                                contentDescription = null,
+                                tint = if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981) else Color(0xFF6366F1),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (merchantGeminiKey.isNotBlank()) "Copilot Gemini Key Active: ${merchantGeminiKey.take(6)}... ($selectedModel)" else "Copilot Key Not Set (Using Semantic Generator)",
+                                fontSize = 11.sp,
+                                color = textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (merchantGeminiKey.isBlank()) {
+                            Text(
+                                text = "Setup",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = goldPrimary,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAiGeneratorModal = false
+                                        viewModel.navigateTo("AiCopilot")
+                                    }
+                                    .padding(start = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Button(
                     onClick = {
@@ -2350,9 +2398,9 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Gemini AI Building Form...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(if (merchantGeminiKey.isNotBlank()) "Gemini AI Building Form..." else "AI Building Form...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     } else {
-                        Text("Generate with Gemini AI ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(if (merchantGeminiKey.isNotBlank()) "Generate with Gemini AI ✨" else "Generate Smart Form ✨", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }
@@ -2370,6 +2418,7 @@ fun PaymentFormsScreen(viewModel: AppViewModel) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val templates = listOf(
+                    Triple("Online MCQ & Exam Quiz", "Interactive timed exam with question palette, autosave, flagging & scoring", "ONLINE_MCQ_EXAM"),
                     Triple("Product Sales Form", "Pre-configured with product choices & bKash/Nagad checkout", "SINGLE_PRODUCT"),
                     Triple("Event Registration", "Includes participant details & automated QR pass", "EVENT_TICKETING"),
                     Triple("PDF Document Sales", "Digital product download form with automatic delivery", "DIGITAL_PRODUCT"),

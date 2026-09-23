@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
 
 /**
  * Pixel-Perfect Form Builder Studio with 4 Navigation Tabs (Builder, Settings, Integrations, Responses)
@@ -301,14 +303,6 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                                         .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("✨ Refine with Gemini AI", color = textPrimary, fontSize = 13.sp) },
-                                        leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(18.dp)) },
-                                        onClick = {
-                                            showMoreDropdown = false
-                                            showAiRefineModal = true
-                                        }
-                                    )
-                                    DropdownMenuItem(
                                         text = { Text("Edit Form Name & Info", color = textPrimary, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp)) },
                                         onClick = {
@@ -343,27 +337,11 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Live Customer Preview", color = textPrimary, fontSize = 13.sp) },
-                                        leadingIcon = { Icon(Icons.Outlined.Visibility, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp)) },
-                                        onClick = {
-                                            showMoreDropdown = false
-                                            showPreviewModal = true
-                                        }
-                                    )
-                                    DropdownMenuItem(
                                         text = { Text("Dynamic Web App Preview", color = textPrimary, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Outlined.Language, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showMoreDropdown = false
                                             showWebAppPreviewModal = true
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Publish & Hosting", color = textPrimary, fontSize = 13.sp) },
-                                        leadingIcon = { Icon(Icons.Outlined.RocketLaunch, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp)) },
-                                        onClick = {
-                                            showMoreDropdown = false
-                                            showPublishModal = true
                                         }
                                     )
                                     HorizontalDivider(color = cardBorder, modifier = Modifier.padding(vertical = 4.dp))
@@ -576,6 +554,54 @@ fun FormBuilderStudioScreen(viewModel: AppViewModel) {
                                 fontSize = 11.sp,
                                 color = textPrimary,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                val merchantGeminiKey by viewModel.geminiApiKey.collectAsState()
+                val selectedModel by viewModel.selectedGeminiModel.collectAsState()
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFF6366F1).copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981).copy(alpha = 0.35f) else Color(0xFF6366F1).copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = if (merchantGeminiKey.isNotBlank()) Icons.Default.VpnKey else Icons.Default.AutoFixHigh,
+                                contentDescription = null,
+                                tint = if (merchantGeminiKey.isNotBlank()) Color(0xFF10B981) else Color(0xFF6366F1),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (merchantGeminiKey.isNotBlank()) "Copilot Key: ${merchantGeminiKey.take(6)}... ($selectedModel)" else "Copilot Key Not Set (Using Semantic Engine)",
+                                fontSize = 11.sp,
+                                color = textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (merchantGeminiKey.isBlank()) {
+                            Text(
+                                text = "Setup",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = goldPrimary,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAiRefineModal = false
+                                        viewModel.navigateTo("AiCopilot")
+                                    }
+                                    .padding(start = 6.dp)
                             )
                         }
                     }
@@ -2158,34 +2184,6 @@ private fun FormBuilderTab(
                             }
                         }
                     }
-
-                    // Canvas Footer Action Buttons: Preview & Publish
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onOpenPreview,
-                            modifier = Modifier.weight(1f).height(46.dp),
-                            shape = formButtonShape,
-                            border = BorderStroke(1.5.dp, formPrimaryColor)
-                        ) {
-                            Icon(Icons.Outlined.Visibility, contentDescription = null, tint = formPrimaryColor, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Live Preview", fontWeight = FontWeight.Bold, color = formPrimaryColor)
-                        }
-
-                        Button(
-                            onClick = onOpenPublish,
-                            modifier = Modifier.weight(1f).height(46.dp),
-                            shape = formButtonShape,
-                            colors = ButtonDefaults.buttonColors(containerColor = formPrimaryColor)
-                        ) {
-                            Icon(Icons.Outlined.RocketLaunch, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Publish Form", fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
                 }
             }
         }
@@ -2380,6 +2378,72 @@ private fun FormBuilderTab(
             }
         )
     }
+}
+
+fun unescapeHtmlString(input: String): String {
+    if (!input.contains("&lt;") && !input.contains("&gt;") && !input.contains("&#") && !input.contains("&amp;")) return input
+    return input
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .replace("&amp;lt;", "<")
+        .replace("&amp;gt;", ">")
+        .replace("&amp;", "&")
+}
+
+@Composable
+fun FormHtmlPreview(
+    htmlContent: String,
+    cssContent: String = "",
+    isDark: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val cleanHtml = remember(htmlContent) { unescapeHtmlString(htmlContent) }
+    val textHex = if (isDark) "#F3F4F6" else "#1F2937"
+    val fullDoc = remember(cleanHtml, cssContent, isDark) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * { box-sizing: border-box; }
+                body {
+                    margin: 0;
+                    padding: 8px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    font-size: 13.5px;
+                    color: $textHex;
+                    background-color: transparent;
+                    word-break: break-word;
+                }
+                $cssContent
+            </style>
+        </head>
+        <body>
+            $cleanHtml
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            WebView(ctx).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.loadWithOverviewMode = true
+                settings.useWideViewPort = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+        },
+        update = { webView ->
+            webView.loadDataWithBaseURL("https://pay.swapnopay.top", fullDoc, "text/html", "UTF-8", null)
+        }
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2582,6 +2646,25 @@ private fun CustomCodeBlockEditor(
         )
         if (usedVariables.isNotEmpty()) {
             Text("Used variables: ${usedVariables.joinToString(", ")}", fontSize = 11.sp, color = textSecondary)
+        }
+        if (html.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("LIVE PREVIEW (লাইভ প্রিভিউ):", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF14120C) else Color(0xFFF8FAFC)),
+                border = BorderStroke(1.dp, if (isDark) Color(0xFF2C2213) else Color(0xFFE2E8F0)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.padding(8.dp)) {
+                    FormHtmlPreview(
+                        htmlContent = html,
+                        cssContent = css,
+                        isDark = isDark,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp, max = 260.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -6196,14 +6279,25 @@ private fun LivePreviewModal(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(if (isDark) Color(0xFF0C0904) else Color(0xFFF8FAFC))
                                 .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
-                                .padding(14.dp)
+                                .padding(8.dp)
                         ) {
-                            Text(
-                                text = renderedHtml.ifBlank { "<em>No custom HTML defined yet</em>" },
-                                fontSize = 12.sp,
-                                color = textPrimary,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
+                            if (renderedHtml.isBlank()) {
+                                Text(
+                                    text = "No custom HTML defined yet",
+                                    fontSize = 12.sp,
+                                    color = textSecondary,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            } else {
+                                FormHtmlPreview(
+                                    htmlContent = renderedHtml,
+                                    cssContent = currentFormPage.customCssContent,
+                                    isDark = isDark,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 140.dp, max = 500.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -6409,20 +6503,41 @@ private fun LivePreviewModal(
                                         }
                                     }
                                     FormFieldType.CUSTOM_CODE -> {
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF18140E) else Color(0xFFF8FAFC)),
-                                        border = BorderStroke(1.dp, cardBorder),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Text(field.label, fontWeight = FontWeight.Bold, color = textPrimary)
-                                            Text("Custom HTML/CSS is sanitized and rendered on the hosted form.", fontSize = 11.sp, color = textSecondary)
-                                            if (field.customVariables.isNotEmpty()) {
-                                                Text(field.customVariables.joinToString(", "), fontSize = 10.sp, color = textSecondary)
+                                        val fieldHtml = remember(field.customCodeHtml, previewDynamicValues) {
+                                            var content = field.customCodeHtml.ifBlank { field.defaultValue }
+                                            content = content.replace("{{form_title}}", formTitle)
+                                            content = content.replace("{{form_description}}", formDescription)
+                                            formFields.forEach { f ->
+                                                val v = previewDynamicValues[f.id] ?: f.defaultValue
+                                                content = content.replace("{{${f.id}}}", v)
+                                                val key = f.label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                                                content = content.replace("{{field_$key}}", v)
+                                            }
+                                            unescapeHtmlString(content)
+                                        }
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF18140E) else Color(0xFFF8FAFC)),
+                                            border = BorderStroke(1.dp, cardBorder),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                if (field.label.isNotBlank() && field.label != "Custom Code Block" && field.label != "Custom Code" && field.label != "HTML/CSS block") {
+                                                    Text(field.label, fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 13.sp)
+                                                }
+                                                if (fieldHtml.isBlank()) {
+                                                    Text("Custom HTML/CSS Block (Empty)", fontSize = 11.sp, color = textSecondary)
+                                                } else {
+                                                    FormHtmlPreview(
+                                                        htmlContent = fieldHtml,
+                                                        cssContent = field.customCodeCss,
+                                                        isDark = isDark,
+                                                        modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp, max = 350.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
                                 FormFieldType.CHECKBOX -> {
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Row(
