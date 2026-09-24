@@ -45,11 +45,19 @@ mkdir -p "$TARGET_DIR/swapnopay-backend/data/shop-sites/stores"
 chown -R www-data:www-data "$TARGET_DIR/swapnopay-backend/data/shop-runtime" "$TARGET_DIR/swapnopay-backend/data/shop-sites" 2>/dev/null || true
 chmod -R 775 "$TARGET_DIR/swapnopay-backend/uploads" "$TARGET_DIR/swapnopay-backend/data" 2>/dev/null || true
 
+# Locate Backend directory: either $TARGET_DIR/swapnopay-backend or $TARGET_DIR
+BACKEND_APP_DIR=""
+if [ -f "$TARGET_DIR/swapnopay-backend/package.json" ]; then
+    BACKEND_APP_DIR="$TARGET_DIR/swapnopay-backend"
+elif [ -f "$TARGET_DIR/package.json" ]; then
+    BACKEND_APP_DIR="$TARGET_DIR"
+fi
+
 # 4. Update Node.js Backend dependencies & restart service
-if [ -d "$TARGET_DIR/swapnopay-backend" ]; then
-    echo -e "${YELLOW}⚙️  Updating Backend API dependencies...${NC}"
-    cd "$TARGET_DIR/swapnopay-backend"
-    npm install --production --no-audit --no-fund
+if [ -n "$BACKEND_APP_DIR" ]; then
+    echo -e "${YELLOW}⚙️  Updating Backend API dependencies in $BACKEND_APP_DIR...${NC}"
+    cd "$BACKEND_APP_DIR"
+    npm install --omit=dev --no-audit --no-fund || true
     
     # Restart PM2 process
     if command -v pm2 >/dev/null 2>&1; then
@@ -58,6 +66,8 @@ if [ -d "$TARGET_DIR/swapnopay-backend" ]; then
             pm2 restart swapnopay-backend
         elif [ -f ecosystem.config.cjs ]; then
             pm2 start ecosystem.config.cjs --env production
+        elif [ -f ecosystem.config.js ]; then
+            pm2 start ecosystem.config.js --env production
         else
             pm2 start src/index.js --name swapnopay-backend
         fi
