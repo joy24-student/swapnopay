@@ -136,7 +136,11 @@ const corsOptions = {
 const app = express()
 const httpServer = createServer(app)
 
-app.use(helmet({ contentSecurityPolicy: false }))
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false
+}))
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1))
 app.disable('x-powered-by')
 
@@ -286,8 +290,13 @@ app.use((req, _res, next) => {
   next()
 })
 
-// Static file hosting for uploads (KYC docs, receipts, shop assets)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+// Static file hosting for uploads (KYC docs, receipts, shop assets, product photos)
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+  next()
+}, express.static(path.join(__dirname, '../uploads')))
 
 // Direct API Gateway Welcome / Info route (for https://api.swapnopay.top/)
 app.get('/', (req, res, next) => {

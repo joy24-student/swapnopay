@@ -1347,6 +1347,21 @@
   };
   let currentFields = [];
 
+  function sanitizeImageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    let trimmed = url.trim();
+    if (trimmed.startsWith('content://') || trimmed.startsWith('file://') || trimmed.startsWith('/data/')) return '';
+    try {
+      if (trimmed.includes('/uploads/products/') || trimmed.includes('/uploads/kyc/')) {
+        const u = new URL(trimmed, window.location.href);
+        if (u.hostname.includes('swapnopay.top') || u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          return u.pathname + u.search;
+        }
+      }
+    } catch (e) {}
+    return trimmed;
+  }
+
   // DOM Elements
   const loadingState = document.getElementById('loadingState');
   const errorState = document.getElementById('errorState');
@@ -1645,13 +1660,19 @@
     ratingRow.style.display = 'flex';
 
     // 7. Product Images & Gallery
-    const mainImg = config.image_url || theme.product_image_url || firstProduct?.imageUrl;
-    const gallery = theme.gallery_urls || firstProduct?.galleryUrls || [];
+    const rawMainImg = config.image_url || theme.product_image_url || firstProduct?.imageUrl || '';
+    const mainImg = sanitizeImageUrl(rawMainImg);
+    const rawGallery = theme.gallery_urls || firstProduct?.galleryUrls || [];
+    const gallery = (Array.isArray(rawGallery) ? rawGallery : []).map(sanitizeImageUrl).filter(Boolean);
 
     if (mainImg) {
       mainProductImage.src = mainImg;
       mainProductImage.style.display = 'block';
       mainArt.style.display = 'none';
+      mainProductImage.onerror = () => {
+        mainProductImage.style.display = 'none';
+        mainArt.style.display = 'block';
+      };
     } else {
       mainProductImage.style.display = 'none';
       mainArt.style.display = 'block';
@@ -1659,15 +1680,17 @@
 
     // Thumbnails: Render images if gallery exists; otherwise render 4 interactive angle presets
     thumbsList.innerHTML = '';
-    if (Array.isArray(gallery) && gallery.length > 0) {
+    if (gallery.length > 0) {
       const allImages = mainImg ? [mainImg, ...gallery.filter(g => g !== mainImg)] : gallery;
       allImages.forEach((imgUrl, idx) => {
+        const sUrl = sanitizeImageUrl(imgUrl);
+        if (!sUrl) return;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `thumb ${idx === 0 ? 'active' : ''}`;
-        btn.innerHTML = `<img src="${imgUrl}" alt="Gallery ${idx + 1}" />`;
+        btn.innerHTML = `<img src="${sUrl}" alt="Gallery ${idx + 1}" onerror="this.parentElement.style.display='none'" />`;
         btn.addEventListener('click', () => {
-          mainProductImage.src = imgUrl;
+          mainProductImage.src = sUrl;
           mainProductImage.style.display = 'block';
           mainArt.style.display = 'none';
           thumbsList.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));

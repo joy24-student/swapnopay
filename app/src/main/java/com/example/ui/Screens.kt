@@ -12080,8 +12080,8 @@ fun MoreScreen(viewModel: AppViewModel) {
                         AdminItemData("Gateway Management", "MFS accounts & routing", Icons.Outlined.PointOfSale, Color(0xFF3B82F6)) { viewModel.navigateTo("PaymentGatewaySettings") },
                         AdminItemData("Devices", "Printers, POS & Terminals", Icons.Outlined.Devices, Color(0xFF8B5CF6)) { viewModel.navigateTo("DeviceManager") },
                         AdminItemData("Backup & Restore", "Data backup settings", Icons.Outlined.Cloud, Color(0xFF0EA5E9)) { viewModel.navigateTo("BackupAndRestore") },
-                        AdminItemData("SIM SMS Gateway", "Auto due, marketing & OTP", Icons.Outlined.Sms, Color(0xFF10B981)) { viewModel.navigateTo("SmsGateway") },
-                        AdminItemData("Developer Portal", "API keys, webhooks & docs", Icons.Outlined.Code, Color(0xFF6366F1)) { viewModel.navigateTo("DeveloperPortal") }
+                        AdminItemData("SIM SMS Gateway", "Auto due, marketing & OTP", Icons.Outlined.Sms, Color(0xFF10B981)) { viewModel.navigateTo("SmsGateway") }
+                       
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -13858,7 +13858,7 @@ fun BusinessProfileScreen(viewModel: AppViewModel) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://docs.swapnopay.org"))
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://swapnopay.top/docs.html"))
                                             context.startActivity(intent)
                                         }
                                         .padding(20.dp),
@@ -13888,7 +13888,7 @@ fun BusinessProfileScreen(viewModel: AppViewModel) {
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = if (isBangla) "ইন্টিগ্রেশন গাইড ও এপিআই রেফারেন্স পড়ুন" else "Read Integration Guide & API Reference",
+                                            text = if (isBangla) "ইন্টিগ্রেশন গাইড " else "Integration Guide",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isDarkMode) Color.White else Color(0xFF1F2937)
@@ -15631,38 +15631,20 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
 
                     Column {
                         Text(
-                            text = "Payment Gateway Settings",
+                            text = "Payment Settings",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = textMain
                         )
                         Text(
-                            text = "Merchant-database payment verification and receipts",
+                            text = "Manage your payment gateway credentials",
                             fontSize = 12.sp,
                             color = textMuted
                         )
                     }
                 }
 
-                // Notification shortcut. No fabricated unread counter is shown.
-                Box(contentAlignment = Alignment.TopEnd) {
-                    IconButton(
-                        onClick = { viewModel.navigateTo("Notifications") },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(if (isDarkMode) Color(0xFF1E1E22) else Color(0xFFEDF2F7))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Notifications,
-                            contentDescription = "Notifications",
-                            tint = textMain,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
+               
             // ── SCROLLABLE CONTENT BODY ──────────────────────────────────────────
             Column(
                 modifier = Modifier
@@ -15911,7 +15893,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isBangla) "Dynamic API Key (গেটওয়ে এক্সেস কি)" else "Dynamic API Key",
+                            text = if (isBangla) "গেটওয়ে এক্সেস কি" else "Dynamic API Key",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = textMain
@@ -16062,19 +16044,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                 }
                             }
 
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = goldColor.copy(alpha = 0.08f),
-                                border = BorderStroke(0.6.dp, goldColor.copy(alpha = 0.25f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = if (isBangla) "💡 Header: x-api-key: sp_live_... দিয়ে যেকোনো ওয়েবসাইট বা কাস্টম ব্যাকএন্ডে SwapnoPay চেকআউট ইন্টিগ্রেশন চালু করুন।" else "💡 Header: Pass 'x-api-key: sp_live_...' to integrate SwapnoPay checkout on any website or custom backend.",
-                                    fontSize = 11.sp,
-                                    color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFF92400E),
-                                    modifier = Modifier.padding(10.dp)
-                                )
-                            }
+                            
 
                             OutlinedButton(
                                 onClick = {
@@ -16100,7 +16070,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isBangla) "🌐 Preview Web Gateway (ওয়েব চেকআউট টেস্ট করুন)" else "🌐 Preview Web Gateway (Test Checkout)",
+                                    text = if (isBangla) "ওয়েব চেকআউট " else " Preview Web Gateway",
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = goldColor
@@ -16468,7 +16438,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                         Text(
                                             text = when {
                                                 isTestingConnection -> "Testing backend…"
-                                                gatewayConnected && gatewayTestError == null -> "Merchant database connected"
+                                                gatewayConnected && gatewayTestError == null -> "connected"
                                                 gatewayTestError != null -> "Connection failed"
                                                 else -> "Not configured"
                                             },

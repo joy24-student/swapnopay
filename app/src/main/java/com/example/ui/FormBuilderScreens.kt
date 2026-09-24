@@ -1298,6 +1298,7 @@ private fun FormBuilderTab(
     var dynamicFieldValues by remember { mutableStateOf(mapOf<String, String>()) }
     var formErrors by remember { mutableStateOf(mapOf<String, String>()) }
     var expandedFieldId by remember { mutableStateOf<String?>(null) }
+    var isShowcaseEditorExpanded by remember { mutableStateOf(false) }
     var showAddProductDialog by remember { mutableStateOf(false) }
     var showRenamePageDialog by remember { mutableStateOf<Int?>(null) }
     var renamePageTitle by remember { mutableStateOf("") }
@@ -1717,19 +1718,45 @@ private fun FormBuilderTab(
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Icon(Icons.Outlined.Storefront, null, tint = goldText, modifier = Modifier.size(18.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB),
+                                                border = BorderStroke(0.5.dp, goldPrimary.copy(alpha = 0.5f))
+                                            ) {
+                                                Text(
+                                                    "#0 Hero",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = goldText,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
                                             Text("Product Showcase Hero", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = textPrimary)
                                         }
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = formPrimaryColor.copy(alpha = 0.15f)
-                                        ) {
-                                            Text(
-                                                "Live Storefront",
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = formPrimaryColor,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = formPrimaryColor.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    "Live Storefront",
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = formPrimaryColor,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { isShowcaseEditorExpanded = !isShowcaseEditorExpanded },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isShowcaseEditorExpanded) Icons.Default.Close else Icons.Outlined.Tune,
+                                                    contentDescription = if (isShowcaseEditorExpanded) "Close Editor" else "Edit Product Showcase",
+                                                    tint = goldText,
+                                                    modifier = Modifier.size(17.dp)
+                                                )
+                                            }
                                         }
                                     }
 
@@ -1797,6 +1824,59 @@ private fun FormBuilderTab(
                                         }
                                     }
 
+                                    // Gallery previews if present
+                                    val currentHeroProd = formProducts.firstOrNull()
+                                    if (currentHeroProd != null && currentHeroProd.galleryUrls.isNotEmpty()) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text("Gallery (${currentHeroProd.galleryUrls.size} photos):", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                items(currentHeroProd.galleryUrls) { gUrl ->
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(44.dp)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .border(1.dp, cardBorder, RoundedCornerShape(8.dp))
+                                                    ) {
+                                                        AsyncImage(
+                                                            model = gUrl,
+                                                            contentDescription = "Gallery Thumbnail",
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Variants preview chips (Variant instead of color)
+                                    if (currentHeroProd != null && currentHeroProd.productVariants.isNotEmpty() && !themeConfig.hideSwatches) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text("Product Variants (${currentHeroProd.productVariants.size}):", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                items(currentHeroProd.productVariants) { pv ->
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = if (isDark) Color(0xFF221A0C) else Color(0xFFFEFDF5),
+                                                        border = BorderStroke(0.8.dp, goldPrimary.copy(alpha = 0.5f))
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            Text(pv.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                                                            if (pv.price > 0.0) {
+                                                                val curr = if (themeConfig.currencyCode == "USD") "$" else "৳"
+                                                                Text("$curr${pv.price.toInt()}", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = goldText)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     // Quick visibility badges summary
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1804,7 +1884,7 @@ private fun FormBuilderTab(
                                     ) {
                                         listOf(
                                             "Header" to !themeConfig.hideHeader,
-                                            "Swatches" to !themeConfig.hideSwatches,
+                                            "Variants" to !themeConfig.hideSwatches,
                                             "Chips" to !themeConfig.hideChips,
                                             "Rating" to !themeConfig.hideRating,
                                             "Assurances" to !themeConfig.hideAssurances,
@@ -1825,6 +1905,18 @@ private fun FormBuilderTab(
                                                 )
                                             }
                                         }
+                                    }
+
+                                    // Expanded Showcase Settings Editor
+                                    if (isShowcaseEditorExpanded) {
+                                        HorizontalDivider(color = cardBorder, thickness = 1.dp)
+                                        ProductShowcaseSettingsEditor(
+                                            themeConfig = themeConfig,
+                                            formProducts = formProducts,
+                                            isDark = isDark,
+                                            viewModel = viewModel,
+                                            onClose = { isShowcaseEditorExpanded = false }
+                                        )
                                     }
                                 }
                             }
@@ -1858,7 +1950,7 @@ private fun FormBuilderTab(
                         // Dynamically Added Form Fields
                         if (activePageFields.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                activePageFields.forEach { field ->
+                                activePageFields.forEachIndexed { pageFieldIndex, field ->
                                     key(field.id) {
                                     val currentVal = dynamicFieldValues[field.id] ?: ""
                                     val fieldError = formErrors[field.id]
@@ -1882,8 +1974,109 @@ private fun FormBuilderTab(
                                         ) {
                                             Row(
                                                 modifier = Modifier.weight(1f).padding(end = 8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
+                                                var dragOffsetY by remember(field.id) { mutableFloatStateOf(0f) }
+                                                val density = LocalDensity.current
+                                                val itemHeightPx = with(density) { 80.dp.toPx() }
+
+                                                Icon(
+                                                    imageVector = Icons.Default.DragHandle,
+                                                    contentDescription = "Drag to reorder",
+                                                    tint = goldText,
+                                                    modifier = Modifier
+                                                        .size(22.dp)
+                                                        .pointerInput(field.id, pageFieldIndex, activePageFields.size) {
+                                                            detectVerticalDragGestures(
+                                                                onDragStart = { dragOffsetY = 0f },
+                                                                onDragEnd = { dragOffsetY = 0f },
+                                                                onDragCancel = { dragOffsetY = 0f },
+                                                                onVerticalDrag = { change, dragAmount ->
+                                                                    change.consume()
+                                                                    dragOffsetY += dragAmount
+                                                                    if (dragOffsetY > itemHeightPx && pageFieldIndex < activePageFields.size - 1) {
+                                                                        val nextField = activePageFields[pageFieldIndex + 1]
+                                                                        val fromIdx = formFields.indexOfFirst { it.id == field.id }
+                                                                        val toIdx = formFields.indexOfFirst { it.id == nextField.id }
+                                                                        if (fromIdx != -1 && toIdx != -1) {
+                                                                            viewModel.reorderFormField(fromIdx, toIdx)
+                                                                        }
+                                                                        dragOffsetY = 0f
+                                                                    } else if (dragOffsetY < -itemHeightPx && pageFieldIndex > 0) {
+                                                                        val prevField = activePageFields[pageFieldIndex - 1]
+                                                                        val fromIdx = formFields.indexOfFirst { it.id == field.id }
+                                                                        val toIdx = formFields.indexOfFirst { it.id == prevField.id }
+                                                                        if (fromIdx != -1 && toIdx != -1) {
+                                                                            viewModel.reorderFormField(fromIdx, toIdx)
+                                                                        }
+                                                                        dragOffsetY = 0f
+                                                                    }
+                                                                }
+                                                            )
+                                                        }
+                                                )
+
+                                                // Micro Move Up / Down Arrow buttons
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (pageFieldIndex > 0) {
+                                                                val prevField = activePageFields[pageFieldIndex - 1]
+                                                                val fromIdx = formFields.indexOfFirst { it.id == field.id }
+                                                                val toIdx = formFields.indexOfFirst { it.id == prevField.id }
+                                                                if (fromIdx != -1 && toIdx != -1) {
+                                                                    viewModel.reorderFormField(fromIdx, toIdx)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = pageFieldIndex > 0,
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.KeyboardArrowUp,
+                                                            contentDescription = "Move Up",
+                                                            tint = if (pageFieldIndex > 0) goldText else cardBorder,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (pageFieldIndex < activePageFields.size - 1) {
+                                                                val nextField = activePageFields[pageFieldIndex + 1]
+                                                                val fromIdx = formFields.indexOfFirst { it.id == field.id }
+                                                                val toIdx = formFields.indexOfFirst { it.id == nextField.id }
+                                                                if (fromIdx != -1 && toIdx != -1) {
+                                                                    viewModel.reorderFormField(fromIdx, toIdx)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = pageFieldIndex < activePageFields.size - 1,
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.KeyboardArrowDown,
+                                                            contentDescription = "Move Down",
+                                                            tint = if (pageFieldIndex < activePageFields.size - 1) goldText else cardBorder,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB),
+                                                    border = BorderStroke(0.5.dp, goldPrimary.copy(alpha = 0.5f))
+                                                ) {
+                                                    Text(
+                                                        "#${pageFieldIndex + 1}",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = goldText,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+
                                                 Text(
                                                     text = field.label,
                                                     fontSize = 13.sp,
@@ -2820,6 +3013,743 @@ private fun CustomCodeBlockEditor(
 }
 
 @Composable
+private fun ProductShowcaseSettingsEditor(
+    themeConfig: FormThemeConfig,
+    formProducts: List<FormProductItem>,
+    isDark: Boolean,
+    viewModel: AppViewModel,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF585E6C)
+    val textPrimary = if (isDark) Color(0xFFF3F4F6) else Color(0xFF111827)
+    val cardBorder = if (isDark) Color(0xFF2C2213) else Color(0xFFE2E8F0)
+    val goldPrimary = Color(0xFFFFC800)
+    val goldText = if (isDark) Color(0xFFFACC15) else Color(0xFF705D00)
+    val cardBg = if (isDark) Color(0xFF1F1A0E) else Color.White
+
+    val primaryProduct = formProducts.firstOrNull() ?: FormProductItem(
+        title = viewModel.formTitle.value.ifBlank { "Flagship Product" },
+        imageUrl = themeConfig.productImageUrl
+    )
+
+    var activeTab by remember { mutableStateOf("DETAILS") } // "DETAILS", "GALLERY", "VARIANTS", "VISIBILITY"
+
+    // Details states
+    var titleInput by remember(primaryProduct.title, viewModel.formTitle.value) {
+        mutableStateOf(primaryProduct.title.ifBlank { viewModel.formTitle.value })
+    }
+    var eyebrowInput by remember(themeConfig.eyebrowText) { mutableStateOf(themeConfig.eyebrowText) }
+    var badgeInput by remember(themeConfig.badgeText) { mutableStateOf(themeConfig.badgeText) }
+    var descInput by remember(primaryProduct.description, viewModel.formDescription.value) {
+        mutableStateOf(primaryProduct.description.ifBlank { viewModel.formDescription.value })
+    }
+    var priceInput by remember(primaryProduct.price) {
+        mutableStateOf(if (primaryProduct.price > 0) primaryProduct.price.toString() else "")
+    }
+    var wasPriceInput by remember(themeConfig.wasPrice) {
+        mutableStateOf(if (themeConfig.wasPrice > 0) themeConfig.wasPrice.toString() else "")
+    }
+    var skuInput by remember(primaryProduct.sku) { mutableStateOf(primaryProduct.sku) }
+    var stockInput by remember(primaryProduct.stock) { mutableStateOf(primaryProduct.stock.toString()) }
+    var ratingScoreInput by remember(themeConfig.ratingScore) {
+        mutableStateOf(if (themeConfig.ratingScore > 0) themeConfig.ratingScore.toString() else "")
+    }
+    var ratingCountInput by remember(themeConfig.ratingCount) {
+        mutableStateOf(if (themeConfig.ratingCount > 0) themeConfig.ratingCount.toString() else "")
+    }
+    var currencyInput by remember(themeConfig.currencyCode) { mutableStateOf(themeConfig.currencyCode) }
+
+    // Image Gallery states & launchers
+    var isUploadingMainImage by remember { mutableStateOf(false) }
+    var isUploadingGalleryImage by remember { mutableStateOf(false) }
+    var newGalleryUrlInput by remember { mutableStateOf("") }
+
+    val mainImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            isUploadingMainImage = true
+            viewModel.uploadProductImage(uri, context) { success, msg, uploadedUrl ->
+                isUploadingMainImage = false
+                if (success && !uploadedUrl.isNullOrBlank()) {
+                    viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = uploadedUrl))
+                    val updated = primaryProduct.copy(imageUrl = uploadedUrl)
+                    viewModel.saveOrUpdateShowcaseProduct(updated)
+                    Toast.makeText(context, "Showcase photo updated", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, msg.ifBlank { "Upload failed" }, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    val galleryImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            isUploadingGalleryImage = true
+            viewModel.uploadProductImage(uri, context) { success, msg, uploadedUrl ->
+                isUploadingGalleryImage = false
+                if (success && !uploadedUrl.isNullOrBlank()) {
+                    val updatedGallery = (primaryProduct.galleryUrls + uploadedUrl).distinct()
+                    val updated = primaryProduct.copy(galleryUrls = updatedGallery)
+                    viewModel.saveOrUpdateShowcaseProduct(updated)
+                    Toast.makeText(context, "Gallery photo added", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, msg.ifBlank { "Upload failed" }, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // Variants states
+    var showAddVariantDialog by remember { mutableStateOf(false) }
+    var newVarName by remember { mutableStateOf("") }
+    var newVarPrice by remember { mutableStateOf("") }
+    var newVarSku by remember { mutableStateOf("") }
+    var newVarStock by remember { mutableStateOf("100") }
+    var newVarDesc by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isDark) Color(0xFF141A24) else Color(0xFFF1F5F9))
+            .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Header with title and close button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Tune, contentDescription = null, tint = goldText, modifier = Modifier.size(18.dp))
+                Text("Customize Product Showcase", fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = textPrimary)
+            }
+            IconButton(onClick = onClose, modifier = Modifier.size(26.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = textSecondary, modifier = Modifier.size(16.dp))
+            }
+        }
+
+        // 4 Category Tabs
+        val tabs = listOf(
+            "DETAILS" to "Details & Price",
+            "GALLERY" to "Image Gallery (${primaryProduct.galleryUrls.size})",
+            "VARIANTS" to "Variants (${primaryProduct.productVariants.size})",
+            "VISIBILITY" to "Section Visibility"
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            items(tabs) { (tabKey, tabLabel) ->
+                val isSelected = activeTab == tabKey
+                Surface(
+                    onClick = { activeTab = tabKey },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) (if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB)) else cardBg,
+                    border = BorderStroke(1.dp, if (isSelected) goldPrimary else cardBorder)
+                ) {
+                    Text(
+                        text = tabLabel,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) goldText else textSecondary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+
+        // TAB 1: DETAILS & PRICING
+        if (activeTab == "DETAILS") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = titleInput,
+                    onValueChange = {
+                        titleInput = it.take(120)
+                        val updated = primaryProduct.copy(title = titleInput)
+                        viewModel.saveOrUpdateShowcaseProduct(updated)
+                        viewModel.formTitle.value = titleInput
+                    },
+                    label = { Text("Product Title / Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = eyebrowInput,
+                        onValueChange = {
+                            eyebrowInput = it.take(60)
+                            viewModel.updateFormThemeConfig(themeConfig.copy(eyebrowText = eyebrowInput))
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(category = eyebrowInput))
+                        },
+                        label = { Text("Category / Eyebrow") },
+                        placeholder = { Text("e.g. Flagship Audio • 2026") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = badgeInput,
+                        onValueChange = {
+                            badgeInput = it.take(30)
+                            viewModel.updateFormThemeConfig(themeConfig.copy(badgeText = badgeInput))
+                        },
+                        label = { Text("Badge Tag") },
+                        placeholder = { Text("e.g. Best Seller") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                OutlinedTextField(
+                    value = descInput,
+                    onValueChange = {
+                        descInput = it.take(600)
+                        viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(description = descInput))
+                        viewModel.formDescription.value = descInput
+                    },
+                    label = { Text("Product Description / Subtitle") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    maxLines = 3
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = priceInput,
+                        onValueChange = { v ->
+                            priceInput = v.filter { ch -> ch.isDigit() || ch == '.' }.take(10)
+                            val p = priceInput.toDoubleOrNull() ?: 0.0
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(price = p))
+                        },
+                        label = { Text("Regular Price (${themeConfig.currencyCode})") },
+                        placeholder = { Text("e.g. 1999") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = wasPriceInput,
+                        onValueChange = { v ->
+                            wasPriceInput = v.filter { ch -> ch.isDigit() || ch == '.' }.take(10)
+                            val wp = wasPriceInput.toDoubleOrNull() ?: 0.0
+                            viewModel.updateFormThemeConfig(themeConfig.copy(wasPrice = wp))
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(salePrice = wp))
+                        },
+                        label = { Text("Was / Compare Price") },
+                        placeholder = { Text("e.g. 2499") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = skuInput,
+                        onValueChange = {
+                            skuInput = it.take(50)
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(sku = skuInput))
+                        },
+                        label = { Text("Product SKU") },
+                        placeholder = { Text("e.g. SKU-PROD-01") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = stockInput,
+                        onValueChange = {
+                            stockInput = it.filter(Char::isDigit).take(6)
+                            val s = stockInput.toIntOrNull() ?: 0
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(stock = s))
+                        },
+                        label = { Text("Stock Quantity") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = ratingScoreInput,
+                        onValueChange = { v ->
+                            ratingScoreInput = v.filter { ch -> ch.isDigit() || ch == '.' }.take(4)
+                            val num = (ratingScoreInput.toDoubleOrNull() ?: 0.0).coerceIn(0.0, 5.0)
+                            viewModel.updateFormThemeConfig(themeConfig.copy(ratingScore = num))
+                        },
+                        label = { Text("Star Rating (0-5)") },
+                        placeholder = { Text("e.g. 4.9") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = ratingCountInput,
+                        onValueChange = { v ->
+                            ratingCountInput = v.filter(Char::isDigit).take(6)
+                            val num = ratingCountInput.toIntOrNull() ?: 0
+                            viewModel.updateFormThemeConfig(themeConfig.copy(ratingCount = num))
+                        },
+                        label = { Text("Review Count") },
+                        placeholder = { Text("e.g. 142") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                Text("CURRENCY CODE", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("BDT", "USD", "EUR", "GBP", "INR").forEach { curr ->
+                        val isCurrSel = themeConfig.currencyCode.equals(curr, ignoreCase = true)
+                        Surface(
+                            onClick = { viewModel.updateFormThemeConfig(themeConfig.copy(currencyCode = curr)) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isCurrSel) (if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB)) else cardBg,
+                            border = BorderStroke(1.dp, if (isCurrSel) goldPrimary else cardBorder),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = curr,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isCurrSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCurrSel) goldText else textPrimary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // TAB 2: IMAGE GALLERY
+        if (activeTab == "GALLERY") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("MAIN SHOWCASE PHOTO", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+
+                if (themeConfig.productImageUrl.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDark) Color(0xFF0F172A) else Color(0xFFF1F5F9)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = themeConfig.productImageUrl,
+                            contentDescription = "Main Product Photo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                        IconButton(
+                            onClick = {
+                                viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = ""))
+                                viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(imageUrl = ""))
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .size(26.dp)
+                                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { mainImagePicker.launch("image/*") },
+                        enabled = !isUploadingMainImage,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB), contentColor = goldText),
+                        border = BorderStroke(1.dp, goldPrimary),
+                        modifier = Modifier.weight(1f).height(42.dp)
+                    ) {
+                        if (isUploadingMainImage) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = goldText)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Uploading...", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(Icons.Outlined.CloudUpload, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (themeConfig.productImageUrl.isNotBlank()) "Change Main Photo" else "Upload Main Photo", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = themeConfig.productImageUrl,
+                    onValueChange = { url ->
+                        val cleanUrl = url.trim()
+                        viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = cleanUrl))
+                        viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(imageUrl = cleanUrl))
+                    },
+                    label = { Text("Or paste Main Photo URL (HTTPS)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true
+                )
+
+                HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+
+                // Multi-Image Gallery List
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "ADDITIONAL GALLERY PHOTOS (${primaryProduct.galleryUrls.size})",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textSecondary
+                    )
+
+                    Surface(
+                        onClick = { galleryImagePicker.launch("image/*") },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isDark) Color(0xFF221A0C) else Color(0xFFFEFDF5),
+                        border = BorderStroke(1.dp, goldPrimary)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = goldText, modifier = Modifier.size(13.dp))
+                            Text("+ Upload to Gallery", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = goldText)
+                        }
+                    }
+                }
+
+                if (isUploadingGalleryImage) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = goldPrimary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Uploading gallery photo...", fontSize = 11.5.sp, color = textSecondary)
+                    }
+                }
+
+                if (primaryProduct.galleryUrls.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(primaryProduct.galleryUrls) { gUrl ->
+                            Box(
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, cardBorder, RoundedCornerShape(8.dp))
+                                    .background(if (isDark) Color(0xFF100D07) else Color.White)
+                            ) {
+                                AsyncImage(
+                                    model = gUrl,
+                                    contentDescription = "Gallery Thumbnail",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val updated = primaryProduct.galleryUrls.filterNot { it == gUrl }
+                                        viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(galleryUrls = updated))
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(20.dp)
+                                        .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        "No additional gallery photos yet. Tap '+ Upload to Gallery' or paste an image URL below.",
+                        fontSize = 11.5.sp,
+                        color = textSecondary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = newGalleryUrlInput,
+                        onValueChange = { newGalleryUrlInput = it },
+                        label = { Text("Paste Gallery Image URL") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = {
+                            if (newGalleryUrlInput.isNotBlank()) {
+                                val updated = (primaryProduct.galleryUrls + newGalleryUrlInput.trim()).distinct()
+                                viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(galleryUrls = updated))
+                                newGalleryUrlInput = ""
+                                Toast.makeText(context, "Image added to gallery", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Text("+ Add", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        // TAB 3: PRODUCT VARIANTS (REPLACING COLOR)
+        if (activeTab == "VARIANTS") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            "PRODUCT VARIANTS (${primaryProduct.productVariants.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            "Replaces color swatches with generalized product options (sizes, models, storage, editions).",
+                            fontSize = 11.sp,
+                            color = textSecondary
+                        )
+                    }
+
+                    Surface(
+                        onClick = { showAddVariantDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF10B981).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFF10B981))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(13.dp))
+                            Text("+ Add Variant", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        }
+                    }
+                }
+
+                if (primaryProduct.productVariants.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        primaryProduct.productVariants.forEach { pv ->
+                            Card(
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1A1610) else Color.White),
+                                border = BorderStroke(1.dp, cardBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(pv.name, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                        val curr = if (themeConfig.currencyCode == "USD") "$" else "৳"
+                                        Text(
+                                            "$curr${pv.price.toInt()}${if (pv.sku.isNotBlank()) " | SKU: ${pv.sku}" else ""}${if (pv.stock > 0) " | Stock: ${pv.stock}" else ""}",
+                                            fontSize = 11.sp,
+                                            color = textSecondary
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val updated = primaryProduct.productVariants.filterNot { it.id == pv.id }
+                                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(productVariants = updated))
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Remove Variant", tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        "No variants configured yet. Tap '+ Add Variant' to add size, bundle, or spec options with individual prices and inventory.",
+                        fontSize = 11.5.sp,
+                        color = textSecondary
+                    )
+                }
+            }
+        }
+
+        // TAB 4: SECTION VISIBILITY & LAYOUT (MOVED FROM SETTINGS TAB)
+        if (activeTab == "VISIBILITY") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Control which sections appear on the live storefront product hero. Toggle off any section to hide it completely from customers.",
+                    fontSize = 11.5.sp,
+                    color = textSecondary
+                )
+
+                SettingsToggleRow("Store Header (ব্র্যান্ড হেডার)", !themeConfig.hideHeader) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideHeader = !visible))
+                }
+
+                SettingsToggleRow("Eyebrow / Category Tag (ক্যাটাগরি ট্যাগ)", !themeConfig.hideEyebrow) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideEyebrow = !visible))
+                }
+
+                SettingsToggleRow("Rating & Reviews Badge (স্টার রেটিং)", !themeConfig.hideRating) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideRating = !visible))
+                }
+
+                SettingsToggleRow("Price & Discount Badge (মূল্য ও ডিসকাউন্ট)", !themeConfig.hidePrice) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hidePrice = !visible))
+                }
+
+                SettingsToggleRow("Product Variants (ভ্যারিয়েন্ট নির্বাচক)", !themeConfig.hideSwatches) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideSwatches = !visible))
+                }
+
+                SettingsToggleRow("Size / Profile Chips (সাইজ ও মডেল চিপস)", !themeConfig.hideChips) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideChips = !visible))
+                }
+
+                SettingsToggleRow("Quantity Selector (পরিমাণ নির্বাচক)", !themeConfig.hideQty) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideQty = !visible))
+                }
+
+                SettingsToggleRow("Order Summary Breakdown (অর্ডার সামারি)", !themeConfig.hideSummary) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideSummary = !visible))
+                }
+
+                SettingsToggleRow("Promo / Coupon Code Box (কুপন কোড বক্স)", !themeConfig.hidePromo) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hidePromo = !visible))
+                }
+
+                SettingsToggleRow("Trust Assurances Grid (নিরাপত্তা গ্যারান্টি)", !themeConfig.hideAssurances) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideAssurances = !visible))
+                }
+
+                SettingsToggleRow("Specifications & Details (বিস্তারিত স্পেসিফিকেশন)", !themeConfig.hideDetails) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideDetails = !visible))
+                }
+
+                SettingsToggleRow("Mobile Sticky Bottom Dock (মোবাইল ডক বার)", !themeConfig.hideMobileDock) { visible ->
+                    viewModel.updateFormThemeConfig(themeConfig.copy(hideMobileDock = !visible))
+                }
+            }
+        }
+    }
+
+    if (showAddVariantDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddVariantDialog = false },
+            title = { Text("Add Product Variant", fontWeight = FontWeight.Bold, color = textPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = newVarName,
+                        onValueChange = { newVarName = it.take(60) },
+                        label = { Text("Variant Name (e.g. 128GB Black, XL)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = newVarPrice,
+                        onValueChange = { v -> newVarPrice = v.filter { ch -> ch.isDigit() || ch == '.' }.take(10) },
+                        label = { Text("Price Override (optional, default: ${primaryProduct.price.toInt()})") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = newVarSku,
+                        onValueChange = { newVarSku = it.take(40) },
+                        label = { Text("Variant SKU (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = newVarStock,
+                        onValueChange = { newVarStock = it.filter(Char::isDigit).take(6) },
+                        label = { Text("Stock Quantity") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newVarName.isNotBlank()) {
+                            val priceVal = newVarPrice.toDoubleOrNull() ?: primaryProduct.price
+                            val stockVal = newVarStock.toIntOrNull() ?: 100
+                            val newVariant = ProductVariantItem(
+                                id = java.util.UUID.randomUUID().toString(),
+                                name = newVarName.trim(),
+                                price = priceVal,
+                                sku = newVarSku.trim(),
+                                stock = stockVal,
+                                description = newVarDesc.trim()
+                            )
+                            val updated = primaryProduct.productVariants + newVariant
+                            viewModel.saveOrUpdateShowcaseProduct(primaryProduct.copy(productVariants = updated))
+                            newVarName = ""
+                            newVarPrice = ""
+                            newVarSku = ""
+                            newVarStock = "100"
+                            showAddVariantDialog = false
+                            Toast.makeText(context, "Variant added", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Enter variant name", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = goldPrimary, contentColor = Color.Black)
+                ) { Text("Add Variant", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddVariantDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
 private fun AdvancedFieldSettingsEditor(
     field: FormFieldItem,
     allFields: List<FormFieldItem>,
@@ -3634,21 +4564,6 @@ private fun FormSettingsTab(
     var pageMargin by remember(themeConfig.pageMarginPx) { mutableFloatStateOf(themeConfig.pageMarginPx.toFloat()) }
     var borderRadius by remember(themeConfig.borderRadiusDp) { mutableFloatStateOf(themeConfig.borderRadiusDp.toFloat()) }
 
-    var isUploadingProductImage by remember { mutableStateOf(false) }
-    val productImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            isUploadingProductImage = true
-            viewModel.uploadProductImage(uri, context) { success, msg, uploadedUrl ->
-                isUploadingProductImage = false
-                if (success && !uploadedUrl.isNullOrBlank()) {
-                    viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = uploadedUrl))
-                    Toast.makeText(context, "Product image attached successfully", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, msg.ifBlank { "Upload failed" }, Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -3962,226 +4877,7 @@ private fun FormSettingsTab(
             }
         }
 
-        // 2B. PRODUCT SHOWCASE & MEDIA SECTION
-        item {
-            SettingsCardSection(
-                title = "Product Showcase & Media (প্রোডাক্ট শোকেস)",
-                icon = Icons.Outlined.ShoppingBag,
-                isDark = isDark
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "Upload real product image, set compare-at pricing, eyebrow tag, and review rating for your product storefront.",
-                        fontSize = 12.sp,
-                        color = textSecondary
-                    )
 
-                    // Image Preview Card (if image exists)
-                    if (themeConfig.productImageUrl.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) Color(0xFF1E2433) else Color(0xFFF1F5F9)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = themeConfig.productImageUrl,
-                                contentDescription = "Product Showcase Image",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                    }
-
-                    // Upload Image & Clear Buttons Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = { productImagePicker.launch("image/*") },
-                            enabled = !isUploadingProductImage,
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isDark) Color(0xFF281E0A) else Color(0xFFFFFBEB),
-                                contentColor = goldText
-                            ),
-                            border = BorderStroke(1.dp, goldPrimary),
-                            modifier = Modifier.weight(1f).height(44.dp)
-                        ) {
-                            if (isUploadingProductImage) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = goldText)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Uploading...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            } else {
-                                Icon(Icons.Outlined.CloudUpload, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Upload Product Image", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        if (themeConfig.productImageUrl.isNotBlank()) {
-                            OutlinedButton(
-                                onClick = { viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = "")) },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.height(44.dp)
-                            ) {
-                                Icon(Icons.Outlined.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Remove", color = Color(0xFFEF4444), fontSize = 11.5.sp)
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = themeConfig.productImageUrl,
-                        onValueChange = { url -> viewModel.updateFormThemeConfig(themeConfig.copy(productImageUrl = url.trim())) },
-                        label = { Text("Product Image URL (HTTPS)") },
-                        leadingIcon = { Icon(Icons.Outlined.Image, null, tint = goldText) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = themeConfig.eyebrowText,
-                            onValueChange = { v -> viewModel.updateFormThemeConfig(themeConfig.copy(eyebrowText = v.take(60))) },
-                            label = { Text("Category / Eyebrow") },
-                            placeholder = { Text("e.g. Flagship Audio • 2026") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
-
-                        OutlinedTextField(
-                            value = themeConfig.badgeText,
-                            onValueChange = { v -> viewModel.updateFormThemeConfig(themeConfig.copy(badgeText = v.take(30))) },
-                            label = { Text("Badge Tag") },
-                            placeholder = { Text("e.g. Best Seller") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        var wasPriceInput by remember(themeConfig.wasPrice) { mutableStateOf(if (themeConfig.wasPrice > 0) themeConfig.wasPrice.toString() else "") }
-                        OutlinedTextField(
-                            value = wasPriceInput,
-                            onValueChange = { v ->
-                                wasPriceInput = v.filter { ch -> ch.isDigit() || ch == '.' }.take(8)
-                                val num = wasPriceInput.toDoubleOrNull() ?: 0.0
-                                viewModel.updateFormThemeConfig(themeConfig.copy(wasPrice = num))
-                            },
-                            label = { Text("Was / Compare Price") },
-                            placeholder = { Text("e.g. 299.00") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
-
-                        var ratingScoreInput by remember(themeConfig.ratingScore) { mutableStateOf(if (themeConfig.ratingScore > 0) themeConfig.ratingScore.toString() else "") }
-                        OutlinedTextField(
-                            value = ratingScoreInput,
-                            onValueChange = { v ->
-                                ratingScoreInput = v.filter { ch -> ch.isDigit() || ch == '.' }.take(4)
-                                val num = (ratingScoreInput.toDoubleOrNull() ?: 0.0).coerceIn(0.0, 5.0)
-                                viewModel.updateFormThemeConfig(themeConfig.copy(ratingScore = num))
-                            },
-                            label = { Text("Rating Score (1-5)") },
-                            placeholder = { Text("e.g. 4.9") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    var ratingCountInput by remember(themeConfig.ratingCount) { mutableStateOf(if (themeConfig.ratingCount > 0) themeConfig.ratingCount.toString() else "") }
-                    OutlinedTextField(
-                        value = ratingCountInput,
-                        onValueChange = { v ->
-                            ratingCountInput = v.filter(Char::isDigit).take(6)
-                            val num = ratingCountInput.toIntOrNull() ?: 0
-                            viewModel.updateFormThemeConfig(themeConfig.copy(ratingCount = num))
-                        },
-                        label = { Text("Review Count") },
-                        placeholder = { Text("e.g. 248") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
-                }
-            }
-        }
-
-        // 2C. SECTION VISIBILITY & LAYOUT TOGGLES
-        item {
-            SettingsCardSection(
-                title = "Section Visibility & Removals (সেকশন কন্ট্রোল)",
-                icon = Icons.Outlined.Visibility,
-                isDark = isDark
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Toggle sections on or off to customize the customer-facing product page layout. Any removed section will be cleanly hidden from buyers.",
-                        fontSize = 12.sp,
-                        color = textSecondary
-                    )
-
-                    SettingsToggleRow("Store Header (ব্র্যান্ড হেডার)", !themeConfig.hideHeader) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideHeader = !visible))
-                    }
-
-                    SettingsToggleRow("Eyebrow / Category Tag (ক্যাটাগরি ট্যাগ)", !themeConfig.hideEyebrow) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideEyebrow = !visible))
-                    }
-
-                    SettingsToggleRow("Rating & Reviews Badge (স্টার রেটিং)", !themeConfig.hideRating) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideRating = !visible))
-                    }
-
-                    SettingsToggleRow("Price & Discount Badge (মূল্য ও ডিসকাউন্ট)", !themeConfig.hidePrice) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hidePrice = !visible))
-                    }
-
-                    SettingsToggleRow("Color Swatches (কালার অপশন সোয়াচ)", !themeConfig.hideSwatches) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideSwatches = !visible))
-                    }
-
-                    SettingsToggleRow("Size / Profile Chips (সাইজ ও মডেল চিপস)", !themeConfig.hideChips) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideChips = !visible))
-                    }
-
-                    SettingsToggleRow("Quantity Selector (পরিমাণ নির্বাচক)", !themeConfig.hideQty) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideQty = !visible))
-                    }
-
-                    SettingsToggleRow("Order Summary Breakdown (অর্ডার সামারি)", !themeConfig.hideSummary) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideSummary = !visible))
-                    }
-
-                    SettingsToggleRow("Promo / Coupon Code Box (কুপন কোড বক্স)", !themeConfig.hidePromo) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hidePromo = !visible))
-                    }
-
-                    SettingsToggleRow("Trust Assurances Grid (নিরাপত্তা গ্যারান্টি)", !themeConfig.hideAssurances) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideAssurances = !visible))
-                    }
-
-                    SettingsToggleRow("Specifications & Details (বিস্তারিত স্পেসিফিকেশন)", !themeConfig.hideDetails) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideDetails = !visible))
-                    }
-
-                    SettingsToggleRow("Mobile Sticky Bottom Dock (মোবাইল ডক বার)", !themeConfig.hideMobileDock) { visible ->
-                        viewModel.updateFormThemeConfig(themeConfig.copy(hideMobileDock = !visible))
-                    }
-                }
-            }
-        }
 
         // 3. FORM LOGIC SETTINGS
         item {

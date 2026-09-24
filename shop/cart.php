@@ -1035,8 +1035,8 @@ if(isset($_POST['form1'])) {
 
 <script>
 // Global variables
-let cartTotal = <?php echo $table_total_price; ?>;
-let cartItems = <?php echo count($cart_p_ids); ?>;
+let cartTotal = <?php echo (isset($table_total_price) && is_numeric($table_total_price)) ? $table_total_price : 0; ?>;
+let cartItems = <?php echo (!empty($cart_p_ids) && is_array($cart_p_ids)) ? count($cart_p_ids) : 0; ?>;
 
 // Update quantity function
 function updateQuantity(index, change) {

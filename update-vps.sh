@@ -38,6 +38,7 @@ git reset --hard origin/main
 # 3. Ensure required directories and permissions
 echo -e "${YELLOW}📁 Verifying storage directories...${NC}"
 mkdir -p "$TARGET_DIR/swapnopay-backend/uploads/kyc"
+mkdir -p "$TARGET_DIR/swapnopay-backend/uploads/products"
 mkdir -p "$TARGET_DIR/swapnopay-backend/data/shop-runtime/hosts"
 mkdir -p "$TARGET_DIR/swapnopay-backend/data/shop-sites/hosts"
 mkdir -p "$TARGET_DIR/swapnopay-backend/data/shop-sites/stores"

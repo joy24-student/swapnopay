@@ -9,7 +9,7 @@ error_reporting(E_ALL);
 $runtimeRoot = getenv('SHOP_RUNTIME_DIR') ?: ($_SERVER['SHOP_RUNTIME_DIR'] ?? null);
 if (!$runtimeRoot) {
     $candidate = dirname(__DIR__, 3) . '/swapnopay-backend/data/shop-runtime';
-    if (is_dir($candidate)) {
+    if (is_dir($candidate . '/hosts')) {
         $runtimeRoot = $candidate;
     }
 }
