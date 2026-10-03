@@ -22,6 +22,7 @@ import {
   updateOrderStatusOnMerchantDB,
   getMerchantDeviceStatus,
   createDisputeAppeal,
+  processReportedPayment,
 } from '../services/adminSupabase.js'
 import { verifyWebhookSignature } from '../utils/crypto.js'
 import { isSafeOutboundWebhookUrl, postSafeWebhook } from '../utils/urlValidator.js'
@@ -403,23 +404,16 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         ).catch(e => console.warn('[payment/heartbeat] merchants update notice:', e.message))
       }
 
-      // Broadcast to merchant room and watch rooms for real-time checkout & dashboard listeners
+      // Broadcast to merchant room for real-time dashboard listeners
       if (io) {
         for (const k of candidateKeys) {
-          const payload = {
+          io.to(`merchant:${k}`).emit('merchant_heartbeat', {
             merchant_id: k,
             device_id: device_id || null,
             battery_level: battery_level ?? null,
             status: status || 'ONLINE',
-            device_active: true,
-            device_last_seen: nowIso,
-            device_count: 1,
             ts: now,
-          }
-          io.to(`merchant:${k}`).emit('merchant_heartbeat', payload)
-          io.to(`merchant:${k}`).emit('device_status_update', payload)
-          io.to(`merchant_watch:${k}`).emit('device_status_update', payload)
-          io.emit(`device_status:${k}`, payload)
+          })
         }
       }
 
@@ -608,45 +602,18 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
 
       console.log(`[payment/report-payment] 📲 Incoming payment reported from Android device: TrxID ${cleanTrx} | ৳${numAmount} | Method: ${payment_method || 'bKash'} | Merchant: ${merchant_id}`)
 
-      // 1. Record the SMS capture in the central activity feed as unmatched.
-      try {
-        const eventRecorded = await recordPaymentEvent(cleanTrx, {
-          tran_id: cleanTrx,
-          trx_id: cleanTrx,
-          // A device report is an SMS capture, not proof that an order matched.
-          // Only /verify, called by the atomic merchant-database matcher, can mark PAID.
-          // Keep the event in the schema's accepted non-final state. This is a
-          // captured SMS, not proof that an order was paid.
-          status: 'PENDING',
-          amount: numAmount,
-          currency: 'BDT',
-          payment_method: payment_method || 'bKash',
-          sender_number: sender_number || null,
-          merchant_id: merchant_id || null,
-          payment_time: timestamp ? new Date(Number(timestamp)).toISOString() : new Date().toISOString(),
-          product_name: `SMS Capture on Device: ${device_id || 'unknown'}`
-        })
-        if (!eventRecorded) {
-          return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
-        }
-      } catch (recErr) {
-        console.warn('[payment/report-payment] Event record notice:', recErr.message)
-        return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
-      }
+      const result = await processReportedPayment({
+        merchantId: merchant_id,
+        trxId: cleanTrx,
+        amount: numAmount,
+        paymentMethod: payment_method || 'bKash',
+        senderNumber: sender_number || null,
+        timestamp,
+        deviceId: device_id || null,
+        io,
+      })
 
-      // 2. Emit payment broadcast to merchant dashboard; order status remains
-      // pending until the merchant-database SMS matcher verifies it.
-      if (merchant_id) {
-        io.to(`merchant:${merchant_id}`).emit('payment_received', {
-          trx_id: cleanTrx,
-          amount: numAmount,
-          method: payment_method,
-          sender: sender_number,
-          time: new Date().toISOString()
-        })
-      }
-
-      return res.json({ ok: true, status: 'RECEIVED', message: 'SMS received. The merchant database is checking for a matching order.', trx_id: cleanTrx })
+      return res.json(result)
     } catch (err) {
       console.error('[payment/report-payment] Error:', err.message)
       return res.status(500).json({ ok: false, error: err.message })
@@ -748,36 +715,123 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     // Check if there is an unassigned or matching verified SMS payment event for this merchant and TrxID
     if (cleanTrx && cleanTrx.length >= 6) {
       try {
-        const { getAdminClient } = await import('../services/adminSupabase.js')
+        const { getAdminClient, getMerchantCredentials } = await import('../services/adminSupabase.js')
         const admin = getAdminClient()
-        const orderRecord = merchant_id ? await getOrderFromMerchantDB(merchant_id, order_id) : null
+        const orderRecord = merchant_id ? await getOrderFromMerchantDB(merchant_id, order_id) : requestedOrder
+        const targetAmount = Number(orderRecord?.amount || requestedOrder?.amount || 0)
+
+        // 1. Check admin payment_events (both PAID and PENDING SMS captures)
         let query = admin.from('payment_events')
           .select('*')
           .eq('trx_id', cleanTrx)
           .eq('merchant_id', merchant_id)
-          .eq('status', 'PAID')
+          .in('status', ['PAID', 'PENDING'])
         const { data: matchedEvents } = merchant_id ? await query.limit(10) : { data: [] }
-        const paidEvent = orderRecord
-          ? (matchedEvents || []).find(event => Number(event.amount) === Number(orderRecord.amount))
-          : null
+        let matchedPayment = (matchedEvents || []).find(event => Math.abs(Number(event.amount) - targetAmount) < 0.01)
 
-        if (paidEvent) {
+        // 2. Also check merchant DB payments table if not found in events
+        if (!matchedPayment && merchant_id) {
+          try {
+            const creds = await getMerchantCredentials(merchant_id)
+            if (creds?.supabase_url && creds?.supabase_anon_key) {
+              const { createClient } = await import('@supabase/supabase-js')
+              const mClient = createClient(creds.supabase_url, creds.supabase_anon_key, { auth: { persistSession: false, autoRefreshToken: false } })
+              const { data: mPay } = await mClient
+                .from('payments')
+                .select('*')
+                .eq('merchant_id', merchant_id)
+                .ilike('trx_id', cleanTrx)
+                .maybeSingle()
+              if (mPay && Math.abs(Number(mPay.amount) - targetAmount) < 0.01) {
+                matchedPayment = {
+                  amount: Number(mPay.amount),
+                  payment_method: mPay.payment_method || 'bKash',
+                  sender_number: mPay.sender_number || null,
+                  trx_id: cleanTrx
+                }
+                // Mark payment matched in merchant DB
+                mClient.from('payments').update({ status: 'MATCHED', matched_order_id: order_id }).eq('id', mPay.id).catch(() => {})
+                if (mPay.sms_hash) {
+                  mClient.from('sms_logs').update({ processed: true, status: 'matched' }).eq('sms_hash', mPay.sms_hash).catch(() => {})
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (matchedPayment) {
+          console.log(`[payment/notify] 🎯 Immediate TrxID match for order ${order_id} (TrxID: ${cleanTrx})!`)
           await updateOrderStatusOnMerchantDB(merchant_id, order_id, 'PAID', {
             matched_trx_id: cleanTrx,
-            payment_method: payment_method || paidEvent.payment_method,
-            amount: paidEvent.amount
+            payment_method: payment_method || matchedPayment.payment_method,
+            amount: matchedPayment.amount,
+            sender_number: matchedPayment.sender_number || customer_phone || null
           })
+
+          // Mark payment_events as PAID in admin DB
+          await admin.from('payment_events').upsert({
+            order_id,
+            tran_id: requestedOrder.tran_id || order_id,
+            trx_id: cleanTrx,
+            status: 'PAID',
+            amount: matchedPayment.amount,
+            currency: 'BDT',
+            payment_method: payment_method || matchedPayment.payment_method,
+            sender_number: matchedPayment.sender_number || customer_phone || null,
+            merchant_id: merchant_id,
+            payment_time: new Date().toISOString()
+          }).catch(() => {})
+
           try {
             const { handleFormPaymentPaid } = await import('./form.js')
-            await handleFormPaymentPaid(order_id, cleanTrx, paidEvent.amount, io)
+            await handleFormPaymentPaid(order_id, cleanTrx, matchedPayment.amount, io)
           } catch (_) {}
-          io.to(`order:${order_id}`).emit('payment_status', {
+
+          try {
+            const { getGatewayConfig } = await import('../services/adminSupabase.js')
+            const gatewayConfig = await getGatewayConfig()
+            sendPaymentReceipts({
+              order_id,
+              tran_id: requestedOrder.tran_id || order_id,
+              trx_id: cleanTrx,
+              amount: matchedPayment.amount,
+              payment_method: payment_method || matchedPayment.payment_method || 'bKash',
+              payment_time: new Date().toISOString(),
+              merchant_name: requestedOrder.merchant_name || 'SwapnoPay Merchant',
+              cus_name: requestedOrder.cus_name,
+              cus_phone: customer_phone || requestedOrder.cus_phone,
+              product_name: requestedOrder.product_name,
+              verification: 'CUSTOMER_TRX_MATCH',
+              customer_email: requestedOrder.cus_email || null,
+              customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled,
+              merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled,
+            }).catch(e => console.warn('[payment/notify] Receipt notice:', e.message))
+          } catch (_) {}
+
+          const matchPayload = {
             order_id,
+            tran_id: requestedOrder.tran_id,
             status: 'PAID',
             trx_id: cleanTrx,
-            amount: paidEvent.amount,
+            amount: matchedPayment.amount,
+            payment_method: payment_method || matchedPayment.payment_method || 'bKash',
             paid_at: new Date().toISOString()
-          })
+          }
+          io.to(`order:${order_id}`).emit('payment_status', matchPayload)
+          if (requestedOrderRoom && requestedOrderRoom !== order_id) {
+            io.to(`order:${requestedOrderRoom}`).emit('payment_status', matchPayload)
+          }
+          if (merchant_id) {
+            io.to(`merchant:${merchant_id}`).emit('payment_received', {
+              order_id,
+              trx_id: cleanTrx,
+              amount: matchedPayment.amount,
+              method: payment_method || matchedPayment.payment_method || 'bKash',
+              sender: customer_phone || null,
+              status: 'MATCHED',
+              time: matchPayload.paid_at
+            })
+          }
           return res.json({ ok: true, status: 'PAID', message: 'Payment verified immediately by TrxID match.' })
         }
       } catch (matchErr) {

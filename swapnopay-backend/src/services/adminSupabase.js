@@ -4,7 +4,7 @@
 //          merchant profile (with logo), cross-DB device status, cross-DB order updates.
 
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'node:crypto'
+import crypto, { randomUUID, createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -306,86 +306,50 @@ export async function getMerchantCredentials(merchantId) {
 // Returns: { active: boolean, last_seen: string|null, device_count: number }
 // ──────────────────────────────────────────────────────────────────────────────
 export async function getMerchantDeviceStatus(merchantId, heartbeatMap = null) {
-  if (!merchantId) return { active: false, last_seen: null, device_count: 0, source: 'no_merchant_id' }
+  if (!merchantId) return { active: null, last_seen: null, device_count: 0 }
 
-  // 90 seconds threshold for live socket/heartbeat telemetry
-  const HEARTBEAT_TIMEOUT_MS = 90 * 1000
-  // 2 minutes threshold for database sync telemetry
-  const DB_SYNC_TIMEOUT_MS = 2 * 60 * 1000
+  const THIRTY_MIN = 30 * 60 * 1000
 
-  // 1. Resolve candidate keys (merchant id and user id)
+  // 1. Fast path: check in-memory heartbeat map first across merchantId and possible aliases
   const creds = await getMerchantCredentials(merchantId)
-  const candidateKeys = new Set([merchantId, creds?.merchant_id, creds?.user_id].filter(Boolean))
+  const candidateKeys = [merchantId, creds?.merchant_id, creds?.user_id].filter(Boolean)
 
-  let admin = null
-  let mRow = null
-  try {
-    admin = getAdminClient()
-  } catch (_) {}
-
-  if (admin) {
-    try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantId)
-      let mQuery = admin.from('merchants').select('id, user_id, status, last_sync, created_at')
-      if (isUuid) {
-        mQuery = mQuery.or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
-      } else {
-        mQuery = mQuery.eq('id', merchantId)
-      }
-      const { data: row } = await mQuery.maybeSingle()
-      if (row) {
-        mRow = row
-        if (row.id) candidateKeys.add(row.id)
-        if (row.user_id) candidateKeys.add(row.user_id)
-      }
-    } catch (_) {}
-  }
-
-  const candidateList = Array.from(candidateKeys)
-
-  // 2. Fast path: check in-memory heartbeat map
   if (heartbeatMap) {
-    const now = Date.now()
-    for (const key of candidateList) {
+    for (const key of candidateKeys) {
       if (heartbeatMap.has(key)) {
         const hb = heartbeatMap.get(key)
-        const ageMs = now - (hb?.ts || 0)
-        if (ageMs < HEARTBEAT_TIMEOUT_MS && (hb?.status !== 'OFFLINE')) {
-          return {
-            active: true,
-            last_seen: new Date(hb.ts).toISOString(),
-            device_count: 1,
-            source: 'heartbeat',
-            battery_level: hb.batteryLevel ?? null,
-            device_model: hb.model ?? null,
-          }
+        const ageMs = Date.now() - hb.ts
+        if (ageMs < THIRTY_MIN) {
+          return { active: true, last_seen: new Date(hb.ts).toISOString(), device_count: 1, source: 'heartbeat' }
         }
       }
     }
   }
 
-  // 3. Check Admin Supabase devices table
-  let lastSeen = null
-  let totalDevices = 0
+  // 2. Check Admin Supabase devices table & merchants table
+  let admin = null
+  try {
+    admin = getAdminClient()
+  } catch (_) {}
   if (admin) {
     try {
       const { data: adminDevs } = await admin
         .from('devices')
         .select('id, online, last_sync, disabled, created_at, merchant_id')
-        .in('merchant_id', candidateList)
+        .in('merchant_id', candidateKeys)
 
       if (adminDevs && adminDevs.length > 0) {
-        totalDevices += adminDevs.length
         const now = Date.now()
+        let lastSeen = null
         const hasActiveDevice = adminDevs.some(d => {
           if (d.disabled === true) return false
-          const syncTime = d.last_sync
+          const syncTime = d.last_sync || d.created_at
           const syncTs = syncTime ? new Date(syncTime).getTime() : 0
-          const isRecent = syncTs > 0 && (now - syncTs) < DB_SYNC_TIMEOUT_MS
+          const isRecent = syncTs > 0 && (now - syncTs) < THIRTY_MIN
           if (syncTime && (!lastSeen || syncTs > new Date(lastSeen).getTime())) {
             lastSeen = syncTime
           }
-          return d.online === true && isRecent
+          return d.online === true || isRecent
         })
 
         if (hasActiveDevice) {
@@ -399,66 +363,71 @@ export async function getMerchantDeviceStatus(merchantId, heartbeatMap = null) {
       }
     } catch (_) {}
 
-    // Check merchant row last_sync
-    if (mRow && mRow.last_sync) {
-      const now = Date.now()
-      const syncTs = new Date(mRow.last_sync).getTime()
-      if (syncTs > 0 && (now - syncTs) < DB_SYNC_TIMEOUT_MS) {
-        return {
-          active: true,
-          last_seen: mRow.last_sync,
-          device_count: Math.max(totalDevices, 1),
-          source: 'merchant_sync',
+    // Check merchant row last_sync or status in admin DB
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantId)
+      let mQuery = admin.from('merchants').select('id, user_id, status, last_sync, created_at')
+      if (isUuid) {
+        mQuery = mQuery.or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
+      } else {
+        mQuery = mQuery.eq('id', merchantId)
+      }
+      const { data: mRow } = await mQuery.maybeSingle()
+      if (mRow) {
+        const now = Date.now()
+        const syncTime = mRow.last_sync
+        const syncTs = syncTime ? new Date(syncTime).getTime() : 0
+        if (syncTs > 0 && (now - syncTs) < THIRTY_MIN) {
+          return { active: true, last_seen: syncTime, device_count: 1, source: 'merchant_sync' }
+        }
+        // If merchant account is active, do NOT lock customer out with false offline curtain
+        if (mRow.status === 'ACTIVE') {
+          return { active: null, last_seen: syncTime || mRow.created_at || null, device_count: 0, source: 'merchant_active' }
         }
       }
-      if (!lastSeen || syncTs > new Date(lastSeen).getTime()) {
-        lastSeen = mRow.last_sync
-      }
-    }
+    } catch (_) {}
   }
 
-  // 4. Check merchant's self-hosted Supabase devices table if credentials configured
+  // 3. Query merchant's self-hosted Supabase devices table if credentials configured
   try {
-    if (creds?.supabase_url && creds?.supabase_anon_key) {
-      const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
-      const { data: devices } = await merchantClient
-        .from('devices')
-        .select('id, online, last_sync, disabled, created_at, merchant_id')
+    if (!creds?.supabase_url || !creds?.supabase_anon_key) {
+      return { active: null, last_seen: null, device_count: 0, source: 'no_device_telemetry' }
+    }
 
-      if (devices && devices.length > 0) {
-        totalDevices += devices.length
-        const now = Date.now()
-        const hasActiveDevice = devices.some(d => {
-          if (d.disabled === true) return false
-          const syncTime = d.last_sync
-          const syncTs = syncTime ? new Date(syncTime).getTime() : 0
-          const isRecent = syncTs > 0 && (now - syncTs) < DB_SYNC_TIMEOUT_MS
-          if (syncTime && (!lastSeen || syncTs > new Date(lastSeen).getTime())) {
-            lastSeen = syncTime
-          }
-          return d.online === true && isRecent
-        })
+    const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
 
-        if (hasActiveDevice) {
-          return {
-            active: true,
-            last_seen: lastSeen,
-            device_count: devices.length,
-            source: 'merchant_db',
-          }
-        }
+    const { data: devices, error } = await merchantClient
+      .from('devices')
+      .select('id, online, last_sync, disabled, created_at, merchant_id')
+
+    if (error || !devices || devices.length === 0) {
+      // Do not hard-block checkout if custom DB table is absent or has no devices registered
+      return { active: null, last_seen: null, device_count: 0, source: 'db_devices_skipped' }
+    }
+
+    const now = Date.now()
+    let lastSeen = null
+
+    const hasActiveDevice = devices.some(d => {
+      if (d.disabled === true) return false
+      const syncTime = d.last_sync || d.created_at
+      const syncTs = syncTime ? new Date(syncTime).getTime() : 0
+      const isRecent = syncTs > 0 && (now - syncTs) < THIRTY_MIN
+      if (syncTime && (!lastSeen || syncTs > new Date(lastSeen).getTime())) {
+        lastSeen = syncTime
       }
+      return d.online === true || isRecent
+    })
+
+    return {
+      active: hasActiveDevice ? true : null,
+      last_seen: lastSeen,
+      device_count: devices.length,
+      source: 'merchant_db',
     }
   } catch (err) {
     console.warn(`[device-status] Error checking merchant ${merchantId}:`, err.message)
-  }
-
-  // If no device is currently online or synced within timeout, merchant device is OFFLINE!
-  return {
-    active: false,
-    last_seen: lastSeen,
-    device_count: totalDevices,
-    source: 'offline',
+    return { active: null, last_seen: null, device_count: 0, source: 'devices_skipped' }
   }
 }
 
@@ -470,7 +439,7 @@ export async function getMerchantDeviceStatus(merchantId, heartbeatMap = null) {
 export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
   if (!orderIdOrTranId) return null
 
-  // If merchantId is missing, resolve from payment_events first
+  // If merchantId is missing, resolve from payment_events or admin orders
   let targetMerchantId = merchantId
   if (!targetMerchantId) {
     try {
@@ -484,6 +453,17 @@ export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
       }
       const { data: ev } = await q.maybeSingle()
       if (ev?.merchant_id) targetMerchantId = ev.merchant_id
+
+      if (!targetMerchantId) {
+        let ordQ = admin.from('orders').select('merchant_id').limit(1)
+        if (isUuid) {
+          ordQ = ordQ.or(`id.eq.${orderIdOrTranId},tran_id.eq.${orderIdOrTranId}`)
+        } else {
+          ordQ = ordQ.eq('tran_id', orderIdOrTranId)
+        }
+        const { data: ordRow } = await ordQ.maybeSingle()
+        if (ordRow?.merchant_id) targetMerchantId = ordRow.merchant_id
+      }
     } catch (_) {}
   }
 
@@ -520,10 +500,45 @@ export async function getOrderFromMerchantDB(merchantId, orderIdOrTranId) {
     console.error(`[merchant-db] getOrderFromMerchantDB failed:`, err.message)
   }
 
-  // Fallback: check admin DB payment_events
+  // Fallback: check admin DB orders table and payment_events
   try {
     const admin = getAdminClient()
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderIdOrTranId)
+
+    // Check admin orders table first
+    let oq = admin.from('orders').select('*')
+    if (isUuid) {
+      oq = oq.or(`id.eq.${orderIdOrTranId},tran_id.eq.${orderIdOrTranId}`)
+    } else {
+      oq = oq.eq('tran_id', orderIdOrTranId)
+    }
+    const { data: admOrder } = await oq.maybeSingle()
+    if (admOrder) {
+      return {
+        id: admOrder.id,
+        tran_id: admOrder.tran_id,
+        amount: admOrder.amount,
+        status: admOrder.status,
+        cus_name: admOrder.cus_name,
+        cus_phone: admOrder.cus_phone,
+        cus_email: admOrder.cus_email,
+        product_name: admOrder.product_name,
+        payment_method: admOrder.payment_method,
+        matched_trx_id: admOrder.matched_trx_id,
+        sender_number: admOrder.sender_number,
+        paid_at: admOrder.paid_at,
+        created_at: admOrder.created_at,
+        expires_at: admOrder.expires_at,
+        success_url: admOrder.success_url,
+        fail_url: admOrder.fail_url,
+        cancel_url: admOrder.cancel_url,
+        callback_url: admOrder.callback_url,
+        merchant_id: admOrder.merchant_id || targetMerchantId,
+        merchant_name: admOrder.merchant_name || null,
+      }
+    }
+
+    // Check admin payment_events
     let q = admin.from('payment_events').select('*')
     if (targetMerchantId) q = q.eq('merchant_id', targetMerchantId)
     if (isUuid) {
@@ -640,6 +655,332 @@ export async function updateOrderStatusOnMerchantDB(merchantId, orderId, status,
   } catch (err) {
     console.error(`[merchant-db] updateOrderStatusOnMerchantDB failed:`, err.message)
     return false
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Process SMS payment reported from merchant's Android device.
+// Automatically mirrors to merchant DB (sms_logs & payments), checks for matching
+// PENDING orders, and marks PAID with Socket.IO realtime broadcasts & email receipts.
+// ──────────────────────────────────────────────────────────────────────────────
+export async function processReportedPayment({
+  merchantId,
+  trxId,
+  amount,
+  paymentMethod = 'bKash',
+  senderNumber = null,
+  timestamp = null,
+  deviceId = null,
+  io = null,
+}) {
+  if (!merchantId || !trxId) {
+    return { ok: false, error: 'merchantId and trxId are required' }
+  }
+
+  const cleanTrx = String(trxId).trim().toUpperCase()
+  const numAmount = parseFloat(amount) || 0
+  const cleanSender = senderNumber ? String(senderNumber).trim() : null
+  const paymentTime = timestamp ? new Date(Number(timestamp)).toISOString() : new Date().toISOString()
+  const smsHash = createHash('sha256').update(`${cleanSender || ''}${numAmount}${cleanTrx}`).digest('hex')
+
+  const adminClient = getAdminClient()
+
+  // 1. Check idempotency: if already PAID, return immediately
+  try {
+    const { data: existingEvent } = await adminClient
+      .from('payment_events')
+      .select('order_id, tran_id, status, amount')
+      .eq('trx_id', cleanTrx)
+      .eq('merchant_id', merchantId)
+      .eq('status', 'PAID')
+      .maybeSingle()
+    if (existingEvent) {
+      console.log(`[processReportedPayment] TrxID ${cleanTrx} already verified as PAID for order ${existingEvent.order_id}`)
+      return { ok: true, status: 'PAID', order_id: existingEvent.order_id, trx_id: cleanTrx }
+    }
+  } catch (_) {}
+
+  // 2. Record initial captured SMS event in payment_events
+  try {
+    await recordPaymentEvent(cleanTrx, {
+      tran_id: cleanTrx,
+      trx_id: cleanTrx,
+      status: 'PENDING',
+      amount: numAmount,
+      currency: 'BDT',
+      payment_method: paymentMethod || 'bKash',
+      sender_number: cleanSender,
+      merchant_id: merchantId,
+      payment_time: paymentTime,
+      product_name: `SMS Capture on Device: ${deviceId || 'unknown'}`
+    })
+  } catch (recErr) {
+    console.warn('[processReportedPayment] Initial event record notice:', recErr.message)
+  }
+
+  // 3. Connect to Merchant DB
+  let merchantClient = null
+  let creds = null
+  try {
+    creds = await getMerchantCredentials(merchantId)
+    if (creds?.supabase_url && creds?.supabase_anon_key) {
+      merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
+    }
+  } catch (cErr) {
+    console.warn('[processReportedPayment] Merchant client creation notice:', cErr.message)
+  }
+
+  let matchedOrder = null
+
+  if (merchantClient) {
+    // 3a. Mirror into merchant DB sms_logs
+    try {
+      await merchantClient.from('sms_logs').upsert({
+        device_id: deviceId || null,
+        merchant_id: merchantId,
+        raw_sms: `You have received Tk ${numAmount.toFixed(2)} from ${cleanSender || 'Customer'}. TrxID ${cleanTrx}`,
+        parsed_amount: numAmount,
+        parsed_sender: cleanSender,
+        parsed_trx_id: cleanTrx,
+        parsed_timestamp: paymentTime,
+        sms_hash: smsHash,
+        processed: false,
+        status: 'unprocessed'
+      }, { onConflict: 'sms_hash' })
+    } catch (smsLogErr) {
+      console.warn('[processReportedPayment] sms_logs mirror notice:', smsLogErr.message)
+    }
+
+    // 3b. Mirror into merchant DB payments
+    try {
+      await merchantClient.from('payments').upsert({
+        merchant_id: merchantId,
+        trx_id: cleanTrx,
+        amount: numAmount,
+        sender_number: cleanSender,
+        sms_timestamp: paymentTime,
+        sms_hash: smsHash,
+        status: 'UNMATCHED',
+        created_at: new Date().toISOString()
+      }, { onConflict: 'sms_hash' })
+    } catch (payLogErr) {
+      console.warn('[processReportedPayment] payments mirror notice:', payLogErr.message)
+    }
+
+    // 3c. Search for matching PENDING order on merchant DB
+    try {
+      const nowIso = new Date().toISOString()
+      const { data: candidates } = await merchantClient
+        .from('orders')
+        .select('*')
+        .eq('merchant_id', merchantId)
+        .eq('amount', numAmount)
+        .eq('status', 'PENDING')
+        .gte('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (candidates && candidates.length > 0) {
+        // Priority 1: Check if customer submitted this TrxID in /notify
+        try {
+          const { data: notifiedList } = await adminClient
+            .from('payment_events')
+            .select('order_id, tran_id')
+            .eq('trx_id', cleanTrx)
+            .eq('merchant_id', merchantId)
+            .limit(5)
+          if (notifiedList && notifiedList.length > 0) {
+            const notifiedIds = new Set(notifiedList.map(n => n.order_id || n.tran_id).filter(Boolean))
+            matchedOrder = candidates.find(c => notifiedIds.has(c.id) || notifiedIds.has(c.tran_id))
+          }
+        } catch (_) {}
+
+        // Priority 2: Exact phone match (using last 11 digits normalized)
+        if (!matchedOrder && cleanSender) {
+          const senderNorm = cleanSender.replace(/\D/g, '').slice(-11)
+          if (senderNorm.length >= 10) {
+            matchedOrder = candidates.find(c => {
+              if (!c.cus_phone) return false
+              const cNorm = String(c.cus_phone).replace(/\D/g, '').slice(-11)
+              return cNorm === senderNorm
+            })
+          }
+        }
+
+        // Priority 3: Only 1 pending order exists for this exact amount within the expiry window
+        if (!matchedOrder && candidates.length === 1) {
+          matchedOrder = candidates[0]
+        }
+      }
+    } catch (orderQueryErr) {
+      console.warn('[processReportedPayment] Order match query notice:', orderQueryErr.message)
+    }
+  }
+
+  // Fallback 3d: If not found on merchant DB, check Admin DB orders
+  if (!matchedOrder) {
+    try {
+      const { data: adminCandidates } = await adminClient
+        .from('orders')
+        .select('*')
+        .eq('merchant_id', merchantId)
+        .eq('amount', numAmount)
+        .eq('status', 'PENDING')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (adminCandidates && adminCandidates.length > 0) {
+        if (cleanSender) {
+          const senderNorm = cleanSender.replace(/\D/g, '').slice(-11)
+          matchedOrder = adminCandidates.find(c => {
+            if (!c.cus_phone) return false
+            return String(c.cus_phone).replace(/\D/g, '').slice(-11) === senderNorm
+          })
+        }
+        if (!matchedOrder && adminCandidates.length === 1) {
+          matchedOrder = adminCandidates[0]
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 4. If MATCHED: Finalize payment to PAID
+  if (matchedOrder) {
+    console.log(`[processReportedPayment] 🎯 MATCH FOUND! Order ${matchedOrder.id} matched with TrxID ${cleanTrx}`)
+
+    // 4a. Update order in merchant DB
+    await updateOrderStatusOnMerchantDB(merchantId, matchedOrder.id, 'PAID', {
+      matched_trx_id: cleanTrx,
+      sender_number: cleanSender,
+      amount: numAmount,
+      payment_method: paymentMethod || 'bKash',
+      payment_time: paymentTime
+    })
+
+    // 4b. Update payments & sms_logs on merchant DB
+    if (merchantClient) {
+      try {
+        await merchantClient.from('payments').update({
+          status: 'MATCHED',
+          matched_order_id: matchedOrder.id
+        }).eq('sms_hash', smsHash)
+
+        await merchantClient.from('sms_logs').update({
+          processed: true,
+          status: 'matched'
+        }).eq('sms_hash', smsHash)
+      } catch (updErr) {
+        console.warn('[processReportedPayment] Merchant DB payments update notice:', updErr.message)
+      }
+    }
+
+    // 4c. Update Admin DB payment_events & orders
+    try {
+      await adminClient.from('payment_events').upsert({
+        order_id: matchedOrder.id,
+        tran_id: matchedOrder.tran_id || matchedOrder.id,
+        trx_id: cleanTrx,
+        status: 'PAID',
+        amount: numAmount,
+        currency: 'BDT',
+        payment_method: paymentMethod || 'bKash',
+        sender_number: cleanSender,
+        merchant_id: merchantId,
+        payment_time: paymentTime
+      })
+      await adminClient.from('orders').update({
+        status: 'PAID',
+        matched_trx_id: cleanTrx,
+        paid_at: paymentTime
+      }).eq('id', matchedOrder.id)
+    } catch (admUpdErr) {
+      console.warn('[processReportedPayment] Admin DB update notice:', admUpdErr.message)
+    }
+
+    // 4d. Emit Socket.IO realtime events
+    if (io) {
+      const orderRoomId = matchedOrder.id
+      const tranRoomId = matchedOrder.tran_id
+      const payload = {
+        order_id: matchedOrder.id,
+        tran_id: matchedOrder.tran_id,
+        status: 'PAID',
+        trx_id: cleanTrx,
+        amount: numAmount,
+        payment_method: paymentMethod || 'bKash',
+        sender_number: cleanSender,
+        paid_at: paymentTime
+      }
+      io.to(`order:${orderRoomId}`).emit('payment_status', payload)
+      if (tranRoomId && tranRoomId !== orderRoomId) {
+        io.to(`order:${tranRoomId}`).emit('payment_status', payload)
+      }
+      io.to(`merchant:${merchantId}`).emit('payment_received', {
+        order_id: matchedOrder.id,
+        trx_id: cleanTrx,
+        amount: numAmount,
+        method: paymentMethod || 'bKash',
+        sender: cleanSender,
+        status: 'MATCHED',
+        time: paymentTime
+      })
+    }
+
+    // 4e. Hosted Form submission trigger
+    try {
+      const { handleFormPaymentPaid } = await import('../routes/form.js')
+      await handleFormPaymentPaid(matchedOrder.id || matchedOrder.tran_id, cleanTrx, numAmount, io)
+    } catch (_) {}
+
+    // 4f. Email receipts
+    try {
+      const { sendPaymentReceipts } = await import('./mailer.js')
+      const gatewayConfig = await getGatewayConfig()
+      sendPaymentReceipts({
+        order_id: matchedOrder.id,
+        tran_id: matchedOrder.tran_id,
+        trx_id: cleanTrx,
+        amount: numAmount,
+        payment_method: paymentMethod || 'bKash',
+        payment_time: paymentTime,
+        merchant_name: creds?.merchant_name || 'SwapnoPay Merchant',
+        cus_name: matchedOrder.cus_name,
+        cus_phone: cleanSender || matchedOrder.cus_phone,
+        product_name: matchedOrder.product_name,
+        verification: 'ANDROID_DEVICE_SYNC',
+        customer_email: matchedOrder.cus_email || null,
+        customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled,
+        merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled,
+      }).catch(e => console.warn('[processReportedPayment] Receipt dispatch notice:', e.message))
+    } catch (_) {}
+
+    return {
+      ok: true,
+      status: 'MATCHED',
+      order_id: matchedOrder.id,
+      tran_id: matchedOrder.tran_id,
+      trx_id: cleanTrx,
+      amount: numAmount
+    }
+  }
+
+  // 5. If NO MATCH yet:
+  if (io) {
+    io.to(`merchant:${merchantId}`).emit('payment_received', {
+      trx_id: cleanTrx,
+      amount: numAmount,
+      method: paymentMethod || 'bKash',
+      sender: cleanSender,
+      status: 'UNMATCHED',
+      time: paymentTime
+    })
+  }
+
+  return {
+    ok: true,
+    status: 'RECEIVED',
+    message: 'SMS captured. No matching order found yet.',
+    trx_id: cleanTrx
   }
 }
 
@@ -834,8 +1175,14 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
 
   const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
 
-  // Honest device telemetry: reflects whether merchant mobile terminal is actually active
+  // If merchant account is ACTIVE in database or has configured receiving numbers, never falsely declare offline
   let finalDeviceActive = deviceStatus.active
+  if (finalDeviceActive === false) {
+    const isMerchantActive = (mStatus === 'ACTIVE' || !merchantRow)
+    if (isMerchantActive || hasNumbers) {
+      finalDeviceActive = null // Never lock out customer when account is active or numbers are configured
+    }
+  }
 
   const effectiveName = merchantRow?.merchant_name || memSettings?.merchant_name || creds?.merchant_name || null
   const effectiveLogo = merchantRow?.merchant_logo_url || memSettings?.merchant_logo_url || creds?.merchant_logo_url || null

@@ -124,6 +124,21 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    fun isPlatformProfile(profile: SupabaseProfileEntity): Boolean {
+        return profile.id == "00000000-0000-0000-0000-000000000001" ||
+                profile.supabaseUrl.contains("tldubojeokgyoclxnzkb") ||
+                profile.supabaseUrl.trimEnd('/') == "https://tldubojeokgyoclxnzkb.supabase.co"
+    }
+
+    suspend fun getMerchantSupabaseProfile(): SupabaseProfileEntity? {
+        val active = getActiveSupabaseProfile()
+        if (active != null && !isPlatformProfile(active) && active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+            return active
+        }
+        val all = getAllSupabaseProfiles()
+        return all.firstOrNull { !isPlatformProfile(it) && it.supabaseUrl.isNotBlank() && it.anonKey.isNotBlank() }
+    }
+
     private suspend fun getAuthenticatedSupabaseProfile(): SupabaseProfileEntity? {
         val profile = getActiveSupabaseProfile() ?: return null
         if (profile.authSessionToken.isBlank()) {
@@ -446,6 +461,7 @@ class AppRepository(private val context: Context) {
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
                 token = active.authSessionToken.ifBlank { active.anonKey },
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch appeals: $err")
@@ -722,13 +738,10 @@ class AppRepository(private val context: Context) {
 
         // 1. Immediately report verified payment to SwapnoPay central gateway for instant verification
         val reported = reportPaymentToBackend(paymentEntity)
-        if (reported) {
-            dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
-        }
 
-        // 2. Also attempt upload to custom Supabase database if configured
-        val success = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
-        if (success && !reported) {
+        // 2. Also upload to merchant's own Supabase database
+        val uploadedToSupabase = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
+        if (reported || uploadedToSupabase) {
             dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
         }
         
@@ -777,21 +790,6 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun uploadSmsToSupabase(sms: SmsQueueEntity): Boolean = withContext(Dispatchers.IO) {
-        // First try central backend
-        val backendReported = reportPaymentToBackend(
-            CachedPaymentEntity(
-                id = sms.trxId,
-                merchantId = sms.merchantId,
-                amount = sms.amount,
-                sender = sms.sender,
-                timestamp = sms.timestamp,
-                status = "UNMATCHED",
-                method = "bKash",
-                orderId = null
-            )
-        )
-        if (backendReported) return@withContext true
-
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         
@@ -863,7 +861,7 @@ class AppRepository(private val context: Context) {
                     supabaseUrl = "https://tldubojeokgyoclxnzkb.supabase.co",
                     anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0",
                     serviceRoleKey = "",
-                    isActive = true
+                    isActive = false
                 )
             )
         }
@@ -1152,18 +1150,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncProductsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "products",
                 selectQuery = "*",
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch products: $err")
@@ -1184,14 +1184,14 @@ class AppRepository(private val context: Context) {
                             id = obj.getString("id"),
                             merchantId = effectiveMid,
                             name = obj.getString("name"),
-                            code = obj.optString("code", null),
+                            code = obj.optString("code").takeIf { it.isNotBlank() },
                             category = obj.optString("category", "General"),
                             purchasePrice = obj.optDouble("purchase_price", 0.0),
                             salePrice = obj.optDouble("sale_price", 0.0),
                             stockQuantity = obj.optDouble("stock_quantity", 0.0),
                             minStockThreshold = obj.optDouble("min_stock_threshold", 5.0),
                             unit = obj.optString("unit", "pcs"),
-                            imageUrl = obj.optString("image_url", null),
+                            imageUrl = obj.optString("image_url").takeIf { it.isNotBlank() },
                             storefrontDetailsJson = obj.optJSONObject("storefront_details")?.toString() ?: "{}",
                             createdAt = parseIsoDateToMillis(obj.optString("created_at")),
                             costPrice = obj.optDouble("purchase_price", 0.0),
@@ -1210,14 +1210,14 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun uploadProductToSupabase(product: ProductItemEntity): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var success = false
         try {
             val payload = org.json.JSONObject().apply {
                 put("id", product.id)
-                put("merchant_id", active.id)
+                put("merchant_id", if (product.merchantId.isNotBlank()) product.merchantId else active.id)
                 put("name", product.name)
                 put("code", product.code ?: "")
                 put("category", product.category ?: "General")
@@ -1232,10 +1232,11 @@ class AppRepository(private val context: Context) {
                 }
             }
 
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.upsertRecord(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "products",
                 payload = payload,
                 onSuccess = { success = true },
@@ -1248,15 +1249,16 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun deleteProductFromSupabase(productId: String): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
 
         var success = false
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.deleteRecord(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "products",
                 primaryKeyCol = "id",
                 primaryKeyVal = productId,
@@ -1270,18 +1272,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncCustomersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "customers",
                 selectQuery = "*",
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch customers: $err")
@@ -1324,18 +1328,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncSuppliersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "suppliers",
                 selectQuery = "*",
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch suppliers: $err")
@@ -1377,18 +1383,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncLedgerFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "ledger_transactions",
                 selectQuery = "*",
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch ledger transactions: $err")
@@ -1434,18 +1442,20 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncPosSalesFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         var resultData: org.json.JSONArray? = null
         try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             com.example.data.remote.SupabaseClient.fetchRecords(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 tableName = "pos_sales",
                 selectQuery = "*",
+                merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to fetch pos sales: $err")
@@ -1486,6 +1496,61 @@ class AppRepository(private val context: Context) {
             }
             if (sales.isNotEmpty()) {
                 dao.insertPosSales(sales)
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun syncExpensesFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
+        val active = getMerchantSupabaseProfile() ?: return@withContext false
+        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
+
+        var resultData: org.json.JSONArray? = null
+        try {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
+            com.example.data.remote.SupabaseClient.fetchRecords(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = token,
+                tableName = "expenses",
+                selectQuery = "*",
+                merchantId = effectiveMid,
+                onSuccess = { jsonArray -> resultData = jsonArray },
+                onFailure = { err ->
+                    android.util.Log.e("AppRepository", "Failed to fetch expenses: $err")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Exception fetching expenses", e)
+        }
+
+        if (resultData != null) {
+            val expenseList = mutableListOf<ExpenseEntity>()
+            for (i in 0 until resultData!!.length()) {
+                val obj = resultData!!.getJSONObject(i)
+                val merchantId = obj.optString("merchant_id")
+                if (merchantId.isBlank() || merchantId == effectiveMid || effectiveMid.isBlank()) {
+                    expenseList.add(
+                        ExpenseEntity(
+                            id = obj.getString("id"),
+                            merchantId = effectiveMid,
+                            category = obj.optString("category", "Others"),
+                            amount = obj.optDouble("amount", 0.0),
+                            date = parseIsoDateToMillis(obj.optString("date", obj.optString("created_at"))),
+                            description = if (obj.isNull("description")) null else obj.optString("description"),
+                            receiptImageUrl = if (obj.isNull("receipt_image_url")) null else obj.optString("receipt_image_url"),
+                            paymentMethod = obj.optString("payment_method", "Cash"),
+                            isRecurring = obj.optBoolean("is_recurring", false),
+                            createdAt = parseIsoDateToMillis(obj.optString("created_at"))
+                        )
+                    )
+                }
+            }
+            if (expenseList.isNotEmpty()) {
+                dao.insertExpenses(expenseList)
             }
             true
         } else {

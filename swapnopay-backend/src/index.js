@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { initAdminSupabase, getShowcaseConfig, getMerchantDeviceStatus } from './services/adminSupabase.js'
+import { initAdminSupabase, getShowcaseConfig } from './services/adminSupabase.js'
 import { initMailer } from './services/mailer.js'
 import { paymentRouter } from './routes/payment.js'
 import { adminRouter } from './routes/admin.js'
@@ -177,15 +177,26 @@ const webhookLimiter = rateLimit({
 })
 
 // ──────────────────────────────────────────────────────────────────────────────
-// ──────────────────────────────────────────────────────────────────────────────
 // In-Memory Merchant Heartbeat Map
 // Tracks which merchant devices are live via Socket.io (O(1) device check)
-// Structure: merchantId → { ts: number, socketId: string, deviceId: string|null, status: string }
+// Structure: merchantId → { ts: number, socketId: string, deviceId: string|null }
 // ──────────────────────────────────────────────────────────────────────────────
 export const merchantHeartbeatMap = new Map()
 
-const HEARTBEAT_TIMEOUT_MS = 90 * 1000   // 90 seconds — device considered stale / offline
-const CLEANUP_INTERVAL_MS = 10 * 1000     // Check every 10 seconds for real-time offline detection
+const HEARTBEAT_GRACE_MS = 3 * 60 * 1000   // 3 minutes — device considered stale
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000  // Clean up stale entries every 5 minutes
+
+setInterval(() => {
+  const now = Date.now()
+  let cleaned = 0
+  for (const [merchantId, hb] of merchantHeartbeatMap.entries()) {
+    if (now - hb.ts > HEARTBEAT_GRACE_MS * 2) {
+      merchantHeartbeatMap.delete(merchantId)
+      cleaned++
+    }
+  }
+  if (cleaned > 0) console.log(`[heartbeat] Cleaned ${cleaned} stale merchant heartbeat(s)`)
+}, CLEANUP_INTERVAL_MS)
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Socket.io
@@ -198,34 +209,6 @@ const io = new SocketIOServer(httpServer, {
   upgradeTimeout: 10000,
   maxHttpBufferSize: 1e6,
 })
-
-// Real-time broadcast helper for merchant device connection changes
-export function broadcastDeviceStatus(merchantId, isActive, details = {}) {
-  if (!merchantId || !io) return
-  const payload = {
-    merchant_id: merchantId,
-    device_active: Boolean(isActive),
-    status: isActive ? 'ONLINE' : 'OFFLINE',
-    device_last_seen: details.last_seen || new Date().toISOString(),
-    device_count: details.device_count ?? (isActive ? 1 : 0),
-    ts: Date.now(),
-  }
-  io.to(`merchant:${merchantId}`).emit('device_status_update', payload)
-  io.to(`merchant_watch:${merchantId}`).emit('device_status_update', payload)
-  io.emit(`device_status:${merchantId}`, payload)
-}
-
-// Background cleanup: if a merchant device stops sending heartbeats for > 90 seconds, broadcast OFFLINE immediately
-setInterval(() => {
-  const now = Date.now()
-  for (const [merchantId, hb] of merchantHeartbeatMap.entries()) {
-    if (now - (hb?.ts || 0) > HEARTBEAT_TIMEOUT_MS) {
-      merchantHeartbeatMap.delete(merchantId)
-      console.log(`[heartbeat] Merchant ${merchantId} marked OFFLINE (heartbeat timed out > 90s)`)
-      broadcastDeviceStatus(merchantId, false, { last_seen: new Date(hb?.ts || now).toISOString() })
-    }
-  }
-}, CLEANUP_INTERVAL_MS)
 
 // Public checkout widgets may connect for an order room. Merchant rooms require
 // a verified account token, platform API key, or the configured admin secret.
@@ -344,55 +327,32 @@ io.on('connection', (socket) => {
     const room = `merchant:${merchant_id}`
     socket.join(room)
 
-    const now = Date.now()
+    // Track merchant as live in heartbeat map
     merchantHeartbeatMap.set(merchant_id, {
-      ts: now,
+      ts: Date.now(),
       socketId: socket.id,
       deviceId: device_id || null,
-      status: 'ONLINE',
     })
 
     console.log(`[socket.io] ${socket.id} joined merchant room: ${room} | device: ${device_id || 'unknown'}`)
-    socket.emit('room_joined', { room, merchant_id, ts: now })
+    socket.emit('room_joined', { room, merchant_id, ts: Date.now() })
 
     // Store merchant_id on socket for cleanup on disconnect
     socket.data.merchant_id = merchant_id
     socket.data.device_id = device_id || null
-
-    broadcastDeviceStatus(merchant_id, true, { last_seen: new Date(now).toISOString() })
   })
 
   // ── Merchant device heartbeat — keeps device_active=true in memory ──
   socket.on('merchant_heartbeat', ({ merchant_id, device_id } = {}) => {
     if (!merchant_id || typeof merchant_id !== 'string') return
-    if (!socket.data.isAdmin && socket.data.authenticatedMerchantId && socket.data.authenticatedMerchantId !== merchant_id) return
-    const now = Date.now()
+    if (!socket.data.isAdmin && socket.data.authenticatedMerchantId !== merchant_id) return
     merchantHeartbeatMap.set(merchant_id, {
-      ts: now,
+      ts: Date.now(),
       socketId: socket.id,
       deviceId: device_id || socket.data.device_id || null,
-      status: 'ONLINE',
     })
-    socket.emit('heartbeat_ack', { ts: now, merchant_id })
-    broadcastDeviceStatus(merchant_id, true, { last_seen: new Date(now).toISOString() })
-  })
-
-  // ── Checkout widget or client watches merchant device status in real time ──
-  socket.on('watch_merchant', async ({ merchant_id } = {}) => {
-    if (!merchant_id || typeof merchant_id !== 'string' || merchant_id.length > 100) return
-    const watchRoom = `merchant_watch:${merchant_id}`
-    socket.join(watchRoom)
-    try {
-      const status = await getMerchantDeviceStatus(merchant_id, merchantHeartbeatMap)
-      socket.emit('device_status_update', {
-        merchant_id,
-        device_active: status.active,
-        device_last_seen: status.last_seen,
-        device_count: status.device_count,
-        source: status.source,
-        ts: Date.now(),
-      })
-    } catch (_) {}
+    // Acknowledge heartbeat with server timestamp
+    socket.emit('heartbeat_ack', { ts: Date.now(), merchant_id })
   })
 
   // ── Widget pings backend to confirm connection is alive ──
@@ -404,15 +364,20 @@ io.on('connection', (socket) => {
   socket.on('disconnect', reason => {
     console.log(`[socket.io] Client disconnected: ${socket.id} — reason: ${reason}`)
 
-    // Mark merchant offline immediately if this socket belonged to a merchant device
+    // Mark merchant offline after grace period if it was the last socket
     const merchant_id = socket.data.merchant_id
     if (merchant_id) {
-      const hb = merchantHeartbeatMap.get(merchant_id)
-      if (hb && hb.socketId === socket.id) {
-        merchantHeartbeatMap.delete(merchant_id)
-        console.log(`[heartbeat] Merchant ${merchant_id} marked OFFLINE on socket disconnect`)
-        broadcastDeviceStatus(merchant_id, false, { last_seen: new Date().toISOString() })
-      }
+      // Give 5 minutes grace before deleting in-memory heartbeat (handles Android backgrounding, network handover, and quick reconnects)
+      setTimeout(() => {
+        const hb = merchantHeartbeatMap.get(merchant_id)
+        if (hb && hb.socketId === socket.id) {
+          // Check if last recorded heartbeat is older than 5 minutes
+          if (Date.now() - (hb.lastSeen || 0) > 5 * 60 * 1000) {
+            merchantHeartbeatMap.delete(merchant_id)
+            console.log(`[heartbeat] Merchant ${merchant_id} marked offline after disconnect (5min grace elapsed)`)
+          }
+        }
+      }, 5 * 60 * 1000)
     }
   })
 
