@@ -88,6 +88,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPayment(payment: CachedPaymentEntity)
 
+    @Query("UPDATE cached_payments SET status = :status, orderId = COALESCE(:orderId, orderId) WHERE id = :trxId")
+    suspend fun updatePaymentStatus(trxId: String, status: String, orderId: String? = null)
+
     // Appeals
     @Query("SELECT * FROM appeals WHERE merchantId = :merchantId ORDER BY timestamp DESC")
     fun observeAppeals(merchantId: String): Flow<List<AppealEntity>>

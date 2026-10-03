@@ -968,6 +968,7 @@ fun AppNavigation(viewModel: AppViewModel) {
         "FormBuilder", "FormBuilderStudio", "AiFormBuilder", "AiBuilder", "FormTemplates", "TemplatePicker", "FormResponses", "FormSubmissions" -> FormBuilderStudioScreen(viewModel)
         "FormResponsesSheet", "FormResponsesSpreadsheet", "FormResponsesLedger", "FormResponsesGrid", "FormResponseSheet" -> FormResponsesSpreadsheetScreen(viewModel)
         "SMSLogs" -> SMSLogsScreen(viewModel)
+        "Appeals", "AppealsScreen", "Disputes", "AppealsHub" -> AppealsScreen(viewModel)
         "Notifications" -> NotificationsScreen(viewModel)
         "SupabaseProfiles", "SupabaseProfileManager", "SupabaseDiagnostics", "CloudBackends" -> SupabaseProfilesScreen(viewModel)
         "SupabaseSetupGuide" -> SupabaseSetupGuideScreen(viewModel)
@@ -11302,7 +11303,42 @@ fun LegacyTransactionsScreen(viewModel: AppViewModel) {
 fun AppealsScreen(viewModel: AppViewModel) {
     val appeals by viewModel.appeals.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        // Header Bar with Back Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(if (isDarkModeGlobal) Color(0xFF1E1F26) else Color.White)
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(if (isDarkModeGlobal) Color(0xFF2C2D35) else Color(0xFFF1F5F9), CircleShape)
+                    .border(BorderStroke(1.dp, if (isDarkModeGlobal) Color(0xFF474555) else Color(0xFFE2E8F0)), CircleShape)
+                    .clickable { viewModel.goBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                text = "Appeals Hub",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B)
+            )
+        }
         // Tabs
         Row(
             modifier = Modifier
@@ -20178,8 +20214,9 @@ fun SMSLogsScreen(viewModel: AppViewModel) {
                             }
 
                             items(smsInGroup) { sms ->
-                                val isMatched = remember(payments, sms.trxId) {
-                                    payments.any { it.id.equals(sms.trxId, ignoreCase = true) && it.status == "MATCHED" }
+                                val isMatched = remember(payments, sms.trxId, sms.status) {
+                                    sms.status.equals("MATCHED", ignoreCase = true) ||
+                                    payments.any { it.id.equals(sms.trxId, ignoreCase = true) && (it.status.equals("MATCHED", ignoreCase = true) || it.status.equals("PAID", ignoreCase = true)) }
                                 }
 
                                 Card(

@@ -7316,7 +7316,7 @@ private fun IntegrationItemCard(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAB 4: FORM RESPONSES / SUBMISSIONS TAB
+// TAB 4: FORM RESPONSES / SUBMISSIONS TAB (EXCEL TABLE & DATA ANALYSIS)
 // ═══════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -7324,6 +7324,7 @@ private fun FormResponsesTab(
     viewModel: AppViewModel
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val isDark by viewModel.isDarkMode.collectAsState()
     val allSubmissions by viewModel.formSubmissions.collectAsState()
     val activeFormId by viewModel.activeFormId.collectAsState()
@@ -7332,6 +7333,7 @@ private fun FormResponsesTab(
         hostedForms.find { it.id == activeFormId }
     }
     val activeFormSlug = activeForm?.slug.orEmpty()
+    val formTitle = activeForm?.title?.ifBlank { "Hosted Form" } ?: "All Forms"
     var showAllForms by remember { mutableStateOf(false) }
 
     LaunchedEffect(hostedForms, activeFormId) {
@@ -7353,6 +7355,13 @@ private fun FormResponsesTab(
     }
     LaunchedEffect(activeFormId) { viewModel.fetchFormSubmissions(activeFormId) }
 
+    // UI State: Filters, Search, View Mode, Selection
+    var searchQuery by remember { mutableStateOf("") }
+    var statusFilter by remember { mutableStateOf("ALL") } // "ALL", "PAID", "PENDING", "FAILED"
+    var viewMode by remember { mutableStateOf("table") } // "table" (Excel grid) or "cards"
+    var selectedSubmission by remember { mutableStateOf<org.json.JSONObject?>(null) }
+
+    // Theme palette
     val cardBg = if (isDark) Color(0xFF13100C) else Color.White
     val cardBorder = if (isDark) Color(0xFF2C2213) else Color(0xFFE2E8F0)
     val textPrimary = if (isDark) Color.White else Color(0xFF0D1C2E)
@@ -7360,16 +7369,199 @@ private fun FormResponsesTab(
     val goldPrimary = if (isDark) Color(0xFFE5A93C) else Color(0xFFFFC800)
     val goldText = if (isDark) Color(0xFFFACC15) else Color(0xFF705D00)
     val goldDarkBg = if (isDark) Color(0xFF221A0C) else Color(0xFFFFFDF0)
+    val tableHeaderBg = if (isDark) Color(0xFF1C1814) else Color(0xFFF1F5F9)
+    val tableRowAltBg = if (isDark) Color(0xFF17130F) else Color(0xFFF8FAFC)
+    val tableBorder = if (isDark) Color(0xFF261E14) else Color(0xFFE2E8F0)
 
-    val totalRevenue = submissions.filter {
-        val st = it.optString("payment_status", "").uppercase()
-        st == "PAID" || st == "NOT_REQUIRED" || st == "FREE" || st == "COMPLETED"
-    }.sumOf { it.optDouble("amount_bdt", it.optDouble("amount", 0.0)) }
-    var selectedSubmission by remember { mutableStateOf<org.json.JSONObject?>(null) }
-    fun csvCell(raw: String): String {
-        val protected = if (raw.firstOrNull() in listOf('=', '+', '-', '@')) "'$raw" else raw
-        val q = "\""
-        return q + protected.replace(q, "\"\"") + q
+    // Data Analysis Calculations
+    val paidCount = remember(submissions) {
+        submissions.count {
+            val st = it.optString("payment_status", "").uppercase()
+            st == "PAID" || st == "FREE" || st == "COMPLETED"
+        }
+    }
+    val pendingCount = remember(submissions) {
+        submissions.count {
+            it.optString("payment_status", "PENDING").uppercase() == "PENDING"
+        }
+    }
+    val failedCount = remember(submissions) {
+        submissions.count {
+            val st = it.optString("payment_status", "").uppercase()
+            st == "FAILED" || st == "CANCELLED" || st == "EXPIRED"
+        }
+    }
+    val totalRevenue = remember(submissions) {
+        submissions.filter {
+            val st = it.optString("payment_status", "").uppercase()
+            st == "PAID" || st == "FREE" || st == "COMPLETED"
+        }.sumOf { it.optDouble("amount_bdt", it.optDouble("amount", 0.0)) }
+    }
+    val conversionRate = remember(submissions, paidCount) {
+        if (submissions.isNotEmpty()) (paidCount.toDouble() / submissions.size.toDouble()) * 100.0 else 0.0
+    }
+
+    // Filtered Submissions based on search and status
+    val filteredSubmissions = remember(submissions, searchQuery, statusFilter) {
+        submissions.filter { sub ->
+            val st = sub.optString("payment_status", "PENDING").uppercase()
+            val matchesStatus = when (statusFilter) {
+                "PAID" -> (st == "PAID" || st == "FREE" || st == "COMPLETED")
+                "PENDING" -> st == "PENDING"
+                "FAILED" -> (st == "FAILED" || st == "CANCELLED" || st == "EXPIRED")
+                else -> true
+            }
+            val matchesSearch = if (searchQuery.isBlank()) true else {
+                val q = searchQuery.trim().lowercase()
+                sub.optString("customer_name").lowercase().contains(q) ||
+                sub.optString("customer_phone").lowercase().contains(q) ||
+                sub.optString("customer_email").lowercase().contains(q) ||
+                sub.optString("transaction_id").lowercase().contains(q) ||
+                sub.optString("matched_trx_id").lowercase().contains(q) ||
+                sub.optString("id").lowercase().contains(q)
+            }
+            matchesStatus && matchesSearch
+        }
+    }
+    val filteredRevenue = remember(filteredSubmissions) {
+        filteredSubmissions.filter {
+            val st = it.optString("payment_status", "").uppercase()
+            st == "PAID" || st == "FREE" || st == "COMPLETED"
+        }.sumOf { it.optDouble("amount_bdt", it.optDouble("amount", 0.0)) }
+    }
+
+    // Helper: Print Native Submissions PDF Report
+    fun printSubmissionsReportPdf() {
+        try {
+            val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as? android.print.PrintManager
+                ?: run {
+                    Toast.makeText(context, "Print service is unavailable on this device", Toast.LENGTH_SHORT).show()
+                    return
+                }
+            val webView = android.webkit.WebView(context).apply { settings.javaScriptEnabled = false }
+            val rowsHtml = StringBuilder()
+            filteredSubmissions.forEachIndexed { idx, sub ->
+                val name = sub.optString("customer_name", "Anonymous")
+                val contact = sub.optString("customer_phone", sub.optString("customer_email", "N/A"))
+                val amt = sub.optDouble("amount_bdt", sub.optDouble("amount", 0.0))
+                val st = sub.optString("payment_status", "PENDING").uppercase()
+                val method = sub.optString("payment_method", "N/A")
+                val trxId = sub.optString("transaction_id", sub.optString("matched_trx_id", "-"))
+                val date = sub.optString("created_at", "").take(16).replace("T", " ")
+                val statusColor = when (st) {
+                    "PAID", "COMPLETED", "FREE" -> "#059669"
+                    "PENDING" -> "#D97706"
+                    else -> "#DC2626"
+                }
+                rowsHtml.append("""
+                    <tr>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; text-align: center; color: #64748B; font-size: 11px;">${idx + 1}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #0F172A;">${android.text.TextUtils.htmlEncode(name)}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; color: #475569;">${android.text.TextUtils.htmlEncode(contact)}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-weight: 700; color: #059669; text-align: right;">৳ ${"%,.0f".format(amt)}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; text-align: center;">
+                            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; color: white; background-color: $statusColor;">$st</span>
+                        </td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; color: #334155;">${android.text.TextUtils.htmlEncode(method)}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-family: monospace; font-size: 11px; color: #475569;">${android.text.TextUtils.htmlEncode(trxId)}</td>
+                        <td style="padding: 7px 10px; border-bottom: 1px solid #E2E8F0; color: #64748B; font-size: 11px;">$date</td>
+                    </tr>
+                """.trimIndent())
+            }
+
+            val html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>${android.text.TextUtils.htmlEncode(formTitle)} Report</title>
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px; color: #0F172A; }
+                        .header { border-bottom: 2px solid #E2E8F0; padding-bottom: 14px; margin-bottom: 16px; }
+                        .title { font-size: 20px; font-weight: 800; color: #0F172A; margin: 0; }
+                        .subtitle { font-size: 11.5px; color: #64748B; margin-top: 4px; }
+                        .kpis { display: flex; gap: 12px; margin-bottom: 18px; }
+                        .kpi-card { flex: 1; padding: 10px 14px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; }
+                        .kpi-label { font-size: 9.5px; font-weight: 700; color: #64748B; text-transform: uppercase; }
+                        .kpi-val { font-size: 18px; font-weight: 800; color: #0F172A; margin-top: 2px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+                        th { background-color: #F1F5F9; padding: 9px 10px; text-align: left; font-weight: 700; color: #334155; border-bottom: 2px solid #CBD5E1; }
+                        tr:nth-child(even) { background-color: #F8FAFC; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1 class="title">${android.text.TextUtils.htmlEncode(formTitle)} — Submissions Report</h1>
+                        <div class="subtitle">Generated on ${java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.US).format(java.util.Date())} • Total: ${filteredSubmissions.size} Submissions</div>
+                    </div>
+                    <div class="kpis">
+                        <div class="kpi-card"><div class="kpi-label">Submissions</div><div class="kpi-val">${filteredSubmissions.size}</div></div>
+                        <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-val" style="color: #059669;">৳ ${"%,.0f".format(filteredRevenue)}</div></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; width: 30px;">#</th>
+                                <th>Customer</th>
+                                <th>Contact</th>
+                                <th style="text-align: right;">Amount</th>
+                                <th style="text-align: center;">Status</th>
+                                <th>Method</th>
+                                <th>Trx ID</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            $rowsHtml
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            """.trimIndent()
+
+            webView.webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                    val printAdapter = webView.createPrintDocumentAdapter("Submissions_Report_${System.currentTimeMillis()}")
+                    printManager.print("Submissions_Report", printAdapter, android.print.PrintAttributes.Builder().build())
+                }
+            }
+            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Printing error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Helper: Export CSV (Excel formatted with UTF-8 BOM)
+    fun exportSubmissionsCsv() {
+        if (filteredSubmissions.isEmpty()) {
+            Toast.makeText(context, "No submissions to export", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val csv = StringBuilder("\uFEFF#,ID,Customer Name,Phone,Email,Amount BDT,Payment Status,Payment Method,Trx ID,Created At\n")
+        filteredSubmissions.forEachIndexed { idx, sub ->
+            val row = listOf(
+                (idx + 1).toString(),
+                sub.optString("id"),
+                sub.optString("customer_name", "Anonymous"),
+                sub.optString("customer_phone", ""),
+                sub.optString("customer_email", ""),
+                sub.optDouble("amount_bdt", sub.optDouble("amount", 0.0)).toString(),
+                sub.optString("payment_status", "PENDING"),
+                sub.optString("payment_method", "N/A"),
+                sub.optString("transaction_id", sub.optString("matched_trx_id", "")),
+                sub.optString("created_at", "")
+            )
+            csv.append(row.joinToString(",") { cell ->
+                val clean = cell.replace("\"", "\"\"")
+                "\"$clean\""
+            }).append("\n")
+        }
+        val sendIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, csv.toString())
+            type = "text/csv"
+        }
+        context.startActivity(android.content.Intent.createChooser(sendIntent, "Export $formTitle CSV"))
     }
 
     LazyColumn(
@@ -7377,9 +7569,9 @@ private fun FormResponsesTab(
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(top = 14.dp, bottom = 24.dp)
+        contentPadding = PaddingValues(top = 14.dp, bottom = 32.dp)
     ) {
-        // Form Selector Chips (when merchant has multiple forms)
+        // Form Selector Chips (if multiple forms exist)
         if (hostedForms.size > 1) {
             item {
                 Row(
@@ -7431,206 +7623,915 @@ private fun FormResponsesTab(
             }
         }
 
-        // Summary Metrics Cards
+        // 1. DATA ANALYSIS & EXECUTIVE METRICS DASHBOARD
         item {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = cardBg),
-                    border = BorderStroke(1.dp, cardBorder)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("TOTAL ORDERS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textSecondary)
-                        Text(submissions.size.toString(), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = goldText)
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = cardBg),
-                    border = BorderStroke(1.dp, cardBorder)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("REVENUE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textSecondary)
-                        Text("৳ ${"%,.0f".format(totalRevenue)}", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
-                    }
-                }
-            }
-        }
-
-        // Section Title & Export Button
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Submissions",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    IconButton(onClick = { viewModel.fetchFormSubmissions(activeFormId) }) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh responses", tint = textSecondary)
-                    }
-                }
-
-                Surface(
-                    onClick = {
-                        if (submissions.isEmpty()) {
-                            Toast.makeText(context, "No submissions to export", Toast.LENGTH_SHORT).show()
-                            return@Surface
-                        }
-                        val csv = StringBuilder("ID,Customer Name,Customer Contact,Amount BDT,Payment Status,Payment Method,Created At\n")
-                        submissions.forEach { sub ->
-                            val contact = sub.optString("customer_email", sub.optString("customer_phone", ""))
-                            csv.append(
-                                listOf(
-                                    sub.optString("id"), sub.optString("customer_name"), contact,
-                                    sub.optDouble("amount_bdt", sub.optDouble("amount", 0.0)).toString(), sub.optString("payment_status"),
-                                    sub.optString("payment_method"), sub.optString("created_at")
-                                ).joinToString(",") { csvCell(it) } + "\n"
-                            )
-                        }
-                        val sendIntent = android.content.Intent().apply {
-                            action = android.content.Intent.ACTION_SEND
-                            putExtra(android.content.Intent.EXTRA_TEXT, csv.toString())
-                            type = "text/csv"
-                        }
-                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Export Form Responses CSV"))
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    color = goldDarkBg,
-                    border = BorderStroke(1.dp, goldPrimary)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(Icons.Outlined.FileDownload, null, tint = goldText, modifier = Modifier.size(16.dp))
-                        Text("Export CSV", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = goldText, softWrap = false, maxLines = 1)
-                    }
-                }
-            }
-        }
-
-        if (submissions.isEmpty()) {
-            item {
-                Text(
-                    "No submissions yet. Responses will appear here after a customer submits a published form.",
-                    fontSize = 13.sp,
-                    color = textSecondary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(24.dp)
-                )
-            }
-        }
-
-        // Database-backed submissions list
-        items(submissions) { submission ->
-            val name = submission.optString("customer_name", "Anonymous")
-            val desc = submission.optString("customer_email", submission.optString("customer_phone", ""))
-            val amt = submission.optDouble("amount_bdt", submission.optDouble("amount", 0.0))
-            val pay = "৳ ${"%,.0f".format(amt)} • ${submission.optString("payment_status", "PENDING")} via ${submission.optString("payment_method", "Unknown")}"
             Card(
-                onClick = { selectedSubmission = submission },
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = cardBg),
-                border = BorderStroke(1.dp, cardBorder),
-                modifier = Modifier.fillMaxWidth()
+                border = BorderStroke(1.dp, cardBorder)
             ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📊", fontSize = 16.sp)
+                            Text("Data Analysis & Summary", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = textPrimary)
+                        }
+                        Text(
+                            text = "${filteredSubmissions.size} filtered",
+                            fontSize = 11.5.sp,
+                            color = textSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // 4 Metric KPI Cards
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Total Responses
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color(0xFF1E1A14) else Color(0xFFF8FAFC))
+                                .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("TOTAL RESPONSES", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                                Spacer(Modifier.height(4.dp))
+                                Text(submissions.size.toString(), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = goldText)
+                            }
+                        }
+
+                        // Total Revenue
+                        Box(
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color(0xFF0F1E17) else Color(0xFFF0FDF4))
+                                .border(1.dp, if (isDark) Color(0xFF164E33) else Color(0xFFBBF7D0), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("TOTAL REVENUE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
+                                Spacer(Modifier.height(4.dp))
+                                Text("৳ ${"%,.0f".format(totalRevenue)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
+                            }
+                        }
+
+                        // Conversion Rate
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color(0xFF161E2E) else Color(0xFFEFF6FF))
+                                .border(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFBFDBFE), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("PAID RATE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB))
+                                Spacer(Modifier.height(4.dp))
+                                Text("${"%.0f".format(conversionRate)}%", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF3B82F6))
+                            }
+                        }
+
+                        // Pending Orders
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color(0xFF261D11) else Color(0xFFFFFBEB))
+                                .border(1.dp, if (isDark) Color(0xFF452D12) else Color(0xFFFDE68A), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("PENDING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
+                                Spacer(Modifier.height(4.dp))
+                                Text(pendingCount.toString(), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFF59E0B))
+                            }
+                        }
+                    }
+
+                    // Interactive Filter Chips: ALL, PAID, PENDING, FAILED
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(
+                            "ALL" to "All (${submissions.size})",
+                            "PAID" to "Paid ($paidCount)",
+                            "PENDING" to "Pending ($pendingCount)",
+                            "FAILED" to "Failed ($failedCount)"
+                        ).forEach { (key, label) ->
+                            val isSel = statusFilter == key
+                            Surface(
+                                onClick = { statusFilter = key },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSel) goldDarkBg else (if (isDark) Color(0xFF1E1A14) else Color(0xFFF1F5F9)),
+                                border = BorderStroke(1.dp, if (isSel) goldPrimary else Color.Transparent)
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSel) goldText else textSecondary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. SEARCH & TOOLBAR (Search, View Toggle, Print PDF, Export CSV, Refresh)
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Search Input
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder = { Text("Search by customer, phone, trx id...", fontSize = 13.sp, color = textSecondary) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, "Clear search", tint = textSecondary, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = cardBg,
+                        unfocusedContainerColor = cardBg,
+                        focusedBorderColor = goldPrimary,
+                        unfocusedBorderColor = cardBorder
+                    ),
+                    singleLine = true
+                )
+
+                // Toolbar: View mode buttons + Action buttons (Print, CSV, Refresh)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // View Mode Switcher: Excel Table vs Cards
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDark) Color(0xFF1C1814) else Color(0xFFE2E8F0))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(goldDarkBg),
-                            contentAlignment = Alignment.Center
+                        Surface(
+                            onClick = { viewMode = "table" },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (viewMode == "table") cardBg else Color.Transparent,
+                            border = if (viewMode == "table") BorderStroke(1.dp, cardBorder) else null
                         ) {
-                            Text(
-                                text = name.take(1).uppercase(),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = goldText
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.TableChart, null, modifier = Modifier.size(15.dp), tint = if (viewMode == "table") goldText else textSecondary)
+                                Text("Excel Grid", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = if (viewMode == "table") textPrimary else textSecondary)
+                            }
                         }
 
-                        Column {
-                            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                            Text(desc, fontSize = 12.sp, color = textSecondary)
-                            Text(pay, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Surface(
+                            onClick = { viewMode = "cards" },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (viewMode == "cards") cardBg else Color.Transparent,
+                            border = if (viewMode == "cards") BorderStroke(1.dp, cardBorder) else null
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.ViewAgenda, null, modifier = Modifier.size(15.dp), tint = if (viewMode == "cards") goldText else textSecondary)
+                                Text("Cards", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = if (viewMode == "cards") textPrimary else textSecondary)
+                            }
                         }
                     }
 
-                    Icon(Icons.Default.ChevronRight, null, tint = textSecondary, modifier = Modifier.size(20.dp))
+                    // Action buttons: Print PDF, CSV, Refresh
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Print PDF Report Button
+                        Surface(
+                            onClick = { printSubmissionsReportPdf() },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isDark) Color(0xFF1F2430) else Color(0xFFEFF6FF),
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF2563EB) else Color(0xFFBFDBFE))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Print, null, modifier = Modifier.size(15.dp), tint = Color(0xFF2563EB))
+                                Text("Print PDF", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB))
+                            }
+                        }
+
+                        // Export CSV Button
+                        Surface(
+                            onClick = { exportSubmissionsCsv() },
+                            shape = RoundedCornerShape(10.dp),
+                            color = goldDarkBg,
+                            border = BorderStroke(1.dp, goldPrimary)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Outlined.FileDownload, null, modifier = Modifier.size(15.dp), tint = goldText)
+                                Text("CSV", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = goldText)
+                            }
+                        }
+
+                        // Refresh Button
+                        IconButton(
+                            onClick = { viewModel.fetchFormSubmissions(activeFormId) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Outlined.Refresh, "Refresh", tint = textSecondary, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        if (filteredSubmissions.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("📋", fontSize = 36.sp)
+                        Text("No submissions match the current filter", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                        Text("Try selecting 'ALL' status or clearing your search keywords.", fontSize = 12.sp, color = textSecondary, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        }
+
+        // 3. EXCEL SPREADSHEET TABLE GRID VIEW
+        if (viewMode == "table" && filteredSubmissions.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column {
+                        // Horizontally scrollable Excel table container
+                        Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                            Column {
+                                // Sticky Excel Header Row
+                                Row(
+                                    modifier = Modifier
+                                        .background(tableHeaderBg)
+                                        .border(BorderStroke(1.dp, tableBorder))
+                                        .padding(vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("#", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("CUSTOMER", modifier = Modifier.width(140.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("CONTACT", modifier = Modifier.width(130.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("AMOUNT", modifier = Modifier.width(90.dp).padding(horizontal = 8.dp), textAlign = TextAlign.End, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("STATUS", modifier = Modifier.width(90.dp), textAlign = TextAlign.Center, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("METHOD", modifier = Modifier.width(80.dp).padding(horizontal = 8.dp), textAlign = TextAlign.Center, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("TRX ID", modifier = Modifier.width(110.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("DATE", modifier = Modifier.width(105.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("ACTION", modifier = Modifier.width(70.dp), textAlign = TextAlign.Center, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                }
+
+                                // Excel Table Data Rows
+                                filteredSubmissions.forEachIndexed { index, sub ->
+                                    val rowBg = if (index % 2 == 1) tableRowAltBg else cardBg
+                                    val name = sub.optString("customer_name", "Anonymous")
+                                    val contact = sub.optString("customer_phone", sub.optString("customer_email", "-"))
+                                    val amt = sub.optDouble("amount_bdt", sub.optDouble("amount", 0.0))
+                                    val st = sub.optString("payment_status", "PENDING").uppercase()
+                                    val method = sub.optString("payment_method", "-")
+                                    val trxId = sub.optString("transaction_id", sub.optString("matched_trx_id", "-"))
+                                    val date = sub.optString("created_at", "").take(16).replace("T", " ")
+
+                                    val statusBg = when (st) {
+                                        "PAID", "COMPLETED", "FREE" -> Color(0xFF059669)
+                                        "PENDING" -> Color(0xFFD97706)
+                                        else -> Color(0xFFDC2626)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .background(rowBg)
+                                            .border(BorderStroke(0.5.dp, tableBorder))
+                                            .clickable { selectedSubmission = sub }
+                                            .padding(vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("${index + 1}", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = textSecondary)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text(name, modifier = Modifier.width(140.dp).padding(horizontal = 8.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text(contact, modifier = Modifier.width(130.dp).padding(horizontal = 8.dp), fontSize = 11.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text("৳ ${"%,.0f".format(amt)}", modifier = Modifier.width(90.dp).padding(horizontal = 8.dp), textAlign = TextAlign.End, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Box(modifier = Modifier.width(90.dp), contentAlignment = Alignment.Center) {
+                                            Surface(
+                                                shape = RoundedCornerShape(9999.dp),
+                                                color = statusBg.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(st, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = statusBg, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                            }
+                                        }
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text(method, modifier = Modifier.width(80.dp).padding(horizontal = 8.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = textPrimary, maxLines = 1)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text(trxId, modifier = Modifier.width(110.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Text(date, modifier = Modifier.width(105.dp).padding(horizontal = 8.dp), fontSize = 10.5.sp, color = textSecondary, maxLines = 1)
+                                        Box(modifier = Modifier.width(1.dp).height(14.dp).background(tableBorder))
+
+                                        Box(modifier = Modifier.width(70.dp), contentAlignment = Alignment.Center) {
+                                            Surface(
+                                                onClick = { selectedSubmission = sub },
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = goldDarkBg,
+                                                border = BorderStroke(1.dp, goldPrimary)
+                                            ) {
+                                                Text("View", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = goldText, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Excel Footer Row (=SUM Totals)
+                                Row(
+                                    modifier = Modifier
+                                        .background(tableHeaderBg)
+                                        .border(BorderStroke(1.dp, tableBorder))
+                                        .padding(vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("∑", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("Total (${filteredSubmissions.size} items)", modifier = Modifier.width(271.dp).padding(horizontal = 8.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("৳ ${"%,.0f".format(filteredRevenue)}", modifier = Modifier.width(90.dp).padding(horizontal = 8.dp), textAlign = TextAlign.End, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
+                                    Box(modifier = Modifier.width(1.dp).height(16.dp).background(tableBorder))
+                                    Text("", modifier = Modifier.width(455.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. CARDS VIEW (when viewMode == "cards")
+        if (viewMode == "cards") {
+            items(filteredSubmissions) { submission ->
+                val name = submission.optString("customer_name", "Anonymous")
+                val desc = submission.optString("customer_phone", submission.optString("customer_email", "N/A"))
+                val amt = submission.optDouble("amount_bdt", submission.optDouble("amount", 0.0))
+                val st = submission.optString("payment_status", "PENDING").uppercase()
+                val method = submission.optString("payment_method", "N/A")
+                val trxId = submission.optString("transaction_id", submission.optString("matched_trx_id", ""))
+                val statusColor = when (st) {
+                    "PAID", "COMPLETED", "FREE" -> Color(0xFF10B981)
+                    "PENDING" -> Color(0xFFF59E0B)
+                    else -> Color(0xFFEF4444)
+                }
+
+                Card(
+                    onClick = { selectedSubmission = submission },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(goldDarkBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = name.take(1).uppercase(),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = goldText
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                Text(desc, fontSize = 12.sp, color = textSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("৳ ${"%,.0f".format(amt)}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
+                                    Text("•", fontSize = 10.sp, color = textSecondary)
+                                    Surface(shape = RoundedCornerShape(4.dp), color = statusColor.copy(alpha = 0.15f)) {
+                                        Text(st, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = statusColor, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                                    }
+                                    Text("via $method", fontSize = 11.sp, color = textSecondary)
+                                }
+                            }
+                        }
+
+                        Icon(Icons.Default.ChevronRight, null, tint = textSecondary, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROFESSIONAL STRUCTURED INSPECTION MODAL (NO RAW JSON DUMP)
+    // ═══════════════════════════════════════════════════════════════════════════
     selectedSubmission?.let { submission ->
+        val name = submission.optString("customer_name", "Anonymous")
+        val phone = submission.optString("customer_phone", "")
+        val email = submission.optString("customer_email", "")
+        val amt = submission.optDouble("amount_bdt", submission.optDouble("amount", 0.0))
+        val st = submission.optString("payment_status", "PENDING").uppercase()
+        val method = submission.optString("payment_method", "N/A")
+        val trxId = submission.optString("transaction_id", submission.optString("matched_trx_id", "N/A"))
+        val subId = submission.optString("id", "")
+        val orderId = submission.optString("order_id", "")
+        val createdAt = submission.optString("created_at", "").take(19).replace("T", " ")
+
         val answers = submission.optJSONObject("answers") ?: org.json.JSONObject()
-        val attachments = buildList {
+        val answersList = remember(answers, hostedForms) {
+            val list = mutableListOf<Pair<String, String>>()
+            val keys = answers.keys()
+            val targetFormId = submission.optString("form_id")
+            val targetFormSlug = submission.optString("form_slug")
+            val subForm = hostedForms.find { it.id == targetFormId || (targetFormSlug.isNotBlank() && it.slug == targetFormSlug) } ?: activeForm
+
+            // Build a fast lookup map for all known fields
+            val fieldLookup = mutableMapOf<String, String>()
+            // 1. Current form fields take highest priority
+            subForm?.fields?.forEach { field ->
+                val label = field.label.ifBlank { field.placeholder.takeIf { it.isNotBlank() } ?: field.type.displayName }
+                fieldLookup[field.id.lowercase()] = label
+            }
+            // 2. Fallback to any other loaded forms
+            hostedForms.forEach { form ->
+                form.fields.forEach { field ->
+                    if (!fieldLookup.containsKey(field.id.lowercase())) {
+                        val label = field.label.ifBlank { field.placeholder.takeIf { it.isNotBlank() } ?: field.type.displayName }
+                        fieldLookup[field.id.lowercase()] = label
+                    }
+                }
+            }
+            // 3. Embedded form schema in submission (if present)
+            listOfNotNull(
+                submission.optJSONObject("payment_forms"),
+                submission.optJSONObject("form")
+            ).forEach { formObj ->
+                val fieldsArr = formObj.optJSONArray("fields")
+                if (fieldsArr != null) {
+                    for (fIdx in 0 until fieldsArr.length()) {
+                        val fo = fieldsArr.optJSONObject(fIdx) ?: continue
+                        val fId = fo.optString("id").lowercase()
+                        if (fId.isNotBlank() && !fieldLookup.containsKey(fId)) {
+                            val fLabel = fo.optString("label").ifBlank { fo.optString("placeholder").ifBlank { fo.optString("title") } }
+                            if (fLabel.isNotBlank()) fieldLookup[fId] = fLabel
+                        }
+                    }
+                }
+            }
+
+            var questionIndex = 1
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val raw = answers.opt(k)
+                val str = when (raw) {
+                    is org.json.JSONObject -> {
+                        if (raw.has("file_name")) "📎 ${raw.optString("file_name")}"
+                        else raw.toString()
+                    }
+                    is org.json.JSONArray -> (0 until raw.length()).map { raw.optString(it) }.joinToString(", ")
+                    else -> raw?.toString() ?: ""
+                }
+
+                // Resolve human-readable question label instead of raw UUID
+                val resolvedQuestion = fieldLookup[k.lowercase()] ?: run {
+                    val isUuid = k.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")) ||
+                            k.matches(Regex("^[0-9a-fA-F]{24,}$")) ||
+                            (k.startsWith("field_") && k.length > 20)
+
+                    if (!isUuid) {
+                        k.replace("_", " ").split(" ")
+                            .joinToString(" ") { word -> word.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase(java.util.Locale.US) else c.toString() } }
+                    } else {
+                        // Intelligent contextual inference based on answer pattern
+                        val cleanStr = str.trim()
+                        if (android.util.Patterns.EMAIL_ADDRESS.matcher(cleanStr).matches()) {
+                            "Email Address"
+                        } else {
+                            val digitsOnly = cleanStr.replace(Regex("[^0-9+]"), "")
+                            if ((digitsOnly.startsWith("01") || digitsOnly.startsWith("+8801")) && (digitsOnly.length == 11 || digitsOnly.length == 14)) {
+                                "Phone Number"
+                            } else if (cleanStr.contains("VIP Pass", ignoreCase = true) || cleanStr.contains("Pass", ignoreCase = true) || cleanStr.contains("Ticket", ignoreCase = true) || cleanStr.contains("Package", ignoreCase = true)) {
+                                "Ticket / Package Option"
+                            } else if (name.isNotBlank() && cleanStr.equals(name, ignoreCase = true)) {
+                                "Full Name"
+                            } else {
+                                "Question $questionIndex"
+                            }
+                        }
+                    }
+                }
+                questionIndex++
+                list.add(resolvedQuestion to str)
+            }
+            list
+        }
+
+        val attachments = remember(answers) {
+            val list = mutableListOf<Pair<String, org.json.JSONObject>>()
             val keys = answers.keys()
             while (keys.hasNext()) {
                 val fieldId = keys.next()
-                val metadata = answers.optJSONObject(fieldId) ?: continue
-                if (metadata.optString("object_path").isNotBlank()) add(fieldId to metadata)
+                val meta = answers.optJSONObject(fieldId) ?: continue
+                if (meta.optString("object_path").isNotBlank() || meta.has("file_name")) {
+                    list.add(fieldId to meta)
+                }
+            }
+            list
+        }
+
+        val statusColor = when (st) {
+            "PAID", "COMPLETED", "FREE" -> Color(0xFF10B981)
+            "PENDING" -> Color(0xFFF59E0B)
+            else -> Color(0xFFEF4444)
+        }
+
+        // Print Single Receipt PDF
+        fun printReceiptPdf() {
+            try {
+                val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as? android.print.PrintManager
+                    ?: run {
+                        Toast.makeText(context, "Print service unavailable", Toast.LENGTH_SHORT).show()
+                        return
+                    }
+                val webView = android.webkit.WebView(context)
+                val answerRowsHtml = StringBuilder()
+                answersList.forEach { (q, a) ->
+                    answerRowsHtml.append("""
+                        <tr>
+                            <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #475569; width: 35%;">${android.text.TextUtils.htmlEncode(q)}</td>
+                            <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; color: #0F172A;">${android.text.TextUtils.htmlEncode(a)}</td>
+                        </tr>
+                    """.trimIndent())
+                }
+
+                val html = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Receipt - $subId</title>
+                        <style>
+                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #0F172A; }
+                            .card { max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; }
+                            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #E2E8F0; padding-bottom: 14px; margin-bottom: 16px; }
+                            .title { font-size: 20px; font-weight: 800; color: #0F172A; margin: 0; }
+                            .sub { font-size: 11px; color: #64748B; margin-top: 4px; }
+                            .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; color: white; }
+                            .sec-title { font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; margin: 16px 0 8px 0; }
+                            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                            .item-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; }
+                            .item-label { font-size: 10px; color: #64748B; }
+                            .item-val { font-size: 13.5px; font-weight: 700; color: #0F172A; margin-top: 2px; }
+                            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="card">
+                            <div class="header">
+                                <div>
+                                    <h1 class="title">${android.text.TextUtils.htmlEncode(formTitle)}</h1>
+                                    <div class="sub">Receipt ID: $subId • $createdAt</div>
+                                </div>
+                                <div>
+                                    <span class="badge" style="background: ${if (st == "PAID") "#059669" else "#D97706"};">$st</span>
+                                </div>
+                            </div>
+                            <div class="sec-title">Customer Information</div>
+                            <div class="grid">
+                                <div class="item-box"><div class="item-label">Name</div><div class="item-val">${android.text.TextUtils.htmlEncode(name)}</div></div>
+                                <div class="item-box"><div class="item-label">Phone</div><div class="item-val">${android.text.TextUtils.htmlEncode(phone.ifBlank { "N/A" })}</div></div>
+                                <div class="item-box"><div class="item-label">Email</div><div class="item-val">${android.text.TextUtils.htmlEncode(email.ifBlank { "N/A" })}</div></div>
+                                <div class="item-box"><div class="item-label">Amount Paid</div><div class="item-val" style="color: #059669;">৳ ${"%,.0f".format(amt)} ($method)</div></div>
+                            </div>
+                            <div class="sec-title">Payment & Transaction</div>
+                            <div class="grid">
+                                <div class="item-box"><div class="item-label">TrxID</div><div class="item-val" style="font-family: monospace;">$trxId</div></div>
+                                <div class="item-box"><div class="item-label">Order ID</div><div class="item-val" style="font-family: monospace;">${orderId.ifBlank { "N/A" }}</div></div>
+                            </div>
+                            <div class="sec-title">Submitted Questionnaire Answers</div>
+                            <table>
+                                <tbody>
+                                    $answerRowsHtml
+                                </tbody>
+                            </table>
+                        </div>
+                    </body>
+                    </html>
+                """.trimIndent()
+
+                webView.webViewClient = object : android.webkit.WebViewClient() {
+                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                        val printAdapter = webView.createPrintDocumentAdapter("Receipt_${subId.take(8)}")
+                        printManager.print("Receipt_${subId.take(8)}", printAdapter, android.print.PrintAttributes.Builder().build())
+                    }
+                }
+                webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Printing error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
+
         AlertDialog(
             onDismissRequest = { selectedSubmission = null },
-            title = { Text("Response details") },
+            modifier = Modifier.fillMaxWidth(0.96f),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = cardBg,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Submission Details", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = textPrimary)
+                        Text(createdAt, fontSize = 11.sp, color = textSecondary)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(9999.dp),
+                        color = statusColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(st, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = statusColor, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                    }
+                }
+            },
             text = {
                 Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("Submission: ${submission.optString("id")}", fontSize = 12.sp)
-                    Text("Order: ${submission.optString("order_id", "Not required")}", fontSize = 12.sp)
-                    Text("Status: ${submission.optString("payment_status", "NOT_REQUIRED")}", fontWeight = FontWeight.Bold)
-                    Text("Submitted answers", fontWeight = FontWeight.Bold)
-                    Text(answers.toString(2), fontSize = 12.sp)
-                    if (attachments.isNotEmpty()) {
-                        Text("Private attachments", fontWeight = FontWeight.Bold)
-                        attachments.forEach { (fieldId, metadata) ->
-                            OutlinedButton(
-                                onClick = { viewModel.openHostedFormAttachment(context, submission.optString("id"), fieldId) },
+                    // 1. Customer Details Card with direct Call / Email actions
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1814) else Color(0xFFF8FAFC)),
+                        border = BorderStroke(1.dp, cardBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("👤 CUSTOMER INFORMATION", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    if (phone.isNotBlank()) Text("📞 $phone", fontSize = 12.sp, color = textSecondary)
+                                    if (email.isNotBlank()) Text("✉️ $email", fontSize = 12.sp, color = textSecondary)
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (phone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$phone"))
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {}
+                                            },
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(Icons.Default.Phone, "Call", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                    if (email.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:$email"))
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {}
+                                            },
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(Icons.Default.Email, "Email", tint = Color(0xFF3B82F6), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Payment & Transaction Card
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1814) else Color(0xFFF8FAFC)),
+                        border = BorderStroke(1.dp, cardBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("💳 PAYMENT & TRANSACTION", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Amount Collected", fontSize = 10.5.sp, color = textSecondary)
+                                    Text("৳ ${"%,.0f".format(amt)}", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
+                                }
+                                Surface(shape = RoundedCornerShape(8.dp), color = goldDarkBg, border = BorderStroke(1.dp, goldPrimary)) {
+                                    Text(method, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = goldText, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                                }
+                            }
+
+                            if (trxId != "N/A" && trxId != "-") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isDark) Color(0xFF13100C) else Color.White)
+                                        .border(1.dp, cardBorder, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("TRANSACTION ID (TRXID)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                                        Text(trxId, fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(trxId))
+                                            Toast.makeText(context, "TrxID copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, "Copy TrxID", tint = textSecondary, modifier = Modifier.size(15.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Structured Questionnaire Answers Table (NO RAW JSON!)
+                    if (answersList.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📝 QUESTIONNAIRE ANSWERS", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1814) else Color(0xFFF8FAFC)),
+                                border = BorderStroke(1.dp, cardBorder),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Outlined.FileDownload, null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(metadata.optString("file_name", "Open attachment"), maxLines = 1)
+                                Column {
+                                    answersList.forEachIndexed { i, (question, answer) ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text(
+                                                text = question,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textSecondary,
+                                                modifier = Modifier.weight(1.2f).padding(end = 8.dp)
+                                            )
+                                            Text(
+                                                text = answer.ifBlank { "-" },
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = textPrimary,
+                                                modifier = Modifier.weight(1.8f)
+                                            )
+                                        }
+                                        if (i < answersList.size - 1) {
+                                            HorizontalDivider(color = cardBorder, thickness = 0.5.dp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 4. Attachments Section (if files were uploaded)
+                    if (attachments.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📎 PRIVATE ATTACHMENTS", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = textSecondary)
+                            attachments.forEach { (fieldId, metadata) ->
+                                val fileName = metadata.optString("file_name", "Open attachment")
+                                OutlinedButton(
+                                    onClick = { viewModel.openHostedFormAttachment(context, subId, fieldId) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Icon(Icons.Outlined.FileDownload, null, modifier = Modifier.size(16.dp), tint = textPrimary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(fileName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { selectedSubmission = null }) { Text("Close") } }
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { printReceiptPdf() },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                    ) {
+                        Icon(Icons.Default.Print, null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Print PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { selectedSubmission = null },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, cardBorder)
+                    ) {
+                        Text("Close", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                    }
+                }
+            }
         )
     }
 }
@@ -8607,7 +9508,7 @@ private fun LivePreviewModal(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
-                                                        Text("❓", fontSize = 13.sp)
+                                                        Text("Γ¥ô", fontSize = 13.sp)
                                                         Text(
                                                             text = section.title.ifBlank { "Frequently Asked Questions" },
                                                             fontSize = 11.sp,
@@ -8700,7 +9601,7 @@ private fun LivePreviewModal(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
-                                                        Text("💬", fontSize = 13.sp)
+                                                        Text("≡ƒÆ¼", fontSize = 13.sp)
                                                         Text(
                                                             text = section.title.ifBlank { "Customer Reviews" },
                                                             fontSize = 11.sp,
@@ -8725,7 +9626,7 @@ private fun LivePreviewModal(
                                                             ) {
                                                                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                                     repeat(5) {
-                                                                        Text("★", color = Color(0xFFF59E0B), fontSize = 13.sp)
+                                                                        Text("Γÿà", color = Color(0xFFF59E0B), fontSize = 13.sp)
                                                                     }
                                                                 }
                                                                 Surface(
@@ -8733,7 +9634,7 @@ private fun LivePreviewModal(
                                                                     color = Color(0xFF10B981).copy(alpha = 0.15f)
                                                                 ) {
                                                                     Text(
-                                                                        "✓ Verified Buyer",
+                                                                        "Γ£ô Verified Buyer",
                                                                         fontSize = 9.5.sp,
                                                                         fontWeight = FontWeight.Bold,
                                                                         color = Color(0xFF10B981),
@@ -8758,7 +9659,7 @@ private fun LivePreviewModal(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                 ) {
-                                                    Text("⭐", fontSize = 13.sp)
+                                                    Text("Γ¡É", fontSize = 13.sp)
                                                     Text(
                                                         text = section.title.ifBlank { "Key Features" },
                                                         fontSize = 11.sp,
@@ -8783,7 +9684,7 @@ private fun LivePreviewModal(
                                                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                                     verticalAlignment = Alignment.Top
                                                                 ) {
-                                                                    Text("✓", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                                    Text("Γ£ô", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                                                     Text(line.trim(), fontSize = 11.5.sp, color = textPrimary)
                                                                 }
                                                             }
@@ -9030,7 +9931,7 @@ private fun LivePreviewModal(
                                                                     border = BorderStroke(1.dp, if (isVarSel) parsedPrimaryColor else cardBorder)
                                                                 ) {
                                                                     Text(
-                                                                        text = "${pv.name} • BDT ${pv.price.toInt()}",
+                                                                        text = "${pv.name} ΓÇó BDT ${pv.price.toInt()}",
                                                                         fontSize = 11.sp,
                                                                         fontWeight = if (isVarSel) FontWeight.Bold else FontWeight.Normal,
                                                                         color = if (isVarSel) parsedPrimaryColor else textSecondary,
@@ -9472,7 +10373,7 @@ private fun LivePreviewModal(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    "🎟️ ${field.label.ifBlank { "Promo / Coupon Code" }}",
+                                                    "≡ƒÄƒ∩╕Å ${field.label.ifBlank { "Promo / Coupon Code" }}",
                                                     fontSize = 12.5.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = textPrimary
@@ -9571,7 +10472,7 @@ private fun LivePreviewModal(
                         shape = parsedButtonShape,
                         border = BorderStroke(1.dp, cardBorder)
                     ) {
-                        Text("← Back", color = textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("ΓåÉ Back", color = textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
 
@@ -9603,7 +10504,7 @@ private fun LivePreviewModal(
                             contentColor = Color.Black
                         )
                     ) {
-                        Text("Next Page →", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Next Page ΓåÆ", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 } else {
                      Button(
@@ -9646,7 +10547,7 @@ private fun LivePreviewModal(
                         )
                     ) {
                         Text(
-                            text = if (isClosedForm) "Form Closed (সময়সীমা শেষ)" else "Submit / Complete Form",
+                            text = if (isClosedForm) "Form Closed (αª╕αª«αª»αª╝αª╕αºÇαª«αª╛ αª╢αºçαª╖)" else "Submit / Complete Form",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.5.sp
                         )

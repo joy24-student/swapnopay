@@ -1175,14 +1175,8 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
 
   const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
 
-  // If merchant account is ACTIVE in database or has configured receiving numbers, never falsely declare offline
+  // Honest device telemetry: reflects whether merchant mobile terminal is actively connected
   let finalDeviceActive = deviceStatus.active
-  if (finalDeviceActive === false) {
-    const isMerchantActive = (mStatus === 'ACTIVE' || !merchantRow)
-    if (isMerchantActive || hasNumbers) {
-      finalDeviceActive = null // Never lock out customer when account is active or numbers are configured
-    }
-  }
 
   const effectiveName = merchantRow?.merchant_name || memSettings?.merchant_name || creds?.merchant_name || null
   const effectiveLogo = merchantRow?.merchant_logo_url || memSettings?.merchant_logo_url || creds?.merchant_logo_url || null

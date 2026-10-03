@@ -299,16 +299,17 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncOrdersFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
+        val active = getMerchantSupabaseProfile() ?: getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
+        val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
 
         var resultData: org.json.JSONArray? = null
         try {
             com.example.data.remote.SupabaseClient.fetchOrders(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 merchantId = effectiveMid,
                 onSuccess = { jsonArray -> resultData = jsonArray },
                 onFailure = { err ->
@@ -335,6 +336,13 @@ class AppRepository(private val context: Context) {
                     notes = obj.optJSONObject("metadata")?.optString("notes", "").orEmpty()
                 )
                 dao.insertOrder(order)
+
+                // Sync matched payment and SMS status when order is verified as PAID
+                val matchedTrx = obj.optString("matched_trx_id").trim()
+                if (matchedTrx.isNotBlank() && obj.optString("status").equals("PAID", ignoreCase = true)) {
+                    dao.updatePaymentStatus(matchedTrx, "MATCHED", order.id)
+                    dao.updateSmsStatusByTrxId(matchedTrx, "MATCHED")
+                }
             }
             true
         } else {
@@ -343,17 +351,18 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncPaymentsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile()
+        val active = getMerchantSupabaseProfile() ?: getAuthenticatedSupabaseProfile()
         var didSyncAny = false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
 
         if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
+            val token = active.serviceRoleKey.ifBlank { active.authSessionToken.ifBlank { active.anonKey } }
             var resultData: org.json.JSONArray? = null
             try {
                 com.example.data.remote.SupabaseClient.fetchPayments(
                     url = active.supabaseUrl,
                     anonKey = active.anonKey,
-                    token = active.authSessionToken.ifBlank { active.anonKey },
+                    token = token,
                     merchantId = effectiveMid,
                     onSuccess = { jsonArray -> resultData = jsonArray },
                     onFailure = { err ->
@@ -367,17 +376,21 @@ class AppRepository(private val context: Context) {
             if (resultData != null) {
                 for (i in 0 until resultData!!.length()) {
                     val obj = resultData!!.getJSONObject(i)
+                    val rawStatus = obj.optString("status", "UNMATCHED")
                     val payment = CachedPaymentEntity(
                         id = obj.optString("trx_id", obj.getString("id")),
                         merchantId = effectiveMid,
                         amount = obj.getDouble("amount"),
                         sender = obj.optString("sender_number", "Unknown"),
                         timestamp = parseIsoDateToMillis(obj.optString("sms_timestamp", obj.optString("created_at"))),
-                        status = obj.getString("status"),
+                        status = rawStatus,
                         method = obj.optString("method", "bKash"),
                         orderId = if (obj.isNull("matched_order_id")) null else obj.getString("matched_order_id")
                     )
                     dao.insertPayment(payment)
+                    if (payment.status.equals("MATCHED", ignoreCase = true) || payment.status.equals("PAID", ignoreCase = true)) {
+                        dao.updateSmsStatusByTrxId(payment.id, "MATCHED")
+                    }
                     if (System.currentTimeMillis() - payment.timestamp < 10 * 60 * 1000L &&
                         !com.example.NotificationHelper.hasBeenNotified(context, payment.id)) {
                         com.example.NotificationHelper.showPaymentNotification(
@@ -394,16 +407,18 @@ class AppRepository(private val context: Context) {
         }
 
         // Backend Sync Fallback: /v1/payment/transactions?merchant_id=...
-        val targetMerchantId = dao.getMerchantProfile()?.id
+        val targetMid = dao.getMerchantProfile()?.id
             ?: active?.id
             ?: activeProfileId
-        if (targetMerchantId.isNotBlank() && targetMerchantId != "00000000-0000-0000-0000-000000000001") {
+        if (targetMid.isNotBlank() && targetMid != "00000000-0000-0000-0000-000000000001") {
             try {
-                val url = java.net.URL("https://api.swapnopay.top/v1/payment/transactions?merchant_id=${java.net.URLEncoder.encode(targetMerchantId, "UTF-8")}")
+                val url = java.net.URL("https://api.swapnopay.top/v1/payment/transactions?merchant_id=${java.net.URLEncoder.encode(targetMid, "UTF-8")}")
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "GET"
                 conn.connectTimeout = 5000
                 conn.readTimeout = 5000
+                conn.setRequestProperty("x-device-id", installationId)
+                conn.setRequestProperty("x-merchant-id", targetMid)
                 active?.authSessionToken?.takeIf { it.isNotBlank() }?.let {
                     conn.setRequestProperty("Authorization", "Bearer $it")
                 }
@@ -416,17 +431,21 @@ class AppRepository(private val context: Context) {
                             val obj = list.getJSONObject(i)
                             val trxId = obj.optString("trx_id").ifBlank { obj.optString("id") }
                             if (trxId.isNotBlank()) {
+                                val txStatus = obj.optString("status", "UNMATCHED")
                                 val payment = CachedPaymentEntity(
                                     id = trxId,
-                                    merchantId = targetMerchantId,
+                                    merchantId = targetMid,
                                     amount = obj.optDouble("amount", 0.0),
                                     sender = obj.optString("sender_number", obj.optString("sender", "Unknown")),
                                     timestamp = obj.optLong("timestamp", parseIsoDateToMillis(obj.optString("created_at"))),
-                                    status = obj.optString("status", "SUCCESS"),
+                                    status = txStatus,
                                     method = obj.optString("payment_method", obj.optString("method", "bKash")),
                                     orderId = if (obj.isNull("order_id")) null else obj.optString("order_id")
                                 )
                                 dao.insertPayment(payment)
+                                if (txStatus.equals("MATCHED", ignoreCase = true) || txStatus.equals("PAID", ignoreCase = true)) {
+                                    dao.updateSmsStatusByTrxId(trxId, "MATCHED")
+                                }
                                 if (System.currentTimeMillis() - payment.timestamp < 10 * 60 * 1000L &&
                                     !com.example.NotificationHelper.hasBeenNotified(context, payment.id)) {
                                     com.example.NotificationHelper.showPaymentNotification(
@@ -443,7 +462,7 @@ class AppRepository(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.d("AppRepository", "Backend transactions sync notice: ${e.message}")
+                android.util.Log.e("AppRepository", "Exception in backend transactions sync fallback", e)
             }
         }
 
@@ -738,10 +757,13 @@ class AppRepository(private val context: Context) {
 
         // 1. Immediately report verified payment to SwapnoPay central gateway for instant verification
         val reported = reportPaymentToBackend(paymentEntity)
+        if (reported) {
+            dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
+        }
 
-        // 2. Also upload to merchant's own Supabase database
-        val uploadedToSupabase = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
-        if (reported || uploadedToSupabase) {
+        // 2. Also attempt upload to custom Supabase database if configured
+        val success = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
+        if (success && !reported) {
             dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
         }
         
@@ -790,6 +812,21 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun uploadSmsToSupabase(sms: SmsQueueEntity): Boolean = withContext(Dispatchers.IO) {
+        // First try central backend
+        val backendReported = reportPaymentToBackend(
+            CachedPaymentEntity(
+                id = sms.trxId,
+                merchantId = sms.merchantId,
+                amount = sms.amount,
+                sender = sms.sender,
+                timestamp = sms.timestamp,
+                status = "UNMATCHED",
+                method = "bKash",
+                orderId = null
+            )
+        )
+        if (backendReported) return@withContext true
+
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         

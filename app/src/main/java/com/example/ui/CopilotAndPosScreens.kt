@@ -2485,23 +2485,24 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
                             Icon(Icons.Default.Download, null, tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFF0F172A), modifier = Modifier.size(18.dp))
                         }
 
-                        // Share CSV Button
+                        // Appeals Hub Button (Replaces Share button per user request)
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFF1F5F9))
-                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFE2E8F0)), CircleShape)
+                                .background(if (isDarkMode) Color(0xFF261D11) else Color(0xFFFFFBEB))
+                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFFDE68A)), CircleShape)
                                 .clickable {
-                                    if (payments.isEmpty()) {
-                                        android.widget.Toast.makeText(context, "No transactions to share", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        viewModel.shareTransactionsCsv(context, filteredPayments)
-                                    }
+                                    viewModel.navigateTo("Appeals")
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Share, null, tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFF0F172A), modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Gavel,
+                                contentDescription = "Appeals Hub",
+                                tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFD97706),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
 
                         // Filter Button
