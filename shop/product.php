@@ -343,6 +343,89 @@ if ($p_id == 104) {
 $hp_logo_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_logo.jpg';
 $lifestyle_img_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_lifestyle.jpg';
 
+// Fetch Related Products (same end category first, or active products in store)
+$related_products = [];
+try {
+    if ($ecat_id > 0) {
+        $stmt_rel = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                                   FROM tbl_product 
+                                   WHERE ecat_id = ? AND p_id != ? AND p_is_active = 1 
+                                   ORDER BY p_id DESC LIMIT 8");
+        $stmt_rel->execute([$ecat_id, $p_id]);
+        $related_products = $stmt_rel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    if (count($related_products) < 4) {
+        $needed = 8 - count($related_products);
+        $exclude_ids = array_merge([$p_id], !empty($related_products) ? array_column($related_products, 'p_id') : []);
+        $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+        
+        $stmt_more = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                                    FROM tbl_product 
+                                    WHERE p_id NOT IN ($placeholders) AND p_is_active = 1 
+                                    ORDER BY p_id DESC LIMIT " . (int)$needed);
+        $stmt_more->execute($exclude_ids);
+        $more_prods = $stmt_more->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!empty($more_prods)) {
+            $related_products = array_merge($related_products, $more_prods);
+        }
+    }
+
+    // Ensure catalog is nicely filled for visual completeness if small store
+    if (count($related_products) < 4) {
+        $mock_related = [
+            [
+                'p_id' => 103,
+                'p_name' => 'Galaxy Watch 6 Pro 44mm LTE Smartwatch',
+                'p_current_price' => 28500,
+                'p_old_price' => 32000,
+                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_galaxy_watch.jpg',
+                'is_top_sale' => 1
+            ],
+            [
+                'p_id' => 104,
+                'p_name' => 'HP Pavilion 15-eg3027TU Core i5 13th Gen 15.6" FHD Laptop',
+                'p_current_price' => 74500,
+                'p_old_price' => 82000,
+                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_laptop_main.jpg',
+                'is_top_sale' => 1
+            ],
+            [
+                'p_id' => 105,
+                'p_name' => 'AirPods Pro 2nd Gen with MagSafe Charging Case',
+                'p_current_price' => 26900,
+                'p_old_price' => 29500,
+                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_airpods.jpg',
+                'is_top_sale' => 0
+            ],
+            [
+                'p_id' => 106,
+                'p_name' => 'iPhone 15 Pro Max 256GB Natural Titanium',
+                'p_current_price' => 152000,
+                'p_old_price' => 165000,
+                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_iphone_15.jpg',
+                'is_top_sale' => 1
+            ]
+        ];
+        foreach ($mock_related as $mock) {
+            if ($mock['p_id'] != $p_id) {
+                $already = false;
+                foreach ($related_products as $rp) {
+                    if ($rp['p_id'] == $mock['p_id'] || $rp['p_name'] == $mock['p_name']) {
+                        $already = true; break;
+                    }
+                }
+                if (!$already) {
+                    $related_products[] = $mock;
+                }
+                if (count($related_products) >= 6) break;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    error_log('Related products error: ' . $e->getMessage());
+}
+
 // Require site header
 require_once('header.php');
 ?>
@@ -375,22 +458,6 @@ require_once('header.php');
             <button type="button" class="sn-nav-tab-pill" data-target="tab-specs">Specifications</button>
             <button type="button" class="sn-nav-tab-pill" data-target="tab-reviews">Reviews</button>
             <button type="button" class="sn-nav-tab-pill" data-target="tab-qa">Q&A</button>
-        </div>
-        <div class="sn-sub-actions">
-            <button type="button" class="sn-sub-action-btn" id="snShareBtn" aria-label="Share">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
-            </button>
-            <button type="button" class="sn-sub-action-btn <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="snMobileWishlistBtn" data-product-id="<?php echo htmlspecialchars($p_id); ?>" aria-label="Wishlist">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_product_in_wishlist ? '#ef4444' : 'none'; ?>" stroke="<?php echo $is_product_in_wishlist ? '#ef4444' : '#111827'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
-            </button>
         </div>
     </div>
 
@@ -686,7 +753,25 @@ require_once('header.php');
             
             <!-- Mobile Brand & Title & Rating Block (Mockup Pixel-Perfect) -->
             <div class="sn-product-header-block">
-                <div class="sn-mob-brand-pill"><?php echo htmlspecialchars($brand_name); ?></div>
+                <div class="sn-mob-brand-actions-row">
+                    <div class="sn-mob-brand-pill"><?php echo htmlspecialchars($brand_name); ?></div>
+                    <div class="sn-mob-gallery-actions">
+                        <button type="button" class="sn-mob-circle-action-btn" id="snShareBtn" aria-label="Share">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="18" cy="5" r="3"></circle>
+                                <circle cx="6" cy="12" r="3"></circle>
+                                <circle cx="18" cy="19" r="3"></circle>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                            </svg>
+                        </button>
+                        <button type="button" class="sn-mob-circle-action-btn <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="snMobileWishlistBtn" data-product-id="<?php echo htmlspecialchars($p_id); ?>" aria-label="Wishlist">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_product_in_wishlist ? '#ef4444' : 'none'; ?>" stroke="<?php echo $is_product_in_wishlist ? '#ef4444' : '#111827'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <h1 class="sn-mob-prod-title"><?php echo htmlspecialchars($p_name); ?></h1>
 
                 <div class="sn-mob-rating-store-row">
@@ -892,6 +977,83 @@ require_once('header.php');
 
         </div>
     </div>
+
+    <!-- ================= RELATED PRODUCTS ROW ================= -->
+    <?php if (!empty($related_products)): ?>
+    <section class="sn-related-section" id="snRelatedSection">
+        <div class="sn-related-header">
+            <div class="sn-related-title-wrap">
+                <span class="sn-related-icon">⚡</span>
+                <h2 class="sn-related-title">Related Products</h2>
+            </div>
+            <div class="sn-related-arrows sn-desktop-only">
+                <button type="button" class="sn-related-arrow" id="snRelPrev" aria-label="Previous Products">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button type="button" class="sn-related-arrow" id="snRelNext" aria-label="Next Products">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="sn-related-scroll-track" id="snRelatedTrack">
+            <?php foreach ($related_products as $rel): 
+                $rCurr = (float)str_replace(',', '', (string)$rel['p_current_price']);
+                $rOld = (float)str_replace(',', '', (string)($rel['p_old_price'] ?? '0'));
+                $rHasDiscount = ($rOld > $rCurr && $rOld > 0);
+                $rDiscountPct = $rHasDiscount ? round((($rOld - $rCurr) / $rOld) * 100) : 0;
+                $rPhoto = $rel['p_featured_photo'] ?? '';
+                $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
+                $rUrl = function_exists('getProductURL') ? getProductURL($rel['p_id'], $rel['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $rel['p_id'];
+            ?>
+                <div class="sn-rel-card">
+                    <div class="sn-rel-card-top">
+                        <?php if ($rHasDiscount): ?>
+                            <span class="sn-rel-badge">-<?php echo $rDiscountPct; ?>%</span>
+                        <?php elseif (!empty($rel['is_top_sale'])): ?>
+                            <span class="sn-rel-badge hot">Top Sale</span>
+                        <?php else: ?>
+                            <span class="sn-rel-badge-spacer"></span>
+                        <?php endif; ?>
+
+                        <button type="button" class="sn-rel-wishlist" title="Save to Wishlist" onclick="relToggleWishlist(<?php echo $rel['p_id']; ?>, this, event)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                        </button>
+                    </div>
+
+                    <a href="<?php echo htmlspecialchars($rUrl); ?>" class="sn-rel-img-box">
+                        <img src="<?php echo htmlspecialchars($rPhotoUrl); ?>" alt="<?php echo htmlspecialchars($rel['p_name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                    </a>
+
+                    <div class="sn-rel-info">
+                        <a href="<?php echo htmlspecialchars($rUrl); ?>" class="sn-rel-title"><?php echo htmlspecialchars($rel['p_name']); ?></a>
+                        <div class="sn-rel-rating-row">
+                            <span class="sn-rel-star">★</span>
+                            <span class="sn-rel-score">4.8</span>
+                            <span class="sn-rel-count">(120+)</span>
+                        </div>
+                    </div>
+
+                    <div class="sn-rel-bottom">
+                        <div class="sn-rel-prices">
+                            <span class="sn-rel-curr">৳ <?php echo number_format($rCurr); ?></span>
+                            <?php if ($rHasDiscount): ?>
+                                <span class="sn-rel-old">৳ <?php echo number_format($rOld); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <button type="button" class="sn-rel-add-btn" onclick="relAddToCart(<?php echo $rel['p_id']; ?>, '<?php echo htmlspecialchars(addslashes($rel['p_name'])); ?>', this)" title="Add to cart" aria-label="Add to Cart">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
 </div>
 
 <!-- ================= FIXED & STICKY BOTTOM ACTION BAR (MOBILE ONLY) ================= -->
@@ -973,7 +1135,100 @@ require_once('header.php');
 </div>
 
 <script>
+// Related Products Global Helpers
+function relAddToCart(productId, productName, btn) {
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:12px;"></i>';
+
+    const fd = new FormData();
+    fd.append('product_id', productId);
+    fd.append('quantity', 1);
+
+    fetch('<?php echo BASE_URL; ?>add-to-cart-ajax.php', {
+        method: 'POST',
+        body: fd
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (data.success) {
+            btn.style.background = '#10b981';
+            btn.style.color = '#ffffff';
+            btn.innerHTML = '<i class="fas fa-check" style="font-size:12px;"></i>';
+            setTimeout(() => {
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.innerHTML = origHtml;
+            }, 1800);
+
+            if (typeof showToast === 'function') {
+                showToast('"' + productName + '" added to cart!');
+            }
+            if (data.cart_count) {
+                const cartBadge = document.getElementById('sn-cart-badge-count');
+                if (cartBadge) {
+                    cartBadge.textContent = data.cart_count;
+                    cartBadge.style.transform = 'scale(1.3)';
+                    setTimeout(() => cartBadge.style.transform = 'scale(1)', 250);
+                }
+                const dockCartBadge = document.getElementById('sn-dock-cart-count');
+                if (dockCartBadge) {
+                    dockCartBadge.textContent = data.cart_count;
+                    dockCartBadge.style.transform = 'scale(1.3)';
+                    setTimeout(() => dockCartBadge.style.transform = 'scale(1)', 250);
+                }
+            }
+        } else {
+            alert(data.message || 'Unable to add to cart.');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        console.error(err);
+    });
+}
+
+function relToggleWishlist(productId, btn, e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const isAdding = !btn.classList.contains('active');
+
+    <?php if (!isset($_SESSION['customer'])): ?>
+        alert('Please login to save items to your wishlist.');
+        window.location.href = '<?php echo BASE_URL; ?>login.php';
+        return;
+    <?php endif; ?>
+
+    btn.classList.toggle('active', isAdding);
+    const svg = btn.querySelector('svg');
+    if (svg) {
+        svg.setAttribute('fill', isAdding ? '#ef4444' : 'none');
+        svg.setAttribute('stroke', isAdding ? '#ef4444' : 'currentColor');
+    }
+
+    fetch('<?php echo BASE_URL; ?>wishlist_action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `product_id=${encodeURIComponent(productId)}&action=${isAdding ? 'add' : 'remove'}&csrf_token=<?php echo $_SESSION['csrf_token'] ?? ''; ?>`
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast(isAdding ? 'Added to your wishlist' : 'Removed from wishlist');
+            }
+        }
+    }).catch(err => console.error(err));
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Related products scroll buttons
+    document.getElementById('snRelPrev')?.addEventListener('click', () => {
+        document.getElementById('snRelatedTrack')?.scrollBy({ left: -260, behavior: 'smooth' });
+    });
+    document.getElementById('snRelNext')?.addEventListener('click', () => {
+        document.getElementById('snRelatedTrack')?.scrollBy({ left: 260, behavior: 'smooth' });
+    });
     // 1. Gallery Thumbnail Switcher
     const thumbs = document.querySelectorAll('.sn-thumb-item');
     const mobThumbs = document.querySelectorAll('.sn-mob-thumb');
