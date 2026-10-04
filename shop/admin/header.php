@@ -181,24 +181,6 @@ foreach ($result as $row) {
 			        </li>
 			        
 			        
-<!-- Inside your existing admin navigation structure -->
-<li class="treeview">
-    <a href="#">
-        <i class="fa fa-gift"></i> <span>Voucher Management</span>
-        <span class="pull-right-container">
-            <i class="fa fa-angle-left pull-right"></i>
-        </span>
-    </a>
-    <ul class="treeview-menu">
-        <li><a href="admin_vouchers.php"><i class="fa fa-circle-o"></i> View All Vouchers</a></li>
-        <li><a href="admin_voucher_add.php"><i class="fa fa-circle-o"></i> Add New Voucher</a></li>
-    </ul>
-</li>
-			        <li class="treeview <?php if( ($cur_page == 'social-media.php') ) {echo 'active';} ?>">
-			          <a href="social-media.php">
-			            <i class="fa fa-globe"></i> <span>Social Media</span>
-			          </a>
-			        </li>
 
 			        <li class="treeview <?php if( ($cur_page == 'subscriber.php')||($cur_page == 'subscriber.php') ) {echo 'active';} ?>">
 			          <a href="subscriber.php">
