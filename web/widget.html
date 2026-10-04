@@ -132,6 +132,7 @@
                 </div>
               </div>
             </div>
+          </div>
 
           <!-- Language Selector -->
           <div class="flex gap-1">
@@ -220,17 +221,8 @@
         <!-- STEP 1: CHOOSE PAYMENT METHOD -->
         <div class="hidden" id="view1">
           <div>
-            <!-- Real-time Terminal Status Header Bar in Step 1 -->
-            <div id="step1-terminal-status-bar" class="mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all duration-300 bg-gray-50 border-gray-200 text-gray-600">
-              <div class="flex items-center gap-2">
-                <span id="terminal-dot-pulse" class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
-                </span>
-                <span id="terminal-status-title" class="font-extrabold text-[11px]">Connecting to Merchant Terminal...</span>
-              </div>
-              <span id="terminal-status-pill" class="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-gray-200 text-gray-700">Checking</span>
-            </div>
+            <!-- Step 1 Status Bar removed to eliminate duplicate "Merchant Terminal Online & Ready" text -->
+            <div id="step1-terminal-status-bar" class="hidden"></div>
 
             <!-- Offline Warning Block (displayed when merchant phone is disconnected) -->
             <div id="terminal-offline-block" class="hidden mb-4 bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 shadow-sm text-left">
@@ -778,7 +770,7 @@
         </div>
       </div>
 
-    </div>
+    </section>
 
   </main>
 

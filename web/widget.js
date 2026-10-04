@@ -633,41 +633,11 @@ function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
     }
   }
 
-  // 2. Update Step 1 Status Bar
+  // 2. Step 1 Status Bar (Duplicate removed as requested; status is cleanly shown in sidebar badge)
   const statusBar = document.getElementById("step1-terminal-status-bar");
-  const statusTitle = document.getElementById("terminal-status-title");
-  const statusPill = document.getElementById("terminal-status-pill");
-  const dotPulse = document.getElementById("terminal-dot-pulse");
-
-  if (statusBar && statusTitle && statusPill) {
-    if (isOnline) {
-      statusBar.className = "mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all duration-300 bg-emerald-50/80 border-emerald-200 text-emerald-900";
-      statusTitle.innerText = (currentLang === 'bn') ? "মার্চেন্ট টার্মিনাল অনলাইন ও প্রস্তুত" : "Merchant Terminal Online & Ready";
-      statusPill.className = "text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-600 text-white tracking-wider";
-      statusPill.innerText = "ONLINE";
-      if (dotPulse) {
-        dotPulse.innerHTML = `
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        `;
-      }
-    } else if (deviceActive === false) {
-      statusBar.className = "mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all duration-300 bg-rose-50/80 border-rose-200 text-rose-900";
-      statusTitle.innerText = (currentLang === 'bn') ? "মার্চেন্ট মোবাইল ফোন বিচ্ছিন্ন রয়েছে" : "Merchant Mobile Terminal Disconnected";
-      statusPill.className = "text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white tracking-wider";
-      statusPill.innerText = "OFFLINE";
-      if (dotPulse) {
-        dotPulse.innerHTML = `
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-        `;
-      }
-    } else {
-      statusBar.className = "mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all duration-300 bg-gray-50 border-gray-200 text-gray-600";
-      statusTitle.innerText = (currentLang === 'bn') ? "টার্মিনালে সংযোগ স্থাপন করা হচ্ছে..." : "Connecting to Merchant Terminal...";
-      statusPill.className = "text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-gray-200 text-gray-700 tracking-wider";
-      statusPill.innerText = "CHECKING";
-    }
+  if (statusBar) {
+    statusBar.classList.add("hidden");
+    statusBar.style.display = "none";
   }
 
   // 3. Update Step 1 Offline Blocking Block & Continue Button
