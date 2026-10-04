@@ -29,6 +29,45 @@ $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $statement->execute();
 $settings_data = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
 
+// Fetch Page Settings (About Us, FAQ, Contact)
+try {
+    $statement = $pdo->prepare("SELECT * FROM tbl_page WHERE id=1");
+    $statement->execute();
+    $page_data = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    $page_data = [];
+}
+$about_title = $page_data['about_title'] ?? '';
+$about_content = $page_data['about_content'] ?? '';
+$about_banner = $page_data['about_banner'] ?? '';
+$about_meta_title = $page_data['about_meta_title'] ?? '';
+$about_meta_keyword = $page_data['about_meta_keyword'] ?? '';
+$about_meta_description = $page_data['about_meta_description'] ?? '';
+
+$faq_title = $page_data['faq_title'] ?? '';
+$faq_banner = $page_data['faq_banner'] ?? '';
+$faq_meta_title = $page_data['faq_meta_title'] ?? '';
+$faq_meta_keyword = $page_data['faq_meta_keyword'] ?? '';
+$faq_meta_description = $page_data['faq_meta_description'] ?? '';
+
+$contact_title = $page_data['contact_title'] ?? '';
+$contact_banner = $page_data['contact_banner'] ?? '';
+$contact_meta_title = $page_data['contact_meta_title'] ?? '';
+$contact_meta_keyword = $page_data['contact_meta_keyword'] ?? '';
+$contact_meta_description = $page_data['contact_meta_description'] ?? '';
+
+// Fetch Language Data
+$lang_ids = [];
+try {
+    $lang_statement = $pdo->prepare("SELECT * FROM tbl_language ORDER BY lang_id ASC");
+    $lang_statement->execute();
+    $lang_rows = $lang_statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($lang_rows as $row) {
+        $lang_ids[(int)$row['lang_id']] = $row['lang_value'];
+    }
+} catch (Throwable $e) {}
+
+
 try {
     $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) {
@@ -847,6 +886,125 @@ if(isset($_POST['form_ads_settings'])) {
 
 
 
+// --- Page Settings Form Handlers ---
+// About Us Form
+if(isset($_POST['form_page_about']) || isset($_POST['form_about'])) {
+    $valid = 1;
+    if(empty($_POST['about_title'])) {
+        $valid = 0;
+        $error_message .= 'About Page Title cannot be empty.<br>';
+    }
+    $path = $_FILES['about_banner']['name'] ?? '';
+    $path_tmp = $_FILES['about_banner']['tmp_name'] ?? '';
+    if(!empty($path)) {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if(!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            $valid = 0;
+            $error_message .= 'You must upload a jpg, jpeg, gif, webp or png file for About banner.<br>';
+        }
+    }
+    if($valid == 1) {
+        if(!empty($path)) {
+            $final_name = 'about-banner-' . time() . '.' . $ext;
+            move_uploaded_file($path_tmp, '../assets/uploads/' . $final_name);
+            $stmt = $pdo->prepare("UPDATE tbl_page SET about_title=?, about_content=?, about_banner=?, about_meta_title=?, about_meta_keyword=?, about_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['about_title'], $_POST['about_content'] ?? '', $final_name, $_POST['about_meta_title'] ?? '', $_POST['about_meta_keyword'] ?? '', $_POST['about_meta_description'] ?? '']);
+            $about_banner = $final_name;
+        } else {
+            $stmt = $pdo->prepare("UPDATE tbl_page SET about_title=?, about_content=?, about_meta_title=?, about_meta_keyword=?, about_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['about_title'], $_POST['about_content'] ?? '', $_POST['about_meta_title'] ?? '', $_POST['about_meta_keyword'] ?? '', $_POST['about_meta_description'] ?? '']);
+        }
+        $about_title = $_POST['about_title'];
+        $about_content = $_POST['about_content'] ?? '';
+        $about_meta_title = $_POST['about_meta_title'] ?? '';
+        $about_meta_keyword = $_POST['about_meta_keyword'] ?? '';
+        $about_meta_description = $_POST['about_meta_description'] ?? '';
+        $success_message = 'About Page Information updated successfully.';
+    }
+}
+
+// FAQ Form
+if(isset($_POST['form_page_faq']) || isset($_POST['form_faq'])) {
+    $valid = 1;
+    if(empty($_POST['faq_title'])) {
+        $valid = 0;
+        $error_message .= 'FAQ Page Title cannot be empty.<br>';
+    }
+    $path = $_FILES['faq_banner']['name'] ?? '';
+    $path_tmp = $_FILES['faq_banner']['tmp_name'] ?? '';
+    if(!empty($path)) {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if(!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            $valid = 0;
+            $error_message .= 'You must upload a jpg, jpeg, gif, webp or png file for FAQ banner.<br>';
+        }
+    }
+    if($valid == 1) {
+        if(!empty($path)) {
+            $final_name = 'faq-banner-' . time() . '.' . $ext;
+            move_uploaded_file($path_tmp, '../assets/uploads/' . $final_name);
+            $stmt = $pdo->prepare("UPDATE tbl_page SET faq_title=?, faq_banner=?, faq_meta_title=?, faq_meta_keyword=?, faq_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['faq_title'], $final_name, $_POST['faq_meta_title'] ?? '', $_POST['faq_meta_keyword'] ?? '', $_POST['faq_meta_description'] ?? '']);
+            $faq_banner = $final_name;
+        } else {
+            $stmt = $pdo->prepare("UPDATE tbl_page SET faq_title=?, faq_meta_title=?, faq_meta_keyword=?, faq_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['faq_title'], $_POST['faq_meta_title'] ?? '', $_POST['faq_meta_keyword'] ?? '', $_POST['faq_meta_description'] ?? '']);
+        }
+        $faq_title = $_POST['faq_title'];
+        $faq_meta_title = $_POST['faq_meta_title'] ?? '';
+        $faq_meta_keyword = $_POST['faq_meta_keyword'] ?? '';
+        $faq_meta_description = $_POST['faq_meta_description'] ?? '';
+        $success_message = 'FAQ Page Information updated successfully.';
+    }
+}
+
+// Contact Form
+if(isset($_POST['form_page_contact']) || isset($_POST['form_contact'])) {
+    $valid = 1;
+    if(empty($_POST['contact_title'])) {
+        $valid = 0;
+        $error_message .= 'Contact Page Title cannot be empty.<br>';
+    }
+    $path = $_FILES['contact_banner']['name'] ?? '';
+    $path_tmp = $_FILES['contact_banner']['tmp_name'] ?? '';
+    if(!empty($path)) {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if(!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            $valid = 0;
+            $error_message .= 'You must upload a jpg, jpeg, gif, webp or png file for Contact banner.<br>';
+        }
+    }
+    if($valid == 1) {
+        if(!empty($path)) {
+            $final_name = 'contact-banner-' . time() . '.' . $ext;
+            move_uploaded_file($path_tmp, '../assets/uploads/' . $final_name);
+            $stmt = $pdo->prepare("UPDATE tbl_page SET contact_title=?, contact_banner=?, contact_meta_title=?, contact_meta_keyword=?, contact_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['contact_title'], $final_name, $_POST['contact_meta_title'] ?? '', $_POST['contact_meta_keyword'] ?? '', $_POST['contact_meta_description'] ?? '']);
+            $contact_banner = $final_name;
+        } else {
+            $stmt = $pdo->prepare("UPDATE tbl_page SET contact_title=?, contact_meta_title=?, contact_meta_keyword=?, contact_meta_description=? WHERE id=1");
+            $stmt->execute([$_POST['contact_title'], $_POST['contact_meta_title'] ?? '', $_POST['contact_meta_keyword'] ?? '', $_POST['contact_meta_description'] ?? '']);
+        }
+        $contact_title = $_POST['contact_title'];
+        $contact_meta_title = $_POST['contact_meta_title'] ?? '';
+        $contact_meta_keyword = $_POST['contact_meta_keyword'] ?? '';
+        $contact_meta_description = $_POST['contact_meta_description'] ?? '';
+        $success_message = 'Contact Page Information updated successfully.';
+    }
+}
+
+// Language Converter Form
+if(isset($_POST['form_language_settings']) || isset($_POST['form_lang_settings'])) {
+    if(!empty($_POST['lang_value']) && is_array($_POST['lang_value'])) {
+        foreach($_POST['lang_value'] as $key => $val) {
+            $stmt = $pdo->prepare("UPDATE tbl_language SET lang_value=? WHERE lang_id=?");
+            $stmt->execute([$val, (int)$key]);
+            $lang_ids[(int)$key] = $val;
+        }
+        $success_message = 'Language Settings updated successfully.';
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     if ($error_message !== '') { $pdo->rollBack(); $success_message=''; }
     else {
@@ -863,6 +1021,35 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $statement->execute();
 $settings_data = $statement->fetch(PDO::FETCH_ASSOC);
+
+try {
+    $statement = $pdo->prepare("SELECT * FROM tbl_page WHERE id=1");
+    $statement->execute();
+    $page_data = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+    $about_title = $page_data['about_title'] ?? '';
+    $about_content = $page_data['about_content'] ?? '';
+    $about_banner = $page_data['about_banner'] ?? '';
+    $about_meta_title = $page_data['about_meta_title'] ?? '';
+    $about_meta_keyword = $page_data['about_meta_keyword'] ?? '';
+    $about_meta_description = $page_data['about_meta_description'] ?? '';
+    $faq_title = $page_data['faq_title'] ?? '';
+    $faq_banner = $page_data['faq_banner'] ?? '';
+    $faq_meta_title = $page_data['faq_meta_title'] ?? '';
+    $faq_meta_keyword = $page_data['faq_meta_keyword'] ?? '';
+    $faq_meta_description = $page_data['faq_meta_description'] ?? '';
+    $contact_title = $page_data['contact_title'] ?? '';
+    $contact_banner = $page_data['contact_banner'] ?? '';
+    $contact_meta_title = $page_data['contact_meta_title'] ?? '';
+    $contact_meta_keyword = $page_data['contact_meta_keyword'] ?? '';
+    $contact_meta_description = $page_data['contact_meta_description'] ?? '';
+    
+    $lang_statement = $pdo->prepare("SELECT * FROM tbl_language ORDER BY lang_id ASC");
+    $lang_statement->execute();
+    $lang_rows = $lang_statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($lang_rows as $row) {
+        $lang_ids[(int)$row['lang_id']] = $row['lang_value'];
+    }
+} catch (Throwable $e) {}
 
 // Re-assign all variables with potentially updated values (using original names)
 $logo = $settings_data['logo'] ?? '';
@@ -1019,6 +1206,201 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
 
 
 
+
+
+$lang_sections = [
+    'Basic' => [
+        1 => 'Currency',
+        2 => 'Search Product',
+        3 => 'Search',
+        4 => 'Submit',
+        5 => 'Update',
+        6 => 'Read More',
+        7 => 'Serial',
+        8 => 'Photo',
+    ],
+    'Login' => [
+        9 => 'Login',
+        10 => 'Customer Login',
+        11 => 'Click here to login',
+        12 => 'Back to Login Page',
+        13 => 'Logged in as',
+        14 => 'Logout',
+    ],
+    'Registration' => [
+        15 => 'Register',
+        16 => 'Customer Registration',
+        17 => 'Registration Successful',
+    ],
+    'Cart and Checkout' => [
+        18 => 'Cart',
+        19 => 'View Cart',
+        20 => 'Update Cart',
+        154 => 'Add to Cart',
+        21 => 'Back to Cart',
+        22 => 'Checkout',
+        23 => 'Proceed to Checkout',
+        160 => 'Please login as customer to checkout',
+    ],
+    'Payment' => [
+        24 => 'Orders',
+        25 => 'Order History',
+        26 => 'Order Details',
+        27 => 'Payment Date and Time',
+        28 => 'Transaction ID',
+        29 => 'Paid Amount',
+        30 => 'Payment Status',
+        31 => 'Payment Method',
+        32 => 'Payment ID',
+        33 => 'Payment Section',
+        34 => 'Select Payment Method',
+        35 => 'Select a Method',
+        36 => 'PayPal',
+        37 => 'Stripe',
+        38 => 'Bank Deposit',
+        39 => 'Card Number',
+        40 => 'CVV',
+        41 => 'Month',
+        42 => 'Year',
+        43 => 'Send to this Details',
+        44 => 'Transaction Information',
+        45 => 'Include transaction id and other information correctly',
+        46 => 'Pay Now',
+    ],
+    'Product' => [
+        47 => 'Product Name',
+        48 => 'Product Details',
+        155 => 'Related Products',
+        156 => 'See all the related products from below',
+        49 => 'Categories',
+        50 => 'Category:',
+        51 => 'All Products Under',
+        52 => 'Select Size',
+        157 => 'Size',
+        53 => 'Select Color',
+        158 => 'Color',
+        159 => 'Price',
+        54 => 'Product Price',
+        55 => 'Quantity',
+        56 => 'Out of Stock',
+        57 => 'Share This',
+        58 => 'Share This Product',
+        59 => 'Product Description',
+        153 => 'No Product Found',
+        60 => 'Features',
+        61 => 'Conditions',
+        62 => 'Return Policy',
+        63 => 'Reviews',
+        64 => 'Review',
+        65 => 'Give a Review',
+        66 => 'Write your comment (Optional)',
+        67 => 'Submit Review',
+        68 => 'You already have given a rating!',
+        163 => 'Rating is submitted successfully!',
+        69 => 'You must have to login to give a review',
+        70 => 'No description found',
+        71 => 'No feature found',
+        72 => 'No condition found',
+        73 => 'No return policy found',
+        74 => 'No Review is Found',
+        75 => 'Customer Name',
+        76 => 'Comment',
+        77 => 'Comments',
+        78 => 'Rating',
+        79 => 'Previous',
+        80 => 'Next',
+        81 => 'Sub Total',
+        82 => 'Total',
+        83 => 'Action',
+    ],
+    'Billing and Shipping' => [
+        84 => 'Shipping Cost',
+        85 => 'Continue Shipping',
+        161 => 'Billing Address',
+        86 => 'Update Billing Address',
+        162 => 'Shipping Address',
+        87 => 'Update Shipping Address',
+        88 => 'Update Billing and Shipping Info',
+    ],
+    'Dashboard' => [
+        89 => 'Dashboard',
+        90 => 'Welcome to the Dashboard',
+        91 => 'Back to Dashboard',
+    ],
+    'Subscribe' => [
+        92 => 'Subscribe',
+        93 => 'Subscribe To Our Newsletter',
+    ],
+    'Email Address' => [
+        94 => 'Email Address',
+        95 => 'Enter Your Email Address',
+    ],
+    'Password' => [
+        96 => 'Password',
+        97 => 'Forget Password',
+        98 => 'Retype Password',
+        99 => 'Update Password',
+        100 => 'New Password',
+        101 => 'Retype New Password',
+        149 => 'Change Password',
+    ],
+    'Customer' => [
+        102 => 'Full Name',
+        103 => 'Company Name',
+        104 => 'Phone Number',
+        105 => 'Address',
+        106 => 'Country',
+        107 => 'City',
+        108 => 'State',
+        109 => 'Zip Code',
+    ],
+    'Other Information' => [
+        110 => 'About Us',
+        111 => 'Featured Posts',
+        112 => 'Popular Posts',
+        113 => 'Recent Posts',
+        114 => 'Contact Information',
+        115 => 'Contact Form',
+        116 => 'Our Office',
+        117 => 'Update Profile',
+        118 => 'Send Message',
+        119 => 'Message',
+        120 => 'Find Us On Map',
+    ],
+    'Error Messages' => [
+        121 => 'Congratulation! Payment is successful.',
+        122 => 'Billing and Shipping Information is updated successfully.',
+        123 => 'Customer Name can not be empty.',
+        124 => 'Phone Number can not be empty.',
+        125 => 'Address can not be empty.',
+        126 => 'You must have to select a country.',
+        127 => 'City can not be empty.',
+        128 => 'State can not be empty.',
+        129 => 'Zip Code can not be empty.',
+        130 => 'Profile Information is updated successfully.',
+        131 => 'Email Address can not be empty',
+        132 => 'Email and/or Password can not be empty.',
+        133 => 'Email Address does not match.',
+        134 => 'Email address must be valid.',
+        147 => 'Email Address Already Exists.',
+        135 => 'You email address is not found in our system.',
+        136 => 'Please check your email and confirm your subscription.',
+        137 => 'Your email is verified successfully. You can now login to our website.',
+        138 => 'Password can not be empty.',
+        139 => 'Passwords do not match.',
+        140 => 'Please enter new and retype passwords.',
+        141 => 'Password is updated successfully.',
+        142 => 'To reset your password, please click on the link below.',
+        143 => 'PASSWORD RESET REQUEST - YOUR WEBSITE.COM',
+        144 => 'The password reset email time (24 hours) has expired. Please again try to reset your password.',
+        145 => 'A confirmation link is sent to your email address. You will get the password reset information in there.',
+        146 => 'Password is reset successfully. You can now login.',
+        148 => 'Sorry! Your account is inactive. Please contact to the administrator.',
+        150 => 'Registration Email Confirmation for YOUR WEBSITE.',
+        151 => 'Thank you for your registration! Your account has been created. To active your account click on the link below:',
+        152 => 'Your registration is completed. Please check your email address to follow the process to confirm your registration.',
+    ],
+];
 
 ?>
 
@@ -1201,6 +1583,8 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
                     <ul class="nav nav-tabs px-4 pt-4">
                         <li class="active"><a href="#tab_general" data-toggle="tab">General</a></li>
                         <li><a href="#tab_home_features" data-toggle="tab">Home Features</a></li>
+                        <li><a href="#tab_page_settings" data-toggle="tab"><i class="fa fa-file-text-o"></i> Page Settings</a></li>
+                        <li><a href="#tab_language_converter" data-toggle="tab"><i class="fa fa-globe"></i> Language Converter</a></li>
                         <li><a href="#tab_payment_gateways" data-toggle="tab">Payment Gateways</a></li>
                         <li><a href="#tab_api_integrations" data-toggle="tab">API Integrations</a></li>
                         <li><a href="#tab_review_delivery" data-toggle="tab">Review & Delivery</a></li>
@@ -1210,7 +1594,6 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
                         <li><a href="#tab_email" data-toggle="tab">Email</a></li>
                         <li><a href="#tab_footer" data-toggle="tab">Footer</a></li>
                         <li><a href="#tab_ads" data-toggle="tab">Ads</a></li>
-                        <li><a href="#tab_blog_posts" data-toggle="tab">Blog/Post Counts</a></li>
                     </ul>
 
                     <div class="tab-content">
@@ -1347,7 +1730,7 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
                         </div>
 
                       <div class="tab-pane" id="tab_home_features">
-                            <form action="" method="post" enctype="multipart/form-data">
+                            
                                 <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; padding:14px 20px; border-radius:10px; margin-bottom:25px;">
                                     <div>
                                         <h4 style="margin:0 0 4px 0; color:#1e40af; font-weight:700;"><i class="fa fa-sliders"></i> Modern Homepage Customizer & Hero Slider</h4>
@@ -1731,36 +2114,252 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
                                         </button>
                                     </div>
                                 </div>
-                            </form>
+                            
                         </div>
 
-                    <!-- TAB: GENERAL SETTINGS -->
-                    <div class="tab-pane" id="tab_general">
-                        <form class="form-horizontal" action="" method="post">
-                            <div class="box box-info">
-                                <div class="box-body">
-                                    <div class="form-group">
-                                        <label class="col-sm-3 control-label">Contact Email</label>
-                                        <div class="col-sm-6">
-                                            <input type="text" class="form-control" name="contact_email" value="<?php echo $contact_email; ?>">
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="col-sm-3 control-label">Contact Phone</label>
-                                        <div class="col-sm-6">
-                                            <input type="text" class="form-control" name="contact_phone" value="<?php echo $contact_phone; ?>">
-                                        </div>
-                                    </div>
-                        <div class="form-group">
-                                        <div class="col-sm-offset-3 col-sm-9" style="margin-top:20px;">
-                                            <button type="submit" class="btn btn-success btn-lg" name="form_home_features">Update Settings</button>
-                                        </div>
-                                    </div>
 
+                        
+                        <!-- TAB: PAGE SETTINGS (About Us, FAQ, Contact) -->
+                        <div class="tab-pane" id="tab_page_settings">
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:#f0fdf4; border:1px solid #bbf7d0; padding:14px 20px; border-radius:10px; margin-bottom:25px;">
+                                <div>
+                                    <h4 style="margin:0 0 4px 0; color:#166534; font-weight:700;"><i class="fa fa-file-text-o"></i> Page Settings</h4>
+                                    <p style="margin:0; font-size:13px; color:#15803d;">Manage content, page banners, and SEO metadata for About Us, FAQ, and Contact pages.</p>
+                                </div>
+                                <div>
+                                    <a href="page.php" class="btn btn-default" style="border-radius:20px; font-weight:600; padding:6px 16px;">
+                                        <i class="fa fa-external-link"></i> Standalone View
+                                    </a>
                                 </div>
                             </div>
-                            </form>
+
+                            <div class="nav-tabs-custom" style="box-shadow:none; border: 1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:20px;">
+                                <ul class="nav nav-pills" style="margin-bottom:20px; display:flex; gap:8px;">
+                                    <li class="active"><a href="#subtab_about" data-toggle="pill" style="border-radius:20px; font-weight:600;">About Us Page</a></li>
+                                    <li><a href="#subtab_faq" data-toggle="pill" style="border-radius:20px; font-weight:600;">FAQ Page</a></li>
+                                    <li><a href="#subtab_contact" data-toggle="pill" style="border-radius:20px; font-weight:600;">Contact Page</a></li>
+                                </ul>
+
+                                <div class="tab-content" style="box-shadow:none; padding:10px 0;">
+                                    <!-- Subtab 1: About Us -->
+                                    <div class="tab-pane active" id="subtab_about">
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Page Title <span class="text-danger">*</span></label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="about_title" value="<?php echo htmlspecialchars($about_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Page Content <span class="text-danger">*</span></label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="about_content" id="editor1"><?php echo $about_content; ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Existing Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <?php if(!empty($about_banner) && file_exists('../assets/uploads/'.$about_banner)): ?>
+                                                    <img src="<?php echo BASE_URL; ?>assets/uploads/<?php echo htmlspecialchars($about_banner); ?>" class="existing-photo" style="height:80px;"><br>
+                                                <?php else: ?>
+                                                    <p class="text-muted">No banner uploaded.</p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">New Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <input type="file" name="about_banner" class="form-control-file">
+                                                <p class="help-block">Upload new banner image (JPG, PNG, JPEG, GIF, WEBP)</p>
+                                            </div>
+                                        </div>
+                                        <h3 class="seo-info mt-6">About Page SEO Settings</h3>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Title</label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="about_meta_title" value="<?php echo htmlspecialchars($about_meta_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Keyword</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="about_meta_keyword" rows="3"><?php echo htmlspecialchars($about_meta_keyword); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Description</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="about_meta_description" rows="3"><?php echo htmlspecialchars($about_meta_description); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <div class="col-sm-offset-3 col-sm-8">
+                                                <button type="submit" class="btn btn-success" name="form_page_about">
+                                                    <i class="fa fa-save"></i> Update About Page
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Subtab 2: FAQ Page -->
+                                    <div class="tab-pane" id="subtab_faq">
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Page Title <span class="text-danger">*</span></label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="faq_title" value="<?php echo htmlspecialchars($faq_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Existing Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <?php if(!empty($faq_banner) && file_exists('../assets/uploads/'.$faq_banner)): ?>
+                                                    <img src="<?php echo BASE_URL; ?>assets/uploads/<?php echo htmlspecialchars($faq_banner); ?>" class="existing-photo" style="height:80px;"><br>
+                                                <?php else: ?>
+                                                    <p class="text-muted">No banner uploaded.</p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">New Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <input type="file" name="faq_banner" class="form-control-file">
+                                                <p class="help-block">Upload new banner image (JPG, PNG, JPEG, GIF, WEBP)</p>
+                                            </div>
+                                        </div>
+                                        <h3 class="seo-info mt-6">FAQ Page SEO Settings</h3>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Title</label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="faq_meta_title" value="<?php echo htmlspecialchars($faq_meta_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Keyword</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="faq_meta_keyword" rows="3"><?php echo htmlspecialchars($faq_meta_keyword); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Description</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="faq_meta_description" rows="3"><?php echo htmlspecialchars($faq_meta_description); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <div class="col-sm-offset-3 col-sm-8">
+                                                <button type="submit" class="btn btn-success" name="form_page_faq">
+                                                    <i class="fa fa-save"></i> Update FAQ Page
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Subtab 3: Contact Page -->
+                                    <div class="tab-pane" id="subtab_contact">
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Page Title <span class="text-danger">*</span></label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="contact_title" value="<?php echo htmlspecialchars($contact_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Existing Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <?php if(!empty($contact_banner) && file_exists('../assets/uploads/'.$contact_banner)): ?>
+                                                    <img src="<?php echo BASE_URL; ?>assets/uploads/<?php echo htmlspecialchars($contact_banner); ?>" class="existing-photo" style="height:80px;"><br>
+                                                <?php else: ?>
+                                                    <p class="text-muted">No banner uploaded.</p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">New Banner Photo</label>
+                                            <div class="col-sm-8">
+                                                <input type="file" name="contact_banner" class="form-control-file">
+                                                <p class="help-block">Upload new banner image (JPG, PNG, JPEG, GIF, WEBP)</p>
+                                            </div>
+                                        </div>
+                                        <h3 class="seo-info mt-6">Contact Page SEO Settings</h3>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Title</label>
+                                            <div class="col-sm-8">
+                                                <input class="form-control" type="text" name="contact_meta_title" value="<?php echo htmlspecialchars($contact_meta_title); ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Keyword</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="contact_meta_keyword" rows="3"><?php echo htmlspecialchars($contact_meta_keyword); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Meta Description</label>
+                                            <div class="col-sm-8">
+                                                <textarea class="form-control" name="contact_meta_description" rows="3"><?php echo htmlspecialchars($contact_meta_description); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <div class="col-sm-offset-3 col-sm-8">
+                                                <button type="submit" class="btn btn-success" name="form_page_contact">
+                                                    <i class="fa fa-save"></i> Update Contact Page
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- TAB: LANGUAGE CONVERTER -->
+                        <div class="tab-pane" id="tab_language_converter">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; background:#eff6ff; border:1px solid #bfdbfe; padding:16px 20px; border-radius:10px; margin-bottom:25px;">
+                                <div>
+                                    <h4 style="margin:0 0 4px 0; color:#1e40af; font-weight:700;"><i class="fa fa-globe"></i> Language Converter</h4>
+                                    <p style="margin:0; font-size:13px; color:#3b82f6;">Customize wording, button labels, and system texts across your online store.</p>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <input type="text" id="langSearchBox" class="form-control" placeholder="Search phrases (e.g. Cart, Checkout, Order)..." style="width:260px; border-radius:20px;">
+                                    <button type="submit" class="btn btn-success" name="form_language_settings" style="border-radius:20px; font-weight:700; padding:6px 18px;">
+                                        <i class="fa fa-check"></i> Save Language
+                                    </button>
+                                    <a href="language.php" class="btn btn-default" style="border-radius:20px; font-weight:600; padding:6px 16px;">
+                                        <i class="fa fa-external-link"></i> Full View
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div id="langGroupsContainer">
+                                <?php foreach ($lang_sections as $sec_title => $sec_items): ?>
+                                    <div class="box box-solid lang-group-box" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                                        <div class="box-header with-border" style="background:#f8fafc; padding:12px 18px; border-bottom:1px solid #e2e8f0; border-top-left-radius:8px; border-top-right-radius:8px;">
+                                            <h4 class="box-title" style="font-weight:700; color:#334155; font-size:15px;">
+                                                <i class="fa fa-folder-open-o text-primary"></i> <?php echo htmlspecialchars($sec_title); ?>
+                                                <span class="badge" style="background:#e2e8f0; color:#475569; font-weight:600; margin-left:8px;"><?php echo count($sec_items); ?></span>
+                                            </h4>
+                                        </div>
+                                        <div class="box-body" style="padding:15px 20px;">
+                                            <div class="row">
+                                                <?php foreach ($sec_items as $lang_id => $lang_label): ?>
+                                                    <div class="col-md-6 lang-item-col" style="margin-bottom:15px;">
+                                                        <label style="font-weight:600; font-size:13px; color:#475569; display:block; margin-bottom:4px;">
+                                                            <?php echo htmlspecialchars($lang_label); ?> <span class="text-danger">*</span>
+                                                            <small class="text-muted pull-right">ID: <?php echo $lang_id; ?></small>
+                                                        </label>
+                                                        <input type="text" class="form-control" name="lang_value[<?php echo $lang_id; ?>]" value="<?php echo htmlspecialchars($lang_ids[$lang_id] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <div style="text-align:right; margin-top:20px; margin-bottom:30px;">
+                                <button type="submit" class="btn btn-success btn-lg" name="form_language_settings" style="border-radius:25px; padding:10px 36px; font-weight:700;">
+                                    <i class="fa fa-check"></i> Save Language Settings
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Tab 3: Payment Gateways -->
                         <div class="tab-pane" id="tab_payment_gateways">
                             <div class="box box-info">
@@ -2434,5 +3033,49 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
     </div>
 
 </section>
+
+<script>
+$(document).ready(function() {
+    // Keep active tab on page refresh / hash change
+    var hash = window.location.hash;
+    if (hash) {
+        $('.nav-tabs a[href="' + hash + '"]').tab('show');
+    }
+    $('.nav-tabs a').on('shown.bs.tab', function(e) {
+        if(history.pushState) {
+            history.pushState(null, null, e.target.hash);
+        } else {
+            window.location.hash = e.target.hash;
+        }
+    });
+
+    // Language Search / Filter
+    $('#langSearchBox').on('keyup', function() {
+        var query = $(this).val().toLowerCase().trim();
+        if (query === '') {
+            $('.lang-item-col').show();
+            $('.lang-group-box').show();
+            return;
+        }
+        $('.lang-item-col').each(function() {
+            var label = $(this).find('label').text().toLowerCase();
+            var val = $(this).find('input').val().toLowerCase();
+            if (label.indexOf(query) > -1 || val.indexOf(query) > -1) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+        $('.lang-group-box').each(function() {
+            var visibleCount = $(this).find('.lang-item-col:visible').length;
+            if (visibleCount > 0) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once('footer.php'); ?>

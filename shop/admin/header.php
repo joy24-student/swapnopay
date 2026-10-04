@@ -199,16 +199,6 @@ foreach ($result as $row) {
         <li><a href="admin_voucher_add.php"><i class="fa fa-circle-o"></i> Add New Voucher</a></li>
     </ul>
 </li>
-			        <li class="treeview <?php if( ($cur_page == 'page.php') ) {echo 'active';} ?>">
-			          <a href="page.php">
-			            <i class="fa fa-tasks"></i> <span>Page Settings</span>
-			          </a>
-			        </li>
-<li class="treeview <?php if($cur_page == 'language.php') {echo 'active';} ?>">
-			          <a href="language.php">
-			           <i class="fa-solid fa-globe"></i> <span>Language Converter</span>
-			          </a>
-			        </li>
 			        <li class="treeview <?php if( ($cur_page == 'social-media.php') ) {echo 'active';} ?>">
 			          <a href="social-media.php">
 			            <i class="fa fa-globe"></i> <span>Social Media</span>
