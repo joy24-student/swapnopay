@@ -16,6 +16,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
 try {
     $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1");
     $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_btn_text varchar(100) DEFAULT 'Claim Now'");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_animation varchar(50) DEFAULT 'spin-zoom'");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_on_off smallint DEFAULT 1");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_end varchar(50) DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_delay integer DEFAULT 2");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_show_again varchar(50) DEFAULT 'session'");
+    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1");
     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_image text DEFAULT ''");
     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_image text DEFAULT ''");
     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_url text DEFAULT ''");
@@ -129,10 +137,17 @@ $home_map_on_off = $settings_data['home_map_on_off'] ?? 0;
 $home_newsletter_on_off = $settings_data['home_newsletter_on_off'] ?? 0;
 $home_brand_on_off = $settings_data['home_brand_on_off'] ?? 0; // Assuming this exists or will be added
 // --- Variable Declarations for Popup ---
-$popup_on_off = $settings_data['popup_on_off'] ?? 0;
-$popup_text   = $settings_data['popup_text'] ?? '';
-$popup_link   = $settings_data['popup_link'] ?? '';
-$popup_photo  = $settings_data['popup_photo'] ?? '';
+$popup_on_off           = (int)($settings_data['popup_on_off'] ?? 0);
+$popup_text             = $settings_data['popup_text'] ?? '';
+$popup_link             = $settings_data['popup_link'] ?? '';
+$popup_photo            = $settings_data['popup_photo'] ?? '';
+$popup_title            = $settings_data['popup_title'] ?? '';
+$popup_btn_text         = !empty($settings_data['popup_btn_text']) ? $settings_data['popup_btn_text'] : 'Claim Now';
+$popup_animation        = !empty($settings_data['popup_animation']) ? $settings_data['popup_animation'] : 'spin-zoom';
+$popup_countdown_on_off = isset($settings_data['popup_countdown_on_off']) ? (int)$settings_data['popup_countdown_on_off'] : 1;
+$popup_countdown_end    = $settings_data['popup_countdown_end'] ?? '';
+$popup_delay            = isset($settings_data['popup_delay']) ? (int)$settings_data['popup_delay'] : 2;
+$popup_show_again       = !empty($settings_data['popup_show_again']) ? $settings_data['popup_show_again'] : 'session';
 // Email Settings - Reverted to original names based on user feedback
 $smtp_from_name = $settings_data['smtp_from_name'] ?? ''; // Reverted to original
 $smtp_from_email = $settings_data['smtp_from_email'] ?? ''; // Reverted to original
@@ -402,24 +417,64 @@ if(isset($_POST['form_general_settings'])) {
     }
 }
 
-if(isset($_POST['form_popup_settings'])) {
-    $popup_on_off = $_POST['popup_on_off'] ?? 0;
-    $popup_text   = $_POST['popup_text'] ?? '';
-    $popup_link   = $_POST['popup_link'] ?? '';
-    $path = $_FILES['popup_photo']['name'] ?? '';
-    $path_tmp = $_FILES['popup_photo']['tmp_name'] ?? '';
+if(isset($_POST['form_popup_settings']) || isset($_POST['form_ads_settings'])) {
+    $popup_on_off           = isset($_POST['popup_on_off']) ? (int)$_POST['popup_on_off'] : 0;
+    $popup_title            = trim($_POST['popup_title'] ?? '');
+    $popup_text             = trim($_POST['popup_text'] ?? '');
+    $popup_link             = trim($_POST['popup_link'] ?? '');
+    $popup_btn_text         = trim($_POST['popup_btn_text'] ?? 'Claim Now');
+    $popup_animation        = trim($_POST['popup_animation'] ?? 'spin-zoom');
+    $popup_countdown_on_off = isset($_POST['popup_countdown_on_off']) ? (int)$_POST['popup_countdown_on_off'] : 0;
+    $popup_countdown_end    = trim($_POST['popup_countdown_end'] ?? '');
+    $popup_delay            = max(0, (int)($_POST['popup_delay'] ?? 2));
+    $popup_show_again       = trim($_POST['popup_show_again'] ?? 'session');
 
-    if($path != '') {
-        $ext = pathinfo($path, PATHINFO_EXTENSION);
-        $file_name = 'popup-'.bin2hex(random_bytes(16)).'.'.$ext;
-        move_uploaded_file($path_tmp, '../assets/uploads/'.$file_name);
-        $statement = $pdo->prepare("UPDATE tbl_settings SET popup_on_off=?, popup_text=?, popup_link=?, popup_photo=? WHERE id=1");
-        $statement->execute(array($popup_on_off, $popup_text, $popup_link, $file_name));
-    } else {
-        $statement = $pdo->prepare("UPDATE tbl_settings SET popup_on_off=?, popup_text=?, popup_link=? WHERE id=1");
-        $statement->execute(array($popup_on_off, $popup_text, $popup_link));
+    $file_name = $popup_photo;
+
+    // Handle Image Upload or Direct CDN URL
+    if (!empty($_FILES['popup_photo']['tmp_name']) && is_uploaded_file($_FILES['popup_photo']['tmp_name'])) {
+        $ext = strtolower(pathinfo($_FILES['popup_photo']['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])) {
+            $cloud_url = function_exists('uploadFileToSupabase') ? uploadFileToSupabase($_FILES['popup_photo']['tmp_name'], 'popup_' . time() . '.' . $ext, 'assets') : null;
+            if ($cloud_url) {
+                $file_name = $cloud_url;
+            } else {
+                $file_name = 'popup-' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['popup_photo']['tmp_name'], '../assets/uploads/' . $file_name);
+            }
+        }
+    } elseif (!empty($_POST['popup_photo_url'])) {
+        $file_name = trim($_POST['popup_photo_url']);
     }
-    $success_message = 'Popup settings updated successfully.';
+
+    $statement = $pdo->prepare("UPDATE tbl_settings SET 
+        popup_on_off=?, 
+        popup_photo=?, 
+        popup_link=?, 
+        popup_title=?, 
+        popup_text=?, 
+        popup_btn_text=?, 
+        popup_animation=?, 
+        popup_countdown_on_off=?, 
+        popup_countdown_end=?, 
+        popup_delay=?, 
+        popup_show_again=? 
+        WHERE id=1");
+    $statement->execute([
+        $popup_on_off, 
+        $file_name, 
+        $popup_link, 
+        $popup_title, 
+        $popup_text, 
+        $popup_btn_text, 
+        $popup_animation, 
+        $popup_countdown_on_off, 
+        $popup_countdown_end, 
+        $popup_delay, 
+        $popup_show_again
+    ]);
+    $popup_photo = $file_name;
+    $success_message = 'Welcome Popup Ad settings updated successfully.';
 }
 
 
@@ -1593,7 +1648,7 @@ $lang_sections = [
                         <li><a href="#tab_social_media" data-toggle="tab">Social Media</a></li>
                         <li><a href="#tab_email" data-toggle="tab">Email</a></li>
                         <li><a href="#tab_footer" data-toggle="tab">Footer</a></li>
-                        <li><a href="#tab_ads" data-toggle="tab">Ads</a></li>
+                        <li><a href="#tab_ads" data-toggle="tab"><i class="fa fa-bullhorn text-yellow"></i> Welcome Popup Ad</a></li>
                     </ul>
 
                     <div class="tab-content">
@@ -2948,74 +3003,219 @@ $lang_sections = [
                             </div>
                         </div>
 
-                        <!-- Tab 11: Ads Settings -->
+                        <!-- Tab 11: Welcome Popup Ad Customization -->
                         <div class="tab-pane" id="tab_ads">
-                            <div class="box box-info">
-                                <div class="box-body">
-                                    <h3 class="seo-info">Advertisement Section Visibility</h3>
-                                    <div class="form-group">
-                                        <label for="ads_above_welcome_on_off" class="col-sm-3 control-label">Above Welcome Section</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_above_welcome_on_off" id="ads_above_welcome_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_above_welcome_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_above_welcome_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ads_above_featured_product_on_off" class="col-sm-3 control-label">Above Featured Product Section</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_above_featured_product_on_off" id="ads_above_featured_product_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_above_featured_product_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_above_featured_product_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ads_above_latest_product_on_off" class="col-sm-3 control-label">Above Latest Product Section</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_above_latest_product_on_off" id="ads_above_latest_product_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_above_latest_product_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_above_latest_product_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ads_above_popular_product_on_off" class="col-sm-3 control-label">Above Popular Product Section</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_above_popular_product_on_off" id="ads_above_popular_product_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_above_popular_product_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_above_popular_product_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ads_above_testimonial_on_off" class="col-sm-3 control-label">Above Testimonial Section</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_above_testimonial_on_off" id="ads_above_testimonial_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_above_testimonial_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_above_testimonial_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ads_category_sidebar_on_off" class="col-sm-3 control-label">Category Page Sidebar Ads</label>
-                                        <div class="col-sm-9">
-                                            <select name="ads_category_sidebar_on_off" id="ads_category_sidebar_on_off" class="form-control w-auto">
-                                                <option value="1" <?php if($ads_category_sidebar_on_off == 1) {echo 'selected';} ?>>On</option>
-                                                <option value="0" <?php if($ads_category_sidebar_on_off == 0) {echo 'selected';} ?>>Off</option>
-                                            </select>
-                                        </div>
-                                    </div>                                    
-                                    <div class="form-group">
-                                        <label for="" class="col-sm-3 control-label"></label>
-                                        <div class="col-sm-6">
-                                            <button type="submit" class="btn btn-success pull-left" name="form_ads_settings">Update</button>
-                                        </div>
-                                    </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:#fefce8; border:1px solid #fef08a; padding:16px 20px; border-radius:10px; margin-bottom:25px;">
+                                <div>
+                                    <h4 style="margin:0 0 4px 0; color:#854d0e; font-weight:700;"><i class="fa fa-bullhorn text-warning"></i> Welcome Screen Popup Ad Customizer</h4>
+                                    <p style="margin:0; font-size:13px; color:#a16207;">Create an eye-catching animated promotional popup modal with clickable banners, spinning animations, and urgency countdown timers.</p>
+                                </div>
+                                <div>
+                                    <span class="badge" style="background:<?php echo $popup_on_off ? '#16a34a' : '#94a3b8'; ?>; font-size:13px; padding:6px 14px; border-radius:20px;">
+                                        <?php echo $popup_on_off ? '● Live Active' : '○ Currently Disabled'; ?>
+                                    </span>
                                 </div>
                             </div>
-                            </form>
+
+                            <div class="box box-info" style="border-radius:8px; border:1px solid #e2e8f0; box-shadow:none;">
+                                <div class="box-body" style="padding:24px;">
+                                    
+                                    <!-- Section 1: Activation & Triggering -->
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                            <i class="fa fa-toggle-on text-primary"></i> 1. Display & Trigger Settings
+                                        </h4>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label style="font-weight:600; color:#334155;">Popup Ad Status</label>
+                                                    <select name="popup_on_off" class="form-control" style="border-radius:6px;">
+                                                        <option value="1" <?php if($popup_on_off == 1) echo 'selected'; ?>>✅ Enabled (Show on Storefront)</option>
+                                                        <option value="0" <?php if($popup_on_off == 0) echo 'selected'; ?>>❌ Disabled (Hidden)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label style="font-weight:600; color:#334155;">Display Delay (Seconds)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" name="popup_delay" class="form-control" value="<?php echo htmlspecialchars($popup_delay); ?>" min="0" max="60" style="border-radius:6px 0 0 6px;">
+                                                        <span class="input-group-addon" style="border-radius:0 6px 6px 0;">sec</span>
+                                                    </div>
+                                                    <small class="text-muted">Wait time before popup opens on screen.</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label style="font-weight:600; color:#334155;">Display Frequency</label>
+                                                    <select name="popup_show_again" class="form-control" style="border-radius:6px;">
+                                                        <option value="always" <?php if($popup_show_again == 'always') echo 'selected'; ?>>Always (Every Visit - Best for Testing)</option>
+                                                        <option value="session" <?php if($popup_show_again == 'session') echo 'selected'; ?>>Once Per Browser Session</option>
+                                                        <option value="24hours" <?php if($popup_show_again == '24hours') echo 'selected'; ?>>Once Every 24 Hours</option>
+                                                        <option value="once" <?php if($popup_show_again == 'once') echo 'selected'; ?>>Once Ever Per Device</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 2: Banner Image & Link -->
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                            <i class="fa fa-picture-o text-success"></i> 2. Clickable Image Banner
+                                        </h4>
+                                        
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Current Banner Preview</label>
+                                            <div class="col-sm-9">
+                                                <?php 
+                                                $popup_preview_src = '';
+                                                if (!empty($popup_photo)) {
+                                                    if (strpos($popup_photo, 'http://') === 0 || strpos($popup_photo, 'https://') === 0) {
+                                                        $popup_preview_src = $popup_photo;
+                                                    } elseif (file_exists('../assets/uploads/' . $popup_photo)) {
+                                                        $popup_preview_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($popup_photo);
+                                                    } else {
+                                                        $popup_preview_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($popup_photo);
+                                                    }
+                                                }
+                                                ?>
+                                                <?php if(!empty($popup_preview_src)): ?>
+                                                    <div style="margin-bottom:12px; display:inline-block; background:#fff; padding:6px; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                                                        <img src="<?php echo htmlspecialchars($popup_preview_src); ?>" alt="Popup Banner" style="max-height:160px; max-width:100%; border-radius:6px; object-fit:contain;">
+                                                    </div>
+                                                <?php else: ?>
+                                                    <p class="text-muted" style="margin-top:6px;"><i class="fa fa-info-circle"></i> No popup banner image uploaded yet.</p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Upload New Banner</label>
+                                            <div class="col-sm-9">
+                                                <input type="file" name="popup_photo" class="form-control-file" accept="image/*">
+                                                <small class="text-muted">Recommended resolution: 600×400 or 700×500px (JPG, PNG, WEBP, GIF).</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Or Direct Image CDN URL</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="popup_photo_url" class="form-control" value="<?php echo htmlspecialchars($popup_photo); ?>" placeholder="https://...supabase.co/storage/v1/object/public/storefront/assets/banner.jpg">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Clickable Target URL <span class="text-danger">*</span></label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="popup_link" class="form-control" value="<?php echo htmlspecialchars($popup_link); ?>" placeholder="e.g. deals.php or product-category.php?id=1 or https://...">
+                                                <small class="text-muted">Visitors clicking the banner image or action button will be redirected here.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 3: Headlines & Content -->
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                            <i class="fa fa-font text-info"></i> 3. Text Headlines & Call to Action
+                                        </h4>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Popup Title / Headline</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="popup_title" class="form-control" value="<?php echo htmlspecialchars($popup_title); ?>" placeholder="e.g. 🎉 Special Welcome Discount!">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Description / Coupon Code</label>
+                                            <div class="col-sm-9">
+                                                <textarea name="popup_text" class="form-control" rows="3" placeholder="e.g. Use coupon code WELCOME20 at checkout for an extra 20% discount on your entire order!"><?php echo htmlspecialchars($popup_text); ?></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Button Action Text</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="popup_btn_text" class="form-control" value="<?php echo htmlspecialchars($popup_btn_text); ?>" placeholder="e.g. Claim Deal Now">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 4: Animation Effects -->
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                            <i class="fa fa-magic text-purple"></i> 4. Entrance Animation Styles
+                                        </h4>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Select Animation Effect</label>
+                                            <div class="col-sm-6">
+                                                <select name="popup_animation" id="popupAnimSelector" class="form-control" style="font-weight:600; border-radius:6px;">
+                                                    <option value="spin-zoom" <?php if($popup_animation == 'spin-zoom') echo 'selected'; ?>>🌪️ 3D Spin & Zoom In (Full 360° Rotation Entrance)</option>
+                                                    <option value="flip-3d" <?php if($popup_animation == 'flip-3d') echo 'selected'; ?>>🔄 3D Perspective Flip (Flips Into View)</option>
+                                                    <option value="bounce-pop" <?php if($popup_animation == 'bounce-pop') echo 'selected'; ?>>⚡ Elastic Bounce Pop (Spring Jump Effect)</option>
+                                                    <option value="slide-up" <?php if($popup_animation == 'slide-up') echo 'selected'; ?>>⬆️ Smooth Slide Up (Rises from Bottom)</option>
+                                                    <option value="slide-down" <?php if($popup_animation == 'slide-down') echo 'selected'; ?>>⬇️ Smooth Slide Down (Drops from Top)</option>
+                                                    <option value="glow-pulse" <?php if($popup_animation == 'glow-pulse') echo 'selected'; ?>>✨ Radiant Glow & Pulse (Glow Aura Entrance)</option>
+                                                    <option value="wiggle-swing" <?php if($popup_animation == 'wiggle-swing') echo 'selected'; ?>>🎭 Pendulum Wiggle & Swing (Playful Swing Entrance)</option>
+                                                </select>
+                                                <small class="text-muted">The animation triggers as soon as the popup opens on the visitor's screen.</small>
+                                            </div>
+                                            <div class="col-sm-3">
+                                                <button type="button" class="btn btn-default btn-block" id="btnPreviewAnim" style="border-radius:6px; font-weight:600;">
+                                                    <i class="fa fa-play text-primary"></i> Preview Animation
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-sm-offset-3 col-sm-9">
+                                                <div id="animPreviewBox" style="display:none; padding:18px; background:#ffffff; border:2px dashed #6366f1; border-radius:10px; text-align:center; margin-top:10px;">
+                                                    <span style="font-weight:700; color:#4338ca; font-size:15px;">✨ Live Animation Preview</span>
+                                                    <p style="margin:4px 0 0 0; color:#64748b; font-size:12px;">This is how your popup will animate onto the storefront!</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 5: Live Countdown Timer -->
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                            <i class="fa fa-clock-o text-danger"></i> 5. Live Countdown Urgency Timer
+                                        </h4>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Countdown Timer</label>
+                                            <div class="col-sm-9">
+                                                <select name="popup_countdown_on_off" class="form-control" style="max-width:240px; border-radius:6px;">
+                                                    <option value="1" <?php if($popup_countdown_on_off == 1) echo 'selected'; ?>>⏰ Enabled (Show Live Ticking Timer)</option>
+                                                    <option value="0" <?php if($popup_countdown_on_off == 0) echo 'selected'; ?>>Disabled (No Timer)</option>
+                                                </select>
+                                                <small class="text-muted">Shows an urgent live countdown clock (Days, Hours, Minutes, Seconds) directly on the popup.</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-3 control-label">Target End Date & Time</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="popup_countdown_end" class="form-control" value="<?php echo htmlspecialchars($popup_countdown_end); ?>" placeholder="YYYY-MM-DD HH:MM:SS (e.g. 2026-12-31 23:59:59)" style="max-width:340px;">
+                                                <small class="text-muted">Leave empty to use a rolling 2-hour urgency countdown timer for every visitor.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Submit Button -->
+                                    <div class="form-group">
+                                        <div class="col-sm-offset-3 col-sm-9">
+                                            <button type="submit" class="btn btn-success btn-lg" name="form_popup_settings" style="border-radius:25px; padding:10px 36px; font-weight:700; box-shadow:0 4px 14px rgba(22, 163, 74, 0.3);">
+                                                <i class="fa fa-check-circle"></i> Save Welcome Popup Settings
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
                         </div>
 
 
@@ -3044,6 +3244,19 @@ $(document).ready(function() {
         } else {
             window.location.hash = e.target.hash;
         }
+    });
+
+    
+    // Animation Preview Handler
+    $('#btnPreviewAnim').on('click', function(e) {
+        e.preventDefault();
+        var anim = $('#popupAnimSelector').val();
+        var $box = $('#animPreviewBox');
+        $box.removeClass('anim-spin-zoom anim-flip-3d anim-bounce-pop anim-slide-up anim-slide-down anim-glow-pulse anim-wiggle-swing');
+        $box.show();
+        setTimeout(function() {
+            $box.addClass('anim-' + anim);
+        }, 50);
     });
 
     // Language Search / Filter
