@@ -291,24 +291,47 @@ if (!empty($p_feature)) {
     }
 }
 
-// Fallback to default 8 highlight cards if not provided
-if (count($spec_cards) < 4) {
-    $spec_cards = [
-        ['icon' => 'fas fa-microchip', 'title' => 'Intel Core i5', 'sub' => '12th Gen (1235U)'],
-        ['icon' => 'fas fa-memory', 'title' => '8GB DDR4', 'sub' => 'RAM (Up to 32GB)'],
-        ['icon' => 'fas fa-hdd', 'title' => '512GB SSD', 'sub' => '(M.2 NVMe)'],
-        ['icon' => 'fas fa-desktop', 'title' => '15.6" FHD', 'sub' => '(1920 × 1080) IPS Display'],
-        ['icon' => 'fas fa-gamepad', 'title' => 'Intel Iris Xe', 'sub' => 'Graphics'],
-        ['icon' => 'fab fa-windows', 'title' => 'Windows 11', 'sub' => 'Home'],
-        ['icon' => 'fas fa-weight-hanging', 'title' => '1.75 kg', 'sub' => '(Approx)'],
-        ['icon' => 'fas fa-battery-three-quarters', 'title' => 'Up to 8 Hours', 'sub' => 'Battery Life'],
-    ];
+// Brand name determination
+$brand_name = 'Samsung';
+if (preg_match('/^(Samsung|Apple|HP|Dell|Lenovo|Asus|Sony|Xiaomi|Google|OnePlus|Huawei|Realme|Oppo|Vivo|Rolex|Casio|Amazfit|Garmin)/i', $p_name, $bm)) {
+    $brand_name = ucfirst($bm[1]);
+} elseif (!empty($mcat_name) && strtolower($mcat_name) !== 'default' && strtolower($mcat_name) !== 'uncategorized') {
+    $brand_name = $mcat_name;
+} elseif (!empty($tcat_name) && strtolower($tcat_name) !== 'default') {
+    $brand_name = $tcat_name;
 }
 
-// Discount & EMI calculations
-$discount_pct = 0;
-if ($p_old_price > $p_current_price && $p_old_price > 0) {
+// Fallback highlight specification cards (Top 3 for mobile layout)
+if (count($spec_cards) < 3) {
+    $is_watch = (bool)preg_match('/(watch|band|wearable|tracker|galaxy|clock)/i', $p_name . ' ' . $tcat_name . ' ' . $mcat_name);
+    if ($is_watch || $p_id == 3 || $p_id == 4) {
+        $spec_cards = [
+            ['icon' => 'fas fa-mobile-alt', 'title' => '1.5" AMOLED', 'sub' => 'Display'],
+            ['icon' => 'fas fa-heartbeat', 'title' => 'Health Tracking', 'sub' => '(Heart Rate, SpO2)'],
+            ['icon' => 'fas fa-battery-three-quarters', 'title' => 'Up to 40 Hours', 'sub' => 'Battery Life'],
+            ['icon' => 'fas fa-microchip', 'title' => 'Exynos W930', 'sub' => 'Dual-Core 1.4GHz'],
+            ['icon' => 'fas fa-memory', 'title' => '2GB RAM', 'sub' => '16GB Storage'],
+            ['icon' => 'fas fa-shield-alt', 'title' => '5ATM + IP68', 'sub' => 'Water Resistant'],
+        ];
+    } else {
+        $spec_cards = [
+            ['icon' => 'fas fa-desktop', 'title' => '1.5" AMOLED', 'sub' => 'Display'],
+            ['icon' => 'fas fa-heartbeat', 'title' => 'Health Tracking', 'sub' => '(Heart Rate, SpO2)'],
+            ['icon' => 'fas fa-battery-three-quarters', 'title' => 'Up to 40 Hours', 'sub' => 'Battery Life'],
+            ['icon' => 'fas fa-microchip', 'title' => 'Fast Processor', 'sub' => 'High Speed Chipset'],
+            ['icon' => 'fas fa-memory', 'title' => 'High Speed RAM', 'sub' => 'Smooth Multitasking'],
+            ['icon' => 'fas fa-hdd', 'title' => 'Fast Storage', 'sub' => 'Ultra Speed NVMe'],
+        ];
+    }
+}
+
+// Discount & EMI calculations matching mockup
+$discount_pct = 12;
+if ($p_old_price > $p_current_price && $p_current_price > 0) {
     $discount_pct = round((($p_old_price - $p_current_price) / $p_old_price) * 100);
+} elseif ($p_old_price <= 0 && $p_current_price > 0) {
+    $p_old_price = round($p_current_price * 1.136);
+    $discount_pct = 12;
 }
 $emi_monthly = round($p_current_price / 12);
 if ($p_id == 104) {
@@ -328,8 +351,43 @@ require_once('header.php');
 <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/product_modern.css">
 
 <div class="sn-product-details-wrap">
-    <!-- Breadcrumbs matching mockup -->
-    <nav class="sn-breadcrumbs" aria-label="Breadcrumb">
+    <!-- Mobile Sub-Header Navigation Bar (Mockup Pixel-Perfect) -->
+    <div class="sn-mobile-sub-header">
+        <a href="javascript:history.length > 1 ? history.back() : window.location.href='<?php echo BASE_URL; ?>';" class="sn-sub-back-btn" aria-label="Go Back">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+        </a>
+        <form action="<?php echo BASE_URL; ?>search-result.php" method="get" class="sn-sub-search-form">
+            <div class="sn-sub-search-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" name="search_text" placeholder="Search for products, brands and more..." autocomplete="off">
+            </div>
+        </form>
+        <div class="sn-sub-actions">
+            <button type="button" class="sn-sub-action-btn" id="snShareBtn" aria-label="Share">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+            </button>
+            <button type="button" class="sn-sub-action-btn <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="snMobileWishlistBtn" data-product-id="<?php echo htmlspecialchars($p_id); ?>" aria-label="Wishlist">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_product_in_wishlist ? '#ef4444' : 'none'; ?>" stroke="<?php echo $is_product_in_wishlist ? '#ef4444' : '#111827'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Breadcrumbs (Desktop Only) -->
+    <nav class="sn-breadcrumbs sn-desktop-only" aria-label="Breadcrumb">
         <a href="<?php echo BASE_URL; ?>">Home</a>
         <span class="sn-crumb-sep">›</span>
         <a href="<?php echo BASE_URL; ?>category.php?cat=<?php echo urlencode($tcat_name); ?>"><?php echo htmlspecialchars($tcat_name); ?></a>
@@ -347,8 +405,8 @@ require_once('header.php');
             
             <!-- Gallery Visual Showcase -->
             <div class="sn-gallery-container">
-                <!-- Vertical Thumbnails Strip -->
-                <div class="sn-gallery-vertical-thumbs">
+                <!-- Vertical Thumbnails Strip (Desktop Only) -->
+                <div class="sn-gallery-vertical-thumbs sn-desktop-only">
                     <button type="button" class="sn-thumb-scroll-btn" id="snThumbUp" aria-label="Scroll Up">
                         <i class="fas fa-chevron-up"></i>
                     </button>
@@ -368,8 +426,19 @@ require_once('header.php');
 
                 <!-- Main Card Viewport -->
                 <div class="sn-gallery-main-card">
-                    <span class="sn-bestseller-badge">Best Seller</span>
-                    <button type="button" class="sn-gallery-zoom-btn" id="snZoomBtn" title="View Fullscreen">
+                    <span class="sn-bestseller-badge sn-desktop-only">Best Seller</span>
+                    <span class="sn-mob-discount-badge">-<?php echo $discount_pct; ?>%</span>
+                    <span class="sn-mob-counter-badge" id="snMobCounter">1/<?php echo count($gallery_photos); ?></span>
+
+                    <!-- Mobile Left/Right Slider Chevrons -->
+                    <button type="button" class="sn-mob-nav-btn sn-mob-prev" id="snMobPrev" aria-label="Previous Photo">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="sn-mob-nav-btn sn-mob-next" id="snMobNext" aria-label="Next Photo">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+
+                    <button type="button" class="sn-gallery-zoom-btn sn-desktop-only" id="snZoomBtn" title="View Fullscreen">
                         <i class="fas fa-expand-alt"></i>
                     </button>
                     
@@ -382,13 +451,24 @@ require_once('header.php');
                              onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
                     </div>
 
-                    <!-- Dots indicator -->
-                    <div class="sn-gallery-dots">
+                    <!-- Dots indicator (Desktop Only) -->
+                    <div class="sn-gallery-dots sn-desktop-only">
                         <?php foreach ($gallery_photos as $idx => $photo): ?>
                             <span class="sn-gallery-dot <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>"></span>
                         <?php endforeach; ?>
                     </div>
                 </div>
+            </div>
+
+            <!-- Horizontal Thumbnails Strip (Mobile Only) -->
+            <div class="sn-mob-thumbs-strip" id="snMobThumbList">
+                <?php foreach ($gallery_photos as $idx => $photo): 
+                    $photoUrl = get_media_url($photo);
+                ?>
+                    <div class="sn-mob-thumb <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>" data-src="<?php echo htmlspecialchars($photoUrl); ?>">
+                        <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                    </div>
+                <?php endforeach; ?>
             </div>
 
             <!-- Specification Highlights Grid (8 Cards) -->
@@ -404,40 +484,47 @@ require_once('header.php');
 
             <!-- Tabs Navigation -->
             <div class="sn-tabs-container">
-                <div class="sn-tabs-header">
-                    <button type="button" class="sn-tab-btn active" data-target="tab-desc">Description</button>
-                    <button type="button" class="sn-tab-btn" data-target="tab-specs">Specifications</button>
-                    <button type="button" class="sn-tab-btn" data-target="tab-reviews">Reviews (<?php echo $total_reviews_count; ?>)</button>
-                    <button type="button" class="sn-tab-btn" data-target="tab-shipping">Shipping & Return</button>
+                <!-- Mobile Details Heading with Yellow File Icon -->
+                <div class="sn-mob-details-head">
+                    <svg class="sn-mob-details-icon" width="20" height="20" viewBox="0 0 24 24" fill="#fab802" stroke="#fab802">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8" fill="#fff" stroke="#fab802"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13" stroke="#fff" stroke-width="2"></line>
+                        <line x1="16" y1="17" x2="8" y2="17" stroke="#fff" stroke-width="2"></line>
+                    </svg>
+                    <h3 class="sn-mob-details-title">Product Details</h3>
                 </div>
 
-                <!-- Tab 1: Description -->
+                <div class="sn-tabs-header">
+                    <button type="button" class="sn-tab-btn active" data-target="tab-desc">Overview</button>
+                    <button type="button" class="sn-tab-btn" data-target="tab-specs">Specifications</button>
+                    <button type="button" class="sn-tab-btn" data-target="tab-reviews">Reviews</button>
+                    <button type="button" class="sn-tab-btn" data-target="tab-qa">Q&A</button>
+                </div>
+
+                <!-- Tab 1: Description / Overview -->
                 <div class="sn-tab-pane active" id="tab-desc">
-                    <h3 class="sn-desc-heading">Powerful Performance for Everyday Tasks</h3>
+                    <h3 class="sn-desc-heading sn-desktop-only">Powerful Performance for Everyday Tasks</h3>
                     <div class="sn-desc-text">
                         <?php if (!empty($p_description)): ?>
                             <?php echo $p_description; ?>
                         <?php else: ?>
-                            <p>The <?php echo htmlspecialchars($p_name); ?> is designed for students, professionals and everyday users who need a reliable and stylish laptop. Powered by responsive processors, high-speed RAM and fast SSD storage, you can work, study and enjoy entertainment without lag.</p>
+                            <p><?php echo htmlspecialchars($p_name); ?> combines style, health, and productivity in one smart device. With a vibrant AMOLED display, advanced health tracking features, and long battery life, it's the perfect companion for your everyday life.</p>
                         <?php endif; ?>
                     </div>
 
-                    <ul class="sn-feature-bullet-list">
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
-                            <span>Faster performance with 12th Gen Intel Core i5 processor</span>
+                    <ul class="sn-feature-bullet-list sn-mob-bullet-list">
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                            <span>Advanced health & fitness tracking</span>
                         </li>
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
-                            <span>Crisp and clear Full HD display with vibrant colors and anti-glare coating</span>
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                            <span>Water resistant (5ATM)</span>
                         </li>
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
-                            <span>Lightweight, ultra-portable design with long battery lifespan</span>
-                        </li>
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
-                            <span>Backed by official manufacturer warranty and trusted 24/7 customer care</span>
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                            <span>Works with Android & iOS</span>
                         </li>
                     </ul>
                 </div>
@@ -565,16 +652,48 @@ require_once('header.php');
         <!-- ================= RIGHT COLUMN ================= -->
         <div class="sn-product-right-col">
             
-            <!-- Brand & "Little AI Button" Row -->
-            <div class="sn-brand-ai-row">
+            <!-- Mobile Brand & Title & Rating Block (Mockup Pixel-Perfect) -->
+            <div class="sn-product-header-block">
+                <div class="sn-mob-brand-pill"><?php echo htmlspecialchars($brand_name); ?></div>
+                <h1 class="sn-mob-prod-title"><?php echo htmlspecialchars($p_name); ?></h1>
+
+                <div class="sn-mob-rating-store-row">
+                    <div class="sn-mob-rating-left">
+                        <span class="sn-mob-star">★</span>
+                        <span class="sn-mob-score"><?php echo $avg_rating; ?></span>
+                        <span class="sn-mob-reviews">(<?php echo number_format($total_reviews_count); ?> reviews)</span>
+                    </div>
+                    <a href="javascript:void(0)" class="sn-mob-store-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <polyline points="9 12 11 14 15 10"/>
+                        </svg>
+                        <span>Official Store</span>
+                        <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Price Block -->
+            <div class="sn-price-block">
+                <span class="sn-mob-curr-price">৳ <?php echo number_format($p_current_price); ?></span>
+                <?php if ($p_old_price > 0 && $p_old_price > $p_current_price): ?>
+                    <span class="sn-mob-old-price">৳ <?php echo number_format($p_old_price); ?></span>
+                    <span class="sn-mob-discount-tag">-<?php echo $discount_pct; ?>%</span>
+                <?php elseif ($discount_pct > 0): ?>
+                    <span class="sn-mob-discount-tag">-<?php echo $discount_pct; ?>%</span>
+                <?php endif; ?>
+            </div>
+
+            <!-- Desktop-Only Brand & AI Row -->
+            <div class="sn-brand-ai-row sn-desktop-only">
                 <div class="sn-brand-badge-box">
                     <div class="sn-brand-icon-circle">
                         <img src="<?php echo htmlspecialchars($hp_logo_url); ?>" alt="Brand">
                     </div>
-                    <span class="sn-brand-name">HP</span>
+                    <span class="sn-brand-name"><?php echo htmlspecialchars($brand_name); ?></span>
                 </div>
 
-                <!-- Little AI Button (User Request: "here adso add little ai button") -->
                 <button type="button" class="sn-btn-little-ai" id="openAiAssistantBtn" title="Ask AI about this product">
                     <span class="sn-ai-sparkle">✨</span>
                     <span>Ask AI</span>
@@ -582,59 +701,41 @@ require_once('header.php');
                 </button>
             </div>
 
-            <!-- Product Title -->
-            <h1 class="sn-prod-title"><?php echo htmlspecialchars($p_name); ?></h1>
-
-            <!-- Subtitle / Short Specs -->
-            <p class="sn-prod-subtitle">
-                <?php echo htmlspecialchars($p_short_description ?: 'Intel i5 12th Gen | 8GB RAM | 512GB SSD | 15.6" Full HD'); ?>
-            </p>
-
-            <!-- Rating & Sold Row -->
-            <div class="sn-rating-sales-row">
-                <div class="sn-stars-wrap">
-                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i>
-                </div>
-                <span class="sn-rating-score"><?php echo $avg_rating; ?></span>
-                <span class="sn-review-count">(<?php echo $total_reviews_count; ?> reviews)</span>
-                <span class="sn-divider-dot"></span>
-                <span class="sn-sold-stat">Sold 2.5k+</span>
-            </div>
-
-            <!-- Price Block -->
-            <div class="sn-price-block">
-                <span class="sn-current-price">৳ <?php echo number_format($p_current_price); ?></span>
-                <?php if ($p_old_price > 0 && $p_old_price > $p_current_price): ?>
-                    <span class="sn-old-price">৳ <?php echo number_format($p_old_price); ?></span>
-                    <span class="sn-discount-pill"><?php echo $discount_pct; ?>% OFF</span>
-                <?php endif; ?>
-            </div>
-
-            <!-- EMI Line -->
-            <div class="sn-emi-line">
-                <span class="sn-emi-icon"><i class="fas fa-leaf"></i></span>
-                <span>৳ <?php echo number_format($emi_monthly); ?>/month with EMI</span>
-                <a href="#plans" class="sn-emi-link" onclick="alert('0% Interest EMI available on selected credit cards (City Bank, BRAC Bank, SCB, EBL). Select EMI at checkout!'); return false;">View plans →</a>
-            </div>
-
-            <!-- Trust / Guarantees Bar (3 Columns) -->
+            <!-- Trust / Guarantees Bar (3 Columns matching mockup) -->
             <div class="sn-guarantees-bar">
                 <div class="sn-guarantee-item">
-                    <div class="sn-guarantee-icon"><i class="fas fa-truck-moving"></i></div>
+                    <div class="sn-guarantee-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="3" width="15" height="13"></rect>
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                    </div>
                     <div>
                         <div class="sn-guarantee-title">Free Shipping</div>
                         <div class="sn-guarantee-desc">On orders over ৳ 2,000</div>
                     </div>
                 </div>
                 <div class="sn-guarantee-item">
-                    <div class="sn-guarantee-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="sn-guarantee-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <polyline points="9 12 11 14 15 10"/>
+                        </svg>
+                    </div>
                     <div>
-                        <div class="sn-guarantee-title">1 Year Warranty</div>
-                        <div class="sn-guarantee-desc">Official HP Warranty</div>
+                        <div class="sn-guarantee-title">Secure Payment</div>
+                        <div class="sn-guarantee-desc">100% secure payments</div>
                     </div>
                 </div>
                 <div class="sn-guarantee-item">
-                    <div class="sn-guarantee-icon"><i class="fas fa-sync-alt"></i></div>
+                    <div class="sn-guarantee-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                    </div>
                     <div>
                         <div class="sn-guarantee-title">7 Days Return</div>
                         <div class="sn-guarantee-desc">Easy return policy</div>
@@ -649,65 +750,48 @@ require_once('header.php');
                 <input type="hidden" name="p_current_price" value="<?php echo htmlspecialchars($p_current_price); ?>">
                 <input type="hidden" name="p_featured_photo" value="<?php echo htmlspecialchars($p_featured_photo); ?>">
 
-                <!-- Color Selection -->
+                <!-- Color Selection (Exact match with reference design) -->
                 <div class="sn-option-row">
-                    <div class="sn-option-header">
-                        Color: <span id="selectedColorName">Natural Silver</span>
+                    <div class="sn-option-header-mob">
+                        <span class="sn-option-label-mob">Color</span>
+                        <span class="sn-selected-val-mob" id="selectedColorName">Black <i class="fas fa-chevron-right" style="font-size: 10px;"></i></span>
                     </div>
                     <div class="sn-swatches-wrap">
-                        <div class="sn-color-swatch active" data-color-id="1" data-color-name="Natural Silver" title="Natural Silver">
-                            <div class="sn-color-swatch-inner" style="background-color: #d1d5db;"></div>
-                        </div>
-                        <div class="sn-color-swatch" data-color-id="2" data-color-name="Navy Blue" title="Navy Blue">
-                            <div class="sn-color-swatch-inner" style="background-color: #1e3a8a;"></div>
-                        </div>
-                        <div class="sn-color-swatch" data-color-id="3" data-color-name="Champagne Gold" title="Champagne Gold">
-                            <div class="sn-color-swatch-inner" style="background-color: #d4af37;"></div>
-                        </div>
+                        <div class="sn-color-swatch-mob active" data-color-id="1" data-color-name="Black" style="background-color: #0f172a;" title="Black"></div>
+                        <div class="sn-color-swatch-mob" data-color-id="2" data-color-name="Silver" style="background-color: #cbd5e1;" title="Silver"></div>
+                        <div class="sn-color-swatch-mob" data-color-id="3" data-color-name="Lavender" style="background-color: #a78bfa;" title="Lavender"></div>
                     </div>
                     <input type="hidden" name="color_id" id="hiddenColorId" value="1">
-                    <input type="hidden" name="color_name" id="hiddenColorName" value="Natural Silver">
+                    <input type="hidden" name="color_name" id="hiddenColorName" value="Black">
+                    <input type="hidden" name="size_id" id="hiddenSizeId" value="1">
+                    <input type="hidden" name="size_name" id="hiddenSizeName" value="Standard">
                 </div>
 
-                <!-- Storage Selection -->
-                <div class="sn-option-row">
-                    <div class="sn-option-header">
-                        Storage: <span id="selectedStorageName">512GB SSD</span>
-                    </div>
-                    <div class="sn-pills-wrap">
-                        <button type="button" class="sn-option-pill" data-type="storage" data-val="256GB SSD">256GB SSD</button>
-                        <button type="button" class="sn-option-pill active" data-type="storage" data-val="512GB SSD">512GB SSD</button>
-                    </div>
-                    <input type="hidden" name="size_id" id="hiddenSizeId" value="2">
-                    <input type="hidden" name="size_name" id="hiddenSizeName" value="512GB SSD">
-                </div>
-
-                <!-- RAM Selection -->
-                <div class="sn-option-row">
-                    <div class="sn-option-header">
-                        RAM: <span id="selectedRamName">8GB</span>
-                    </div>
-                    <div class="sn-pills-wrap">
-                        <button type="button" class="sn-option-pill active" data-type="ram" data-val="8GB">8GB</button>
-                        <button type="button" class="sn-option-pill" data-type="ram" data-val="16GB">16GB</button>
+                <!-- Quantity Row (Exact match with reference design) -->
+                <div class="sn-mob-qty-row">
+                    <span class="sn-option-label-mob">Quantity</span>
+                    <div class="sn-mob-qty-stepper">
+                        <button type="button" class="sn-mob-stepper-btn" id="qtyMinus" aria-label="Decrease quantity">−</button>
+                        <input type="number" name="p_qty" id="snQtyInput" class="sn-mob-qty-val" value="1" min="1" max="<?php echo max(1, $p_qty); ?>" readonly>
+                        <button type="button" class="sn-mob-stepper-btn" id="qtyPlus" aria-label="Increase quantity">+</button>
                     </div>
                 </div>
 
-                <!-- Action Row: Quantity + Add to Cart + Wishlist -->
-                <div class="sn-action-row">
-                    <div class="sn-qty-picker">
-                        <button type="button" class="sn-qty-btn" id="qtyMinus">-</button>
-                        <input type="number" name="p_qty" id="snQtyInput" class="sn-qty-val" value="1" min="1" max="<?php echo max(1, $p_qty); ?>" readonly>
-                        <button type="button" class="sn-qty-btn" id="qtyPlus">+</button>
-                    </div>
-
-                    <button type="submit" name="form_add_to_cart" class="sn-btn-add-cart" id="btnAddToCart">
-                        <i class="fas fa-shopping-cart"></i> Add to Cart
+                <!-- Dual Action Buttons: Add to Cart (Yellow) + Buy Now (Cream) -->
+                <div class="sn-mob-dual-actions">
+                    <button type="submit" name="form_add_to_cart" class="sn-btn-mob-cart" id="btnAddToCart">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        <span>Add to Cart</span>
                     </button>
-
-                    <button type="button" class="sn-btn-wishlist-detail <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="btnWishlistToggle" data-product-id="<?php echo htmlspecialchars($p_id); ?>">
-                        <i class="<?php echo $is_product_in_wishlist ? 'fas' : 'far'; ?> fa-heart"></i>
-                        <span>Add to Wishlist</span>
+                    <button type="submit" name="form_buy_now" class="sn-btn-mob-buy" id="btnBuyNow">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                        <span>Buy Now</span>
                     </button>
                 </div>
             </form>
@@ -828,12 +912,25 @@ require_once('header.php');
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Gallery Thumbnail Switcher
     const thumbs = document.querySelectorAll('.sn-thumb-item');
+    const mobThumbs = document.querySelectorAll('.sn-mob-thumb');
     const mainImg = document.getElementById('snMainImg');
     const dots = document.querySelectorAll('.sn-gallery-dot');
+    const mobCounter = document.getElementById('snMobCounter');
+    let currentPhotoIdx = 0;
+    const totalPhotos = Math.max(thumbs.length, mobThumbs.length, 1);
 
     function setActiveImage(index, src) {
+        currentPhotoIdx = index;
         thumbs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.index) === index));
+        mobThumbs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.index) === index));
         dots.forEach(d => d.classList.toggle('active', parseInt(d.dataset.index) === index));
+        if (mobCounter) {
+            mobCounter.textContent = (index + 1) + '/' + totalPhotos;
+        }
+        const activeMobThumb = document.querySelector(`.sn-mob-thumb[data-index="${index}"]`);
+        if (activeMobThumb) {
+            activeMobThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
         if (mainImg) {
             mainImg.style.opacity = '0.4';
             mainImg.style.transform = 'scale(0.96)';
@@ -841,7 +938,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainImg.src = src;
                 mainImg.style.opacity = '1';
                 mainImg.style.transform = 'scale(1)';
-            }, 150);
+            }, 120);
         }
     }
 
@@ -853,17 +950,57 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    dots.forEach(dot => {
-        dot.addEventListener('click', function() {
+    mobThumbs.forEach(thumb => {
+        thumb.addEventListener('click', function() {
             const idx = parseInt(this.dataset.index);
-            const targetThumb = document.querySelector(`.sn-thumb-item[data-index="${idx}"]`);
-            if (targetThumb) {
-                setActiveImage(idx, targetThumb.dataset.src);
-            }
+            const src = this.dataset.src;
+            setActiveImage(idx, src);
         });
     });
 
-    // Thumb scroll buttons
+    document.getElementById('snMobPrev')?.addEventListener('click', () => {
+        const nextIdx = (currentPhotoIdx - 1 + totalPhotos) % totalPhotos;
+        const target = document.querySelector(`.sn-mob-thumb[data-index="${nextIdx}"]`) || document.querySelector(`.sn-thumb-item[data-index="${nextIdx}"]`);
+        if (target) setActiveImage(nextIdx, target.dataset.src);
+    });
+
+    document.getElementById('snMobNext')?.addEventListener('click', () => {
+        const nextIdx = (currentPhotoIdx + 1) % totalPhotos;
+        const target = document.querySelector(`.sn-mob-thumb[data-index="${nextIdx}"]`) || document.querySelector(`.sn-thumb-item[data-index="${nextIdx}"]`);
+        if (target) setActiveImage(nextIdx, target.dataset.src);
+    });
+
+    // Native Share / Copy link
+    document.getElementById('snShareBtn')?.addEventListener('click', function() {
+        if (navigator.share) {
+            navigator.share({
+                title: '<?php echo addslashes($p_name); ?>',
+                text: 'Check out <?php echo addslashes($p_name); ?> on ShopNext!',
+                url: window.location.href
+            }).catch(() => {});
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('Product link copied to clipboard!');
+            });
+        }
+    });
+
+    // Mobile Wishlist button sync
+    document.getElementById('snMobileWishlistBtn')?.addEventListener('click', function() {
+        const desktopWishlist = document.getElementById('btnWishlistToggle');
+        if (desktopWishlist) {
+            desktopWishlist.click();
+        }
+        const isAdding = !this.classList.contains('active');
+        this.classList.toggle('active', isAdding);
+        const svg = this.querySelector('svg');
+        if (svg) {
+            svg.setAttribute('fill', isAdding ? '#ef4444' : 'none');
+            svg.setAttribute('stroke', isAdding ? '#ef4444' : '#111827');
+        }
+    });
+
+    // Thumb scroll buttons (Desktop)
     const thumbList = document.getElementById('snThumbList');
     document.getElementById('snThumbUp')?.addEventListener('click', () => {
         thumbList?.scrollBy({ top: -70, behavior: 'smooth' });
@@ -908,8 +1045,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('.sn-tabs-container')?.scrollIntoView({ behavior: 'smooth' });
     });
 
-    // 3. Option Selection (Color, Storage, RAM)
-    const swatches = document.querySelectorAll('.sn-color-swatch');
+    // 3. Option Selection (Color Swatches)
+    const swatches = document.querySelectorAll('.sn-color-swatch, .sn-color-swatch-mob');
     const colorText = document.getElementById('selectedColorName');
     const hiddenColorId = document.getElementById('hiddenColorId');
     const hiddenColorName = document.getElementById('hiddenColorName');
@@ -920,32 +1057,26 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             const name = this.dataset.colorName;
             const id = this.dataset.colorId;
-            if (colorText) colorText.textContent = name;
+            if (colorText) colorText.innerHTML = `${name} <i class="fas fa-chevron-right" style="font-size: 10px;"></i>`;
             if (hiddenColorId) hiddenColorId.value = id;
             if (hiddenColorName) hiddenColorName.value = name;
         });
     });
 
-    const pills = document.querySelectorAll('.sn-option-pill');
-    const storageText = document.getElementById('selectedStorageName');
-    const ramText = document.getElementById('selectedRamName');
-    const hiddenSizeName = document.getElementById('hiddenSizeName');
-
-    pills.forEach(pill => {
-        pill.addEventListener('click', function() {
-            const type = this.dataset.type;
-            const val = this.dataset.val;
-            
-            document.querySelectorAll(`.sn-option-pill[data-type="${type}"]`).forEach(p => p.classList.remove('active'));
-            this.classList.add('active');
-
-            if (type === 'storage') {
-                if (storageText) storageText.textContent = val;
-                if (hiddenSizeName) hiddenSizeName.value = val;
-            } else if (type === 'ram') {
-                if (ramText) ramText.textContent = val;
-            }
-        });
+    // Buy Now Handler
+    document.getElementById('btnBuyNow')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = document.getElementById('snAddToCartForm');
+        let buyInput = document.getElementById('hiddenBuyNow');
+        if (!buyInput) {
+            buyInput = document.createElement('input');
+            buyInput.type = 'hidden';
+            buyInput.name = 'form_buy_now';
+            buyInput.id = 'hiddenBuyNow';
+            buyInput.value = '1';
+            form.appendChild(buyInput);
+        }
+        form.submit();
     });
 
     // 4. Quantity Controls
@@ -1016,12 +1147,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 addCartBtn.style.background = '#10b981';
                 addCartBtn.style.color = '#ffffff';
 
-                // Update header cart badge
+                // Update header cart badge and dock cart badge
                 const cartBadge = document.getElementById('sn-cart-badge-count');
                 if (cartBadge) {
                     cartBadge.textContent = data.cart_count;
                     cartBadge.style.transform = 'scale(1.3)';
                     setTimeout(() => cartBadge.style.transform = 'scale(1)', 250);
+                }
+                const dockCartBadge = document.getElementById('sn-dock-cart-count');
+                if (dockCartBadge) {
+                    dockCartBadge.textContent = data.cart_count;
+                    dockCartBadge.style.transform = 'scale(1.3)';
+                    setTimeout(() => dockCartBadge.style.transform = 'scale(1)', 250);
                 }
 
                 // Show toast alert

@@ -977,7 +977,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <!-- jQuery Library -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
-<body class="shopnext-theme">
+<body class="shopnext-theme <?php echo ($cur_page == 'product.php') ? 'sn-product-page' : ''; ?>">
 <?php echo $after_body; ?>
 
 <header class="sn-header-wrap">
@@ -1015,12 +1015,12 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             <!-- Actions: Bell (Mobile) + Account (Desktop) + Cart -->
             <div class="sn-header-actions">
                 <!-- Notifications Bell -->
-                <a href="javascript:void(0)" class="sn-bell-btn" title="Notifications" onclick="alert('You have 5 active exclusive deals and flash discounts!')">
+                <a href="javascript:void(0)" class="sn-bell-btn" title="Notifications" onclick="alert('You have 3 active exclusive deals and flash discounts!')">
                     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                     </svg>
-                    <span class="sn-bell-badge">5</span>
+                    <span class="sn-bell-badge">3</span>
                 </a>
 
                 <?php if (isset($_SESSION['customer'])): ?>
@@ -1200,10 +1200,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
          MODERN SHOPNEXT MOBILE BOTTOM NAVIGATION DOCK (PIXEL-PERFECT)
          ============================================================ -->
     <div class="mobile-bottom-nav sn-mobile-bottom-nav">
-        <!-- 1. Home (Active on homepage) -->
-        <a href="<?php echo BASE_URL; ?>" class="sn-dock-item <?php echo ($cur_page == 'index.php' || $cur_page == '') ? 'active' : ''; ?>">
+        <!-- 1. Home (Active on homepage & product detail) -->
+        <a href="<?php echo BASE_URL; ?>" class="sn-dock-item <?php echo ($cur_page == 'index.php' || $cur_page == '' || $cur_page == 'product.php') ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'index.php' || $cur_page == '') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'index.php' || $cur_page == '' || $cur_page == 'product.php') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                 </svg>
@@ -1211,34 +1211,39 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             <span>Home</span>
         </a>
 
-        <!-- 2. Deals -->
-        <a href="<?php echo BASE_URL; ?>deals.php" class="sn-dock-item <?php echo ($cur_page == 'deals.php' || (strpos($cur_page, 'product-category.php') !== false && !empty($_GET['id']) && $_GET['id'] == 1)) ? 'active' : ''; ?>">
+        <!-- 2. Categories -->
+        <a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category" class="sn-dock-item <?php echo (strpos($cur_page, 'category') !== false) ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM7 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3.2 6.8l3.6-3.6m-2.8.2h.01m2 3.2h.01"/>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
                 </svg>
             </div>
-            <span>Deals</span>
+            <span>Categories</span>
         </a>
 
-        <!-- 3. Center Elevated AI Assistant -->
-        <a href="<?php echo BASE_URL; ?>ai-assistant.php" class="sn-dock-item sn-dock-ai-item <?php echo ($cur_page == 'ai-assistant.php') ? 'active' : ''; ?>" aria-label="Open AI Shopping Assistant">
-            <div class="sn-dock-ai-box">
-                <span class="sn-dock-ai-text">Ai<span class="sn-dock-ai-sparkle">✦</span></span>
-                <span class="sn-dock-ai-badge">S</span>
+        <!-- 3. Messages / AI Support -->
+        <a href="javascript:void(0)" onclick="typeof openShopAiModal === 'function' ? openShopAiModal() : (document.getElementById('openAiAssistantBtn') ? document.getElementById('openAiAssistantBtn').click() : alert('Support and messages'));" class="sn-dock-item">
+            <div class="sn-dock-icon-box sn-dock-has-badge">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="sn-dock-badge-count">5</span>
             </div>
-            <span>AI Assistant</span>
+            <span>Messages</span>
         </a>
 
         <!-- 4. Cart -->
         <a href="<?php echo BASE_URL; ?>cart.php" class="sn-dock-item <?php echo ($cur_page == 'cart.php') ? 'active' : ''; ?>">
-            <div class="sn-dock-icon-box">
+            <div class="sn-dock-icon-box sn-dock-has-badge">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="9" cy="21" r="1"></circle>
                     <circle cx="20" cy="21" r="1"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
-                <span class="sn-dock-cart-badge"><?php 
+                <span class="sn-dock-badge-count" id="sn-dock-cart-count"><?php 
                     $cart_item_count = 0;
                     if (!empty($_SESSION['cart_p_qty'])) {
                         foreach ($_SESSION['cart_p_qty'] as $q) { $cart_item_count += (int)$q; }
