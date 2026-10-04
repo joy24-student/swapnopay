@@ -118,11 +118,6 @@ foreach ($result as $row) {
 			          </a>
 			        </li>
 
-			        <li class="treeview <?php if( ($cur_page == 'homepage-banners.php') ) {echo 'active';} ?>">
-			          <a href="homepage-banners.php">
-			            <i class="fa fa-sliders"></i> <span>Homepage Customizer & Hero Slider</span>
-			          </a>
-			        </li>
 
                     <li class="treeview <?php if( ($cur_page == 'size.php') || ($cur_page == 'size-add.php') || ($cur_page == 'size-edit.php') || ($cur_page == 'color.php') || ($cur_page == 'color-add.php') || ($cur_page == 'color-edit.php') || ($cur_page == 'country.php') || ($cur_page == 'country-add.php') || ($cur_page == 'country-edit.php') || ($cur_page == 'shipping-cost.php') || ($cur_page == 'shipping-cost-edit.php') || ($cur_page == 'top-category.php') || ($cur_page == 'top-category-add.php') || ($cur_page == 'top-category-edit.php') || ($cur_page == 'mid-category.php') || ($cur_page == 'mid-category-add.php') || ($cur_page == 'mid-category-edit.php') || ($cur_page == 'end-category.php') || ($cur_page == 'end-category-add.php') || ($cur_page == 'end-category-edit.php') ) {echo 'active';} ?>">
                         <a href="#">
@@ -191,34 +186,6 @@ foreach ($result as $row) {
 			        </li>
 			        
 			        
-			        <!-- আপনার বর্তমান অ্যাডমিন নেভিগেশনের মধ্যে এই কোডটি যোগ করুন -->
-<li class="treeview">
-    <a href="#">
-        <i class="fa fa-store"></i> <span>ব্যবসা/স্টোর ম্যানেজমেন্ট</span>
-        <span class="pull-right-container">
-            <i class="fa fa-angle-left pull-right"></i>
-        </span>
-    </a>
-    <ul class="treeview-menu">
-        <li><a href="admin_businesses.php"><i class="fa fa-circle-o"></i> সকল ব্যবসা/স্টোর দেখুন</a></li>
-        <li><a href="admin_business_add.php"><i class="fa fa-circle-o"></i> নতুন ব্যবসা/স্টোর যোগ করুন</a></li>
-        <!-- যদি প্রয়োজন হয়: স্টোর পণ্যের জন্য আলাদা ম্যানেজমেন্ট -->
-        <!-- <li><a href="admin_business_products.php"><i class="fa fa-circle-o"></i> স্টোরের পণ্য ম্যানেজ করুন</a></li> -->
-    </ul>
-</li>
-			     <li class="treeview">
-    <a href="#">
-        <i class="fa fa-money"></i> <span>কয়েন ম্যানেজমেন্ট</span>
-        <span class="pull-right-container">
-            <i class="fa fa-angle-left pull-right"></i>
-        </span>
-    </a>
-    <ul class="treeview-menu">
-        <li><a href="admin_manage_coins.php"><i class="fa fa-circle-o"></i> ব্যবহারকারী কয়েন দেখুন</a></li>
-        <li><a href="admin_add_coins.php"><i class="fa fa-circle-o"></i> কয়েন যোগ/বাতিল করুন</a></li>
-        <li><a href="admin_coin_transactions.php"><i class="fa fa-circle-o"></i> লেনদেনের ইতিহাস দেখুন</a></li>
-    </ul>
-</li>
 <!-- Inside your existing admin navigation structure -->
 <li class="treeview">
     <a href="#">
@@ -232,22 +199,6 @@ foreach ($result as $row) {
         <li><a href="admin_voucher_add.php"><i class="fa fa-circle-o"></i> Add New Voucher</a></li>
     </ul>
 </li>
-<!-- আপনার বর্তমান অ্যাডমিন নেভিগেশনের মধ্যে এই কোডটি যোগ করুন -->
-<li class="treeview">
-    <a href="#">
-        <i class="fa fa-user-md"></i> <span>প্রফেশনাল ম্যানেজমেন্ট</span>
-        <span class="pull-right-container">
-            <i class="fa fa-angle-left pull-right"></i>
-        </span>
-    </a>
-    <ul class="treeview-menu">
-        <li><a href="admin_professional_categories.php"><i class="fa fa-circle-o"></i> ক্যাটাগরি ম্যানেজ করুন</a></li>
-        <li><a href="admin_professionals.php"><i class="fa fa-circle-o"></i> সকল প্রফেশনাল দেখুন</a></li>
-        <li><a href="admin_professional_reviews.php"><i class="fa fa-circle-o"></i> প্রফেশনাল রিভিউ দেখুন</a></li>
-    </ul>
-</li>
-
-<!-- You'd add similar sections for Professionals, Restaurants, Drivers etc. -->
 			        <li class="treeview <?php if( ($cur_page == 'page.php') ) {echo 'active';} ?>">
 			          <a href="page.php">
 			            <i class="fa fa-tasks"></i> <span>Page Settings</span>
