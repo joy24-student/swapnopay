@@ -161,11 +161,6 @@ foreach ($result as $row) {
                     </li>
 
 
-                     <li class="treeview <?php if( ($cur_page == 'slider.php') || ($cur_page == 'homepage-banners.php') ) {echo 'active';} ?>">
-			          <a href="homepage-banners.php">
-			            <i class="fa fa-picture-o"></i> <span>Manage Sliders & Banners</span>
-			          </a>
-			        </li>
                     <!-- Icons to be displayed on Shop -->
 			        <li class="treeview <?php if( ($cur_page == 'service.php') ) {echo 'active';} ?>">
 			          <a href="service.php">

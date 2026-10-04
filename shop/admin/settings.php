@@ -1644,7 +1644,7 @@ $lang_sections = [
                         <li><a href="#tab_api_integrations" data-toggle="tab">API Integrations</a></li>
                         <li><a href="#tab_review_delivery" data-toggle="tab">Review & Delivery</a></li>
                         <li><a href="#tab_sms" data-toggle="tab">SMS</a></li>
-                        <li><a href="#tab_banners" data-toggle="tab">Banners</a></li>
+                        <li><a href="#tab_banners" data-toggle="tab"><i class="fa fa-picture-o"></i> Sliders & Banners</a></li>
                         <li><a href="#tab_social_media" data-toggle="tab">Social Media</a></li>
                         <li><a href="#tab_email" data-toggle="tab">Email</a></li>
                         <li><a href="#tab_footer" data-toggle="tab">Footer</a></li>
@@ -2682,6 +2682,16 @@ $lang_sections = [
                         <div class="tab-pane" id="tab_banners">
                             <div class="box box-info">
                                 <div class="box-body">
+                                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:16px 20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                                        <div>
+                                            <h4 style="margin:0 0 4px 0; color:#0369a1; font-weight:700; font-size:16px;"><i class="fa fa-picture-o"></i> Homepage Sliders & Hero Banners</h4>
+                                            <p style="margin:0; font-size:13px; color:#0284c7;">Manage your homepage carousel slides, hero banners, and promotional tiles.</p>
+                                        </div>
+                                        <a href="homepage-banners.php" class="btn btn-primary" style="font-weight:600; border-radius:6px; box-shadow:0 2px 8px rgba(3,105,161,0.25);">
+                                            <i class="fa fa-pencil-square-o"></i> Customize Homepage Sliders & Banners <i class="fa fa-arrow-right"></i>
+                                        </a>
+                                    </div>
+
                                     <h3 class="seo-info">Page Banners</h3>
                                     <?php
                                     $banner_fields_map = [
