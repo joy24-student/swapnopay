@@ -203,30 +203,7 @@ try {
         min-height: 100vh !important;
     }
 
-    /* Mobile Bottom Dock Active Pill (Matching Mockup) */
-    .mobile-bottom-nav .sn-dock-item:last-child.active {
-        background: #fff8d6 !important;
-        border-radius: 999px !important;
-        padding: 6px 16px !important;
-        color: #d97706 !important;
-        font-weight: 800 !important;
-        display: inline-flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        gap: 6px !important;
-    }
 
-    .mobile-bottom-nav .sn-dock-item:last-child.active svg {
-        color: #d97706 !important;
-        stroke: #d97706 !important;
-    }
-
-    .mobile-bottom-nav .sn-dock-item:last-child.active span {
-        color: #d97706 !important;
-        font-weight: 800 !important;
-        font-size: 12.5px !important;
-    }
-}
 
 /* ──────────────────────────────────────────────────────────────────────────
    MOBILE ACCOUNT SCREEN STYLES (MATCHING media_1790400596699.png)

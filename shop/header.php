@@ -689,67 +689,144 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             margin-left: 250px;
         }
 
-        /* Mobile Bottom Navigation Bar */
-        .mobile-bottom-nav {
+        /* ============================================================
+           PIXEL-PERFECT MOBILE BOTTOM NAVIGATION DOCK (CART-CONSISTENT)
+           ============================================================ */
+        .mobile-bottom-nav,
+        .sn-mobile-bottom-nav {
             display: none;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: #fff;
-            border-top: 1px solid #eee;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            z-index: 100;
-            justify-content: space-around;
-            align-items: center;
-            padding: 8px 0;
-            box-sizing: border-box;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            height: 56px !important;
+            min-height: 56px !important;
+            max-height: 56px !important;
+            background: #ffffff !important;
+            border-top: 1px solid #f1f5f9 !important;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+            z-index: 1000 !important;
+            align-items: center !important;
+            justify-content: space-around !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            transition: none !important;
         }
 
+        .mobile-bottom-nav .sn-dock-item,
+        .sn-mobile-bottom-nav .sn-dock-item,
         .mobile-bottom-nav .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-decoration: none;
-            color: #7f8c8d;
-            font-size: 0.8em;
-            font-weight: 500;
-            transition: color 0.2s ease;
-            position: relative;
-            padding: 5px 0;
-            flex: 1;
+            flex: 1 1 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 56px !important;
+            max-height: 56px !important;
+            padding: 4px 2px !important;
+            margin: 0 !important;
+            text-decoration: none !important;
+            color: #64748b !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            position: relative !important;
+            cursor: pointer !important;
+            box-sizing: border-box !important;
+            -webkit-tap-highlight-color: transparent !important;
+            transition: color 0.15s ease !important;
         }
 
-        .mobile-bottom-nav .nav-item i {
-            font-size: 1.4em;
-            margin-bottom: 3px;
-            transition: color 0.2s ease;
+        .mobile-bottom-nav .sn-dock-item:hover,
+        .mobile-bottom-nav .sn-dock-item:focus,
+        .mobile-bottom-nav .sn-dock-item:active,
+        .sn-mobile-bottom-nav .sn-dock-item:hover,
+        .sn-mobile-bottom-nav .sn-dock-item:focus,
+        .sn-mobile-bottom-nav .sn-dock-item:active {
+            text-decoration: none !important;
+            outline: none !important;
         }
 
-        .mobile-bottom-nav .nav-item:hover {
-            color: #007bff;
-        }
-
+        .mobile-bottom-nav .sn-dock-item.active,
+        .sn-mobile-bottom-nav .sn-dock-item.active,
         .mobile-bottom-nav .nav-item.active {
-            color: #007bff;
+            color: #0f172a !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+            padding: 4px 2px !important;
+            flex-direction: column !important;
+            gap: 0 !important;
         }
 
-        .mobile-bottom-nav .nav-item.active i {
-            color: #007bff;
+        .mobile-bottom-nav .sn-dock-icon-box,
+        .sn-mobile-bottom-nav .sn-dock-icon-box {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: relative !important;
+            height: 22px !important;
+            line-height: 1 !important;
+            margin: 0 0 2px 0 !important;
+            background: transparent !important;
         }
 
-        .mobile-bottom-nav .cart-count-bottom {
-            background-color: #e74c3c;
-            color: white;
-            border-radius: 50%;
-            padding: 2px 6px;
-            font-size: 0.7em;
-            position: absolute;
-            top: 0px;
-            right: 15px;
-            min-width: 18px;
-            text-align: center;
-            transform: translateX(50%);
+        .mobile-bottom-nav .sn-dock-icon-box svg,
+        .sn-mobile-bottom-nav .sn-dock-icon-box svg {
+            width: 20px !important;
+            height: 20px !important;
+            display: block !important;
+            flex-shrink: 0 !important;
+            stroke: #64748b !important;
+            stroke-width: 2px !important;
+            transition: stroke 0.15s ease, fill 0.15s ease !important;
+        }
+
+        .mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box svg,
+        .sn-mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box svg {
+            stroke: #0f172a !important;
+        }
+
+        .mobile-bottom-nav .sn-dock-item.active svg[fill="currentColor"],
+        .sn-mobile-bottom-nav .sn-dock-item.active svg[fill="currentColor"] {
+            fill: #0f172a !important;
+        }
+
+        .mobile-bottom-nav .sn-dock-badge-count,
+        .sn-mobile-bottom-nav .sn-dock-badge-count {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #0f172a !important;
+            margin-left: 3px !important;
+            line-height: 1 !important;
+            display: inline-block !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+
+        .mobile-bottom-nav .sn-dock-item > span:not(.sn-dock-badge-count),
+        .sn-mobile-bottom-nav .sn-dock-item > span:not(.sn-dock-badge-count),
+        .mobile-bottom-nav .nav-item span {
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            line-height: 1.15 !important;
+            letter-spacing: -0.2px !important;
+            color: #64748b !important;
+            text-align: center !important;
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            transition: color 0.15s ease !important;
+        }
+
+        .mobile-bottom-nav .sn-dock-item.active > span:not(.sn-dock-badge-count),
+        .sn-mobile-bottom-nav .sn-dock-item.active > span:not(.sn-dock-badge-count),
+        .mobile-bottom-nav .nav-item.active span {
+            color: #0f172a !important;
+            font-weight: 700 !important;
         }
 
 
@@ -778,8 +855,9 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 box-shadow: 3px 0 15px rgba(0,0,0,0.3);
             }
 
-            .mobile-bottom-nav {
-                display: flex;
+            .mobile-bottom-nav,
+            .sn-mobile-bottom-nav {
+                display: flex !important;
             }
 
             body {
@@ -796,6 +874,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 display: flex;
             }
             .mobile-header-content, .mobile-search-bar-expanded {
+                display: none !important;
+            }
+            .mobile-bottom-nav,
+            .sn-mobile-bottom-nav {
                 display: none !important;
             }
             .desktop-sidebar {
@@ -838,6 +920,28 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             padding-top: 0 !important;
         }
 
+        /* Smooth Search Input Hide / Show on Scroll */
+        .sn-search-form {
+            transition: max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                        opacity 0.25s ease,
+                        transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                        margin 0.28s ease,
+                        padding 0.28s ease;
+            transform-origin: top center;
+        }
+
+        .sn-search-form.sn-search-hidden {
+            max-height: 0 !important;
+            opacity: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            transform: translateY(-10px) scaleY(0.85) !important;
+            pointer-events: none !important;
+            overflow: hidden !important;
+        }
+
         @media (max-width: 768px) {
             .sn-header-wrap {
                 position: fixed !important;
@@ -849,10 +953,15 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 border-bottom: 1px solid #f1f5f9 !important;
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
                 z-index: 1000 !important;
+                transition: box-shadow 0.25s ease;
             }
             body.shopnext-theme .content-wrapper-main {
                 padding-top: 96px !important;
                 padding-bottom: 72px !important;
+                transition: padding-top 0.3s ease;
+            }
+            body.shopnext-theme.sn-search-scrolled .content-wrapper-main {
+                padding-top: 56px !important;
             }
         }
 
@@ -1082,8 +1191,55 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             <a href="<?php echo BASE_URL; ?>product-category.php?id=3&type=top-category" class="sn-nav-link">Brands</a>
             <a href="<?php echo BASE_URL; ?>contact.php" class="sn-nav-link <?php echo ($cur_page == 'contact.php') ? 'active' : ''; ?>">Contact</a>
         </nav>
-    </div>
 </header>
+
+<script>
+(function() {
+    let lastScrollY = window.pageYOffset || document.documentElement.scrollTop;
+    let isTicking = false;
+    const scrollDelta = 6;
+
+    function handleScrollSearch() {
+        const currentScrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const searchForm = document.getElementById('sn-search-form');
+        const searchInput = document.getElementById('sn-search-input');
+        const body = document.body;
+
+        if (!searchForm) return;
+
+        // Keep search open if user is currently typing or input has focus
+        if (searchInput && (document.activeElement === searchInput || searchForm.contains(document.activeElement))) {
+            lastScrollY = currentScrollY;
+            isTicking = false;
+            return;
+        }
+
+        // At top of screen (<= 25px) -> always show search input
+        if (currentScrollY <= 25) {
+            searchForm.classList.remove('sn-search-hidden');
+            body.classList.remove('sn-search-scrolled');
+        } else if (currentScrollY > lastScrollY + scrollDelta && currentScrollY > 60) {
+            // Scroll down -> hide search input field
+            searchForm.classList.add('sn-search-hidden');
+            body.classList.add('sn-search-scrolled');
+        } else if (currentScrollY < lastScrollY - scrollDelta) {
+            // Scroll up -> show search input field
+            searchForm.classList.remove('sn-search-hidden');
+            body.classList.remove('sn-search-scrolled');
+        }
+
+        lastScrollY = Math.max(0, currentScrollY);
+        isTicking = false;
+    }
+
+    window.addEventListener('scroll', function() {
+        if (!isTicking) {
+            window.requestAnimationFrame(handleScrollSearch);
+            isTicking = true;
+        }
+    }, { passive: true });
+})();
+</script>
 
 <div class="desktop-sidebar">
     <div class="sidebar-header">

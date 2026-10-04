@@ -960,29 +960,6 @@
         display: none !important;
     }
 
-    /* Mobile Bottom Dock Active Pill (Matching Mockup) */
-    .mobile-bottom-nav .sn-dock-item.active {
-        background: #fab802 !important;
-        border-radius: 999px !important;
-        padding: 5px 14px !important;
-        color: #0f172a !important;
-        font-weight: 800 !important;
-        display: inline-flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        gap: 6px !important;
-    }
-    .mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box {
-        margin: 0 !important;
-    }
-    .mobile-bottom-nav .sn-dock-item.active svg {
-        color: #0f172a !important;
-        fill: #0f172a !important;
-    }
-    .mobile-bottom-nav .sn-dock-item.active span {
-        color: #0f172a !important;
-        font-weight: 800 !important;
-        font-size: 12px !important;
-    }
 }
+
 
