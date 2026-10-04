@@ -912,6 +912,15 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                     margin-top: 0 !important;
                     padding-top: 0 !important;
                 }
+                .sn-nav-bar {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 28px !important;
+                    width: 100% !important;
+                    margin: 0 auto !important;
+                    padding-bottom: 4px !important;
+                }
         }
 
         body.shopnext-theme,

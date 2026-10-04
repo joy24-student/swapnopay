@@ -291,12 +291,15 @@ body.shopnext-theme {
     border: 1.5px solid #ffffff;
 }
 
-/* Secondary Navigation Bar */
+/* Secondary Navigation Bar (Centered on Desktop) */
 .sn-nav-bar {
     display: flex;
     align-items: center;
-    gap: 24px;
-    padding-bottom: 2px;
+    justify-content: center;
+    gap: 28px;
+    padding-bottom: 4px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 .sn-nav-link {
