@@ -2652,9 +2652,6 @@ $lang_sections = [
                                         'banner_team' => 'Team Page Banner',
                                     ];
 
-                                    foreach ($banner_fields_map as $field_name => $label): ?>
-                                        <div class="form-group">
-                                            <label for="<?php echo $field_name; ?>" class="col-sm-3 control-label">Existing <?php echo $label; ?></label>
                                     foreach ($banner_fields_map as $field_name => $label): 
                                         $current_banner = $settings_data[$field_name] ?? '';
                                         $banner_src = '';
