@@ -144,10 +144,70 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
     <style>
         /* General Reset & Body */
-        * {
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            outline: none !important;
+        }
+
+        *:focus,
+        *:focus-visible,
+        *:focus-within,
+        *:hover,
+        *:active {
+            outline: none !important;
+            outline-color: transparent !important;
+            outline-width: 0 !important;
+            outline-style: none !important;
+        }
+
+        a,
+        a:hover,
+        a:focus,
+        a:active,
+        a:focus-visible,
+        button,
+        button:hover,
+        button:focus,
+        button:active,
+        button:focus-visible {
+            outline: none !important;
+            outline-style: none !important;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sn-nav-link,
+        .sn-nav-link:hover,
+        .sn-nav-link:focus,
+        .sn-nav-link:active,
+        .sn-nav-link:focus-visible {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .sn-flash-card,
+        .sn-flash-card:hover,
+        .sn-flash-card:focus,
+        .sn-flash-card:active,
+        .sn-flash-card:focus-visible,
+        .sn-product-card,
+        .sn-product-card:hover,
+        .sn-product-card:focus,
+        .sn-product-card:active,
+        .sn-product-card:focus-visible,
+        .sn-shira-card,
+        .sn-shira-card:hover,
+        .sn-shira-card:focus,
+        .sn-shira-card:active,
+        .sn-shira-card:focus-visible,
+        .sn-category-scroll-item,
+        .sn-category-scroll-item:hover,
+        .sn-category-scroll-item:focus,
+        .sn-category-scroll-item:active,
+        .sn-category-scroll-item:focus-visible {
+            outline: none !important;
         }
 
         body {

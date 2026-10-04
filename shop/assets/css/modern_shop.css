@@ -39,8 +39,34 @@ body.shopnext-theme {
     -moz-osx-font-smoothing: grayscale;
 }
 
-.shopnext-theme * {
+.shopnext-theme *,
+.shopnext-theme *::before,
+.shopnext-theme *::after {
     box-sizing: border-box;
+    outline: none !important;
+}
+
+.shopnext-theme *:focus,
+.shopnext-theme *:focus-visible,
+.shopnext-theme *:hover,
+.shopnext-theme *:active {
+    outline: none !important;
+    outline-width: 0 !important;
+    outline-style: none !important;
+}
+
+.shopnext-theme a,
+.shopnext-theme a:hover,
+.shopnext-theme a:focus,
+.shopnext-theme a:active,
+.shopnext-theme a:focus-visible,
+.shopnext-theme button,
+.shopnext-theme button:hover,
+.shopnext-theme button:focus,
+.shopnext-theme button:active,
+.shopnext-theme button:focus-visible {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .sn-container {
@@ -284,11 +310,20 @@ body.shopnext-theme {
     gap: 4px;
     position: relative;
     transition: color 0.2s ease;
+    outline: none !important;
+    border: none !important;
 }
 
-.sn-nav-link:hover, .sn-nav-link.active {
+.sn-nav-link:hover,
+.sn-nav-link.active,
+.sn-nav-link:focus,
+.sn-nav-link:focus-visible,
+.sn-nav-link:active {
     color: var(--sn-dark);
     font-weight: 700;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .sn-nav-link.active::after {
@@ -550,8 +585,9 @@ body.shopnext-theme {
 
 .sn-category-card:hover {
     transform: translateY(-4px);
-    border-color: var(--sn-border);
+    border-color: var(--sn-border-light);
     box-shadow: var(--sn-shadow-md);
+    outline: none !important;
 }
 
 .sn-category-img-box {
@@ -603,12 +639,14 @@ body.shopnext-theme {
     text-decoration: none;
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: var(--sn-shadow-sm);
+    outline: none !important;
 }
 
 .sn-product-card:hover {
     transform: translateY(-5px);
-    border-color: var(--sn-border);
+    border-color: var(--sn-border-light);
     box-shadow: var(--sn-shadow-lg);
+    outline: none !important;
 }
 
 /* Card Badges */

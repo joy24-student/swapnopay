@@ -151,6 +151,45 @@ $currencySymbol = '৳ ';
     --sn-border: #f1f5f9;
 }
 
+*, *::before, *::after {
+    outline: none !important;
+}
+
+*:focus,
+*:focus-visible,
+*:hover,
+*:active {
+    outline: none !important;
+    outline-color: transparent !important;
+    outline-width: 0 !important;
+    outline-style: none !important;
+}
+
+a,
+a:hover,
+a:focus,
+a:active,
+a:focus-visible,
+button,
+button:hover,
+button:focus,
+button:active,
+button:focus-visible {
+    outline: none !important;
+    outline-style: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sn-nav-link,
+.sn-nav-link:hover,
+.sn-nav-link:focus,
+.sn-nav-link:active,
+.sn-nav-link:focus-visible {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
 body {
     background-color: var(--sn-bg-page);
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -448,9 +487,11 @@ body {
 }
 
 .sn-slider-arrow:hover {
-    background: var(--sn-dark);
-    color: #ffffff;
-    border-color: var(--sn-dark);
+    background: #ffffff;
+    color: var(--sn-primary);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    outline: none !important;
 }
 
 .sn-slider-prev { left: 12px; }
@@ -701,8 +742,9 @@ body {
 
 .sn-flash-card:hover {
     transform: translateY(-3px);
-    border-color: #e2e8f0;
+    border-color: #f1f5f9;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    outline: none !important;
 }
 
 .sn-flash-card-top {
@@ -829,8 +871,9 @@ body {
 
 .sn-shira-card:hover {
     transform: translateY(-3px);
-    border-color: #e2e8f0;
+    border-color: #f1f5f9;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    outline: none !important;
 }
 
 .sn-shira-img-box {
@@ -904,7 +947,8 @@ body {
 .sn-product-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    border-color: #e2e8f0;
+    border-color: #f1f5f9;
+    outline: none !important;
 }
 
 .sn-badge {
