@@ -8,21 +8,39 @@
 
 // ── 1. Category Resolution ────────────────────────────────────────────────
 $category_type = (string)($_REQUEST['type'] ?? 'top-category');
-$category_id   = isset($_REQUEST['slug'])
+
+if (!isset($_REQUEST['slug']) && !isset($_REQUEST['id'])) {
+    $uriPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+    if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?category/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)/?$#', $uriPath, $m)) {
+        $_REQUEST['slug'] = $m[3];
+        $category_type = 'end-category';
+    } elseif (preg_match('#/(?:[a-zA-Z0-9_-]+/)?category/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)/?$#', $uriPath, $m)) {
+        $_REQUEST['slug'] = $m[2];
+        $category_type = 'mid-category';
+    } elseif (preg_match('#/(?:[a-zA-Z0-9_-]+/)?category/([a-zA-Z0-9_-]+)/?$#', $uriPath, $m)) {
+        $_REQUEST['slug'] = $m[1];
+        $category_type = 'top-category';
+    }
+}
+
+$category_id = isset($_REQUEST['slug'])
     ? extractIdFromSlug((string)$_REQUEST['slug'])
     : (int)($_REQUEST['id'] ?? 0);
 
-// If no category ID provided, default to Laptops & Computers (or first active top category)
+if (!$category_id && !empty($_REQUEST['slug']) && is_numeric($_REQUEST['slug'])) {
+    $category_id = (int)$_REQUEST['slug'];
+}
+
+// If no category ID provided, default to first active top category in database
 if (!$category_id) {
     try {
-        $sCat = $pdo->query("SELECT tcat_id FROM tbl_top_category WHERE tcat_name LIKE '%Laptop%' OR tcat_id IN (7, 4) ORDER BY tcat_order ASC LIMIT 1");
+        $sCat = $pdo->query("SELECT tcat_id FROM tbl_top_category ORDER BY tcat_order ASC, tcat_id ASC LIMIT 1");
         $foundId = $sCat->fetchColumn();
-        $category_id = $foundId ? (int)$foundId : 7;
-        $category_type = 'top-category';
-    } catch (Throwable $e) {
-        $category_id = 7;
-        $category_type = 'top-category';
-    }
+        if ($foundId) {
+            $category_id = (int)$foundId;
+            $category_type = 'top-category';
+        }
+    } catch (Throwable $e) {}
 }
 
 $types = [

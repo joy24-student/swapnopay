@@ -52,18 +52,31 @@ function extractIdFromSlug($slug) {
 function getProductIdBySlug($slug, $pdo) {
     $id = extractIdFromSlug($slug);
     
-    if (!$id) {
-        return false;
+    if ($id) {
+        $statement = $pdo->prepare("SELECT p_id FROM tbl_product WHERE p_id=? AND p_is_active=1");
+        $statement->execute(array($id));
+        if ($statement->rowCount() > 0) {
+            return $id;
+        }
     }
     
-    // Verify product exists with this ID
-    $statement = $pdo->prepare("SELECT p_id FROM tbl_product WHERE p_id=? AND p_is_active=1");
-    $statement->execute(array($id));
-    
-    if ($statement->rowCount() > 0) {
-        return $id;
+    // Check if the slug itself is numeric
+    if (is_numeric($slug)) {
+        $statement = $pdo->prepare("SELECT p_id FROM tbl_product WHERE p_id=? AND p_is_active=1");
+        $statement->execute([(int)$slug]);
+        if ($statement->rowCount() > 0) {
+            return (int)$slug;
+        }
     }
-    
+
+    // Fallback: check slug column or name
+    try {
+        $stmt = $pdo->prepare("SELECT p_id FROM tbl_product WHERE slug=? AND p_is_active=1 LIMIT 1");
+        $stmt->execute([$slug]);
+        $found = $stmt->fetchColumn();
+        if ($found) return (int)$found;
+    } catch (Throwable $e) {}
+
     return false;
 }
 

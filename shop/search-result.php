@@ -1,14 +1,20 @@
 <?php require_once('header.php'); ?>
 
 <?php
-if(!isset($_REQUEST['search_text'])) {
-    header('Location: index.php');
+if (!isset($_REQUEST['search_text']) || $_REQUEST['search_text'] === '') {
+    if (isset($_REQUEST['q']) && $_REQUEST['q'] !== '') {
+        $_REQUEST['search_text'] = $_REQUEST['q'];
+    } else {
+        $uriPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+        if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?search/([^/]+)/?$#', $uriPath, $m)) {
+            $_REQUEST['search_text'] = urldecode($m[1]);
+        }
+    }
+}
+
+if (!isset($_REQUEST['search_text']) || trim($_REQUEST['search_text']) === '') {
+    header('Location: ' . (defined('BASE_URL') ? BASE_URL : 'index.php'));
     exit;
-} else {
-	if($_REQUEST['search_text']=='') {
-		header('Location: index.php');
-	   	exit;
-	}
 }
 ?>
 

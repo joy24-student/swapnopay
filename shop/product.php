@@ -18,6 +18,14 @@ $success_message = '';
 // Handle both old-style (?id=) and new SEO-friendly URLs
 $p_id = null;
 
+if (!isset($_REQUEST['slug']) && !isset($_REQUEST['id'])) {
+    $uriPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+    if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?product/([a-zA-Z0-9_-]+)/?$#', $uriPath, $m)) {
+        $_REQUEST['slug'] = $m[1];
+        $_GET['slug'] = $m[1];
+    }
+}
+
 if (isset($_REQUEST['slug'])) {
     $slug = $_REQUEST['slug'];
     $p_id = getProductIdBySlug($slug, $pdo);
@@ -349,7 +357,7 @@ require_once('header.php');
                             $photoUrl = get_media_url($photo);
                         ?>
                             <div class="sn-thumb-item <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>" data-src="<?php echo htmlspecialchars($photoUrl); ?>">
-                                <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" loading="lazy">
+                                <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -370,7 +378,8 @@ require_once('header.php');
                         <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" 
                              alt="<?php echo htmlspecialchars($p_name); ?>" 
                              class="sn-gallery-main-img" 
-                             id="snMainImg">
+                             id="snMainImg"
+                             onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
                     </div>
 
                     <!-- Dots indicator -->

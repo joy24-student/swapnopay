@@ -1,4 +1,28 @@
 <?php 
+// -------------------------------------------------------------------------
+// 0. FRONT CONTROLLER CLEAN-URL ROUTING (SEO / Friendly URLs)
+// -------------------------------------------------------------------------
+$rawUri = $_SERVER['REQUEST_URI'] ?? '';
+$path = strtok($rawUri, '?');
+if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?product/([a-zA-Z0-9_-]+)/?$#', $path, $m)) {
+    $_REQUEST['slug'] = $m[1];
+    $_GET['slug'] = $m[1];
+    require __DIR__ . '/product.php';
+    exit;
+}
+if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?category(?:/.*)?$#', $path)) {
+    require __DIR__ . '/product-category.php';
+    exit;
+}
+if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?search(?:/.*)?$#', $path)) {
+    require __DIR__ . '/search-result.php';
+    exit;
+}
+if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?page/([0-9]+)/?$#', $path, $m)) {
+    $_REQUEST['page'] = (int)$m[1];
+    $_GET['page'] = (int)$m[1];
+}
+
 require_once('header.php'); 
 
 // -------------------------------------------------------------------------
