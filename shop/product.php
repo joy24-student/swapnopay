@@ -200,7 +200,7 @@ $stmt_color->execute([$p_id]);
 $product_colors = $stmt_color->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Settings
-$stmt_settings = $pdo->prepare("SELECT review_feature_on_off, estimated_delivery_time_local, estimated_delivery_time_international, gemini_api_key, free_delivery_threshold_qty, product_voucher_code, product_voucher_discount FROM tbl_settings WHERE id = 1");
+$stmt_settings = $pdo->prepare("SELECT * FROM tbl_settings WHERE id = 1");
 $stmt_settings->execute();
 $settings_data = $stmt_settings->fetch(PDO::FETCH_ASSOC);
 
@@ -210,6 +210,8 @@ $estimated_delivery_time_international = $settings_data['estimated_delivery_time
 $gemini_api_key = $settings_data['gemini_api_key'] ?? '';
 $product_voucher_code = !empty($settings_data['product_voucher_code']) ? $settings_data['product_voucher_code'] : 'WELCOME10';
 $product_voucher_discount = !empty($settings_data['product_voucher_discount']) ? (float)$settings_data['product_voucher_discount'] : 10.00;
+$related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
+$mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
 
 // Fetch Ratings & Reviews
 $avg_rating = 4.6;
@@ -979,7 +981,7 @@ require_once('header.php');
     </div>
 
     <!-- ================= RELATED PRODUCTS ROW ================= -->
-    <?php if (!empty($related_products)): ?>
+    <?php if ($related_products_on_off == 1 && !empty($related_products)): ?>
     <section class="sn-related-section" id="snRelatedSection">
         <div class="sn-related-header">
             <div class="sn-related-title-wrap">

@@ -2385,41 +2385,50 @@ a, button {
         stroke: #ef4444 !important;
     }
 
-    /* Mobile Related Products Row */
+    /* Mobile Related Products: TWO COLUMN FORMAT */
     .sn-related-section {
         margin-top: 24px !important;
         padding-top: 20px !important;
         margin-bottom: 24px !important;
+        width: 100% !important;
+    }
+
+    .sn-related-header {
+        margin-bottom: 14px !important;
     }
 
     .sn-related-title {
         font-size: 17px !important;
     }
 
-    .sn-related-scroll-track {
-        display: flex !important;
-        gap: 12px !important;
-        overflow-x: auto !important;
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-        padding-bottom: 8px !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-
-    .sn-related-scroll-track::-webkit-scrollbar {
+    .sn-related-arrows {
         display: none !important;
     }
 
+    .sn-related-scroll-track {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        overflow: visible !important;
+        padding-bottom: 0 !important;
+        width: 100% !important;
+    }
+
     .sn-rel-card {
-        flex: 0 0 162px !important;
-        min-width: 162px !important;
-        max-width: 162px !important;
-        padding: 11px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        flex: none !important;
+        padding: 10px !important;
         border-radius: 14px !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
 
     .sn-rel-img-box {
-        height: 120px !important;
+        width: 100% !important;
+        height: 135px !important;
         border-radius: 10px !important;
         margin-bottom: 8px !important;
     }
@@ -2427,10 +2436,23 @@ a, button {
     .sn-rel-title {
         font-size: 12.5px !important;
         min-height: 32px !important;
+        line-height: 1.25 !important;
     }
 
     .sn-rel-curr {
         font-size: 14px !important;
+    }
+
+    .sn-rel-bottom {
+        padding-top: 6px !important;
+        margin-top: auto !important;
+    }
+
+    /* Mobile Footer: Hidden on mobile when configured */
+    .sn-mobile-footer-hidden,
+    .sn-footer-wrap.sn-mobile-footer-hidden,
+    body.sn-product-page .sn-footer-wrap.sn-mobile-footer-hidden {
+        display: none !important;
     }
 
     body.sn-product-page .sn-product-details-wrap {

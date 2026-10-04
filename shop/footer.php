@@ -35,9 +35,24 @@ if (isset($_POST['form_subscribe']) && !empty($_POST['email_subscribe'])) {
         }
     }
 }
+
+// Mobile footer visibility from settings (Default 0 = hidden on mobile)
+$mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$settings['mobile_footer_on_off'] : 0;
 ?>
 
-<footer class="sn-footer-wrap">
+<?php if ($mobile_footer_on_off == 0): ?>
+<style>
+@media (max-width: 768px) {
+    .sn-footer-wrap,
+    .sn-footer-wrap.sn-mobile-footer-hidden,
+    footer.sn-footer-wrap {
+        display: none !important;
+    }
+}
+</style>
+<?php endif; ?>
+
+<footer class="sn-footer-wrap <?php echo ($mobile_footer_on_off == 0 ? 'sn-mobile-footer-hidden' : ''); ?>">
     <div class="sn-container">
         <div class="sn-footer-top">
             <!-- Brand & Socials -->

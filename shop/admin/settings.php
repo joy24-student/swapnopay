@@ -191,6 +191,8 @@ $footer_about_us = $settings_data['footer_about_us'] ?? '';
 $contact_address = $settings_data['contact_address'] ?? ''; // From user's provided settings.php
 $contact_map_iframe = $settings_data['contact_map_iframe'] ?? ''; // From user's provided settings.php
 $payment_verified_image = $settings_data['payment_verified_image'] ?? ''; // New field
+$mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
+$related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
 
 
 
@@ -704,17 +706,30 @@ if(isset($_POST['form_footer_settings'])) {
     if ($payment_verified_image === false) $valid = 0;
 
     if ($valid == 1) {
+        $mobile_footer_on_off = isset($_POST['mobile_footer_on_off']) ? (int)$_POST['mobile_footer_on_off'] : 0;
+        $related_products_on_off = isset($_POST['related_products_on_off']) ? (int)$_POST['related_products_on_off'] : 1;
+
+        // Auto-add column if not exists in tenant schema
+        try {
+            $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0");
+            $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1");
+        } catch (Throwable $e) {}
+
         $statement = $pdo->prepare("UPDATE tbl_settings SET
-                                    copyright_text=?, footer_about_us=?, contact_address=?, contact_map_iframe=?, payment_verified_image=?
+                                    copyright_text=?, footer_about_us=?, contact_address=?, contact_map_iframe=?, payment_verified_image=?,
+                                    mobile_footer_on_off=?, related_products_on_off=?
                                     WHERE id=1");
         $statement->execute(array(
             $_POST['copyright_text'] ?? '',
             $_POST['footer_about_us'] ?? '',
             $_POST['contact_address'] ?? '',
             $_POST['contact_map_iframe'] ?? '',
-            $payment_verified_image
+            $payment_verified_image,
+            $mobile_footer_on_off,
+            $related_products_on_off
         ));
-        $success_message = 'Footer Settings are updated successfully.';
+        @unlink(__DIR__ . '/inc/cache_settings.json');
+        $success_message = 'Footer & Display Settings are updated successfully.';
     }
 }
 
@@ -947,6 +962,8 @@ $footer_about_us = $settings_data['footer_about_us'] ?? '';
 $contact_address = $settings_data['contact_address'] ?? '';
 $contact_map_iframe = $settings_data['contact_map_iframe'] ?? '';
 $payment_verified_image = $settings_data['payment_verified_image'] ?? '';
+$mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
+$related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
 
 $ads_above_welcome_on_off = $settings_data['ads_above_welcome_on_off'] ?? 0;
 $ads_above_featured_product_on_off = $settings_data['ads_above_featured_product_on_off'] ?? 0;
@@ -2259,6 +2276,41 @@ $hide_free_delivery_mobile = $settings_data['hide_free_delivery_mobile'] ?? 0;
                                             <?php endif; ?>
                                             <input type="file" name="payment_verified_image" id="payment_verified_image" class="form-control-file">
                                             <p class="help-block">Upload an image showing accepted payment methods (JPG, PNG, JPEG, GIF)</p>
+                                        </div>
+                                    </div>
+
+                                    <h3 class="seo-info mt-8">Visibility & Display Settings</h3>
+                                    <div class="form-group">
+                                        <label for="mobile_footer_on_off" class="col-sm-3 control-label">Footer on Mobile Screen</label>
+                                        <div class="col-sm-9">
+                                            <div class="radio radio-inline">
+                                                <label>
+                                                    <input type="radio" name="mobile_footer_on_off" value="0" <?php if($mobile_footer_on_off == 0) {echo 'checked';} ?>> <strong>Hide on Mobile (Recommended)</strong>
+                                                </label>
+                                            </div>
+                                            <div class="radio radio-inline">
+                                                <label>
+                                                    <input type="radio" name="mobile_footer_on_off" value="1" <?php if($mobile_footer_on_off == 1) {echo 'checked';} ?>> Show on Mobile
+                                                </label>
+                                            </div>
+                                            <p class="help-block">Choose whether the footer is displayed on mobile screens. Hiding keeps the mobile screen clean and app-like.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="related_products_on_off" class="col-sm-3 control-label">Related Products Section</label>
+                                        <div class="col-sm-9">
+                                            <div class="radio radio-inline">
+                                                <label>
+                                                    <input type="radio" name="related_products_on_off" value="1" <?php if($related_products_on_off == 1) {echo 'checked';} ?>> <strong>Show Related Products (Default)</strong>
+                                                </label>
+                                            </div>
+                                            <div class="radio radio-inline">
+                                                <label>
+                                                    <input type="radio" name="related_products_on_off" value="0" <?php if($related_products_on_off == 0) {echo 'checked';} ?>> Hide Related Products
+                                                </label>
+                                            </div>
+                                            <p class="help-block">Controls whether the related products card row appears on the product details page.</p>
                                         </div>
                                     </div>
 
