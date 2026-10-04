@@ -221,8 +221,17 @@
         <!-- STEP 1: CHOOSE PAYMENT METHOD -->
         <div class="hidden" id="view1">
           <div>
-            <!-- Step 1 Status Bar removed to eliminate duplicate "Merchant Terminal Online & Ready" text -->
-            <div id="step1-terminal-status-bar" class="hidden"></div>
+            <!-- Real-time Terminal Status Header Bar in Step 1 -->
+            <div id="step1-terminal-status-bar" class="mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all duration-300 bg-gray-50 border-gray-200 text-gray-600">
+              <div class="flex items-center gap-2">
+                <span id="terminal-dot-pulse" class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
+                </span>
+                <span id="terminal-status-title" class="font-extrabold text-[11px]">Connecting to Merchant Terminal...</span>
+              </div>
+              <span id="terminal-status-pill" class="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-gray-200 text-gray-700">Checking</span>
+            </div>
 
             <!-- Offline Warning Block (displayed when merchant phone is disconnected) -->
             <div id="terminal-offline-block" class="hidden mb-4 bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 shadow-sm text-left">
@@ -377,16 +386,6 @@
                     <span data-translate="copy">Copy</span>
                     <span class="material-symbols-outlined text-[14px]">content_copy</span>
                   </button>
-                </div>
-              </div>
-
-              <!-- Transaction ID (TrxID) -->
-              <div>
-                <label class="block text-[10px] font-bold text-gray-600 mb-0.5">
-                  <span>Transaction ID (TrxID)</span> <span class="text-gray-400 font-normal">(পেমেন্ট পরবর্তী TrxID লিখুন)</span>
-                </label>
-                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-white">
-                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-semibold outline-none uppercase" id="step2-trx-input" placeholder="e.g. 9H8B7G6F5E" autocomplete="off" />
                 </div>
               </div>
             </div>
