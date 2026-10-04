@@ -1610,6 +1610,99 @@ $lang_sections = [
         border: 1px solid #d2d6da;
         accent-color: #4f46e5; /* For checked state */
     }
+
+    /* ==========================================================================
+       Welcome Popup Animations & Live Preview Modal
+       ========================================================================== */
+    .anim-spin-zoom {
+        animation: snSpinZoom 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+    }
+    @keyframes snSpinZoom {
+        0% { transform: scale(0.1) rotate3d(0, 1, 1, 360deg); opacity: 0; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    .anim-flip-3d {
+        animation: snFlip3d 0.75s cubic-bezier(0.23, 1, 0.32, 1) forwards !important;
+    }
+    @keyframes snFlip3d {
+        0% { transform: perspective(800px) rotateY(-90deg) scale(0.6); opacity: 0; }
+        100% { transform: perspective(800px) rotateY(0deg) scale(1); opacity: 1; }
+    }
+
+    .anim-bounce-pop {
+        animation: snBouncePop 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards !important;
+    }
+    @keyframes snBouncePop {
+        0% { transform: scale(0.3); opacity: 0; }
+        60% { transform: scale(1.08); opacity: 1; }
+        85% { transform: scale(0.96); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    .anim-slide-up {
+        animation: snSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    }
+    @keyframes snSlideUp {
+        0% { transform: translateY(120px) scale(0.9); opacity: 0; }
+        100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .anim-slide-down {
+        animation: snSlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    }
+    @keyframes snSlideDown {
+        0% { transform: translateY(-120px) scale(0.9); opacity: 0; }
+        100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .anim-glow-pulse {
+        animation: snGlowPulse 0.8s ease-out forwards !important;
+    }
+    @keyframes snGlowPulse {
+        0% { transform: scale(0.6); opacity: 0; box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+        50% { transform: scale(1.04); opacity: 1; box-shadow: 0 0 35px 10px rgba(99, 102, 241, 0.6); }
+        100% { transform: scale(1); opacity: 1; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); }
+    }
+
+    .anim-wiggle-swing {
+        animation: snWiggleSwing 0.85s ease-in-out forwards !important;
+    }
+    @keyframes snWiggleSwing {
+        0% { transform: scale(0.5) rotate(-18deg); opacity: 0; }
+        40% { transform: scale(1.03) rotate(14deg); opacity: 1; }
+        65% { transform: scale(0.98) rotate(-8deg); }
+        85% { transform: scale(1.01) rotate(4deg); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    /* Admin Popup Live Preview Overlay Modal */
+    #adminPopupPreviewOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 999999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    #adminPopupPreviewCard {
+        background: #ffffff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 460px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        transform-origin: center center;
+    }
 </style>
 
 <section class="content-header p-6 bg-white shadow-sm rounded-lg mb-6">
@@ -1644,7 +1737,7 @@ $lang_sections = [
                         <li><a href="#tab_api_integrations" data-toggle="tab">API Integrations</a></li>
                         <li><a href="#tab_review_delivery" data-toggle="tab">Review & Delivery</a></li>
                         <li><a href="#tab_sms" data-toggle="tab">SMS</a></li>
-                        <li><a href="#tab_banners" data-toggle="tab"><i class="fa fa-picture-o"></i> Sliders & Banners</a></li>
+                        <li><a href="#tab_banners" data-toggle="tab">Banners</a></li>
                         <li><a href="#tab_social_media" data-toggle="tab">Social Media</a></li>
                         <li><a href="#tab_email" data-toggle="tab">Email</a></li>
                         <li><a href="#tab_footer" data-toggle="tab">Footer</a></li>
@@ -2682,16 +2775,6 @@ $lang_sections = [
                         <div class="tab-pane" id="tab_banners">
                             <div class="box box-info">
                                 <div class="box-body">
-                                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:16px 20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                                        <div>
-                                            <h4 style="margin:0 0 4px 0; color:#0369a1; font-weight:700; font-size:16px;"><i class="fa fa-picture-o"></i> Homepage Sliders & Hero Banners</h4>
-                                            <p style="margin:0; font-size:13px; color:#0284c7;">Manage your homepage carousel slides, hero banners, and promotional tiles.</p>
-                                        </div>
-                                        <a href="homepage-banners.php" class="btn btn-primary" style="font-weight:600; border-radius:6px; box-shadow:0 2px 8px rgba(3,105,161,0.25);">
-                                            <i class="fa fa-pencil-square-o"></i> Customize Homepage Sliders & Banners <i class="fa fa-arrow-right"></i>
-                                        </a>
-                                    </div>
-
                                     <h3 class="seo-info">Page Banners</h3>
                                     <?php
                                     $banner_fields_map = [
@@ -3173,17 +3256,27 @@ $lang_sections = [
                                                 <small class="text-muted">The animation triggers as soon as the popup opens on the visitor's screen.</small>
                                             </div>
                                             <div class="col-sm-3">
-                                                <button type="button" class="btn btn-default btn-block" id="btnPreviewAnim" style="border-radius:6px; font-weight:600;">
-                                                    <i class="fa fa-play text-primary"></i> Preview Animation
+                                                <button type="button" class="btn btn-primary btn-block" id="btnPreviewAnim" style="border-radius:6px; font-weight:700; background:#6366f1; border-color:#4f46e5; color:#ffffff; padding:8px 12px; box-shadow:0 3px 10px rgba(99,102,241,0.3);">
+                                                    <i class="fa fa-play-circle"></i> Preview Animation
                                                 </button>
                                             </div>
                                         </div>
 
+                                        <!-- Inline Live Animation Demo Box -->
                                         <div class="row">
                                             <div class="col-sm-offset-3 col-sm-9">
-                                                <div id="animPreviewBox" style="display:none; padding:18px; background:#ffffff; border:2px dashed #6366f1; border-radius:10px; text-align:center; margin-top:10px;">
-                                                    <span style="font-weight:700; color:#4338ca; font-size:15px;">✨ Live Animation Preview</span>
-                                                    <p style="margin:4px 0 0 0; color:#64748b; font-size:12px;">This is how your popup will animate onto the storefront!</p>
+                                                <div id="animInlineStage" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:12px; padding:20px; text-align:center; overflow:hidden;">
+                                                    <div id="animInlineCard" style="display:inline-block; background:#ffffff; border-radius:12px; padding:18px 24px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.12); border:1px solid #e2e8f0; max-width:380px; width:100%; transform-origin:center center;">
+                                                        <div style="font-size:26px; margin-bottom:6px;" id="inlineAnimEmoji">🌪️</div>
+                                                        <h5 style="margin:0 0 4px 0; font-weight:700; color:#1e293b;" id="inlineAnimName">3D Spin & Zoom In</h5>
+                                                        <p style="margin:0 0 14px 0; font-size:12px; color:#64748b;">Live entrance animation preview</p>
+                                                        <button type="button" class="btn btn-xs btn-default" id="btnReplayInline" style="border-radius:15px; font-weight:600; padding:5px 14px;">
+                                                            <i class="fa fa-refresh text-primary"></i> Replay Animation
+                                                        </button>
+                                                        <button type="button" class="btn btn-xs btn-primary" id="btnLaunchFullModal" style="border-radius:15px; font-weight:600; padding:5px 14px; margin-left:6px; background:#4f46e5; border-color:#4338ca;">
+                                                            <i class="fa fa-external-link"></i> Full Modal View
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -3241,6 +3334,51 @@ $lang_sections = [
 
 </section>
 
+<!-- Live Animated Preview Modal Overlay -->
+<div id="adminPopupPreviewOverlay">
+    <div id="adminPopupPreviewCard">
+        <button type="button" id="adminClosePreviewBtn" style="position:absolute; top:12px; right:12px; width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.95); border:none; box-shadow:0 4px 10px rgba(0,0,0,0.15); color:#1e293b; font-size:22px; line-height:1; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;">&times;</button>
+        
+        <div id="previewCardBannerWrap" style="width:100%; max-height:220px; overflow:hidden; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+            <img id="previewCardBannerImg" src="<?php echo !empty($popup_preview_src) ? htmlspecialchars($popup_preview_src) : ''; ?>" alt="Popup Banner" style="width:100%; max-height:220px; object-fit:cover; display:<?php echo !empty($popup_preview_src) ? 'block' : 'none'; ?>;">
+        </div>
+
+        <div style="padding:22px 24px 26px 24px;">
+            <div style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                <span id="previewAnimBadge">🌪️ 3D Spin & Zoom In</span> Preview
+            </div>
+
+            <h3 id="previewCardTitle" style="margin:0 0 8px 0; font-size:21px; font-weight:800; color:#0f172a; line-height:1.25;">
+                <?php echo htmlspecialchars(!empty($popup_title) ? $popup_title : 'Special Welcome Offer!'); ?>
+            </h3>
+
+            <p id="previewCardDesc" style="margin:0 0 16px 0; font-size:13px; color:#475569; line-height:1.5;">
+                <?php echo htmlspecialchars(!empty($popup_text) ? $popup_text : 'Get exclusive discounts across our catalog. Use coupon code at checkout!'); ?>
+            </p>
+
+            <div id="previewCardTimer" style="background:linear-gradient(135deg, #fef2f2, #fff1f2); border:1px solid #fecdd3; border-radius:10px; padding:8px 12px; margin-bottom:18px; display:inline-flex; flex-direction:column; align-items:center; gap:4px; width:100%;">
+                <span style="font-size:11px; font-weight:700; color:#e11d48; text-transform:uppercase;">⏰ Limited Time Offer Ends In:</span>
+                <div style="display:flex; align-items:center; gap:6px; font-weight:800;">
+                    <div style="background:#fff; border:1px solid #fda4af; border-radius:4px; padding:3px 8px; color:#be123c;"><span id="prevTimerD">00</span><small style="display:block; font-size:8px;">Days</small></div>
+                    <span style="color:#e11d48;">:</span>
+                    <div style="background:#fff; border:1px solid #fda4af; border-radius:4px; padding:3px 8px; color:#be123c;"><span id="prevTimerH">01</span><small style="display:block; font-size:8px;">Hours</small></div>
+                    <span style="color:#e11d48;">:</span>
+                    <div style="background:#fff; border:1px solid #fda4af; border-radius:4px; padding:3px 8px; color:#be123c;"><span id="prevTimerM">59</span><small style="display:block; font-size:8px;">Mins</small></div>
+                    <span style="color:#e11d48;">:</span>
+                    <div style="background:#fff; border:1px solid #fda4af; border-radius:4px; padding:3px 8px; color:#be123c;"><span id="prevTimerS">59</span><small style="display:block; font-size:8px;">Secs</small></div>
+                </div>
+            </div>
+
+            <button type="button" id="previewCardCtaBtn" style="width:100%; background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#ffffff; font-weight:700; font-size:14px; padding:12px 24px; border-radius:30px; border:none; box-shadow:0 4px 14px rgba(37,99,235,0.35); cursor:pointer;">
+                <span id="previewCardCtaText"><?php echo htmlspecialchars(!empty($popup_btn_text) ? $popup_btn_text : 'Claim Offer Now'); ?></span> &rarr;
+            </button>
+            <div style="margin-top:12px;">
+                <a href="javascript:void(0)" id="adminClosePreviewLink" style="font-size:12px; color:#64748b; text-decoration:underline;">Close Preview (Esc)</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function() {
     // Keep active tab on page refresh / hash change
@@ -3256,18 +3394,124 @@ $(document).ready(function() {
         }
     });
 
-    
-    // Animation Preview Handler
-    $('#btnPreviewAnim').on('click', function(e) {
+    // Animation Metadata
+    var animMeta = {
+        'spin-zoom': { emoji: '🌪️', name: '3D Spin & Zoom In' },
+        'flip-3d': { emoji: '🔄', name: '3D Perspective Flip' },
+        'bounce-pop': { emoji: '⚡', name: 'Elastic Bounce Pop' },
+        'slide-up': { emoji: '⬆️', name: 'Smooth Slide Up' },
+        'slide-down': { emoji: '⬇️', name: 'Smooth Slide Down' },
+        'glow-pulse': { emoji: '✨', name: 'Radiant Glow & Pulse' },
+        'wiggle-swing': { emoji: '🎭', name: 'Pendulum Wiggle & Swing' }
+    };
+
+    var animClasses = 'anim-spin-zoom anim-flip-3d anim-bounce-pop anim-slide-up anim-slide-down anim-glow-pulse anim-wiggle-swing';
+
+    // Play Inline Preview Animation
+    function playInlineAnim(anim) {
+        anim = anim || $('#popupAnimSelector').val() || 'spin-zoom';
+        var meta = animMeta[anim] || { emoji: '✨', name: anim };
+        $('#inlineAnimEmoji').text(meta.emoji);
+        $('#inlineAnimName').text(meta.name);
+        
+        var $card = $('#animInlineCard');
+        $card.removeClass(animClasses);
+        void $card[0].offsetWidth; // trigger DOM reflow
+        setTimeout(function() {
+            $card.addClass('anim-' + anim);
+        }, 20);
+    }
+
+    // Play Full Modal Preview Animation
+    function openFullModalPreview(anim) {
+        anim = anim || $('#popupAnimSelector').val() || 'spin-zoom';
+        var meta = animMeta[anim] || { emoji: '✨', name: anim };
+        $('#previewAnimBadge').text(meta.emoji + ' ' + meta.name);
+
+        // Sync values from live form inputs
+        var titleVal = $('input[name="popup_title"]').val();
+        if (titleVal && titleVal.trim()) $('#previewCardTitle').text(titleVal.trim());
+
+        var descVal = $('textarea[name="popup_text"]').val();
+        if (descVal && descVal.trim()) $('#previewCardDesc').text(descVal.trim());
+
+        var btnVal = $('input[name="popup_btn_text"]').val();
+        if (btnVal && btnVal.trim()) $('#previewCardCtaText').text(btnVal.trim());
+
+        var photoUrl = $('input[name="popup_photo_url"]').val();
+        if (photoUrl && photoUrl.trim()) {
+            $('#previewCardBannerImg').attr('src', photoUrl.trim()).show();
+        }
+
+        var $overlay = $('#adminPopupPreviewOverlay');
+        var $card = $('#adminPopupPreviewCard');
+        
+        $card.removeClass(animClasses);
+        $overlay.css('display', 'flex');
+        
+        void $card[0].offsetWidth; // trigger DOM reflow
+        setTimeout(function() {
+            $card.addClass('anim-' + anim);
+        }, 20);
+    }
+
+    function closeFullModalPreview() {
+        $('#adminPopupPreviewOverlay').hide();
+    }
+
+    // Initialize initial inline animation on tab load
+    playInlineAnim($('#popupAnimSelector').val());
+
+    // When dropdown changes, animate both inline and open preview modal
+    $('#popupAnimSelector').on('change', function() {
+        var anim = $(this).val();
+        playInlineAnim(anim);
+        openFullModalPreview(anim);
+    });
+
+    // Button click triggers
+    $('#btnPreviewAnim, #btnLaunchFullModal').on('click', function(e) {
         e.preventDefault();
         var anim = $('#popupAnimSelector').val();
-        var $box = $('#animPreviewBox');
-        $box.removeClass('anim-spin-zoom anim-flip-3d anim-bounce-pop anim-slide-up anim-slide-down anim-glow-pulse anim-wiggle-swing');
-        $box.show();
-        setTimeout(function() {
-            $box.addClass('anim-' + anim);
-        }, 50);
+        playInlineAnim(anim);
+        openFullModalPreview(anim);
     });
+
+    $('#btnReplayInline').on('click', function(e) {
+        e.preventDefault();
+        playInlineAnim($('#popupAnimSelector').val());
+    });
+
+    // Close Modal Events
+    $('#adminClosePreviewBtn, #adminClosePreviewLink').on('click', function(e) {
+        e.preventDefault();
+        closeFullModalPreview();
+    });
+
+    $('#adminPopupPreviewOverlay').on('click', function(e) {
+        if (e.target === this) {
+            closeFullModalPreview();
+        }
+    });
+
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $('#adminPopupPreviewOverlay').is(':visible')) {
+            closeFullModalPreview();
+        }
+    });
+
+    // Live Urgency Countdown Ticker in Preview
+    var pMins = 59, pSecs = 59;
+    setInterval(function() {
+        pSecs--;
+        if (pSecs < 0) {
+            pSecs = 59;
+            pMins--;
+            if (pMins < 0) pMins = 59;
+        }
+        $('#prevTimerM').text(String(pMins).padStart(2, '0'));
+        $('#prevTimerS').text(String(pSecs).padStart(2, '0'));
+    }, 1000);
 
     // Language Search / Filter
     $('#langSearchBox').on('keyup', function() {
