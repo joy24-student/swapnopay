@@ -12,11 +12,32 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
     exit;
 }
 
+// Ensure required columns exist across all tenant schemas safely
+try {
+    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1");
+    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_image text DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_image text DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_url text DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_url text DEFAULT ''");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0");
+    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1");
+} catch (Throwable $e) {}
+
 // Fetch all settings data from the database
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $statement->execute();
-$settings_data = $statement->fetch(PDO::FETCH_ASSOC);
-$slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$settings_data = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+try {
+    $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    try {
+        $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e2) {
+        $slides = [];
+    }
+}
 // Assign variables for current values, using null coalescing operator for safety
 // General Settings
 $logo = $settings_data['logo'] ?? '';
@@ -516,7 +537,15 @@ if(isset($_POST['form_home_features'])) {
     
     // Refresh settings data & slides for this page render
     $settings_data = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
-    $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    try {
+        $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        try {
+            $slides = $pdo->query("SELECT * FROM tbl_slider ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e2) {
+            $slides = [];
+        }
+    }
     
     $msgParts = ['Homepage features and customizations updated successfully!'];
     if ($uploadedCount > 0) {

@@ -879,7 +879,9 @@ CREATE TABLE IF NOT EXISTS "tbl_slider" (
   "content" TEXT,
   "button_text" VARCHAR(255) DEFAULT NULL,
   "button_url" VARCHAR(255) DEFAULT NULL,
-  "position" VARCHAR(50) DEFAULT NULL
+  "position" VARCHAR(50) DEFAULT NULL,
+  "slide_order" INT DEFAULT 1,
+  "is_active" SMALLINT DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_social" (
