@@ -71,7 +71,7 @@ export function shopConfiguration(env = process.env) {
     runtime, sites, template,
     dbHost, dbPort, dbName, dbUser, dbPass,
     sslmode: env.SHOP_DB_SSLMODE || 'require',
-    group: env.SHOP_RUNTIME_GID ? Number(env.SHOP_RUNTIME_GID) : undefined,
+    group: env.SHOP_RUNTIME_GID ? Number(env.SHOP_RUNTIME_GID) : (process.platform !== 'win32' ? 33 : undefined),
     backendUrl: env.SHOP_BACKEND_URL || 'https://api.swapnopay.top',
     vendor: env.SHOP_VENDOR_DIR || '',
   }
@@ -422,19 +422,33 @@ export class ShopService {
     } finally { client.release() }
   }
   async writePrivate(file, data) {
-    await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o750 })
-    if (this.config.group !== undefined && process.platform !== 'win32') await fs.chown(path.dirname(file),-1,this.config.group)
+    const targetGid = this.config.group !== undefined ? this.config.group : (process.platform !== 'win32' ? 33 : undefined)
+    await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o755 })
+    if (targetGid !== undefined && process.platform !== 'win32') {
+      try { await fs.chown(path.dirname(file), -1, targetGid) } catch (_) {}
+    }
     const temporary = `${file}.${crypto.randomUUID()}.tmp`
-    await fs.writeFile(temporary, data, { mode: 0o640 })
-    if (this.config.group !== undefined && process.platform !== 'win32') await fs.chown(temporary, -1, this.config.group)
+    await fs.writeFile(temporary, data, { mode: 0o644 })
+    if (targetGid !== undefined && process.platform !== 'win32') {
+      try {
+        await fs.chown(temporary, -1, targetGid)
+        await fs.chmod(temporary, 0o644)
+      } catch (_) {}
+    }
     await fs.rename(temporary, file)
+    if (process.platform !== 'win32') {
+      try {
+        await fs.chmod(file, 0o644)
+        if (targetGid !== undefined) await fs.chown(file, -1, targetGid)
+      } catch (_) {}
+    }
   }
   async publishFiles(row, secrets) {
     const tenantDir = path.join(this.config.sites, 'stores', row.merchant_id)
     const marker = path.join(tenantDir, '.swapnopay-ready')
     try { await fs.access(marker) } catch {
       const stage = `${tenantDir}.${row.job_id}.tmp`
-      await fs.mkdir(path.dirname(stage), { recursive: true })
+      await fs.mkdir(path.dirname(stage), { recursive: true, mode: 0o755 })
       const denied = /(?:^|[/\\])(?:\.[^/\\]+|DATABASE FILE|uploads|test[^/\\]*|debug[^/\\]*|setup[^/\\]*|migration[^/\\]*|install[^/\\]*|fix_[^/\\]*|create_[^/\\]*|seo-manager.php|seo-verify.php|speed-manager.php|security-dashboard.php|email_tester.php|smtp_test.php|01test.php|phpinfo.php|Dockerfile|.*\.(?:sql|log|zip|bak|txt|md))$/i
       await fs.cp(this.config.template, stage, { recursive: true, filter: source => !denied.test(path.relative(this.config.template,source)) })
       if (this.config.vendor) await fs.cp(this.config.vendor,path.join(stage,'vendor'),{recursive:true})
@@ -445,7 +459,7 @@ export class ShopService {
         await fs.chown(path.join(stage,'assets','uploads'),-1,this.config.group)
         await fs.chmod(path.join(stage,'assets','uploads'),0o2770)
       }
-      await fs.writeFile(path.join(stage,'.swapnopay-ready'), row.merchant_id, { mode: 0o640 })
+      await fs.writeFile(path.join(stage,'.swapnopay-ready'), row.merchant_id, { mode: 0o644 })
       try {
         await fs.rename(stage, tenantDir)
       } catch (renameErr) {

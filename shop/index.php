@@ -1493,48 +1493,37 @@ body {
 
             <div class="sn-flash-scroll">
                 <?php
-                $flashItems = [
-                    [
-                        'id' => 105,
-                        'name' => 'Apple AirPods Pro (2nd Gen)',
-                        'curr' => '27,999',
-                        'old' => '32,999',
-                        'discount' => '-15%',
-                        'img' => 'assets/uploads/deal_airpods.jpg',
-                        'fallback' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/product_airpods_pro.jpg'
-                    ],
-                    [
-                        'id' => 107,
-                        'name' => 'Samsung Galaxy Watch 6',
-                        'curr' => '26,999',
-                        'old' => '29,999',
-                        'discount' => '-12%',
-                        'img' => 'assets/uploads/deal_galaxy_watch.jpg',
-                        'fallback' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/product_galaxy_watch_6.jpg'
-                    ],
-                    [
-                        'id' => 103,
-                        'name' => 'iPhone 15 128GB | Black',
-                        'curr' => '89,999',
-                        'old' => '99,999',
-                        'discount' => '-8%',
-                        'img' => 'assets/uploads/deal_iphone_15.jpg',
-                        'fallback' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/product_iphone16_pro.jpg'
-                    ],
-                    [
-                        'id' => 104,
-                        'name' => 'ASUS ROG Strix G15 Ryzen 7 | 16GB | 1TB SSD',
-                        'curr' => '1,12,999',
-                        'old' => '1,32,999',
-                        'discount' => '-10%',
-                        'img' => 'assets/uploads/deal_asus_rog.jpg',
-                        'fallback' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/product_hp_pavilion_15.jpg'
-                    ]
-                ];
+                // Fetch dynamic flash sale items from active products in the store's database
+                $dbFlash = [];
+                try {
+                    $flashQuery = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active=1 ORDER BY p_id DESC LIMIT 8");
+                    if ($flashQuery) $dbFlash = $flashQuery->fetchAll(PDO::FETCH_ASSOC);
+                } catch (Throwable $e) {}
+
+                $flashItems = [];
+                if (!empty($dbFlash)) {
+                    foreach ($dbFlash as $prod) {
+                        $curr = (float)str_replace(',', '', (string)$prod['p_current_price']);
+                        $old = (float)str_replace(',', '', (string)($prod['p_old_price'] ?? '0'));
+                        $discountStr = ($old > $curr && $old > 0) ? '-' . round((($old - $curr) / $old) * 100) . '%' : 'HOT';
+                        $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
+                        $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : BASE_URL . 'assets/uploads/' . $photo) : BASE_URL . 'assets/images/no-image.png';
+                        $flashItems[] = [
+                            'id' => (int)$prod['p_id'],
+                            'name' => $prod['p_name'],
+                            'curr' => number_format($curr, 2),
+                            'old' => ($old > $curr && $old > 0) ? number_format($old, 2) : '',
+                            'discount' => $discountStr,
+                            'img' => $imgUrl,
+                            'fallback' => BASE_URL . 'assets/images/no-image.png'
+                        ];
+                    }
+                }
 
                 foreach ($flashItems as $fi):
+                    $prodUrl = function_exists('getProductURL') ? getProductURL($fi['id'], $fi['name'], BASE_URL) : BASE_URL . 'product.php?id=' . $fi['id'];
                 ?>
-                    <a href="<?php echo BASE_URL; ?>product.php?id=<?php echo $fi['id']; ?>" class="sn-flash-card">
+                    <a href="<?php echo htmlspecialchars($prodUrl); ?>" class="sn-flash-card">
                         <div class="sn-flash-card-top">
                             <span class="sn-flash-discount"><?php echo $fi['discount']; ?></span>
                             <button type="button" class="sn-flash-wishlist" title="Save to Wishlist" onclick="homeToggleWishlist(<?php echo $fi['id']; ?>, this, event)">
@@ -1547,7 +1536,9 @@ body {
                         <h3 class="sn-flash-title"><?php echo htmlspecialchars($fi['name']); ?></h3>
                         <div class="sn-flash-pricing-row">
                             <div class="sn-flash-curr-price">৳ <?php echo $fi['curr']; ?></div>
-                            <div class="sn-flash-old-price">৳ <?php echo $fi['old']; ?></div>
+                            <?php if (!empty($fi['old'])): ?>
+                                <div class="sn-flash-old-price">৳ <?php echo $fi['old']; ?></div>
+                            <?php endif; ?>
                         </div>
                     </a>
                 <?php endforeach; ?>
