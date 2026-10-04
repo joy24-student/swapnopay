@@ -359,7 +359,7 @@ require_once('header.php');
                 <polyline points="12 19 5 12 12 5"></polyline>
             </svg>
         </a>
-        <form action="<?php echo BASE_URL; ?>search-result.php" method="get" class="sn-sub-search-form">
+        <form action="<?php echo BASE_URL; ?>search-result.php" method="get" class="sn-sub-search-form" id="snSubSearchForm">
             <div class="sn-sub-search-wrap">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
@@ -368,6 +368,14 @@ require_once('header.php');
                 <input type="text" name="search_text" placeholder="Search for products, brands and more..." autocomplete="off">
             </div>
         </form>
+
+        <!-- On-Scroll Horizontal Specification Tabs -->
+        <div class="sn-top-nav-tabs" id="snTopNavTabs">
+            <button type="button" class="sn-nav-tab-pill active" data-target="tab-desc">Overview</button>
+            <button type="button" class="sn-nav-tab-pill" data-target="tab-specs">Specifications</button>
+            <button type="button" class="sn-nav-tab-pill" data-target="tab-reviews">Reviews</button>
+            <button type="button" class="sn-nav-tab-pill" data-target="tab-qa">Q&A</button>
+        </div>
         <div class="sn-sub-actions">
             <button type="button" class="sn-sub-action-btn" id="snShareBtn" aria-label="Share">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -626,21 +634,45 @@ require_once('header.php');
                     </div>
                 </div>
 
-                <!-- Tab 4: Shipping & Return -->
-                <div class="sn-tab-pane" id="tab-shipping">
-                    <h3 class="sn-desc-heading">Shipping & Return Guarantee</h3>
+                <!-- Tab 4: Q&A and Shipping & Return -->
+                <div class="sn-tab-pane" id="tab-qa">
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #0f172a;">Customer Questions & Answers</h4>
+                        <p style="font-size: 13px; color: #64748b;">Common inquiries about authenticity, delivery, and warranty.</p>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
+                            <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                                <span style="color: #fab802; margin-right: 6px;">Q:</span> Is this product 100% original & authentic?
+                            </div>
+                            <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Yes, all items sold on ShopNext are 100% brand new, authentic, and backed by official manufacturer warranty.
+                            </div>
+                        </div>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
+                            <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                                <span style="color: #fab802; margin-right: 6px;">Q:</span> What is the estimated delivery time?
+                            </div>
+                            <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Standard local delivery takes <?php echo htmlspecialchars($estimated_delivery_time_local); ?>. Express tracking is sent via SMS upon confirmation.
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #0f172a;">Shipping & Return Guarantee</h4>
                     <p class="sn-desc-text">We provide express, tracked door-to-door delivery throughout Bangladesh and internationally. Every device is packaged in shock-proof reinforced packaging with tamper-evident seals.</p>
-                    <ul class="sn-feature-bullet-list">
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
+                    <ul class="sn-feature-bullet-list sn-mob-bullet-list">
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
                             <span><strong>Local Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_local); ?></span>
                         </li>
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
                             <span><strong>International Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_international); ?></span>
                         </li>
-                        <li class="sn-feature-bullet-item">
-                            <span class="sn-bullet-check-icon"><i class="fas fa-check"></i></span>
+                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
                             <span><strong>7 Days Return Policy:</strong> Return easily within 7 days of receipt if unopened or defective.</span>
                         </li>
                     </ul>
@@ -862,6 +894,38 @@ require_once('header.php');
     </div>
 </div>
 
+<!-- ================= FIXED & STICKY BOTTOM ACTION BAR (MOBILE ONLY) ================= -->
+<div class="sn-sticky-bottom-bar" id="snStickyBottomBar">
+    <!-- Message Button -->
+    <button type="button" class="sn-sticky-btn-msg" id="snStickyMsgBtn" aria-label="Message / AI Assistant">
+        <div class="sn-sticky-msg-icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span class="sn-sticky-msg-badge">1</span>
+        </div>
+        <span>Message</span>
+    </button>
+
+    <!-- Add to Cart Button (Solid Yellow) -->
+    <button type="button" class="sn-sticky-btn-cart" id="snStickyCartBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span>Add to Cart</span>
+    </button>
+
+    <!-- Buy Now Button (Warm Cream) -->
+    <button type="button" class="sn-sticky-btn-buy" id="snStickyBuyBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <span>Buy Now</span>
+    </button>
+</div>
+
 <!-- ================= AI ASSISTANT MODAL ================= -->
 <div class="sn-ai-modal-backdrop" id="snAiModal">
     <div class="sn-ai-modal-card">
@@ -1024,26 +1088,118 @@ document.addEventListener('DOMContentLoaded', function() {
         zoomModal.style.display = 'none';
     });
 
-    // 2. Tab Navigation
+    // 2. Tab Navigation & On-Scroll Top Nav Bar Tab Switching
     const tabBtns = document.querySelectorAll('.sn-tab-btn');
     const tabPanes = document.querySelectorAll('.sn-tab-pane');
+    const topNavTabs = document.getElementById('snTopNavTabs');
+    const topNavPills = document.querySelectorAll('.sn-nav-tab-pill');
+    const mobileSubHeader = document.querySelector('.sn-mobile-sub-header');
 
-    function switchTab(targetId) {
+    const productSections = [
+        { id: 'tab-desc', btnTarget: 'tab-desc' },
+        { id: 'tab-specs', btnTarget: 'tab-specs' },
+        { id: 'tab-reviews', btnTarget: 'tab-reviews' },
+        { id: 'tab-qa', btnTarget: 'tab-qa' }
+    ];
+
+    function switchTab(targetId, shouldScroll = false) {
         tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.target === targetId));
-        tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+        topNavPills.forEach(pill => {
+            const isActive = pill.dataset.target === targetId;
+            pill.classList.toggle('active', isActive);
+            if (isActive && mobileSubHeader?.classList.contains('is-scrolled')) {
+                pill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        });
+
+        if (window.innerWidth > 768) {
+            tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+        }
+
+        if (shouldScroll) {
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                const headerOffset = 105;
+                const elementPosition = targetEl.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        }
     }
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', function() {
-            switchTab(this.dataset.target);
+            switchTab(this.dataset.target, window.innerWidth <= 768);
+        });
+    });
+
+    topNavPills.forEach(pill => {
+        pill.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchTab(this.dataset.target, true);
         });
     });
 
     document.getElementById('linkToReviewsTab')?.addEventListener('click', (e) => {
         e.preventDefault();
-        switchTab('tab-reviews');
-        document.querySelector('.sn-tabs-container')?.scrollIntoView({ behavior: 'smooth' });
+        switchTab('tab-reviews', true);
     });
+
+    // On-Scroll Handler: Changes Search Bar <-> Specification Tabs and updates active tab
+    let isScrollTicking = false;
+    function handleWindowScroll() {
+        const scrollPos = window.pageYOffset || document.documentElement.scrollTop;
+
+        // 1. Change top nav bar on scroll past 220px
+        if (mobileSubHeader) {
+            if (scrollPos > 220) {
+                if (!mobileSubHeader.classList.contains('is-scrolled')) {
+                    mobileSubHeader.classList.add('is-scrolled');
+                }
+            } else {
+                if (mobileSubHeader.classList.contains('is-scrolled')) {
+                    mobileSubHeader.classList.remove('is-scrolled');
+                }
+            }
+        }
+
+        // 2. Scroll-Spy: detect which specification section is currently active
+        if (window.innerWidth <= 768) {
+            let currentActiveId = productSections[0].id;
+            for (let i = 0; i < productSections.length; i++) {
+                const secEl = document.getElementById(productSections[i].id);
+                if (secEl) {
+                    const rect = secEl.getBoundingClientRect();
+                    if (rect.top <= 130) {
+                        currentActiveId = productSections[i].id;
+                    }
+                }
+            }
+
+            topNavPills.forEach(pill => {
+                const isActive = pill.dataset.target === currentActiveId;
+                pill.classList.toggle('active', isActive);
+            });
+            tabBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.target === currentActiveId);
+            });
+        }
+
+        isScrollTicking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+        if (!isScrollTicking) {
+            window.requestAnimationFrame(handleWindowScroll);
+            isScrollTicking = true;
+        }
+    }, { passive: true });
+
+    // Initial check on load
+    handleWindowScroll();
 
     // 3. Option Selection (Color Swatches)
     const swatches = document.querySelectorAll('.sn-color-swatch, .sn-color-swatch-mob');
@@ -1124,8 +1280,15 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         const origHtml = addCartBtn.innerHTML;
+        const stickyCartBtn = document.getElementById('snStickyCartBtn');
+        const origStickyHtml = stickyCartBtn ? stickyCartBtn.innerHTML : '';
+
         addCartBtn.disabled = true;
         addCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        if (stickyCartBtn) {
+            stickyCartBtn.disabled = true;
+            stickyCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        }
 
         const formData = new FormData(addToCartForm);
         formData.append('product_id', '<?php echo $p_id; ?>');
@@ -1142,10 +1305,18 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(r => r.json())
         .then(data => {
             addCartBtn.disabled = false;
+            if (stickyCartBtn) stickyCartBtn.disabled = false;
+
             if (data.success) {
                 addCartBtn.innerHTML = '<i class="fas fa-check"></i> Added!';
                 addCartBtn.style.background = '#10b981';
                 addCartBtn.style.color = '#ffffff';
+
+                if (stickyCartBtn) {
+                    stickyCartBtn.innerHTML = '<i class="fas fa-check"></i> Added!';
+                    stickyCartBtn.style.background = '#10b981';
+                    stickyCartBtn.style.color = '#ffffff';
+                }
 
                 // Update header cart badge and dock cart badge
                 const cartBadge = document.getElementById('sn-cart-badge-count');
@@ -1170,9 +1341,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     addCartBtn.innerHTML = origHtml;
                     addCartBtn.style.background = '';
                     addCartBtn.style.color = '';
+                    if (stickyCartBtn) {
+                        stickyCartBtn.innerHTML = origStickyHtml;
+                        stickyCartBtn.style.background = '';
+                        stickyCartBtn.style.color = '';
+                    }
                 }, 2000);
             } else {
                 addCartBtn.innerHTML = origHtml;
+                if (stickyCartBtn) stickyCartBtn.innerHTML = origStickyHtml;
                 alert(data.message || 'Unable to add to cart.');
             }
         })
@@ -1180,6 +1357,43 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error(err);
             addToCartForm.submit();
         });
+    });
+
+    // 5.8 Sticky Bottom Action Bar Handlers (Message, Add to Cart, Buy Now)
+    const stickyMsgBtn = document.getElementById('snStickyMsgBtn');
+    const stickyCartBtn = document.getElementById('snStickyCartBtn');
+    const stickyBuyBtn = document.getElementById('snStickyBuyBtn');
+
+    stickyMsgBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal();
+    });
+
+    stickyCartBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (addCartBtn) {
+            addCartBtn.click();
+        }
+    });
+
+    stickyBuyBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const mainBuy = document.getElementById('btnBuyNow');
+        if (mainBuy) {
+            mainBuy.click();
+        } else {
+            const form = document.getElementById('snAddToCartForm');
+            let buyInput = document.getElementById('hiddenBuyNow');
+            if (!buyInput) {
+                buyInput = document.createElement('input');
+                buyInput.type = 'hidden';
+                buyInput.name = 'form_buy_now';
+                buyInput.id = 'hiddenBuyNow';
+                buyInput.value = '1';
+                form.appendChild(buyInput);
+            }
+            form.submit();
+        }
     });
 
     // 6. Wishlist Button Toggle

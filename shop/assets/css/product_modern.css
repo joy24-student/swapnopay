@@ -1347,7 +1347,9 @@ a, button {
 .sn-mob-details-head,
 .sn-mob-dual-actions,
 .sn-mob-qty-row,
-.sn-option-header-mob {
+.sn-option-header-mob,
+.sn-sticky-bottom-bar,
+.sn-top-nav-tabs {
     display: none;
 }
 
@@ -1415,8 +1417,68 @@ a, button {
         display: flex !important;
         align-items: center;
         gap: 8px;
+        position: sticky !important;
+        top: 46px !important;
+        z-index: 998 !important;
+        background: #ffffff !important;
+        padding: 6px 0 !important;
         margin-bottom: 12px;
         width: 100%;
+        transition: box-shadow 0.2s ease, background-color 0.2s ease !important;
+    }
+
+    .sn-mobile-sub-header.is-scrolled {
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
+        padding: 6px 2px !important;
+    }
+
+    .sn-mobile-sub-header.is-scrolled .sn-sub-search-form {
+        display: none !important;
+    }
+
+    .sn-mobile-sub-header.is-scrolled .sn-top-nav-tabs {
+        display: flex !important;
+    }
+
+    /* On-Scroll Horizontal Specification Tabs */
+    .sn-top-nav-tabs {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        flex: 1;
+        padding: 2px 0;
+    }
+    .sn-top-nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sn-nav-tab-pill {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 13px;
+        border-radius: 9999px;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+        outline: none;
+    }
+
+    .sn-nav-tab-pill:active {
+        transform: scale(0.95);
+    }
+
+    .sn-nav-tab-pill.active {
+        background: #fab802 !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        box-shadow: 0 2px 6px rgba(250, 184, 2, 0.25) !important;
     }
 
     .sn-sub-back-btn {
@@ -2059,7 +2121,12 @@ a, button {
     }
 
     .sn-tab-pane {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
         padding: 0 !important;
+        margin-bottom: 28px !important;
+        scroll-margin-top: 110px !important;
     }
 
     .sn-desc-text {
@@ -2100,9 +2167,14 @@ a, button {
         flex-shrink: 0 !important;
     }
 
-    /* 12. Mobile Bottom Navigation Dock (Fixed) */
-    .mobile-bottom-nav.sn-mobile-bottom-nav {
-        display: flex !important;
+    /* 12. Hide generic 5-dock bottom nav on product screen */
+    body.sn-product-page .mobile-bottom-nav,
+    body.sn-product-page .sn-mobile-bottom-nav {
+        display: none !important;
+    }
+
+    /* 13. Fixed & Sticky Bottom Action Bar (Message, Add to Cart, Buy Now) */
+    .sn-sticky-bottom-bar {
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
@@ -2110,63 +2182,113 @@ a, button {
         width: 100% !important;
         background: #ffffff !important;
         border-top: 1px solid #f1f5f9 !important;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+        box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08) !important;
         z-index: 1000 !important;
-        padding: 6px 4px 8px 4px !important;
-        justify-content: space-around !important;
+        display: flex !important;
         align-items: center !important;
+        gap: 10px !important;
+        padding: 8px 14px calc(8px + env(safe-area-inset-bottom, 8px)) 14px !important;
         box-sizing: border-box !important;
     }
 
-    .sn-dock-item {
+    .sn-sticky-btn-msg {
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
-        text-decoration: none !important;
-        color: #64748b !important;
-        font-size: 10.5px !important;
-        font-weight: 500 !important;
-        flex: 1 !important;
-        position: relative !important;
+        justify-content: center !important;
+        background: transparent !important;
+        border: none !important;
+        color: #475569 !important;
+        padding: 2px 4px !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        min-width: 48px !important;
         gap: 2px !important;
+        text-decoration: none !important;
+        transition: all 0.15s ease !important;
     }
 
-    .sn-dock-icon-box {
+    .sn-sticky-btn-msg:active {
+        transform: scale(0.92) !important;
+        color: #0f172a !important;
+    }
+
+    .sn-sticky-msg-icon-box {
         position: relative !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        height: 28px !important;
-        padding: 0 4px !important;
-        transition: all 0.2s ease !important;
+        width: 24px !important;
+        height: 24px !important;
     }
 
-    .sn-dock-item.active .sn-dock-icon-box {
-        background: #fde047 !important;
-        border-radius: 14px !important;
-        padding: 3px 18px !important;
-        color: #0f172a !important;
-    }
-
-    .sn-dock-item.active span {
-        color: #0f172a !important;
-        font-weight: 700 !important;
-    }
-
-    .sn-dock-badge-count {
+    .sn-sticky-msg-badge {
         position: absolute !important;
         top: -3px !important;
         right: -6px !important;
         background: #ef4444 !important;
         color: #ffffff !important;
-        font-size: 9px !important;
+        font-size: 8.5px !important;
         font-weight: 800 !important;
         border-radius: 50% !important;
-        min-width: 16px !important;
-        height: 16px !important;
-        line-height: 16px !important;
+        min-width: 14px !important;
+        height: 14px !important;
+        line-height: 14px !important;
         text-align: center !important;
         border: 1.5px solid #ffffff !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+    }
+
+    .sn-sticky-btn-msg span {
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        line-height: 1 !important;
+    }
+
+    .sn-sticky-btn-cart {
+        flex: 1 !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+        background: #fab802 !important;
+        color: #0f172a !important;
+        border: none !important;
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        cursor: pointer !important;
+        box-shadow: 0 3px 10px rgba(250, 184, 2, 0.28) !important;
+        transition: transform 0.15s ease, background 0.15s ease !important;
+    }
+
+    .sn-sticky-btn-cart:active {
+        transform: scale(0.97) !important;
+    }
+
+    .sn-sticky-btn-buy {
+        flex: 1 !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+        background: #fef3c7 !important;
+        color: #b45309 !important;
+        border: none !important;
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        cursor: pointer !important;
+        transition: transform 0.15s ease, background 0.15s ease !important;
+    }
+
+    .sn-sticky-btn-buy:active {
+        transform: scale(0.97) !important;
+    }
+
+    body.sn-product-page .sn-product-details-wrap {
+        padding-bottom: 96px !important;
     }
 }
