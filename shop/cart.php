@@ -1,5 +1,4 @@
 <?php 
-$cur_page = 'cart.php';
 require_once('header.php'); 
 
 // -------------------------------------------------------------------------
@@ -174,19 +173,14 @@ try {
 <div class="sn-cart-page-wrapper">
     <div class="sn-container">
         
-        <!-- Top Title Bar (Identical layout to deals.php) -->
-        <div class="sn-deals-title-bar">
-            <a href="index.php" class="sn-deals-back-btn" aria-label="Go back">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-            </a>
-            <div class="sn-deals-title-content">
-                <h1 class="sn-deals-title">Cart <span class="sn-deals-badge-sparkle">🛒</span></h1>
-                <p class="sn-deals-subtitle">Review items, apply coupons & quick checkout <span id="pageItemCount" style="display:none;"><?php echo $total_cart_items; ?></span></p>
-            </div>
-        </div>
+        <!-- Breadcrumbs (Home > Cart) -->
+        <nav class="sn-breadcrumbs" aria-label="breadcrumb">
+            <a href="index.php">Home</a>
+            <span class="sn-bc-sep">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+            <span class="sn-bc-current">Cart</span>
+        </nav>
 
         <?php if ($total_cart_items === 0): ?>
             <!-- ========================================================
@@ -207,6 +201,40 @@ try {
                 </div>
             </div>
         <?php else: ?>
+
+            <!-- ========================================================
+                 PAGE TITLE BAR (Desktop Header Area)
+                 ======================================================== -->
+            <div class="sn-cart-page-header">
+                <div class="sn-cart-heading-wrap">
+                    <div class="sn-cart-title-icon">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="sn-page-title">Your Cart</h1>
+                        <p class="sn-page-subtitle">
+                            <span id="pageItemCount"><?php echo $total_cart_items; ?></span> items • Save for later • Easy checkout
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Auto-Saved Cart Pill -->
+                <div class="sn-auto-saved-badge">
+                    <div class="sn-saved-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="sn-saved-title">Your cart is saved automatically</div>
+                        <div class="sn-saved-desc">Items will be here even if you close the page.</div>
+                    </div>
+                </div>
+            </div>
 
             <!-- ========================================================
                  MAIN TWO-COLUMN GRID (Desktop & Tablet)
@@ -515,7 +543,7 @@ try {
         <section class="sn-recommendations-section">
             <div class="sn-recom-head">
                 <h2 class="sn-recom-title">You Might Also Like</h2>
-                <a href="product-category.php" class="sn-recom-link">
+                <a href="product-category.php?id=1&type=top-category" class="sn-recom-link">
                     <span>View All</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </a>
@@ -524,28 +552,20 @@ try {
             <div class="sn-recom-grid">
                 <?php foreach ($recommendations as $rec): ?>
                 <div class="sn-recom-card">
-                    <a href="product.php?id=<?php echo $rec['id']; ?>" class="sn-recom-img-box">
-                        <img src="<?php echo htmlspecialchars($rec['image']); ?>" alt="<?php echo htmlspecialchars($rec['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/default_product.jpg';">
-                    </a>
+                    <div class="sn-recom-img-box">
+                        <img src="<?php echo htmlspecialchars($rec['image']); ?>" alt="<?php echo htmlspecialchars($rec['name']); ?>" loading="lazy">
+                    </div>
                     <div class="sn-recom-content">
-                        <h4 class="sn-recom-item-name">
-                            <a href="product.php?id=<?php echo $rec['id']; ?>"><?php echo htmlspecialchars($rec['name']); ?></a>
-                        </h4>
-                        <?php if (!empty($rec['subtitle'])): ?>
-                            <div class="sn-recom-item-sub"><?php echo htmlspecialchars($rec['subtitle']); ?></div>
-                        <?php endif; ?>
+                        <h4 class="sn-recom-item-name"><?php echo htmlspecialchars($rec['name']); ?></h4>
+                        <div class="sn-recom-item-sub"><?php echo htmlspecialchars($rec['subtitle']); ?></div>
                         
                         <div class="sn-recom-price-row">
                             <span class="sn-recom-price">৳ <?php echo number_format($rec['price']); ?></span>
-                            <?php if ($rec['old_price'] > $rec['price']): ?>
-                                <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
-                            <?php endif; ?>
+                            <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
                         </div>
-                        <?php if (!empty($rec['discount'])): ?>
-                            <div class="sn-recom-discount"><?php echo htmlspecialchars($rec['discount']); ?></div>
-                        <?php endif; ?>
+                        <div class="sn-recom-discount"><?php echo htmlspecialchars($rec['discount']); ?></div>
 
-                        <button type="button" class="sn-recom-add-btn" onclick="quickAddToCart(<?php echo $rec['id']; ?>, '<?php echo addslashes($rec['name']); ?>', <?php echo $rec['price']; ?>, '<?php echo htmlspecialchars($rec['image']); ?>', '<?php echo addslashes($rec['subtitle']); ?>')" title="Add to Cart" aria-label="Add to cart">
+                        <button type="button" class="sn-recom-add-btn" onclick="quickAddToCart(<?php echo $rec['id']; ?>, '<?php echo addslashes($rec['name']); ?>', <?php echo $rec['price']; ?>, '<?php echo htmlspecialchars($rec['image']); ?>', '<?php echo addslashes($rec['subtitle']); ?>')" title="Add to Cart">
                             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="9" cy="21" r="1"></circle>
                                 <circle cx="20" cy="21" r="1"></circle>
@@ -653,7 +673,7 @@ try {
             <div class="sn-mob-shipping">Shipping Fee: <span>৳ 0</span></div>
         </div>
 
-        <button type="button" class="sn-mobile-checkout-btn" onclick="submitMobileCheckout()">
+        <button type="button" class="sn-mobile-checkout-btn" onclick="document.getElementById('checkoutForm').submit()">
             Checkout(<span id="mobileCheckoutBadge"><?php echo $total_cart_items; ?></span>)
         </button>
     </div>
@@ -690,10 +710,30 @@ try {
     --sn-red-bg: #fee2e2;
 }
 
+/* GLOBAL VIEWPORT SAFETY & OVERFLOW PREVENTION */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden !important;
+}
+
 body.shopnext-theme {
     background-color: var(--sn-bg-page);
     font-family: var(--sn-font);
     color: var(--sn-dark);
+    overflow-x: hidden !important;
+    width: 100%;
+}
+
+/* Explicit sn-container definition to protect against broken stylesheets */
+.sn-cart-page-wrapper .sn-container,
+.sn-container {
+    width: 100%;
+    max-width: 1240px;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 20px;
+    padding-right: 20px;
+    box-sizing: border-box;
 }
 
 /* Sticky Right Summary Column on Desktop */
@@ -706,72 +746,74 @@ body.shopnext-theme {
 }
 
 .sn-cart-page-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     padding: 24px 0 60px 0;
+    box-sizing: border-box;
 }
 
-/* 1. TOP TITLE BAR (MATCHING DEALS SCREEN) */
-.sn-deals-title-bar {
+/* 1. BREADCRUMBS */
+.sn-breadcrumbs {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 20px;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--sn-muted);
+    margin-bottom: 24px;
+    width: 100%;
+    box-sizing: border-box;
 }
-.sn-deals-back-btn {
-    display: inline-flex;
+.sn-breadcrumbs a {
+    color: var(--sn-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.sn-breadcrumbs a:hover {
+    color: var(--sn-dark);
+}
+.sn-bc-sep {
+    display: flex;
+    align-items: center;
+    color: #cbd5e1;
+}
+.sn-bc-current {
+    color: var(--sn-dark);
+    font-weight: 600;
+}
+
+/* 2. PAGE HEADER BAR */
+.sn-cart-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.sn-cart-heading-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.sn-cart-title-icon {
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    color: var(--sn-dark);
-    text-decoration: none;
-    border-radius: 50%;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    transition: all 0.15s ease;
-    flex-shrink: 0;
-    margin-top: 1px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-}
-.sn-deals-back-btn:hover {
-    background-color: #f1f5f9;
-    transform: translateX(-2px);
     color: var(--sn-dark);
 }
-.sn-deals-title-content {
-    flex: 1;
-}
-.sn-deals-title {
-    font-size: 22px;
+.sn-page-title {
+    font-size: 28px;
     font-weight: 800;
     color: var(--sn-dark);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0 0 2px 0;
-    line-height: 1.2;
-    letter-spacing: -0.3px;
-}
-.sn-deals-badge-sparkle {
-    font-size: 20px;
-    line-height: 1;
-}
-.sn-deals-subtitle {
-    font-size: 13px;
-    color: var(--sn-muted);
     margin: 0;
-    line-height: 1.35;
-    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
 }
-@media (min-width: 769px) {
-    .sn-deals-title-bar {
-        margin-bottom: 24px;
-    }
-    .sn-deals-title {
-        font-size: 26px;
-    }
-    .sn-deals-subtitle {
-        font-size: 14px;
-    }
+.sn-page-subtitle {
+    font-size: 13.5px;
+    color: var(--sn-muted);
+    margin: 4px 0 0 0;
 }
 
 /* Auto-saved notification badge */
@@ -1633,11 +1675,18 @@ body.shopnext-theme {
 .sn-empty-cart-stage {
     background: #ffffff;
     border-radius: 20px;
-    border: 1px solid #f1f5f9;
+    border: 1px solid #e2e8f0;
     padding: 60px 24px;
     text-align: center;
-    margin: 40px auto;
-    max-width: 540px;
+    margin: 48px auto;
+    max-width: 520px;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 .sn-empty-icon-ring {
     width: 100px;
@@ -1734,20 +1783,26 @@ body.shopnext-theme {
    ============================================================ */
 @media (max-width: 1024px) {
     .sn-cart-layout-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 100%;
+        gap: 20px;
     }
     .sn-recom-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .sn-trust-assurance-bar {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 768px) {
     .sn-cart-page-wrapper {
         padding-top: 14px;
-        padding-bottom: 120px;
+        padding-bottom: 140px;
+    }
+    .sn-empty-cart-stage {
+        padding: 40px 16px;
+        margin: 24px auto;
+        border-radius: 16px;
     }
     .sn-cart-page-header {
         flex-direction: column;
@@ -1761,154 +1816,32 @@ body.shopnext-theme {
     .sn-auto-saved-badge {
         width: 100%;
         border-radius: 12px;
+        box-sizing: border-box;
     }
 
     /* Product row becomes mobile card layout */
     .sn-cart-item-row {
-        grid-template-columns: 24px 85px 1fr;
+        grid-template-columns: 24px 85px minmax(0, 1fr);
         grid-template-areas: 
             "check img details"
             "check img pricing"
             "check img total";
         gap: 12px;
         padding: 16px;
+        box-sizing: border-box;
     }
     .sn-item-checkbox-cell { grid-area: check; }
     .sn-item-image-cell { grid-area: img; }
     .sn-img-container { width: 85px; height: 85px; }
-    .sn-item-details-cell { grid-area: details; }
-    .sn-item-pricing-cell { grid-area: pricing; }
+    .sn-item-details-cell { grid-area: details; min-width: 0; }
+    .sn-item-pricing-cell { grid-area: pricing; min-width: 0; }
     .sn-item-total-cell { grid-area: total; text-align: left; margin-top: -6px; }
 
-    /* Hide Order Summary Card on Mobile as requested */
-    .sn-cart-right-col {
-        display: none !important;
-    }
-    .sn-cart-layout-grid {
-        margin-bottom: 20px !important;
-    }
-
-    /* "You Might Also Like" section: 2 columns on mobile */
-    .sn-recommendations-section {
-        margin-top: 16px !important;
-        margin-bottom: 24px !important;
-    }
-    .sn-recom-head {
-        margin-bottom: 12px !important;
-    }
-    .sn-recom-title {
-        font-size: 16.5px !important;
-    }
     .sn-recom-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 10px !important;
-    }
-    .sn-recom-card {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        padding: 10px 10px 12px 10px !important;
-        border-radius: 14px !important;
-        position: relative !important;
-        gap: 0 !important;
-        background: #ffffff !important;
-        border: 1px solid #f1f5f9 !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
-    }
-    .sn-recom-img-box {
-        width: 100% !important;
-        height: 120px !important;
-        background: #f8fafc !important;
-        border-radius: 10px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin-bottom: 8px !important;
-        overflow: hidden !important;
-        text-decoration: none !important;
-    }
-    .sn-recom-img-box img {
-        max-width: 90% !important;
-        max-height: 90% !important;
-        object-fit: contain !important;
-    }
-    .sn-recom-content {
-        width: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        position: relative !important;
-        padding-right: 30px !important;
-    }
-    .sn-recom-item-name {
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        line-height: 1.3 !important;
-        margin: 0 0 3px 0 !important;
-        height: 31px !important;
-        white-space: normal !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        display: -webkit-box !important;
-        -webkit-line-clamp: 2 !important;
-        -webkit-box-orient: vertical !important;
-        color: var(--sn-dark) !important;
-    }
-    .sn-recom-item-name a {
-        color: inherit !important;
-        text-decoration: none !important;
-    }
-    .sn-recom-item-sub {
-        font-size: 10px !important;
-        color: var(--sn-muted) !important;
-        margin-bottom: 4px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-    .sn-recom-price-row {
-        display: flex !important;
-        align-items: baseline !important;
-        gap: 5px !important;
-        margin-bottom: 2px !important;
-        flex-wrap: wrap !important;
-    }
-    .sn-recom-price {
-        font-size: 13.5px !important;
-        font-weight: 800 !important;
-        color: var(--sn-dark) !important;
-    }
-    .sn-recom-old-price {
-        font-size: 10.5px !important;
-        color: #94a3b8 !important;
-        text-decoration: line-through !important;
-    }
-    .sn-recom-discount {
-        font-size: 9.5px !important;
-        font-weight: 700 !important;
-        color: #ef4444 !important;
-        min-height: 14px !important;
-    }
-    .sn-recom-add-btn {
-        position: absolute !important;
-        right: 8px !important;
-        bottom: 8px !important;
-        width: 28px !important;
-        height: 28px !important;
-        border-radius: 50% !important;
-        background: #fab802 !important;
-        border: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: 0 2px 6px rgba(250, 184, 2, 0.3) !important;
-        cursor: pointer !important;
-        z-index: 2 !important;
-    }
-    .sn-recom-add-btn svg {
-        width: 14px !important;
-        height: 14px !important;
+        grid-template-columns: 100%;
     }
     .sn-trust-assurance-bar {
-        grid-template-columns: 1fr;
+        grid-template-columns: 100%;
         padding: 20px;
     }
 
@@ -2404,24 +2337,6 @@ function updateHeaderCartBadges(count) {
     if (desktopBadge) desktopBadge.textContent = count;
     const mobileBadge = document.querySelector('.sn-dock-cart-badge');
     if (mobileBadge) mobileBadge.textContent = count;
-}
-
-// 12. MOBILE CHECKOUT SUBMISSION
-function submitMobileCheckout() {
-    const checked = document.querySelectorAll('.sn-item-checkbox:checked');
-    if (checked.length === 0) {
-        if (typeof showToast === 'function') {
-            showToast('Please select at least one item to proceed to checkout.', 'error');
-        } else {
-            alert('Please select at least one item to proceed to checkout.');
-        }
-        return;
-    }
-    recalculateCart();
-    const form = document.getElementById('checkoutForm');
-    if (form) {
-        form.submit();
-    }
 }
 
 // Form Checkout Submission Check

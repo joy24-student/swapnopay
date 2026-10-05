@@ -22,7 +22,6 @@ import {
   updateOrderStatusOnMerchantDB,
   getMerchantDeviceStatus,
   createDisputeAppeal,
-  processReportedPayment,
 } from '../services/adminSupabase.js'
 import { verifyWebhookSignature } from '../utils/crypto.js'
 import { isSafeOutboundWebhookUrl, postSafeWebhook } from '../utils/urlValidator.js'
@@ -602,18 +601,45 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
 
       console.log(`[payment/report-payment] 📲 Incoming payment reported from Android device: TrxID ${cleanTrx} | ৳${numAmount} | Method: ${payment_method || 'bKash'} | Merchant: ${merchant_id}`)
 
-      const result = await processReportedPayment({
-        merchantId: merchant_id,
-        trxId: cleanTrx,
-        amount: numAmount,
-        paymentMethod: payment_method || 'bKash',
-        senderNumber: sender_number || null,
-        timestamp,
-        deviceId: device_id || null,
-        io,
-      })
+      // 1. Record the SMS capture in the central activity feed as unmatched.
+      try {
+        const eventRecorded = await recordPaymentEvent(cleanTrx, {
+          tran_id: cleanTrx,
+          trx_id: cleanTrx,
+          // A device report is an SMS capture, not proof that an order matched.
+          // Only /verify, called by the atomic merchant-database matcher, can mark PAID.
+          // Keep the event in the schema's accepted non-final state. This is a
+          // captured SMS, not proof that an order was paid.
+          status: 'PENDING',
+          amount: numAmount,
+          currency: 'BDT',
+          payment_method: payment_method || 'bKash',
+          sender_number: sender_number || null,
+          merchant_id: merchant_id || null,
+          payment_time: timestamp ? new Date(Number(timestamp)).toISOString() : new Date().toISOString(),
+          product_name: `SMS Capture on Device: ${device_id || 'unknown'}`
+        })
+        if (!eventRecorded) {
+          return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
+        }
+      } catch (recErr) {
+        console.warn('[payment/report-payment] Event record notice:', recErr.message)
+        return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
+      }
 
-      return res.json(result)
+      // 2. Emit payment broadcast to merchant dashboard; order status remains
+      // pending until the merchant-database SMS matcher verifies it.
+      if (merchant_id) {
+        io.to(`merchant:${merchant_id}`).emit('payment_received', {
+          trx_id: cleanTrx,
+          amount: numAmount,
+          method: payment_method,
+          sender: sender_number,
+          time: new Date().toISOString()
+        })
+      }
+
+      return res.json({ ok: true, status: 'RECEIVED', message: 'SMS received. The merchant database is checking for a matching order.', trx_id: cleanTrx })
     } catch (err) {
       console.error('[payment/report-payment] Error:', err.message)
       return res.status(500).json({ ok: false, error: err.message })
@@ -715,123 +741,88 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     // Check if there is an unassigned or matching verified SMS payment event for this merchant and TrxID
     if (cleanTrx && cleanTrx.length >= 6) {
       try {
-        const { getAdminClient, getMerchantCredentials } = await import('../services/adminSupabase.js')
+        const { getAdminClient } = await import('../services/adminSupabase.js')
         const admin = getAdminClient()
-        const orderRecord = merchant_id ? await getOrderFromMerchantDB(merchant_id, order_id) : requestedOrder
-        const targetAmount = Number(orderRecord?.amount || requestedOrder?.amount || 0)
-
-        // 1. Check admin payment_events (both PAID and PENDING SMS captures)
+        const orderRecord = merchant_id ? await getOrderFromMerchantDB(merchant_id, order_id) : null
         let query = admin.from('payment_events')
           .select('*')
           .eq('trx_id', cleanTrx)
           .eq('merchant_id', merchant_id)
-          .in('status', ['PAID', 'PENDING'])
+          .eq('status', 'PAID')
         const { data: matchedEvents } = merchant_id ? await query.limit(10) : { data: [] }
-        let matchedPayment = (matchedEvents || []).find(event => Math.abs(Number(event.amount) - targetAmount) < 0.01)
+        const paidEvent = orderRecord
+          ? (matchedEvents || []).find(event => Number(event.amount) === Number(orderRecord.amount))
+          : null
 
-        // 2. Also check merchant DB payments table if not found in events
-        if (!matchedPayment && merchant_id) {
-          try {
-            const creds = await getMerchantCredentials(merchant_id)
-            if (creds?.supabase_url && creds?.supabase_anon_key) {
-              const { createClient } = await import('@supabase/supabase-js')
-              const mClient = createClient(creds.supabase_url, creds.supabase_anon_key, { auth: { persistSession: false, autoRefreshToken: false } })
-              const { data: mPay } = await mClient
-                .from('payments')
-                .select('*')
-                .eq('merchant_id', merchant_id)
-                .ilike('trx_id', cleanTrx)
-                .maybeSingle()
-              if (mPay && Math.abs(Number(mPay.amount) - targetAmount) < 0.01) {
-                matchedPayment = {
-                  amount: Number(mPay.amount),
-                  payment_method: mPay.payment_method || 'bKash',
-                  sender_number: mPay.sender_number || null,
-                  trx_id: cleanTrx
-                }
-                // Mark payment matched in merchant DB
-                mClient.from('payments').update({ status: 'MATCHED', matched_order_id: order_id }).eq('id', mPay.id).catch(() => {})
-                if (mPay.sms_hash) {
-                  mClient.from('sms_logs').update({ processed: true, status: 'matched' }).eq('sms_hash', mPay.sms_hash).catch(() => {})
-                }
-              }
-            }
-          } catch (_) {}
-        }
-
-        if (matchedPayment) {
-          console.log(`[payment/notify] 🎯 Immediate TrxID match for order ${order_id} (TrxID: ${cleanTrx})!`)
+        if (paidEvent) {
           await updateOrderStatusOnMerchantDB(merchant_id, order_id, 'PAID', {
             matched_trx_id: cleanTrx,
-            payment_method: payment_method || matchedPayment.payment_method,
-            amount: matchedPayment.amount,
-            sender_number: matchedPayment.sender_number || customer_phone || null
+            payment_method: payment_method || paidEvent.payment_method,
+            amount: paidEvent.amount
           })
-
-          // Mark payment_events as PAID in admin DB
-          await admin.from('payment_events').upsert({
-            order_id,
-            tran_id: requestedOrder.tran_id || order_id,
-            trx_id: cleanTrx,
-            status: 'PAID',
-            amount: matchedPayment.amount,
-            currency: 'BDT',
-            payment_method: payment_method || matchedPayment.payment_method,
-            sender_number: matchedPayment.sender_number || customer_phone || null,
-            merchant_id: merchant_id,
-            payment_time: new Date().toISOString()
-          }).catch(() => {})
-
           try {
             const { handleFormPaymentPaid } = await import('./form.js')
-            await handleFormPaymentPaid(order_id, cleanTrx, matchedPayment.amount, io)
+            await handleFormPaymentPaid(order_id, cleanTrx, paidEvent.amount, io)
           } catch (_) {}
 
+          // ── Dispatch email receipts on immediate TrxID match ──
           try {
-            const { getGatewayConfig } = await import('../services/adminSupabase.js')
-            const gatewayConfig = await getGatewayConfig()
+            const { sendPaymentReceipts } = await import('../services/mailer.js')
+            const { getGatewayConfig, getMerchantCredentials } = await import('../services/adminSupabase.js')
+            const [gatewayConfig, creds] = await Promise.all([
+              getGatewayConfig().catch(() => ({ customer_receipts_enabled: true, merchant_receipts_enabled: true })),
+              merchant_id ? getMerchantCredentials(merchant_id).catch(() => null) : null
+            ])
+            let targetCustomerEmail = requestedOrder?.cus_email || requestedOrder?.customer_email || orderRecord?.cus_email || orderRecord?.customer_email || null
+            if (!targetCustomerEmail && (order_id || requestedOrder?.tran_id)) {
+              try {
+                const { getAdminClient } = await import('../services/adminSupabase.js')
+                const admin = getAdminClient()
+                const { data: sub } = await admin
+                  .from('form_submissions')
+                  .select('customer_email, answers')
+                  .or(`request_id.eq.${order_id},id.eq.${order_id}`)
+                  .maybeSingle()
+                if (sub?.customer_email) targetCustomerEmail = sub.customer_email
+                else if (sub?.answers && typeof sub.answers === 'object') {
+                  targetCustomerEmail = sub.answers.email || sub.answers.cus_email || sub.answers['Your Email'] || null
+                }
+              } catch (_) {}
+            }
+            const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[payment_method || paidEvent.payment_method]) || creds?.default_number || creds?.phone || '01700000000'
             sendPaymentReceipts({
               order_id,
-              tran_id: requestedOrder.tran_id || order_id,
+              tran_id: requestedOrder?.tran_id || orderRecord?.tran_id || order_id,
               trx_id: cleanTrx,
-              amount: matchedPayment.amount,
-              payment_method: payment_method || matchedPayment.payment_method || 'bKash',
+              amount: paidEvent.amount,
+              payment_method: payment_method || paidEvent.payment_method || 'bKash',
               payment_time: new Date().toISOString(),
-              merchant_name: requestedOrder.merchant_name || 'SwapnoPay Merchant',
-              cus_name: requestedOrder.cus_name,
-              cus_phone: customer_phone || requestedOrder.cus_phone,
-              product_name: requestedOrder.product_name,
-              verification: 'CUSTOMER_TRX_MATCH',
-              customer_email: requestedOrder.cus_email || null,
-              customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled,
-              merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled,
-            }).catch(e => console.warn('[payment/notify] Receipt notice:', e.message))
-          } catch (_) {}
+              merchant_name: creds?.merchant_name || 'SwapnoPay Merchant',
+              merchant_phone: creds?.phone || creds?.default_number || null,
+              merchant_address: creds?.address || creds?.business_address || null,
+              merchant_website: creds?.website || null,
+              merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
+              receiver_number: receiverNumber,
+              cus_name: requestedOrder?.cus_name || orderRecord?.cus_name || 'Customer',
+              cus_phone: customer_phone || requestedOrder?.cus_phone || orderRecord?.cus_phone || null,
+              product_name: requestedOrder?.product_name || orderRecord?.product_name || 'Payment',
+              verification: 'IMMEDIATE_TRX_MATCH',
+              customer_email: targetCustomerEmail,
+              merchant_email: creds?.merchant_email || creds?.email || null,
+              customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled ?? true,
+              merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled ?? true,
+            }).catch(err => console.warn('[payment/notify] Receipt dispatch notice:', err.message))
+          } catch (receiptErr) {
+            console.warn('[payment/notify] Receipt trigger notice:', receiptErr.message)
+          }
 
-          const matchPayload = {
+          io.to(`order:${order_id}`).emit('payment_status', {
             order_id,
-            tran_id: requestedOrder.tran_id,
             status: 'PAID',
             trx_id: cleanTrx,
-            amount: matchedPayment.amount,
-            payment_method: payment_method || matchedPayment.payment_method || 'bKash',
+            amount: paidEvent.amount,
             paid_at: new Date().toISOString()
-          }
-          io.to(`order:${order_id}`).emit('payment_status', matchPayload)
-          if (requestedOrderRoom && requestedOrderRoom !== order_id) {
-            io.to(`order:${requestedOrderRoom}`).emit('payment_status', matchPayload)
-          }
-          if (merchant_id) {
-            io.to(`merchant:${merchant_id}`).emit('payment_received', {
-              order_id,
-              trx_id: cleanTrx,
-              amount: matchedPayment.amount,
-              method: payment_method || matchedPayment.payment_method || 'bKash',
-              sender: customer_phone || null,
-              status: 'MATCHED',
-              time: matchPayload.paid_at
-            })
-          }
+          })
           return res.json({ ok: true, status: 'PAID', message: 'Payment verified immediately by TrxID match.' })
         }
       } catch (matchErr) {
@@ -971,19 +962,56 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
 
     // ── Step 3: Send email receipts ──
     if (status === 'PAID') {
-      getGatewayConfig()
-        .then(gatewayConfig => sendPaymentReceipts({
+      let resolvedCustomerEmail = cus_email || body.customer_email || verifiedOrder?.cus_email || verifiedOrder?.customer_email || null
+      const resolvedCustomerName = cus_name || body.customer_name || verifiedOrder?.cus_name || 'Customer'
+      const resolvedCustomerPhone = cus_phone || body.customer_phone || sender_number || verifiedOrder?.cus_phone || null
+      const resolvedProductName = product_name || verifiedOrder?.product_name || 'Payment'
+      const resolvedMerchantName = merchant_name || verifiedOrder?.merchant_name || 'SwapnoPay Merchant'
+      let resolvedMerchantEmail = merchant_email || null
+
+      Promise.all([
+        getGatewayConfig().catch(() => ({ customer_receipts_enabled: true, merchant_receipts_enabled: true })),
+        merchant_id ? (await import('../services/adminSupabase.js')).getMerchantCredentials(merchant_id).catch(() => null) : null
+      ]).then(async ([gatewayConfig, creds]) => {
+        if (!resolvedMerchantEmail && creds) {
+          resolvedMerchantEmail = creds.merchant_email || creds.email || null
+        }
+        if (!resolvedCustomerEmail && (order_id || tran_id)) {
+          try {
+            const { getAdminClient } = await import('../services/adminSupabase.js')
+            const admin = getAdminClient()
+            const { data: sub } = await admin
+              .from('form_submissions')
+              .select('customer_email, answers')
+              .or(`request_id.eq.${order_id},id.eq.${order_id}`)
+              .maybeSingle()
+            if (sub?.customer_email) resolvedCustomerEmail = sub.customer_email
+            else if (sub?.answers && typeof sub.answers === 'object') {
+              resolvedCustomerEmail = sub.answers.email || sub.answers.cus_email || sub.answers['Your Email'] || null
+            }
+          } catch (_) {}
+        }
+        const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[payment_method || verifiedOrder?.payment_method]) || creds?.default_number || creds?.phone || '01700000000'
+        return sendPaymentReceipts({
           order_id, tran_id, trx_id, amount,
-          payment_method, payment_time,
-          merchant_name: merchant_name || 'SwapnoPay Merchant',
-          cus_name, cus_phone, product_name,
+          payment_method: payment_method || verifiedOrder?.payment_method || 'bKash',
+          payment_time: payment_time || new Date().toISOString(),
+          merchant_name: creds?.merchant_name || resolvedMerchantName,
+          merchant_phone: creds?.phone || creds?.default_number || null,
+          merchant_address: creds?.address || creds?.business_address || null,
+          merchant_website: creds?.website || null,
+          merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
+          receiver_number: receiverNumber,
+          cus_name: resolvedCustomerName,
+          cus_phone: resolvedCustomerPhone,
+          product_name: resolvedProductName,
           verification: verification || 'ATOMIC_SMS_MATCH',
-          customer_email: cus_email || null,
-          merchant_email: merchant_email || null,
-          customer_receipts_enabled: gatewayConfig.customer_receipts_enabled,
-          merchant_receipts_enabled: gatewayConfig.merchant_receipts_enabled,
-        }))
-        .catch(err => console.error('[payment/verify] Email receipts error:', err.message))
+          customer_email: resolvedCustomerEmail,
+          merchant_email: resolvedMerchantEmail,
+          customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled ?? true,
+          merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled ?? true,
+        })
+      }).catch(err => console.error('[payment/verify] Email receipts error:', err.message))
     }
 
     // ── Step 4: Build redirect URL ──

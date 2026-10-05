@@ -170,6 +170,43 @@ router.get('/health', async (_req, res) => {
   res.status(allOk ? 200 : 207).json(status)
 })
 
+// POST /v1/admin/test-email — Send a test payment receipt
+router.post('/test-email', async (req, res) => {
+  const { to, role = 'customer' } = req.body || {}
+  const targetEmail = to || 'studentroutinemanager@gmail.com'
+  try {
+    const { sendPaymentReceipt, isMailerReady } = await import('../services/mailer.js')
+    if (!isMailerReady()) {
+      return res.status(503).json({ ok: false, error: 'Mailer transporter not ready. Check SMTP credentials in environment.' })
+    }
+    const messageId = await sendPaymentReceipt(role, targetEmail, {
+      order_id: req.body?.order_id || 'TEST-ORD-' + Date.now(),
+      tran_id: req.body?.tran_id || 'TEST-TRX-' + Date.now(),
+      trx_id: req.body?.trx_id || '71QCLF08',
+      amount: req.body?.amount || '2240.00',
+      currency: req.body?.currency || 'BDT',
+      payment_method: req.body?.payment_method || 'NAGAD',
+      payment_time: req.body?.payment_time || new Date().toISOString(),
+      merchant_name: req.body?.merchant_name || 'SwapnoPay Merchant Store',
+      merchant_phone: req.body?.merchant_phone || '01700000000',
+      merchant_address: req.body?.merchant_address || 'Level 4, Commercial Plaza, Dhanmondi, Dhaka, Bangladesh',
+      merchant_website: req.body?.merchant_website || 'https://swapnopay.top',
+      merchant_email: req.body?.merchant_email || 'support@swapnopay.top',
+      merchant_logo_url: req.body?.merchant_logo_url || null,
+      receiver_number: req.body?.receiver_number || '01711223344',
+      cus_name: req.body?.cus_name || 'JOY SAHA',
+      cus_phone: req.body?.cus_phone || '01735342839',
+      customer_email: targetEmail,
+      product_name: req.body?.product_name || 'E-commerce Purchase',
+      verification: 'ADMIN_DIAGNOSTIC_TEST'
+    })
+    res.json({ ok: true, message: `Test receipt sent successfully to ${targetEmail}`, messageId })
+  } catch (err) {
+    console.error('[admin/test-email] Test email failed:', err.message)
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
 // ────────────────────────────────────────────────────────────────────────────
 // MERCHANT MANAGEMENT API ENDPOINTS
 // ────────────────────────────────────────────────────────────────────────────

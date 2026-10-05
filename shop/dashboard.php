@@ -64,7 +64,7 @@ try {
 
 // Order status breakdown for mobile "My Orders" buttons
 $count_to_pay = 0;
-$count_to_ship = 5; // Default badge from mockup
+$count_to_ship = 0;
 $count_to_receive = 0;
 $count_to_review = 0;
 $count_returns = 0;
@@ -76,8 +76,7 @@ try {
 
     $stmt_ship_count = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE customer_id = ? AND (shipping_status = 'Pending' OR shipping_status = 'Processing')");
     $stmt_ship_count->execute([$cust_id]);
-    $real_ship_count = (int)$stmt_ship_count->fetchColumn();
-    if ($real_ship_count > 0) $count_to_ship = $real_ship_count;
+    $count_to_ship = (int)$stmt_ship_count->fetchColumn();
 
     $stmt_rec_count = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE customer_id = ? AND shipping_status = 'Shipped'");
     $stmt_rec_count->execute([$cust_id]);
@@ -210,16 +209,21 @@ try {
    ────────────────────────────────────────────────────────────────────────── */
 .sn-mob-top-header {
     background: radial-gradient(circle at 85% 15%, #fef3c7 0%, #fffbeb 40%, #f8fafc 75%);
-    padding: 24px 20px 14px 20px;
+    padding: 24px 16px 14px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sn-mob-user-info {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 1;
+    min-width: 0;
 }
 
 .sn-mob-user-avatar {
@@ -244,11 +248,16 @@ try {
 
 .sn-mob-user-name {
     margin: 0;
-    font-size: 21px;
+    font-size: 19px;
     font-weight: 800;
     color: #0f172a;
     font-family: 'Plus Jakarta Sans', sans-serif;
     letter-spacing: -0.3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
 }
 
 .sn-mob-settings-btn {
@@ -265,6 +274,7 @@ try {
     text-decoration: none;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     transition: all 0.15s ease;
+    flex-shrink: 0;
 }
 
 .sn-mob-settings-btn:hover {
@@ -275,11 +285,13 @@ try {
 /* White Card Containers */
 .sn-mob-card {
     background: #ffffff;
-    border-radius: 20px;
-    padding: 18px 16px;
-    margin: 0 16px 14px 16px;
+    border-radius: 18px;
+    padding: 16px 12px;
+    margin: 0 12px 12px 12px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
     border: 1px solid #f1f5f9;
+    box-sizing: border-box;
+    width: calc(100% - 24px);
 }
 
 .sn-mob-card-header {
@@ -291,7 +303,7 @@ try {
 
 .sn-mob-card-title {
     margin: 0;
-    font-size: 16.5px;
+    font-size: 16px;
     font-weight: 700;
     color: #0f172a;
     display: flex;
@@ -316,10 +328,12 @@ try {
 
 /* 5 Order Action Buttons */
 .sn-mob-orders-grid {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
     text-align: center;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sn-mob-order-btn {
@@ -327,21 +341,23 @@ try {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 56px;
+    width: 100%;
+    min-width: 0;
 }
 
 .sn-mob-order-icon-box {
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     background: #fff8e6;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #f59e0b;
-    font-size: 20px;
+    font-size: 18px;
     position: relative;
     transition: transform 0.15s ease;
+    flex-shrink: 0;
 }
 
 .sn-mob-order-btn:hover .sn-mob-order-icon-box {
@@ -355,30 +371,34 @@ try {
     background: #ef4444;
     color: #ffffff;
     border-radius: 50%;
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 800;
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid #ffffff;
+    border: 1.5px solid #ffffff;
 }
 
 .sn-mob-order-label {
-    font-size: 11.5px;
+    font-size: 10.5px;
     font-weight: 600;
     color: #1e293b;
-    margin-top: 6px;
-    line-height: 1.2;
+    margin-top: 5px;
+    line-height: 1.15;
     text-align: center;
+    word-break: break-word;
+    overflow: hidden;
 }
 
 /* Recently Viewed Products Grid (3 items) */
 .sn-mob-recent-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sn-mob-product-card {
@@ -391,6 +411,8 @@ try {
     text-decoration: none;
     position: relative;
     transition: box-shadow 0.15s ease;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .sn-mob-product-card:hover {
@@ -414,7 +436,7 @@ try {
 }
 
 .sn-mob-prod-img-box {
-    height: 105px;
+    height: 95px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -429,7 +451,7 @@ try {
 }
 
 .sn-mob-prod-title {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     color: #0f172a;
     margin: 0 0 2px 0;
@@ -454,13 +476,13 @@ try {
 }
 
 .sn-mob-prod-price {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 800;
     color: #f59e0b;
 }
 
 .sn-mob-prod-old-price {
-    font-size: 10.5px;
+    font-size: 10px;
     color: #94a3b8;
     text-decoration: line-through;
 }
@@ -468,22 +490,26 @@ try {
 /* 4 Quick Action Tiles */
 .sn-mob-action-tiles-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 0 16px 14px 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 12px 12px 12px;
+    width: calc(100% - 24px);
+    box-sizing: border-box;
 }
 
 .sn-mob-tile-card {
     background: #ffffff;
     border: 1px solid #f1f5f9;
-    border-radius: 16px;
-    padding: 14px 6px;
+    border-radius: 14px;
+    padding: 12px 4px;
     text-align: center;
     text-decoration: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-width: 0;
+    box-sizing: border-box;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -493,32 +519,39 @@ try {
 }
 
 .sn-mob-tile-icon-circle {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: #fff8e6;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     color: #334155;
-    font-size: 18px;
+    font-size: 16px;
+    flex-shrink: 0;
 }
 
 .sn-mob-tile-label {
-    font-size: 12.5px;
+    font-size: 11.5px;
     font-weight: 600;
     color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
 
 /* Menu List Card */
 .sn-mob-menu-card {
     background: #ffffff;
-    border-radius: 20px;
-    padding: 4px 18px;
-    margin: 0 16px 20px 16px;
+    border-radius: 18px;
+    padding: 4px 16px;
+    margin: 0 12px 20px 12px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
     border: 1px solid #f1f5f9;
+    width: calc(100% - 24px);
+    box-sizing: border-box;
 }
 
 .sn-mob-menu-row {

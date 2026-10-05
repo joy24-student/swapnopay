@@ -936,6 +936,24 @@ export async function processReportedPayment({
     try {
       const { sendPaymentReceipts } = await import('./mailer.js')
       const gatewayConfig = await getGatewayConfig()
+      let customerEmail = matchedOrder.cus_email || matchedOrder.customer_email || null
+
+      // Fallback: If customer email is not directly on order, check form submissions
+      if (!customerEmail && (matchedOrder.id || matchedOrder.tran_id)) {
+        try {
+          const { data: sub } = await adminClient
+            .from('form_submissions')
+            .select('customer_email, answers')
+            .or(`request_id.eq.${matchedOrder.id},id.eq.${matchedOrder.id}`)
+            .maybeSingle()
+          if (sub?.customer_email) customerEmail = sub.customer_email
+          else if (sub?.answers && typeof sub.answers === 'object') {
+            customerEmail = sub.answers.email || sub.answers.cus_email || sub.answers['Your Email'] || null
+          }
+        } catch (_) {}
+      }
+
+      const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[paymentMethod]) || creds?.default_number || creds?.phone || '01700000000'
       sendPaymentReceipts({
         order_id: matchedOrder.id,
         tran_id: matchedOrder.tran_id,
@@ -944,15 +962,23 @@ export async function processReportedPayment({
         payment_method: paymentMethod || 'bKash',
         payment_time: paymentTime,
         merchant_name: creds?.merchant_name || 'SwapnoPay Merchant',
-        cus_name: matchedOrder.cus_name,
-        cus_phone: cleanSender || matchedOrder.cus_phone,
-        product_name: matchedOrder.product_name,
+        merchant_phone: creds?.phone || creds?.default_number || null,
+        merchant_address: creds?.address || creds?.business_address || null,
+        merchant_website: creds?.website || null,
+        merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
+        receiver_number: receiverNumber,
+        cus_name: matchedOrder.cus_name || 'Customer',
+        cus_phone: cleanSender || matchedOrder.cus_phone || null,
+        product_name: matchedOrder.product_name || 'Payment',
         verification: 'ANDROID_DEVICE_SYNC',
-        customer_email: matchedOrder.cus_email || null,
-        customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled,
-        merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled,
+        customer_email: customerEmail,
+        merchant_email: creds?.merchant_email || creds?.email || null,
+        customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled ?? true,
+        merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled ?? true,
       }).catch(e => console.warn('[processReportedPayment] Receipt dispatch notice:', e.message))
-    } catch (_) {}
+    } catch (mailErr) {
+      console.warn('[processReportedPayment] Receipt trigger error:', mailErr.message)
+    }
 
     return {
       ok: true,

@@ -55,6 +55,7 @@ foreach ($result as $row) {
 	$p_feature = $row['p_feature'];
 	$p_condition = $row['p_condition'];
 	$p_return_policy = $row['p_return_policy'];
+	$p_video_link = $row['p_video_link'] ?? '';
 	$p_is_featured = $row['p_is_featured'];
 	$p_is_active = $row['p_is_active'];
 	$ecat_id = $row['ecat_id'];
@@ -314,6 +315,13 @@ foreach ($result as $row) {
 							<label for="" class="col-sm-3 control-label">Return Policy</label>
 							<div class="col-sm-8">
 								<textarea name="p_return_policy" class="form-control" cols="30" rows="10" id="editor5"><?php echo $p_return_policy; ?></textarea>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="" class="col-sm-3 control-label">Product Video Link</label>
+							<div class="col-sm-8">
+								<input type="text" name="p_video_link" class="form-control" value="<?php echo htmlspecialchars($p_video_link ?? ''); ?>" placeholder="https://www.youtube.com/watch?v=... or https://...r2.dev/video.mp4">
+								<small class="text-muted">Supports YouTube video links or Cloudflare R2 / direct MP4 object storage URLs (comma or newline separated for multiple videos).</small>
 							</div>
 						</div>
 						<div class="form-group">

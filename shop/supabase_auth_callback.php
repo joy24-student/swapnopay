@@ -8,7 +8,7 @@ require_once __DIR__ . '/admin/inc/config.php';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Authenticating... - ShopNext</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@ require_once __DIR__ . '/admin/inc/config.php';
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
         body {
-            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+            background-color: #f8fafc;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -26,28 +26,28 @@ require_once __DIR__ . '/admin/inc/config.php';
         }
         .auth-card {
             background: #ffffff;
-            border-radius: 24px;
-            padding: 40px 48px;
-            max-width: 440px;
+            border-radius: 28px;
+            padding: 40px 32px;
+            max-width: 420px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
-            border: 1px solid #f1f5f9;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+            border: 1.5px solid #e2e8f0;
         }
         .brand-logo {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 800;
             color: #0f172a;
             margin-bottom: 28px;
             text-decoration: none;
         }
-        .brand-logo span { color: #f59e0b; }
+        .brand-logo span { color: #fab802; }
         .spinner {
-            width: 52px;
-            height: 52px;
+            width: 50px;
+            height: 50px;
             border: 4px solid #f1f5f9;
             border-top: 4px solid #fab802;
             border-radius: 50%;
@@ -55,28 +55,29 @@ require_once __DIR__ . '/admin/inc/config.php';
             margin: 0 auto 24px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+        h2 { font-size: 20px; font-weight: 800; color: #0a2569; margin-bottom: 8px; }
         p { font-size: 14px; color: #64748b; line-height: 1.5; }
         .error-box {
             display: none;
             background: #fef2f2;
             color: #ef4444;
             border: 1px solid #fecaca;
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 14px;
-            font-size: 13px;
-            margin-top: 16px;
+            font-size: 13.5px;
+            margin-top: 20px;
         }
         .btn-retry {
             display: inline-block;
             margin-top: 18px;
             background: #fab802;
-            color: #1e293b;
+            color: #0f172a;
             font-weight: 700;
-            padding: 10px 24px;
-            border-radius: 10px;
+            padding: 12px 28px;
+            border-radius: 25px;
             text-decoration: none;
             font-size: 14px;
+            box-shadow: 0 4px 14px rgba(250, 184, 2, 0.3);
         }
     </style>
 </head>
@@ -84,10 +85,12 @@ require_once __DIR__ . '/admin/inc/config.php';
 
 <div class="auth-card">
     <div class="brand-logo">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fab802" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>
+        <svg width="36" height="40" viewBox="0 0 48 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 16.5 C9 15.5 9.8 14.5 11 14.5 L37 14.5 C38.2 14.5 39 15.5 39 16.5 L36 43 C36 45 34 46.5 32 46.5 L16 46.5 C14 46.5 12 45 12 43 Z" fill="#FBBF24" stroke="#0F172A" stroke-width="2.8" stroke-linejoin="round"/>
+            <path d="M19 14.5 V10 C19 7 21 5 24 5 C27 5 29 7 29 10 V14.5" stroke="#0F172A" stroke-width="2.8" stroke-linecap="round"/>
+            <path d="M20 28 C21.5 31 26.5 31 28 28" stroke="#0F172A" stroke-width="2.8" stroke-linecap="round"/>
         </svg>
-        Shop<span>Next</span>
+        <span>Shop<span style="color:#fab802;">Next</span></span>
     </div>
 
     <div class="spinner" id="spinner"></div>
@@ -98,8 +101,8 @@ require_once __DIR__ . '/admin/inc/config.php';
 </div>
 
 <script>
-    const SUPABASE_URL = 'https://oaudxkhxwdrdsybyaheb.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hdWR4a2h4d2RyZHN5YnlhaGViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzOTY3NjAsImV4cCI6MjEwNDk3Mjc2MH0.bCvAIA-54s91_nN9jp_qz3aNDX622QMbBhGxpsLcfW0';
+    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://pueowrrkspsykbwzwgua.supabase.co"; ?>';
+    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1ZW93cnJrc3BzeWtid3p3Z3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MDkwNzksImV4cCI6MjEwNjQ4NTA3OX0.f4wk8rYN6SzdCglQO3aFFrMh8oo96Q-5L7oAhhYTuuw"; ?>';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     async function checkAuthSession() {
@@ -178,4 +181,3 @@ require_once __DIR__ . '/admin/inc/config.php';
 </script>
 </body>
 </html>
-

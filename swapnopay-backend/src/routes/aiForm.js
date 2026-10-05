@@ -35,9 +35,37 @@ async function getMerchantGeminiKey(merchantId) {
   }
 }
 
-// ── Call Gemini with multi-model fallback ─────────────────────────────────────
+// ── Multi-Key Pool State (Round-Robin + Cooldown Failover) ───────────────────
+const poolCursors = { gemini: 0, openrouter: 0 }
+const keyCooldownUntil = new Map()
+
+function getOrderedKeyPool(provider, rawKeysString) {
+  const keys = Array.from(new Set(
+    String(rawKeysString || '')
+      .split(/[\r\n,;]+/)
+      .map(k => k.trim())
+      .filter(Boolean)
+  ))
+  if (keys.length <= 1) return keys
+  const start = poolCursors[provider] % keys.length
+  poolCursors[provider] = (poolCursors[provider] + 1) % keys.length
+  const rotated = keys.map((_, idx) => keys[(start + idx) % keys.length])
+  const now = Date.now()
+  const healthy = []
+  const cooling = []
+  for (const k of rotated) {
+    const until = keyCooldownUntil.get(`${provider}:${k}`) || 0
+    if (until <= now) healthy.push(k)
+    else cooling.push(k)
+  }
+  cooling.sort((a, b) => (keyCooldownUntil.get(`${provider}:${a}`) || 0) - (keyCooldownUntil.get(`${provider}:${b}`) || 0))
+  return [...healthy, ...cooling]
+}
+
+// ── Call Gemini with multi-key pool & multi-model fallback ────────────────────
 async function callGemini(apiKey, systemPrompt, userMessage, preferredModel = null) {
-  if (!apiKey) return null
+  const orderedKeys = getOrderedKeyPool('gemini', apiKey)
+  if (orderedKeys.length === 0) return null
   const contents = [
     { role: 'user', parts: [{ text: systemPrompt + '\n\n---\n\n' + userMessage }] }
   ]
@@ -50,66 +78,94 @@ async function callGemini(apiKey, systemPrompt, userMessage, preferredModel = nu
     ? [preferredModel, ...GEMINI_MODELS.filter(m => m !== preferredModel)]
     : (preferredModel ? [preferredModel, ...GEMINI_MODELS] : GEMINI_MODELS)
 
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents, generationConfig })
-      })
-      if (response.ok) {
-        const data = await response.json()
-        let text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-        if (text) {
-          // Strip markdown fences if present
-          text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-          return text
+  for (const currentKey of orderedKeys) {
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(currentKey)}`
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents, generationConfig })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          let text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+          if (text) {
+            keyCooldownUntil.delete(`gemini:${currentKey}`)
+            // Strip markdown fences if present
+            text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+            return text
+          }
+        } else {
+          const errBody = await response.text()
+          console.warn(`[aiForm] Gemini ${model} HTTP ${response.status}:`, errBody.slice(0, 200))
+          if ([400, 401, 402, 403, 429].includes(response.status)) {
+            const cooldownMs = response.status === 429 ? 60_000 : 300_000
+            keyCooldownUntil.set(`gemini:${currentKey}`, Date.now() + cooldownMs)
+            break // Rotate to next Gemini key in pool
+          }
         }
-      } else {
-        const errBody = await response.text()
-        console.warn(`[aiForm] Gemini ${model} HTTP ${response.status}:`, errBody.slice(0, 200))
+      } catch (e) {
+        console.warn(`[aiForm] Gemini ${model} error:`, e.message)
       }
-    } catch (e) {
-      console.warn(`[aiForm] Gemini ${model} error:`, e.message)
     }
   }
   return null
 }
 
-// ── Call OpenRouter if configured by merchant ─────────────────────────────────
+// ── Call OpenRouter with multi-key pool & model cascade ───────────────────────
+const OPENROUTER_MODELS = [
+  'google/gemini-2.0-flash-001',
+  'openrouter/free',
+  'meta-llama/llama-3.1-8b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free'
+]
+
 async function callOpenRouter(apiKey, systemPrompt, userMessage, model = 'google/gemini-2.0-flash-001') {
-  if (!apiKey) return null
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://swapnopay.top',
-        'X-Title': 'SwapnoPay Form Builder'
-      },
-      body: JSON.stringify({
-        model: model || 'google/gemini-2.0-flash-001',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ]
-      })
-    })
-    if (res.ok) {
-      const data = await res.json()
-      let text = data?.choices?.[0]?.message?.content?.trim()
-      if (text) {
-        text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-        return text
+  const orderedKeys = getOrderedKeyPool('openrouter', apiKey)
+  if (orderedKeys.length === 0) return null
+  const modelsToTry = Array.from(new Set([model || 'google/gemini-2.0-flash-001', ...OPENROUTER_MODELS]))
+
+  for (const currentKey of orderedKeys) {
+    for (const currentModel of modelsToTry) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://swapnopay.top',
+            'X-Title': 'SwapnoPay Form Builder'
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ]
+          })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          let text = data?.choices?.[0]?.message?.content?.trim()
+          if (text) {
+            keyCooldownUntil.delete(`openrouter:${currentKey}`)
+            text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+            return text
+          }
+        } else {
+          const err = await res.text()
+          console.warn('[aiForm] OpenRouter HTTP', res.status, err.slice(0, 160))
+          if ([401, 402, 403, 429].includes(res.status)) {
+            const cooldownMs = res.status === 429 ? 60_000 : 300_000
+            keyCooldownUntil.set(`openrouter:${currentKey}`, Date.now() + cooldownMs)
+            break // Rotate to next OpenRouter key in pool
+          }
+        }
+      } catch (e) {
+        console.warn('[aiForm] OpenRouter call error:', e.message)
       }
-    } else {
-      const err = await res.text()
-      console.warn('[aiForm] OpenRouter HTTP', res.status, err.slice(0, 160))
     }
-  } catch (e) {
-    console.warn('[aiForm] OpenRouter call error:', e.message)
   }
   return null
 }

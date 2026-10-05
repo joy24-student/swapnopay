@@ -993,6 +993,25 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
                 z-index: 1000 !important;
                 padding: 0 !important;
+                transition: box-shadow 0.25s ease !important;
+            }
+            /* When scrolled: collapse logo + actions, keep only search bar visible */
+            .sn-header-wrap.sn-mobile-header-hidden .sn-brand-logo {
+                display: none !important;
+            }
+            .sn-header-wrap.sn-mobile-header-hidden .sn-header-actions {
+                display: none !important;
+            }
+            .sn-header-wrap.sn-mobile-header-hidden .sn-header-top {
+                padding: 5px 0 5px 0 !important;
+                gap: 0 !important;
+            }
+            .sn-header-wrap.sn-mobile-header-hidden .sn-search-form {
+                margin-top: 0 !important;
+                padding-bottom: 5px !important;
+            }
+            .sn-header-wrap.sn-mobile-header-hidden {
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
             }
             .sn-header-wrap .sn-container {
                 padding: 0 14px !important;
@@ -1019,6 +1038,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 align-items: center !important;
                 gap: 14px !important;
             }
+            /* Search bar row is sticky on mobile within the header */
             .sn-search-form {
                 order: 3 !important;
                 flex: 0 0 100% !important;
@@ -1050,21 +1070,46 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 outline: none !important;
                 background: transparent !important;
                 padding: 0 6px !important;
-                font-size: 11.5px !important;
+                font-size: 12px !important;
             }
+            /* Mobile Search Button: Icon-only circular button without 'Search' text */
             .sn-search-btn {
                 background: #fab802 !important;
                 color: #111827 !important;
-                font-weight: 700 !important;
-                font-size: 12px !important;
-                padding: 0 16px !important;
-                height: 30px !important;
-                border-radius: 999px !important;
+                width: 32px !important;
+                height: 32px !important;
+                min-width: 32px !important;
+                padding: 0 !important;
+                border-radius: 50% !important;
                 border: none !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                cursor: pointer !important;
+                box-shadow: 0 2px 6px rgba(250, 184, 2, 0.28) !important;
+                transition: transform 0.15s ease, background-color 0.15s ease !important;
+            }
+            .sn-search-btn:active {
+                transform: scale(0.92) !important;
+            }
+            .sn-search-btn-icon {
+                display: block !important;
+                width: 16px !important;
+                height: 16px !important;
+                stroke: #111827 !important;
+                stroke-width: 2.5 !important;
+            }
+            .sn-search-btn-text {
+                display: none !important; /* Remove Search text on mobile, just icon */
             }
             body.shopnext-theme .content-wrapper-main {
                 padding-top: 96px !important;
                 padding-bottom: 72px !important;
+                transition: padding-top 0.25s ease !important;
+            }
+            /* When header collapses to search-only (~48px height), shrink padding */
+            body.shopnext-theme.sn-header-scrolled-away .content-wrapper-main {
+                padding-top: 58px !important;
             }
         }
 
@@ -1417,7 +1462,13 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                             <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
-                    <button type="submit" class="sn-search-btn" aria-label="Search">Search</button>
+                    <button type="submit" class="sn-search-btn" aria-label="Search">
+                        <svg class="sn-search-btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <span class="sn-search-btn-text">Search</span>
+                    </button>
                 </div>
                 <div class="sn-search-suggestions" id="sn-search-suggestions"></div>
             </form>
@@ -1491,6 +1542,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             <a href="<?php echo BASE_URL; ?>product-category.php?id=3&type=top-category" class="sn-nav-link">Brands</a>
             <a href="<?php echo BASE_URL; ?>contact.php" class="sn-nav-link <?php echo ($cur_page == 'contact.php') ? 'active' : ''; ?>">Contact</a>
         </nav>
+    </div>
 </header>
 
 <script>
@@ -1501,33 +1553,48 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
     function handleScrollSearch() {
         const currentScrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const headerWrap = document.querySelector('.sn-header-wrap');
         const searchForm = document.getElementById('sn-search-form');
         const searchInput = document.getElementById('sn-search-input');
         const body = document.body;
 
-        if (!searchForm) return;
-
-        // Keep search open if user is currently typing or input has focus
-        if (searchInput && (document.activeElement === searchInput || searchForm.contains(document.activeElement))) {
+        // Keep header & search open if user is currently typing in search input
+        if (searchInput && (document.activeElement === searchInput || (searchForm && searchForm.contains(document.activeElement)))) {
             lastScrollY = currentScrollY;
             isTicking = false;
             return;
         }
 
-        // At top of screen (<= 25px) -> always show search input
-        if (currentScrollY <= 25) {
-            searchForm.classList.remove('sn-search-hidden');
-            body.classList.remove('sn-search-scrolled');
-        } else if (currentScrollY > lastScrollY + scrollDelta && currentScrollY > 60) {
-            // Scroll down -> hide search input field on desktop only
-            if (window.innerWidth > 768) {
-                searchForm.classList.add('sn-search-hidden');
-                body.classList.add('sn-search-scrolled');
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            // MOBILE HEADER BEHAVIOR:
+            // "every screen of mobile header it should be vanish after scroll, it back when user come back to top"
+            if (currentScrollY <= 20) {
+                // Back at the top -> bring back the mobile header
+                if (headerWrap) headerWrap.classList.remove('sn-mobile-header-hidden');
+                body.classList.remove('sn-header-scrolled-away');
+            } else if (currentScrollY > 40) {
+                // Scrolled down away from top -> vanish the mobile header
+                if (headerWrap) headerWrap.classList.add('sn-mobile-header-hidden');
+                body.classList.add('sn-header-scrolled-away');
             }
-        } else if (currentScrollY < lastScrollY - scrollDelta) {
-            // Scroll up -> show search input field
-            searchForm.classList.remove('sn-search-hidden');
-            body.classList.remove('sn-search-scrolled');
+        } else {
+            // DESKTOP HEADER BEHAVIOR:
+            if (headerWrap) headerWrap.classList.remove('sn-mobile-header-hidden');
+            body.classList.remove('sn-header-scrolled-away');
+            if (searchForm) {
+                if (currentScrollY <= 25) {
+                    searchForm.classList.remove('sn-search-hidden');
+                    body.classList.remove('sn-search-scrolled');
+                } else if (currentScrollY > lastScrollY + scrollDelta && currentScrollY > 60) {
+                    searchForm.classList.add('sn-search-hidden');
+                    body.classList.add('sn-search-scrolled');
+                } else if (currentScrollY < lastScrollY - scrollDelta) {
+                    searchForm.classList.remove('sn-search-hidden');
+                    body.classList.remove('sn-search-scrolled');
+                }
+            }
         }
 
         lastScrollY = Math.max(0, currentScrollY);
@@ -1540,6 +1607,11 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             isTicking = true;
         }
     }, { passive: true });
+
+    // Also run on resize/orientation change to reset classes if necessary
+    window.addEventListener('resize', function() {
+        handleScrollSearch();
+    });
 })();
 </script>
 

@@ -31,6 +31,14 @@ $is_orders    = in_array($cur_script, ['customer-order.php', 'customer-orders.ph
 $is_settings  = in_array($cur_script, ['customer-password-update.php', 'customer-password.php']);
 ?>
 
+<style>
+@media (max-width: 991px) {
+    .sn-portal-sidebar {
+        display: none !important;
+    }
+}
+</style>
+
 <aside class="sn-portal-sidebar">
     <!-- User Profile Badge Card -->
     <div class="sn-sidebar-profile-card">

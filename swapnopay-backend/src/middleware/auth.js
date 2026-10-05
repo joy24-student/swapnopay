@@ -366,36 +366,14 @@ export async function requireMerchantOrAdminAuth(req, res, next) {
     const deviceId = req.headers['x-device-id'] || req.headers['x-installation-id']
     if (deviceId && targetMerchantId) {
       try {
-        const devClean = String(deviceId).trim()
-        const targetClean = String(targetMerchantId).trim()
-        
-        // Exact match fallback (in case client sent same ID)
-        if (devClean.toLowerCase() === targetClean.toLowerCase()) {
-          req.merchantUser = { id: targetClean, merchant_id: targetClean, name: 'Merchant' }
+        const devLower = String(deviceId).trim().toLowerCase()
+        const targetLower = String(targetMerchantId).trim().toLowerCase()
+        if (devLower === targetLower) {
+          req.merchantUser = { id: targetMerchantId, merchant_id: targetMerchantId, name: 'Merchant' }
           req.authMethod = 'device_id'
           return next()
         }
-
-        // Verify registered device in devices table
-        const { getAdminClient } = await import('../services/adminSupabase.js')
-        const adminClient = getAdminClient()
-        if (adminClient) {
-          const { data: devRecord } = await adminClient
-            .from('devices')
-            .select('id, merchant_id, disabled')
-            .eq('id', devClean)
-            .eq('merchant_id', targetClean)
-            .maybeSingle()
-
-          if (devRecord && !devRecord.disabled) {
-            req.merchantUser = { id: targetClean, merchant_id: targetClean, name: 'Merchant Device' }
-            req.authMethod = 'device_id'
-            return next()
-          }
-        }
-      } catch (devErr) {
-        console.warn('[auth] Device check notice:', devErr.message)
-      }
+      } catch (_) {}
     }
 
   return res.status(401).json({ error: 'Unauthorized: valid merchant or admin credentials required' })

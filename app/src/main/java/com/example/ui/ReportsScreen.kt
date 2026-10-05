@@ -74,6 +74,8 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
 
     // Data States from ViewModel
     val posSales by viewModel.posSales.collectAsState()
+    val orders by viewModel.orders.collectAsState()
+    val payments by viewModel.payments.collectAsState()
     val expenses by viewModel.expenses.collectAsState()
     val customers by viewModel.customers.collectAsState()
     val suppliers by viewModel.suppliers.collectAsState()
@@ -85,6 +87,18 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
     var selectedCategory by remember { mutableStateOf("Overview") } // Overview, Sales, Expenses, Receivables, Inventory
     var showExportModal by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (posSales.isEmpty() && ledgerTxs.isEmpty() && products.isEmpty()) {
+            isRefreshing = true
+            try {
+                viewModel.pullAllMerchantDataFromRemoteInternal(viewModel.activeProfile.value.id)
+            } catch (_: Exception) {
+            } finally {
+                isRefreshing = false
+            }
+        }
+    }
 
     fun formatMoney(amount: Double): String {
         return "৳" + String.format(Locale.US, "%,.2f", amount)
@@ -108,6 +122,14 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
         posSales.filter { it.timestamp >= minTimestamp }
     }
 
+    val filteredOrders = remember(orders, minTimestamp) {
+        orders.filter { it.status == "PAID" && (it.createdAt ?: 0L) >= minTimestamp }
+    }
+
+    val filteredPayments = remember(payments, minTimestamp) {
+        payments.filter { it.timestamp >= minTimestamp }
+    }
+
     val filteredExpenses = remember(expenses, minTimestamp) {
         expenses.filter { it.date >= minTimestamp }
     }
@@ -118,10 +140,12 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
 
     // Key Aggregations
     val totalPosRevenue = remember(filteredSales) { filteredSales.sumOf { it.netTotal } }
+    val totalOrderRevenue = remember(filteredOrders) { filteredOrders.sumOf { it.amount } }
+    val totalPaymentRevenue = remember(filteredPayments) { filteredPayments.sumOf { it.amount } }
     val totalLedgerCredit = remember(filteredLedgers) {
         filteredLedgers.filter { it.type.lowercase() == "credit" }.sumOf { it.amount }
     }
-    val totalGrossRevenue = totalPosRevenue + totalLedgerCredit
+    val totalGrossRevenue = totalPosRevenue + totalOrderRevenue + totalPaymentRevenue + totalLedgerCredit
     val totalExpenseAmount = remember(filteredExpenses) { filteredExpenses.sumOf { it.amount } }
 
     val estimatedCogs = remember(filteredSales) {
@@ -131,12 +155,11 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
     val netProfit = totalGrossRevenue - totalExpenseAmount - estimatedCogs
     val profitMargin = if (totalGrossRevenue > 0) (netProfit / totalGrossRevenue) * 100 else 0.0
 
-    val transactions by viewModel.ledgerTransactions.collectAsState()
-    val totalCustomerDues = remember(customers, transactions) {
+    val totalCustomerDues = remember(customers, ledgerTxs) {
         val sumFromEntities = customers.sumOf { kotlin.math.abs(it.currentBalance) }
         if (sumFromEntities > 0.0) sumFromEntities
         else customers.sumOf { c ->
-            transactions.filter { it.customerId == c.id }
+            ledgerTxs.filter { it.customerId == c.id }
                 .sumOf { if (it.type == "credit") it.amount else -it.amount }
                 .coerceAtLeast(0.0)
         }
@@ -228,11 +251,16 @@ fun ReportsMainScreen(viewModel: AppViewModel) {
                                         .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
                                         .clickable {
                                             isRefreshing = true
-                                            viewModel.syncAllScreensToSupabase()
                                             scope.launch {
-                                                kotlinx.coroutines.delay(1000)
-                                                isRefreshing = false
-                                                Toast.makeText(context, "Data re-calculated from database", Toast.LENGTH_SHORT).show()
+                                                try {
+                                                    viewModel.pullAllMerchantDataFromRemoteInternal(viewModel.activeProfile.value.id)
+                                                    viewModel.forceSyncSupabase()
+                                                    Toast.makeText(context, if (isBangla) "ডাটাবেজ থেকে ডাটা সিঙ্ক ও হিসাব সম্পন্ন হয়েছে" else "Data synced and calculated from database", Toast.LENGTH_SHORT).show()
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Sync error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                } finally {
+                                                    isRefreshing = false
+                                                }
                                             }
                                         },
                                     contentAlignment = Alignment.Center

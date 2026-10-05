@@ -1672,7 +1672,12 @@ a, button {
         padding: 6px 0 !important;
         margin-bottom: 12px;
         width: 100%;
-        transition: box-shadow 0.2s ease, background-color 0.2s ease !important;
+        transition: top 0.25s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+    }
+
+    /* When header collapses to search-bar only, sub-header moves up */
+    body.sn-header-scrolled-away .sn-mobile-sub-header {
+        top: 48px !important;
     }
 
     .sn-mobile-sub-header.is-scrolled {

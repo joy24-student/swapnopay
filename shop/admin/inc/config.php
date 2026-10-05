@@ -19,11 +19,11 @@ if ($runtimeRoot) {
     if (str_contains($host, ':')) {
         $host = explode(':', $host, 2)[0];
     }
-    if (!preg_match('/\A[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\z/', $host)) {
+    if ($host !== '' && !preg_match('/\A[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\z/', $host)) {
         http_response_code(404); exit('Store not found.');
     }
-    $file = rtrim($runtimeRoot, '/\\') . '/hosts/' . $host . '.json';
-    $runtime = is_file($file) ? json_decode(file_get_contents($file), true) : null;
+    $file = $host !== '' ? rtrim($runtimeRoot, '/\\') . '/hosts/' . $host . '.json' : '';
+    $runtime = (is_file($file)) ? json_decode(file_get_contents($file), true) : null;
 
     // Fallback: path-based tenant lookup (e.g. https://shop.swapnopay.top/<slug>/...)
     if (!$runtime) {
@@ -54,11 +54,29 @@ if ($runtimeRoot) {
     }
 
     if (!$runtime || empty($runtime['merchant_id']) || empty($runtime['db'])) {
-        http_response_code(404); exit('Store not found.');
+        $envFile = dirname(__DIR__, 2) . '/.env';
+        if (is_file($envFile)) {
+            $runtime = null;
+            $runtimeRoot = null;
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
+                [$name,$value] = explode('=', $line, 2);
+                $name = trim($name);
+                if (preg_match('/\A[A-Z_][A-Z0-9_]*\z/', $name)) {
+                    $cleanVal = trim($value, " \t\n\r\0\x0B\"'");
+                    putenv($name . '=' . $cleanVal);
+                    $_ENV[$name] = $cleanVal;
+                    $_SERVER[$name] = $cleanVal;
+                }
+            }
+        } else {
+            http_response_code(404); exit('Store not found.');
+        }
     }
 
     // Tenant-isolated session
-    $sessionCookieName = 'SP_SESS_' . substr(md5($runtime['merchant_id']), 0, 12);
+    $merchantId = $runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: 'default-merchant');
+    $sessionCookieName = 'SP_SESS_' . substr(md5($merchantId), 0, 12);
     if (session_status() !== PHP_SESSION_ACTIVE) {
         session_name($sessionCookieName);
         session_start();
@@ -66,11 +84,11 @@ if ($runtimeRoot) {
     // Bind authentication to the store even if someone supplies a session ID
     // originally created on a different tenant's hostname.
     if (session_status() === PHP_SESSION_ACTIVE) {
-        if (($_SESSION['shop_merchant_id'] ?? '') !== $runtime['merchant_id']) {
+        if (($_SESSION['shop_merchant_id'] ?? '') !== $merchantId) {
             $_SESSION = [];
             session_regenerate_id(true);
         }
-        $_SESSION['shop_merchant_id'] = $runtime['merchant_id'];
+        $_SESSION['shop_merchant_id'] = $merchantId;
     }
 } else {
     $envFile = dirname(__DIR__, 2) . '/.env';

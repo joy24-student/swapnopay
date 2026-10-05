@@ -58,8 +58,7 @@ $stmtCat = $pdo->prepare("SELECT $nameColumn FROM $table WHERE $idColumn = ?");
 $stmtCat->execute([$category_id]);
 $title = $stmtCat->fetchColumn();
 if ($title === false) {
-    // If not found by ID, fall back to "Laptops & Computers"
-    $title = 'Laptops & Computers';
+    $title = 'Products';
 }
 
 // ── 2. Collect end-category IDs for product query ─────────────────────────
@@ -68,11 +67,9 @@ if ($category_type === 'top-category') {
     $s = $pdo->prepare('SELECT e.ecat_id FROM tbl_end_category e JOIN tbl_mid_category m ON e.mcat_id=m.mcat_id WHERE m.tcat_id=?');
     $s->execute([$category_id]);
     $final_ecat_ids = $s->fetchAll(PDO::FETCH_COLUMN);
-    // Also include category 4 if category 7 has no mapped end categories
-    if (empty($final_ecat_ids) && ($category_id == 7 || $category_id == 4)) {
-        $s2 = $pdo->prepare('SELECT e.ecat_id FROM tbl_end_category e JOIN tbl_mid_category m ON e.mcat_id=m.mcat_id WHERE m.tcat_id IN (4, 7)');
-        $s2->execute();
-        $final_ecat_ids = $s2->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($final_ecat_ids)) {
+        $sAll = $pdo->query('SELECT DISTINCT ecat_id FROM tbl_product WHERE p_is_active = 1');
+        $final_ecat_ids = $sAll->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 } elseif ($category_type === 'mid-category') {
     $s = $pdo->prepare('SELECT ecat_id FROM tbl_end_category WHERE mcat_id=?');
@@ -84,11 +81,11 @@ if ($category_type === 'top-category') {
 $final_ecat_ids = array_map('intval', array_filter($final_ecat_ids));
 
 // ── 3. Filters & Pagination Params ────────────────────────────────────────
-$perPage     = 8;
+$perPage     = 12;
 $currentPage = max(1, (int)($_GET['page'] ?? 1));
 $filterBrand = trim($_GET['brand'] ?? '');
-$filterPrice = trim($_GET['price'] ?? '2'); // Default to ৳ 30,000 - ৳ 50,000 matching mockup
-$filterRam   = trim($_GET['ram'] ?? '8 GB'); // Default to 8 GB matching mockup
+$filterPrice = trim($_GET['price'] ?? '');
+$filterRam   = trim($_GET['ram'] ?? '');
 $filterSort  = trim($_GET['sort'] ?? 'popularity');
 $filterView  = trim($_GET['view'] ?? 'grid');
 $filterSubcat= trim($_GET['subcat'] ?? '');
@@ -97,199 +94,93 @@ $filterSubcat= trim($_GET['subcat'] ?? '');
 $dbProducts = [];
 $totalProductCount = 0;
 
-if (!empty($final_ecat_ids)) {
+if (empty($final_ecat_ids)) {
+    $whereClauses = ["p.p_is_active = 1"];
+    $params = [];
+} else {
     $placeholders = implode(',', array_fill(0, count($final_ecat_ids), '?'));
     $whereClauses = ["p.ecat_id IN ($placeholders)", "p.p_is_active = 1"];
     $params = $final_ecat_ids;
-
-    if ($filterBrand !== '') {
-        $whereClauses[] = "p.p_name LIKE ?";
-        $params[] = '%' . $filterBrand . '%';
-    }
-
-    if ($filterPrice === '1') {
-        $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) < 30000";
-    } elseif ($filterPrice === '2') {
-        $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 30000 AND 50000";
-    } elseif ($filterPrice === '3') {
-        $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 50000 AND 80000";
-    } elseif ($filterPrice === '4') {
-        $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 80000 AND 120000";
-    } elseif ($filterPrice === '5') {
-        $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) > 120000";
-    }
-
-    $whereSQL = 'WHERE ' . implode(' AND ', $whereClauses);
-
-    $orderSQL = match($filterSort) {
-        'price_asc'  => 'ORDER BY CAST(p.p_current_price AS DECIMAL(12,2)) ASC',
-        'price_desc' => 'ORDER BY CAST(p.p_current_price AS DECIMAL(12,2)) DESC',
-        'newest'     => 'ORDER BY p.p_id DESC',
-        'rating'     => 'ORDER BY avg_r DESC',
-        default      => 'ORDER BY p.p_id DESC',
-    };
-
-    try {
-        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tbl_product p $whereSQL");
-        $stmtCount->execute($params);
-        $totalProductCount = (int)$stmtCount->fetchColumn();
-    } catch (Throwable $e) {}
-
-    $offset = ($currentPage - 1) * $perPage;
-    try {
-        $stmtProd = $pdo->prepare(
-            "SELECT p.*,
-                    COALESCE((SELECT AVG(r.rating) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as avg_r,
-                    COALESCE((SELECT COUNT(r.r_id) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as review_count
-             FROM tbl_product p
-             $whereSQL
-             $orderSQL
-             LIMIT ? OFFSET ?"
-        );
-        $stmtProd->execute(array_merge($params, [$perPage, $offset]));
-        $dbProducts = $stmtProd->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {}
 }
 
-// ── 5. Mockup Flagship Products (Matching media_1790250619159.png) ────────
-$mockProducts = [
-    [
-        'p_id' => 'm1',
-        'p_name' => 'HP Pavilion 15',
-        'p_current_price' => '62999',
-        'p_old_price' => '73999',
-        'p_qty' => 25,
-        'p_featured_photo' => 'cat_mockup/p1_hp_pavilion.png',
-        'avg_r' => 4.6,
-        'review_count' => 892,
-        'badge' => 'Best Seller',
-        'badge_class' => 'b-yellow',
-        'specs' => 'Intel i5 | 8GB RAM | 512GB SSD | 15.6" FHD',
-        'discount' => 15,
-        'brand' => 'HP',
-        'ram' => '8 GB'
-    ],
-    [
-        'p_id' => 'm2',
-        'p_name' => 'Apple MacBook Air (M2)',
-        'p_current_price' => '105999',
-        'p_old_price' => '124999',
-        'p_qty' => 18,
-        'p_featured_photo' => 'cat_mockup/p2_macbook_air.png',
-        'avg_r' => 4.8,
-        'review_count' => 1200,
-        'badge' => '-15%',
-        'badge_class' => 'b-red',
-        'specs' => 'Apple M2 | 8GB RAM | 256GB SSD | 13.6"',
-        'discount' => 15,
-        'brand' => 'Apple',
-        'ram' => '8 GB'
-    ],
-    [
-        'p_id' => 'm3',
-        'p_name' => 'Dell Inspiron 15',
-        'p_current_price' => '68999',
-        'p_old_price' => '',
-        'p_qty' => 12,
-        'p_featured_photo' => 'cat_mockup/p3_dell_inspiron.png',
-        'avg_r' => 4.5,
-        'review_count' => 643,
-        'badge' => 'New',
-        'badge_class' => 'b-green',
-        'specs' => 'Intel i5 | 16GB RAM | 512GB SSD | 15.6" FHD',
-        'discount' => 0,
-        'brand' => 'Dell',
-        'ram' => '16 GB'
-    ],
-    [
-        'p_id' => 'm4',
-        'p_name' => 'ASUS ROG Strix G15',
-        'p_current_price' => '112999',
-        'p_old_price' => '132999',
-        'p_qty' => 8,
-        'p_featured_photo' => 'cat_mockup/p4_asus_rog.png',
-        'avg_r' => 4.7,
-        'review_count' => 421,
-        'badge' => 'Gaming',
-        'badge_class' => 'b-purple',
-        'specs' => 'Ryzen 7 | 16GB RAM | 1TB SSD | 15.6" FHD',
-        'discount' => 15,
-        'brand' => 'ASUS',
-        'ram' => '16 GB'
-    ],
-    [
-        'p_id' => 'm5',
-        'p_name' => 'Lenovo ThinkPad E14',
-        'p_current_price' => '58999',
-        'p_old_price' => '67999',
-        'p_qty' => 30,
-        'p_featured_photo' => 'cat_mockup/p5_lenovo_thinkpad.png',
-        'avg_r' => 4.4,
-        'review_count' => 318,
-        'badge' => '',
-        'badge_class' => '',
-        'specs' => 'Intel i5 | 8GB RAM | 512GB SSD | 14" FHD',
-        'discount' => 13,
-        'brand' => 'Lenovo',
-        'ram' => '8 GB'
-    ],
-    [
-        'p_id' => 'm6',
-        'p_name' => 'Acer Aspire 5',
-        'p_current_price' => '54999',
-        'p_old_price' => '62999',
-        'p_qty' => 20,
-        'p_featured_photo' => 'cat_mockup/p6_acer_aspire.png',
-        'avg_r' => 4.3,
-        'review_count' => 276,
-        'badge' => '',
-        'badge_class' => '',
-        'specs' => 'Intel i5 | 8GB RAM | 512GB SSD | 15.6" FHD',
-        'discount' => 13,
-        'brand' => 'Acer',
-        'ram' => '8 GB'
-    ],
-    [
-        'p_id' => 'm7',
-        'p_name' => 'Microsoft Surface Laptop Go 3',
-        'p_current_price' => '72999',
-        'p_old_price' => '84999',
-        'p_qty' => 15,
-        'p_featured_photo' => 'cat_mockup/p7_surface_laptop.png',
-        'avg_r' => 4.4,
-        'review_count' => 189,
-        'badge' => '',
-        'badge_class' => '',
-        'specs' => 'Intel i5 | 8GB RAM | 256GB SSD | 12.4"',
-        'discount' => 14,
-        'brand' => 'Microsoft',
-        'ram' => '8 GB'
-    ],
-    [
-        'p_id' => 'm8',
-        'p_name' => 'HP Victus 15',
-        'p_current_price' => '49999',
-        'p_old_price' => '57999',
-        'p_qty' => 22,
-        'p_featured_photo' => 'cat_mockup/p8_hp_victus.png',
-        'avg_r' => 4.2,
-        'review_count' => 156,
-        'badge' => '',
-        'badge_class' => '',
-        'specs' => 'Ryzen 5 | 8GB RAM | 512GB SSD | 15.6" FHD',
-        'discount' => 14,
-        'brand' => 'HP',
-        'ram' => '8 GB'
-    ],
-];
+if ($filterBrand !== '') {
+    $whereClauses[] = "p.p_name LIKE ?";
+    $params[] = '%' . $filterBrand . '%';
+}
 
-// If DB returns fewer than 4 items (common in clean local dev), hydrate with mockup seed items
+if ($filterPrice === '1') {
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) < 30000";
+} elseif ($filterPrice === '2') {
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 30000 AND 50000";
+} elseif ($filterPrice === '3') {
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 50000 AND 80000";
+} elseif ($filterPrice === '4') {
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 80000 AND 120000";
+} elseif ($filterPrice === '5') {
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) > 120000";
+}
+
+$whereSQL = 'WHERE ' . implode(' AND ', $whereClauses);
+
+$orderSQL = match($filterSort) {
+    'price_asc'  => 'ORDER BY CAST(p.p_current_price AS DECIMAL(12,2)) ASC',
+    'price_desc' => 'ORDER BY CAST(p.p_current_price AS DECIMAL(12,2)) DESC',
+    'newest'     => 'ORDER BY p.p_id DESC',
+    'rating'     => 'ORDER BY avg_r DESC',
+    default      => 'ORDER BY p.p_id DESC',
+};
+
+try {
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tbl_product p $whereSQL");
+    $stmtCount->execute($params);
+    $totalProductCount = (int)$stmtCount->fetchColumn();
+} catch (Throwable $e) {}
+
+$limitInt = max(1, (int)$perPage);
+$offsetInt = max(0, ($currentPage - 1) * $limitInt);
+
+try {
+    $stmtProd = $pdo->prepare(
+        "SELECT p.*,
+                COALESCE((SELECT AVG(r.rating) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as avg_r,
+                COALESCE((SELECT COUNT(*) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as review_count
+         FROM tbl_product p
+         $whereSQL
+         $orderSQL
+         LIMIT $limitInt OFFSET $offsetInt"
+    );
+    $stmtProd->execute($params);
+    $dbProducts = $stmtProd->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {}
+
 $displayProducts = $dbProducts;
-if (count($displayProducts) < 4) {
-    // Merge or fallback to mockup products to ensure pixel-perfect fidelity with media_1790250619159.png
-    $displayProducts = $mockProducts;
-    $totalProductCount = 482; // Matches exact mockup count!
-}
+
+$realSubcategories = [];
+try {
+    if ($category_type === 'top-category') {
+        $subStmt = $pdo->prepare("SELECT m.mcat_id, m.mcat_name, COUNT(p.p_id) as p_count 
+                                  FROM tbl_mid_category m 
+                                  LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
+                                  LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                                  WHERE m.tcat_id = ? 
+                                  GROUP BY m.mcat_id, m.mcat_name 
+                                  ORDER BY m.mcat_id ASC");
+        $subStmt->execute([$category_id]);
+        $realSubcategories = $subStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+} catch (Throwable $e) {}
+
+$sidebarCategories = [];
+try {
+    $sbCatStmt = $pdo->query("SELECT t.tcat_id, t.tcat_name, COUNT(p.p_id) as cat_count 
+                             FROM tbl_top_category t 
+                             LEFT JOIN tbl_mid_category m ON m.tcat_id = t.tcat_id 
+                             LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
+                             LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                             GROUP BY t.tcat_id, t.tcat_name 
+                             ORDER BY t.tcat_order ASC, t.tcat_id ASC");
+    $sidebarCategories = $sbCatStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {}
 
 // ── 6. Wishlist check ─────────────────────────────────────────────────────
 $wishlistIds = [];
@@ -333,11 +224,15 @@ function renderStarIcons($rating) {
     color: #0f172a;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     padding-bottom: 60px;
+    width: 100%;
+    overflow-x: hidden;
 }
 .sn-cat-container {
+    width: 100%;
     max-width: 1240px;
     margin: 0 auto;
-    padding: 0 16px;
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 /* Breadcrumb */
@@ -368,18 +263,25 @@ function renderStarIcons($rating) {
 
 /* Top Section: Title on Left + Hero Promo Card on Right */
 .sn-top-row {
+    display: block;
+    width: 100%;
+    margin-bottom: 24px;
+}
+.sn-top-row:has(.sn-promo-card) {
     display: grid;
     grid-template-columns: 310px 1fr;
     gap: 24px;
     align-items: center;
-    margin-bottom: 24px;
+}
+.sn-cat-info {
+    width: 100%;
 }
 .sn-cat-info h1 {
     font-size: 30px;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: -0.02em;
-    margin: 0 0 10px 0;
+    margin: 0 0 8px 0;
     line-height: 1.2;
 }
 .sn-cat-info p {
@@ -387,7 +289,7 @@ function renderStarIcons($rating) {
     color: #64748b;
     line-height: 1.55;
     margin: 0;
-    max-width: 290px;
+    max-width: 100%;
 }
 
 /* Promo Card */
@@ -491,9 +393,10 @@ function renderStarIcons($rating) {
 /* 6 Subcategory Horizontal Quick Filter Cards */
 .sn-subcat-tabs {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 14px;
     margin-bottom: 24px;
+    width: 100%;
 }
 .sn-subcat-card {
     background: #ffffff;
@@ -540,17 +443,24 @@ function renderStarIcons($rating) {
     color: #b45309;
 }
 
-/* Main Layout: Sidebar (250px) + Catalog Content */
+/* Main Layout: Sidebar (260px) + Catalog Content */
 .sn-catalog-layout {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 260px 1fr;
     gap: 24px;
     align-items: start;
+    width: 100%;
 }
 
 /* Left Sidebar */
 .sn-sidebar {
-    background: transparent;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px;
+    position: sticky;
+    top: 90px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 .sn-filter-header {
     display: flex;
@@ -1050,9 +960,14 @@ function renderStarIcons($rating) {
     transform: translateY(0);
 }
 
-/* Responsive Collapses */
-@media (max-width: 1024px) {
-    .sn-top-row {
+/* Responsive Layout Breakpoints */
+@media (max-width: 1200px) {
+    .sn-product-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (max-width: 991px) {
+    .sn-top-row:has(.sn-promo-card) {
         grid-template-columns: 1fr;
     }
     .sn-promo-card {
@@ -1062,24 +977,29 @@ function renderStarIcons($rating) {
         display: none;
     }
     .sn-subcat-tabs {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
     .sn-catalog-layout {
         grid-template-columns: 1fr;
     }
     .sn-sidebar {
-        display: none; /* Collapsible on mobile/tablet */
+        position: static;
+        margin-bottom: 20px;
     }
     .sn-product-grid {
         grid-template-columns: repeat(3, 1fr);
     }
 }
 @media (max-width: 768px) {
+    .sn-cat-container {
+        padding: 0 14px;
+    }
     .sn-subcat-tabs {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     }
     .sn-product-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
     }
     .sn-promo-card {
         grid-template-columns: 1fr;
@@ -1089,8 +1009,13 @@ function renderStarIcons($rating) {
     }
 }
 @media (max-width: 480px) {
+    .sn-subcat-tabs {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
     .sn-product-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
     }
 }
 </style>
@@ -1108,73 +1033,29 @@ function renderStarIcons($rating) {
             <span class="current"><?= htmlspecialchars($title) ?></span>
         </nav>
 
-        <!-- 2. Top Header Row: Category Info + Hero Promo Card -->
+        <!-- 2. Top Header Row: Category Info -->
         <section class="sn-top-row">
-            <div class="sn-cat-info">
+            <div class="sn-cat-info" style="width: 100%;">
                 <h1><?= htmlspecialchars($title) ?></h1>
-                <p>Find the perfect laptop for work, study, gaming and more.<br>Best brands, latest models, and great prices.</p>
-            </div>
-
-            <div class="sn-promo-card">
-                <div class="sn-promo-text">
-                    <span class="sn-promo-badge">Top Picks</span>
-                    <h2 class="sn-promo-title">Power Your Ideas</h2>
-                    <p class="sn-promo-sub">Premium laptops for work, study and creativity.</p>
-                    <a href="#sn-catalog" class="sn-promo-btn">Shop Now &rarr;</a>
-                </div>
-                <div class="sn-promo-img-wrap">
-                    <img src="assets/uploads/cat_mockup/hero_laptop.png" alt="Laptop Promo" onerror="this.src='assets/uploads/laptop_hp_pavilion.png'">
-                </div>
-                <div class="sn-promo-trust">
-                    <div class="sn-trust-item">
-                        <i class="fa-solid fa-shield-halved"></i>
-                        <span>Top Brands</span>
-                    </div>
-                    <div class="sn-trust-item">
-                        <i class="fa-solid fa-tag"></i>
-                        <span>Best Prices</span>
-                    </div>
-                    <div class="sn-trust-item">
-                        <i class="fa-solid fa-truck-fast"></i>
-                        <span>Fast Delivery</span>
-                    </div>
-                </div>
+                <p>Showing products in <?= htmlspecialchars($title) ?>.</p>
             </div>
         </section>
 
-        <!-- 3. Quick-Filter Subcategory Tabs (6 horizontal cards) -->
+        <?php if (!empty($realSubcategories)): ?>
+        <!-- 3. Quick-Filter Subcategory Tabs -->
         <section class="sn-subcat-tabs">
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === '' || $filterSubcat === 'all') ? 'active' : '' ?>" onclick="filterSubcat('all', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-laptop"></i></div>
-                <div class="sn-subcat-name">All Laptops</div>
-                <div class="sn-subcat-count">482 items</div>
+            <a href="product-category.php?id=<?= $category_id ?>&type=<?= $category_type ?>" class="sn-subcat-card <?= ($filterSubcat === '' || $filterSubcat === 'all') ? 'active' : '' ?>">
+                <div class="sn-subcat-name">All</div>
+                <div class="sn-subcat-count"><?= $totalProductCount ?> items</div>
             </a>
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === 'gaming') ? 'active' : '' ?>" onclick="filterSubcat('gaming', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-gamepad"></i></div>
-                <div class="sn-subcat-name">Gaming Laptops</div>
-                <div class="sn-subcat-count">96 items</div>
-            </a>
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === 'business') ? 'active' : '' ?>" onclick="filterSubcat('business', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-briefcase"></i></div>
-                <div class="sn-subcat-name">Business Laptops</div>
-                <div class="sn-subcat-count">124 items</div>
-            </a>
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === 'student') ? 'active' : '' ?>" onclick="filterSubcat('student', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-graduation-cap"></i></div>
-                <div class="sn-subcat-name">Student Laptops</div>
-                <div class="sn-subcat-count">87 items</div>
-            </a>
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === '2in1') ? 'active' : '' ?>" onclick="filterSubcat('2in1', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-tablet-screen-button"></i></div>
-                <div class="sn-subcat-name">2-in-1 Laptops</div>
-                <div class="sn-subcat-count">42 items</div>
-            </a>
-            <a href="javascript:void(0)" class="sn-subcat-card <?= ($filterSubcat === 'refurbished') ? 'active' : '' ?>" onclick="filterSubcat('refurbished', this)">
-                <div class="sn-subcat-icon"><i class="fa-solid fa-recycle"></i></div>
-                <div class="sn-subcat-name">Refurbished</div>
-                <div class="sn-subcat-count">36 items</div>
-            </a>
+            <?php foreach ($realSubcategories as $rSub): ?>
+                <a href="product-category.php?id=<?= $rSub['mcat_id'] ?>&type=mid-category" class="sn-subcat-card <?= ($category_type === 'mid-category' && $category_id == $rSub['mcat_id']) ? 'active' : '' ?>">
+                    <div class="sn-subcat-name"><?= htmlspecialchars($rSub['mcat_name']) ?></div>
+                    <div class="sn-subcat-count"><?= (int)$rSub['p_count'] ?> items</div>
+                </a>
+            <?php endforeach; ?>
         </section>
+        <?php endif; ?>
 
         <!-- 4. Main Catalog Section (Sidebar + Product Listing) -->
         <div class="sn-catalog-layout" id="sn-catalog">
@@ -1189,65 +1070,18 @@ function renderStarIcons($rating) {
                 <!-- Category Accordion -->
                 <div class="sn-accordion" id="acc-cat">
                     <div class="sn-acc-header" onclick="toggleAccordion('acc-cat')">
-                        <span class="sn-acc-title">Category</span>
+                        <span class="sn-acc-title">Categories</span>
                         <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
                     </div>
                     <div class="sn-acc-body">
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" checked onchange="filterCheckChange()"> Laptops</label>
-                            <span class="sn-count-tag">(482)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" onchange="filterCheckChange()"> Desktop Computers</label>
-                            <span class="sn-count-tag">(128)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" onchange="filterCheckChange()"> Monitors</label>
-                            <span class="sn-count-tag">(96)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" onchange="filterCheckChange()"> Accessories</label>
-                            <span class="sn-count-tag">(243)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Brand Accordion -->
-                <div class="sn-accordion" id="acc-brand">
-                    <div class="sn-acc-header" onclick="toggleAccordion('acc-brand')">
-                        <span class="sn-acc-title">Brand</span>
-                        <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
-                    </div>
-                    <div class="sn-acc-body">
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="HP" onchange="applyFilters()"> HP</label>
-                            <span class="sn-count-tag">(120)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="Dell" onchange="applyFilters()"> Dell</label>
-                            <span class="sn-count-tag">(98)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="Lenovo" onchange="applyFilters()"> Lenovo</label>
-                            <span class="sn-count-tag">(87)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="ASUS" onchange="applyFilters()"> ASUS</label>
-                            <span class="sn-count-tag">(64)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="Acer" onchange="applyFilters()"> Acer</label>
-                            <span class="sn-count-tag">(52)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="Apple" onchange="applyFilters()"> Apple</label>
-                            <span class="sn-count-tag">(42)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="brand-check" value="Microsoft" onchange="applyFilters()"> Microsoft</label>
-                            <span class="sn-count-tag">(18)</span>
-                        </div>
-                        <a href="javascript:void(0)" class="sn-more-link" onclick="toast('Showing all 24 computer brands')">+ Show more</a>
+                        <?php foreach ($sidebarCategories as $sbCat): ?>
+                            <div class="sn-check-item">
+                                <a href="product-category.php?id=<?= $sbCat['tcat_id'] ?>&type=top-category" style="text-decoration:none; color:inherit; display:flex; justify-content:space-between; width:100%; font-size:13px; padding:4px 0;">
+                                    <span><?= htmlspecialchars($sbCat['tcat_name']) ?></span>
+                                    <span class="sn-count-tag">(<?= (int)$sbCat['cat_count'] ?>)</span>
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
 
@@ -1259,73 +1093,23 @@ function renderStarIcons($rating) {
                     </div>
                     <div class="sn-acc-body">
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="1" onchange="applyFilters()"> Under ৳ 30,000</label>
+                            <label><input type="radio" name="price_range" value="" <?= ($filterPrice === '') ? 'checked' : '' ?> onchange="applyFilters()"> All Prices</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="2" checked onchange="applyFilters()"> ৳ 30,000 – ৳ 50,000</label>
+                            <label><input type="radio" name="price_range" value="1" <?= ($filterPrice === '1') ? 'checked' : '' ?> onchange="applyFilters()"> Under ৳ 30,000</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="3" onchange="applyFilters()"> ৳ 50,000 – ৳ 80,000</label>
+                            <label><input type="radio" name="price_range" value="2" <?= ($filterPrice === '2') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 30,000 – ৳ 50,000</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="4" onchange="applyFilters()"> ৳ 80,000 – ৳ 1,20,000</label>
+                            <label><input type="radio" name="price_range" value="3" <?= ($filterPrice === '3') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 50,000 – ৳ 80,000</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="5" onchange="applyFilters()"> Above ৳ 1,20,000</label>
+                            <label><input type="radio" name="price_range" value="4" <?= ($filterPrice === '4') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 80,000 – ৳ 1,20,000</label>
                         </div>
-                    </div>
-                </div>
-
-                <!-- RAM Accordion -->
-                <div class="sn-accordion" id="acc-ram">
-                    <div class="sn-acc-header" onclick="toggleAccordion('acc-ram')">
-                        <span class="sn-acc-title">RAM</span>
-                        <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
-                    </div>
-                    <div class="sn-acc-body">
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="ram-check" value="4 GB" onchange="applyFilters()"> 4 GB</label>
-                            <span class="sn-count-tag">(56)</span>
+                        <div class="sn-radio-item">
+                            <label><input type="radio" name="price_range" value="5" <?= ($filterPrice === '5') ? 'checked' : '' ?> onchange="applyFilters()"> Above ৳ 1,20,000</label>
                         </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="ram-check" value="8 GB" checked onchange="applyFilters()"> 8 GB</label>
-                            <span class="sn-count-tag">(210)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="ram-check" value="16 GB" onchange="applyFilters()"> 16 GB</label>
-                            <span class="sn-count-tag">(142)</span>
-                        </div>
-                        <div class="sn-check-item">
-                            <label><input type="checkbox" class="ram-check" value="32 GB" onchange="applyFilters()"> 32 GB</label>
-                            <span class="sn-count-tag">(38)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Storage Accordion (Collapsed) -->
-                <div class="sn-accordion collapsed" id="acc-storage">
-                    <div class="sn-acc-header" onclick="toggleAccordion('acc-storage')">
-                        <span class="sn-acc-title">Storage</span>
-                        <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
-                    </div>
-                    <div class="sn-acc-body">
-                        <div class="sn-check-item"><label><input type="checkbox"> 256 GB SSD</label><span class="sn-count-tag">(84)</span></div>
-                        <div class="sn-check-item"><label><input type="checkbox"> 512 GB SSD</label><span class="sn-count-tag">(245)</span></div>
-                        <div class="sn-check-item"><label><input type="checkbox"> 1 TB SSD</label><span class="sn-count-tag">(112)</span></div>
-                    </div>
-                </div>
-
-                <!-- Processor Accordion (Collapsed) -->
-                <div class="sn-accordion collapsed" id="acc-processor">
-                    <div class="sn-acc-header" onclick="toggleAccordion('acc-processor')">
-                        <span class="sn-acc-title">Processor</span>
-                        <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
-                    </div>
-                    <div class="sn-acc-body">
-                        <div class="sn-check-item"><label><input type="checkbox"> Intel Core i5</label><span class="sn-count-tag">(180)</span></div>
-                        <div class="sn-check-item"><label><input type="checkbox"> Intel Core i7</label><span class="sn-count-tag">(95)</span></div>
-                        <div class="sn-check-item"><label><input type="checkbox"> AMD Ryzen 5</label><span class="sn-count-tag">(82)</span></div>
-                        <div class="sn-check-item"><label><input type="checkbox"> Apple Silicon (M-series)</label><span class="sn-count-tag">(42)</span></div>
                     </div>
                 </div>
             </aside>
@@ -1359,90 +1143,103 @@ function renderStarIcons($rating) {
                     </div>
                 </div>
 
-                <!-- 4-Column Product Grid -->
+                <!-- Product Grid -->
                 <div class="sn-product-grid" id="productGrid">
-                    <?php foreach ($displayProducts as $prod):
-                        $pid = $prod['p_id'];
-                        $isMock = str_starts_with((string)$pid, 'm');
-                        $pname = $prod['p_name'] ?? 'Product';
-                        $currPrice = (float)($prod['p_current_price'] ?? 0);
-                        $oldPrice = !empty($prod['p_old_price']) ? (float)$prod['p_old_price'] : 0;
-                        $photo = $prod['p_featured_photo'] ?? 'default.png';
-                        $rating = (float)($prod['avg_r'] ?? 4.5);
-                        $revCount = (int)($prod['review_count'] ?? 100);
-                        $specs = $prod['specs'] ?? 'Intel Core | High Performance';
-                        $badge = $prod['badge'] ?? '';
-                        $badgeClass = $prod['badge_class'] ?? 'b-yellow';
-                        $discount = (int)($prod['discount'] ?? 0);
-                        if (!$discount && $oldPrice > $currPrice) {
-                            $discount = round((($oldPrice - $currPrice) / $oldPrice) * 100);
-                        }
-                        $isWish = in_array($pid, $wishlistIds);
-                        $detailLink = $isMock ? "product.php?id=86" : "product.php?id=" . urlencode($pid);
-                    ?>
-                    <div class="sn-card" data-pid="<?= htmlspecialchars($pid) ?>" data-price="<?= $currPrice ?>" data-rating="<?= $rating ?>" data-brand="<?= htmlspecialchars($prod['brand'] ?? '') ?>" data-ram="<?= htmlspecialchars($prod['ram'] ?? '') ?>">
-                        <div class="sn-card-top">
-                            <?php if (!empty($badge)): ?>
-                                <span class="sn-badge <?= htmlspecialchars($badgeClass) ?>"><?= htmlspecialchars($badge) ?></span>
-                            <?php else: ?>
-                                <span></span>
-                            <?php endif; ?>
-
-                            <button type="button" class="sn-wish-btn <?= $isWish ? 'active' : '' ?>" title="Add to Wishlist" onclick="toggleWishlist('<?= htmlspecialchars($pid) ?>', this)">
-                                <i class="<?= $isWish ? 'fa-solid' : 'fa-regular' ?> fa-heart"></i>
-                            </button>
+                    <?php if (empty($displayProducts)): ?>
+                        <div style="grid-column: 1 / -1; padding: 50px 20px; text-align: center; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <i class="fa-solid fa-box-open" style="font-size: 40px; color: #94a3b8; margin-bottom: 15px;"></i>
+                            <h3 style="font-size: 18px; color: #1e293b; margin-bottom: 8px;">No Products Found</h3>
+                            <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">There are no products available in this category yet.</p>
+                            <a href="index.php" style="display: inline-block; padding: 8px 22px; background: #fab802; color: #111; font-weight: 700; border-radius: 999px; text-decoration: none;">Browse Store</a>
                         </div>
-
-                        <div class="sn-card-thumb">
-                            <a href="<?= $detailLink ?>">
-                                <img src="assets/uploads/<?= htmlspecialchars($photo) ?>" alt="<?= htmlspecialchars($pname) ?>" onerror="this.src='assets/uploads/default.png'" loading="lazy">
-                            </a>
-                        </div>
-
-                        <div class="sn-card-body">
-                            <h3 class="sn-card-title"><a href="<?= $detailLink ?>"><?= htmlspecialchars($pname) ?></a></h3>
-                            <div class="sn-card-specs"><?= htmlspecialchars($specs) ?></div>
-
-                            <div class="sn-card-rating">
-                                <?= renderStarIcons($rating) ?>
-                                <span class="sn-rate-val"><?= number_format($rating, 1) ?></span>
-                                <span class="sn-rate-count">(<?= formatReviewCount($revCount) ?>)</span>
-                            </div>
-
-                            <div class="sn-card-price-row">
-                                <span class="sn-price-current">৳ <?= number_format($currPrice) ?></span>
-                                <?php if ($oldPrice > $currPrice): ?>
-                                    <span class="sn-price-old">৳ <?= number_format($oldPrice) ?></span>
-                                <?php endif; ?>
+                    <?php else: ?>
+                        <?php foreach ($displayProducts as $prod):
+                            $pid = $prod['p_id'];
+                            $pname = $prod['p_name'] ?? 'Product';
+                            $currPrice = (float)($prod['p_current_price'] ?? 0);
+                            $oldPrice = !empty($prod['p_old_price']) ? (float)$prod['p_old_price'] : 0;
+                            $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
+                            $photoUrl = !empty($photo) ? (str_starts_with($photo, 'http') ? $photo : (function_exists('get_media_url') ? get_media_url($photo) : BASE_URL . 'assets/uploads/' . $photo)) : BASE_URL . 'assets/images/no-image.png';
+                            $rating = (float)($prod['avg_r'] ?? 0);
+                            $revCount = (int)($prod['review_count'] ?? 0);
+                            $specs = !empty($prod['p_short_description']) ? strip_tags($prod['p_short_description']) : '';
+                            $discount = ($oldPrice > $currPrice && $oldPrice > 0) ? round((($oldPrice - $currPrice) / $oldPrice) * 100) : 0;
+                            $isWish = in_array($pid, $wishlistIds);
+                            $detailLink = function_exists('getProductURL') ? getProductURL($pid, $pname, BASE_URL) : BASE_URL . "product.php?id=" . urlencode($pid);
+                        ?>
+                        <div class="sn-card" data-pid="<?= htmlspecialchars($pid) ?>" data-price="<?= $currPrice ?>" data-rating="<?= $rating ?>">
+                            <div class="sn-card-top">
                                 <?php if ($discount > 0): ?>
-                                    <span class="sn-discount-badge"><?= $discount ?>% OFF</span>
+                                    <span class="sn-badge b-red">-<?= $discount ?>%</span>
+                                <?php else: ?>
+                                    <span></span>
                                 <?php endif; ?>
+
+                                <button type="button" class="sn-wish-btn <?= $isWish ? 'active' : '' ?>" title="Add to Wishlist" onclick="toggleWishlist('<?= htmlspecialchars($pid) ?>', this)">
+                                    <i class="<?= $isWish ? 'fa-solid' : 'fa-regular' ?> fa-heart"></i>
+                                </button>
                             </div>
 
-                            <div class="sn-card-actions">
-                                <button type="button" class="sn-add-cart-btn" onclick="addToCart('<?= htmlspecialchars($pid) ?>', this)">
-                                    <i class="fa-solid fa-cart-shopping"></i>
-                                    <span>Add to Cart</span>
-                                </button>
-                                <a href="<?= $detailLink ?>" class="sn-details-link">View Details &rarr;</a>
+                            <div class="sn-card-thumb">
+                                <a href="<?= $detailLink ?>">
+                                    <img src="<?= htmlspecialchars($photoUrl) ?>" alt="<?= htmlspecialchars($pname) ?>" onerror="this.src='assets/images/no-image.png'" loading="lazy">
+                                </a>
+                            </div>
+
+                            <div class="sn-card-body">
+                                <h3 class="sn-card-title"><a href="<?= $detailLink ?>"><?= htmlspecialchars($pname) ?></a></h3>
+                                <?php if (!empty($specs)): ?>
+                                    <div class="sn-card-specs"><?= htmlspecialchars($specs) ?></div>
+                                <?php endif; ?>
+
+                                <?php if ($rating > 0): ?>
+                                <div class="sn-card-rating">
+                                    <?= renderStarIcons($rating) ?>
+                                    <span class="sn-rate-val"><?= number_format($rating, 1) ?></span>
+                                    <span class="sn-rate-count">(<?= formatReviewCount($revCount) ?>)</span>
+                                </div>
+                                <?php endif; ?>
+
+                                <div class="sn-card-price-row">
+                                    <span class="sn-price-current">৳ <?= number_format($currPrice) ?></span>
+                                    <?php if ($oldPrice > $currPrice): ?>
+                                        <span class="sn-price-old">৳ <?= number_format($oldPrice) ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($discount > 0): ?>
+                                        <span class="sn-discount-badge"><?= $discount ?>% OFF</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="sn-card-actions">
+                                    <button type="button" class="sn-add-cart-btn" onclick="addToCart('<?= htmlspecialchars($pid) ?>', this)">
+                                        <i class="fa-solid fa-cart-shopping"></i>
+                                        <span>Add to Cart</span>
+                                    </button>
+                                    <a href="<?= $detailLink ?>" class="sn-details-link">View Details &rarr;</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
 
-                <!-- 5. Pagination Bar matching mockup: ←  1  2  3  4  5  ...  21  → -->
+                <!-- 5. Dynamic Pagination Bar -->
+                <?php
+                $totalPages = ceil($totalProductCount / $perPage);
+                if ($totalPages > 1):
+                ?>
                 <div class="sn-pagination">
-                    <a href="javascript:void(0)" class="sn-page-nav" onclick="changePage('prev')"><i class="fa-solid fa-arrow-left"></i></a>
-                    <a href="javascript:void(0)" class="sn-page-item active" onclick="changePage(1)">1</a>
-                    <a href="javascript:void(0)" class="sn-page-item" onclick="changePage(2)">2</a>
-                    <a href="javascript:void(0)" class="sn-page-item" onclick="changePage(3)">3</a>
-                    <a href="javascript:void(0)" class="sn-page-item" onclick="changePage(4)">4</a>
-                    <a href="javascript:void(0)" class="sn-page-item" onclick="changePage(5)">5</a>
-                    <span class="sn-page-dots">...</span>
-                    <a href="javascript:void(0)" class="sn-page-item" onclick="changePage(21)">21</a>
-                    <a href="javascript:void(0)" class="sn-page-nav" onclick="changePage('next')"><i class="fa-solid fa-arrow-right"></i></a>
+                    <?php if ($currentPage > 1): ?>
+                        <a href="product-category.php?id=<?= $category_id ?>&type=<?= $category_type ?>&page=<?= ($currentPage - 1) ?>" class="sn-page-nav"><i class="fa-solid fa-arrow-left"></i></a>
+                    <?php endif; ?>
+                    <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+                        <a href="product-category.php?id=<?= $category_id ?>&type=<?= $category_type ?>&page=<?= $p ?>" class="sn-page-item <?= ($p === $currentPage) ? 'active' : '' ?>"><?= $p ?></a>
+                    <?php endfor; ?>
+                    <?php if ($currentPage < $totalPages): ?>
+                        <a href="product-category.php?id=<?= $category_id ?>&type=<?= $category_type ?>&page=<?= ($currentPage + 1) ?>" class="sn-page-nav"><i class="fa-solid fa-arrow-right"></i></a>
+                    <?php endif; ?>
                 </div>
+                <?php endif; ?>
 
             </main>
         </div>
@@ -1514,28 +1311,14 @@ function renderStarIcons($rating) {
         const cards = document.querySelectorAll('.sn-card');
         let count = 0;
         cards.forEach(c => {
-            // Apply subcategory logic
-            if (catKey === 'all') {
+            if (catKey === 'all' || !catKey) {
                 c.style.display = 'flex';
                 count++;
-            } else if (catKey === 'gaming') {
-                const name = c.querySelector('.sn-card-title')?.textContent || '';
-                const isGaming = name.includes('ROG') || name.includes('Victus') || name.includes('Gaming');
-                c.style.display = isGaming ? 'flex' : 'none';
-                if (isGaming) count++;
-            } else if (catKey === 'business') {
-                const name = c.querySelector('.sn-card-title')?.textContent || '';
-                const isBiz = name.includes('ThinkPad') || name.includes('Dell') || name.includes('Surface');
-                c.style.display = isBiz ? 'flex' : 'none';
-                if (isBiz) count++;
-            } else if (catKey === 'student') {
-                const name = c.querySelector('.sn-card-title')?.textContent || '';
-                const isStudent = name.includes('Aspire') || name.includes('Pavilion') || name.includes('Surface');
-                c.style.display = isStudent ? 'flex' : 'none';
-                if (isStudent) count++;
             } else {
-                c.style.display = 'flex';
-                count++;
+                const sub = (c.dataset.subcat || c.querySelector('.sn-card-specs')?.textContent || '').toLowerCase();
+                const match = sub.includes(catKey.toLowerCase());
+                c.style.display = match ? 'flex' : 'none';
+                if (match) count++;
             }
         });
 
@@ -1544,30 +1327,14 @@ function renderStarIcons($rating) {
         toast('Filtered by ' + (cardEl?.querySelector('.sn-subcat-name')?.textContent || 'Category'));
     };
 
-    // 5. Sidebar Filters (Brand, Price, RAM)
+    // 5. Sidebar Filters
     window.applyFilters = function() {
-        const selectedBrands = Array.from(document.querySelectorAll('.brand-check:checked')).map(cb => cb.value.toLowerCase());
         const selectedPrice = document.querySelector('input[name="price_range"]:checked')?.value;
-        const selectedRams = Array.from(document.querySelectorAll('.ram-check:checked')).map(cb => cb.value.toLowerCase());
-
         const cards = document.querySelectorAll('.sn-card');
         let visibleCount = 0;
 
         cards.forEach(card => {
-            const cardBrand = (card.dataset.brand || '').toLowerCase();
             const cardPrice = parseFloat(card.dataset.price || '0');
-            const cardRam = (card.dataset.ram || '').toLowerCase();
-
-            let matchBrand = true;
-            if (selectedBrands.length > 0) {
-                matchBrand = selectedBrands.some(b => cardBrand.includes(b));
-            }
-
-            let matchRam = true;
-            if (selectedRams.length > 0) {
-                matchRam = selectedRams.some(r => cardRam.includes(r));
-            }
-
             let matchPrice = true;
             if (selectedPrice === '1') matchPrice = cardPrice < 30000;
             else if (selectedPrice === '2') matchPrice = (cardPrice >= 30000 && cardPrice <= 50000);
@@ -1575,20 +1342,13 @@ function renderStarIcons($rating) {
             else if (selectedPrice === '4') matchPrice = (cardPrice >= 80000 && cardPrice <= 120000);
             else if (selectedPrice === '5') matchPrice = cardPrice > 120000;
 
-            // If 0 matches on strict, show gracefully
-            if (matchBrand && matchRam) {
+            if (matchPrice) {
                 card.style.display = 'flex';
                 visibleCount++;
             } else {
                 card.style.display = 'none';
             }
         });
-
-        if (visibleCount === 0) {
-            // Restore all to prevent empty state in demo
-            cards.forEach(c => c.style.display = 'flex');
-            visibleCount = cards.length;
-        }
 
         const countHeader = document.getElementById('productCountHeader');
         if (countHeader) countHeader.textContent = visibleCount + ' products';
@@ -1599,15 +1359,13 @@ function renderStarIcons($rating) {
     };
 
     window.clearAllFilters = function() {
-        document.querySelectorAll('.brand-check, .ram-check').forEach(cb => cb.checked = false);
-        const radio = document.querySelector('input[name="price_range"][value="2"]');
-        if (radio) radio.checked = true;
-        document.querySelectorAll('.sn-subcat-card').forEach(c => c.classList.remove('active'));
-        document.querySelector('.sn-subcat-card')?.classList.add('active');
+        const allRadio = document.querySelector('input[name="price_range"][value=""]');
+        if (allRadio) allRadio.checked = true;
 
-        document.querySelectorAll('.sn-card').forEach(c => c.style.display = 'flex');
+        const cards = document.querySelectorAll('.sn-card');
+        cards.forEach(c => c.style.display = 'flex');
         const countHeader = document.getElementById('productCountHeader');
-        if (countHeader) countHeader.textContent = '482 products';
+        if (countHeader) countHeader.textContent = cards.length + ' products';
         toast('All filters cleared');
     };
 
@@ -1645,7 +1403,7 @@ function renderStarIcons($rating) {
 
         const fd = new FormData();
         fd.append('action', newActive ? 'add' : 'remove');
-        fd.append('product_id', productId.replace('m', '86')); // fallback to valid product id for mock
+        fd.append('product_id', productId);
 
         fetch('wishlist_action.php', {
             method: 'POST',
@@ -1671,9 +1429,7 @@ function renderStarIcons($rating) {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
 
         const fd = new FormData();
-        // Use real product id or fallback to ID 86 for mock demo products
-        const realId = productId.startsWith('m') ? '86' : productId;
-        fd.append('product_id', realId);
+        fd.append('product_id', productId);
         fd.append('quantity', '1');
 
         fetch('add-to-cart-ajax.php', {

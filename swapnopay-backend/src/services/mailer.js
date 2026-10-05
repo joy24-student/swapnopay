@@ -3,6 +3,7 @@
 // Uses the same Gmail OAuth2 approach as gateway-service/src/gmail.js.
 
 import nodemailer from 'nodemailer'
+import { generateInvoicePdf, buildInvoiceHtml, getInvoiceAttachments, getMerchantLogoBuffer } from './invoiceService.js'
 
 let _transporter = null
 let _fromEmail = ''
@@ -13,8 +14,12 @@ let _fromName = ''
  * Call this at startup.
  */
 export function initMailer() {
-  const fromEmail = (process.env.SMTP_USER || process.env.GMAIL_FROM_EMAIL || process.env.EMAIL_FROM || 'payment@swapnopay.top').trim().toLowerCase()
+  // Public From address seen by customer/merchant in the email header
+  const fromEmail = (process.env.SMTP_FROM || process.env.GMAIL_FROM_EMAIL || process.env.EMAIL_FROM || 'payment@swapnopay.top').trim().toLowerCase()
   const fromName = process.env.GMAIL_FROM_NAME || process.env.EMAIL_FROM_NAME || 'SwapnoPay'
+  
+  // Dedicated SMTP authentication username (e.g. the Gmail account address when using smtp.gmail.com)
+  const authUser = (process.env.SMTP_USER || process.env.GMAIL_USER || process.env.EMAIL_USER || fromEmail).trim().toLowerCase()
   const appPassword = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || '').replace(/\s+/g, '')
 
   _fromEmail = fromEmail
@@ -24,7 +29,7 @@ export function initMailer() {
   if (appPassword) {
     const host = process.env.SMTP_HOST || 'smtp.gmail.com'
     const port = Number(process.env.SMTP_PORT) || 465
-    const secure = process.env.SMTP_SECURE !== 'false'
+    const secure = process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE !== 'false' : port === 465
 
     _transporter = nodemailer.createTransport({
       service: host.includes('gmail') ? 'gmail' : undefined,
@@ -32,11 +37,14 @@ export function initMailer() {
       port,
       secure,
       auth: {
-        user: _fromEmail,
+        user: authUser,
         pass: appPassword,
       },
+      tls: {
+        rejectUnauthorized: false
+      }
     })
-    console.log('[mailer] SMTP transporter ready with App Password. Sending from:', _fromEmail)
+    console.log(`[mailer] SMTP transporter ready with ${host.includes('gmail') ? 'Gmail/App Password' : 'SMTP'}. Login user: ${authUser} | Display from: ${_fromEmail}`)
     return
   }
 
@@ -50,7 +58,7 @@ export function initMailer() {
       service: 'gmail',
       auth: {
         type: 'OAuth2',
-        user: _fromEmail,
+        user: authUser,
         clientId,
         clientSecret,
         refreshToken,
@@ -60,8 +68,8 @@ export function initMailer() {
     return
   }
 
-  console.warn('[mailer] Email credentials not fully set -- email receipts disabled.')
-  console.warn('[mailer] Set GMAIL_APP_PASSWORD (or SMTP_PASS) or GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN.')
+  console.warn('[mailer] ⚠️  Email credentials not fully set -- email receipts disabled.')
+  console.warn('[mailer] Set GMAIL_APP_PASSWORD (or SMTP_PASS) with SMTP_USER or GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN.')
 }
 
 export function isMailerReady() {
@@ -90,9 +98,19 @@ export async function sendPaymentReceipt(role, toEmail, paymentData) {
   const subject =
     role === 'merchant'
       ? `[PAID] ${paymentData.tran_id} — BDT ${Number(paymentData.amount).toFixed(2)}`
-      : `Payment Receipt from ${paymentData.merchant_name || 'SwapnoPay Merchant'}`
+      : `Payment Invoice ${paymentData.order_id || paymentData.tran_id} — ${paymentData.merchant_name || 'SwapnoPay Merchant'}`
 
-  const html = buildReceiptHtml(role, paymentData)
+  const merchantLogoBuf = await getMerchantLogoBuffer(paymentData.merchant_logo_url || paymentData.photo_url || paymentData.merchant_logo).catch(() => null)
+
+  let pdfBuffer = null
+  try {
+    pdfBuffer = await generateInvoicePdf(paymentData)
+  } catch (pdfErr) {
+    console.warn(`[mailer] PDF invoice generation notice for ${role}:`, pdfErr.message)
+  }
+
+  const html = buildInvoiceHtml(paymentData, role, Boolean(merchantLogoBuf))
+  const attachments = getInvoiceAttachments(paymentData, pdfBuffer, merchantLogoBuf)
 
   try {
     const info = await _transporter.sendMail({
@@ -100,8 +118,9 @@ export async function sendPaymentReceipt(role, toEmail, paymentData) {
       to: normalizedTo,
       subject,
       html,
+      attachments,
     })
-    console.log(`[mailer] Receipt sent to ${role} (${normalizedTo}): messageId=${info.messageId}`)
+    console.log(`[mailer] Official receipt & invoice PDF sent to ${role} (${normalizedTo}): messageId=${info.messageId} (pdf=${pdfBuffer ? 'attached' : 'none'}, merchantLogo=${merchantLogoBuf ? 'yes' : 'badge'})`)
     return info.messageId
   } catch (err) {
     console.error(`[mailer] Failed to send receipt to ${role} (${normalizedTo}):`, err.message)
@@ -121,19 +140,33 @@ export async function sendPaymentReceipts(paymentData) {
     merchant_receipts_enabled = true,
   } = paymentData
 
+  console.log(`[mailer] 📧 sendPaymentReceipts triggered for order ${paymentData.order_id || paymentData.tran_id}:`, {
+    customer_email: customer_email || '(none)',
+    customer_receipts_enabled,
+    merchant_email: merchant_email || '(none)',
+    merchant_receipts_enabled,
+    mailer_ready: isMailerReady()
+  })
+
+  if (!customer_email) {
+    console.warn(`[mailer] ℹ️ Customer receipt skipped for order ${paymentData.order_id || paymentData.tran_id}: No customer email provided in order data.`)
+  } else if (!customer_receipts_enabled) {
+    console.warn(`[mailer] ℹ️ Customer receipt skipped for order ${paymentData.order_id || paymentData.tran_id}: customer_receipts_enabled is false in gateway config.`)
+  }
+
   const tasks = []
 
   if (customer_receipts_enabled && customer_email) {
     tasks.push(
       sendPaymentReceipt('customer', customer_email, paymentData)
-        .catch(err => console.error('[mailer] Customer receipt error:', err.message))
+        .catch(err => console.error(`[mailer] ❌ Customer receipt failed for ${customer_email}:`, err.message))
     )
   }
 
   if (merchant_receipts_enabled && merchant_email && merchant_email !== customer_email) {
     tasks.push(
       sendPaymentReceipt('merchant', merchant_email, paymentData)
-        .catch(err => console.error('[mailer] Merchant receipt error:', err.message))
+        .catch(err => console.error(`[mailer] ❌ Merchant receipt failed for ${merchant_email}:`, err.message))
     )
   }
 

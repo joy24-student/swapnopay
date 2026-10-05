@@ -201,10 +201,10 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 						
 <!-- After return policy field -->
 <div class="form-group">
-    <label for="" class="col-sm-3 control-label">YouTube Video Link</label>
+    <label for="" class="col-sm-3 control-label">Product Video Link</label>
     <div class="col-sm-8">
-        <input type="text" name="p_video_link" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
-        <small class="text-muted">Paste YouTube product video URL</small>
+        <input type="text" name="p_video_link" class="form-control" placeholder="https://www.youtube.com/watch?v=... or https://...r2.dev/video.mp4">
+        <small class="text-muted">Supports YouTube video links or Cloudflare R2 / direct MP4 object storage URLs (comma or newline separated for multiple videos).</small>
     </div>
 </div>
 

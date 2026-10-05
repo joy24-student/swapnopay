@@ -30,6 +30,28 @@ object GeminiClient {
         "gemini-1.5-pro"
     )
 
+    private val roundRobinCursor = java.util.concurrent.atomic.AtomicInteger(0)
+    private val keyCooldownUntilMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun parseKeyPool(keysInput: String): List<String> {
+        return keysInput.split(Regex("[\\r\\n,;]+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
+    private fun getOrderedKeys(rawKeys: List<String>): List<String> {
+        if (rawKeys.size <= 1) return rawKeys
+        val count = rawKeys.size
+        val start = (roundRobinCursor.getAndIncrement() and Int.MAX_VALUE) % count
+        val rotated = (0 until count).map { idx -> rawKeys[(start + idx) % count] }
+        val now = System.currentTimeMillis()
+        val (healthy, cooling) = rotated.partition { key ->
+            (keyCooldownUntilMs[key] ?: 0L) <= now
+        }
+        return healthy + cooling.sortedBy { keyCooldownUntilMs[it] ?: 0L }
+    }
+
     suspend fun getChatCompletion(
         apiKey: String,
         model: String = "gemini-2.0-flash",
@@ -37,8 +59,9 @@ object GeminiClient {
         onSuccess: (response: String) -> Unit,
         onFailure: (error: String) -> Unit
     ) {
-        if (apiKey.isBlank()) {
-            onFailure("No Google AI Studio API key configured. Please add a key in Settings.")
+        val rawKeys = parseKeyPool(apiKey)
+        if (rawKeys.isEmpty()) {
+            onFailure("No Google AI Studio API key configured. Please add one or more keys in Settings.")
             return
         }
 
@@ -81,58 +104,71 @@ object GeminiClient {
                 put("maxOutputTokens", 2048)
             })
         }
-        val requestBody = payload.toString().toRequestBody(JSON_MEDIA_TYPE)
+        val requestBodyString = payload.toString()
 
         val candidateModels = (listOf(model) + GEMINI_MODELS).distinct()
+        val orderedKeys = getOrderedKeys(rawKeys)
         var lastError = "Unknown error"
 
-        for (candidateModel in candidateModels) {
-            val modelUrl = "$GEMINI_URL$candidateModel:generateContent"
-            val request = Request.Builder()
-                .url(modelUrl)
-                .addHeader("x-goog-api-key", apiKey)
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody)
-                .build()
+        for (currentKey in orderedKeys) {
+            for (candidateModel in candidateModels) {
+                val modelUrl = "$GEMINI_URL$candidateModel:generateContent"
+                val request = Request.Builder()
+                    .url(modelUrl)
+                    .addHeader("x-goog-api-key", currentKey)
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBodyString.toRequestBody(JSON_MEDIA_TYPE))
+                    .build()
 
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    client.newCall(request).execute().use { response ->
-                        val bodyStr = response.body?.string()
-                        val code = response.code
+                try {
+                    var rotateKeyImmediately = false
+                    val result = withContext(Dispatchers.IO) {
+                        client.newCall(request).execute().use { response ->
+                            val bodyStr = response.body?.string()
+                            val code = response.code
 
-                        if (response.isSuccessful && bodyStr != null) {
-                            val json = JSONObject(bodyStr)
-                            val candidates = json.optJSONArray("candidates")
-                            if (candidates != null && candidates.length() > 0) {
-                                val candidate = candidates.getJSONObject(0)
-                                val contentObj = candidate.optJSONObject("content")
-                                val parts = contentObj?.optJSONArray("parts")
-                                if (parts != null && parts.length() > 0) {
-                                    val text = parts.getJSONObject(0).optString("text", "")
-                                    if (text.isNotEmpty()) {
-                                        return@use text
+                            if (response.isSuccessful && bodyStr != null) {
+                                val json = JSONObject(bodyStr)
+                                val candidates = json.optJSONArray("candidates")
+                                if (candidates != null && candidates.length() > 0) {
+                                    val candidate = candidates.getJSONObject(0)
+                                    val contentObj = candidate.optJSONObject("content")
+                                    val parts = contentObj?.optJSONArray("parts")
+                                    if (parts != null && parts.length() > 0) {
+                                        val text = parts.getJSONObject(0).optString("text", "")
+                                        if (text.isNotEmpty()) {
+                                            keyCooldownUntilMs.remove(currentKey)
+                                            return@use text
+                                        }
                                     }
                                 }
+                                lastError = "Model $candidateModel returned empty response content"
+                                null
+                            } else {
+                                val errorDetail = bodyStr ?: "HTTP error $code"
+                                lastError = "Model $candidateModel failed: Code $code - $errorDetail"
+                                Log.w("GeminiClient", lastError)
+                                if (code == 429 || code == 400 || code == 401 || code == 403) {
+                                    val cooldownMs = if (code == 429) 60_000L else 300_000L
+                                    keyCooldownUntilMs[currentKey] = System.currentTimeMillis() + cooldownMs
+                                    rotateKeyImmediately = true
+                                }
+                                null
                             }
-                            lastError = "Model $candidateModel returned empty response content"
-                            null
-                        } else {
-                            val errorDetail = bodyStr ?: "HTTP error $code"
-                            lastError = "Model $candidateModel failed: Code $code - $errorDetail"
-                            Log.w("GeminiClient", lastError)
-                            null
                         }
                     }
-                }
 
-                if (result != null) {
-                    onSuccess(result)
-                    return
+                    if (result != null) {
+                        onSuccess(result)
+                        return
+                    }
+                    if (rotateKeyImmediately) {
+                        break // Try next Gemini key in pool
+                    }
+                } catch (e: Exception) {
+                    lastError = "Model $candidateModel network exception: ${e.localizedMessage ?: "timeout"}"
+                    Log.w("GeminiClient", lastError)
                 }
-            } catch (e: Exception) {
-                lastError = "Model $candidateModel network exception: ${e.localizedMessage ?: "timeout"}"
-                Log.w("GeminiClient", lastError)
             }
         }
 

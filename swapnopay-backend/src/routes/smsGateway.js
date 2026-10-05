@@ -4,7 +4,6 @@
 
 import express from 'express'
 import crypto from 'node:crypto'
-import { getMerchantDeviceStatus } from '../services/adminSupabase.js'
 
 export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   const router = express.Router()
@@ -55,36 +54,21 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   // ────────────────────────────────────────────────────────────────────────────
   router.post('/send-otp', authenticateGatewayApiKey, async (req, res) => {
     try {
-      const {
-        phone,
-        purpose = 'Verification',
-        expiryMinutes = 5,
-        expiry_seconds,
-        length = 6,
-        otp_length,
-        template,
-        brand_name,
-        is_test,
-        test_otp_code,
-      } = req.body
+      const { phone, purpose = 'Verification', expiryMinutes = 5, length = 6, template } = req.body
 
       if (!phone || typeof phone !== 'string' || phone.trim().length < 10) {
         return res.status(400).json({ ok: false, error: 'Valid phone number is required' })
       }
 
       const cleanPhone = phone.trim().replace(/\s+/g, '')
-      const codeLength = Math.min(Math.max(Number(otp_length || length) || 6, 4), 8)
+      const codeLength = Math.min(Math.max(Number(length) || 6, 4), 8)
       
-      // Generate or reuse test OTP
-      let otpCode = (is_test && test_otp_code) ? String(test_otp_code).trim() : ''
-      if (!otpCode) {
-        const minNum = Math.pow(10, codeLength - 1)
-        const maxNum = Math.pow(10, codeLength) - 1
-        otpCode = crypto.randomInt(minNum, maxNum + 1).toString()
-      }
+      // Generate cryptographically secure random numeric OTP
+      const minNum = Math.pow(10, codeLength - 1)
+      const maxNum = Math.pow(10, codeLength) - 1
+      const otpCode = crypto.randomInt(minNum, maxNum + 1).toString()
 
-      const calculatedMinutes = expiry_seconds ? Math.ceil(Number(expiry_seconds) / 60) : (Number(expiryMinutes) || 5)
-      const ttlMs = calculatedMinutes * 60 * 1000
+      const ttlMs = (Number(expiryMinutes) || 5) * 60 * 1000
       const expiresAt = Date.now() + ttlMs
       const otpId = `otp_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
       const jobId = `job_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
@@ -102,8 +86,7 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
       })
 
       // Formulate Bengali / English dual message text
-      const brand = brand_name || 'SwapnoPay'
-      const defaultMsg = `আপনার ${brand} যাচাইকরণ ওটিপি কোড হলো: ${otpCode}। কোডটির মেয়াদ ${calculatedMinutes} মিনিট। কাউকে এটি জানাবেন না।`
+      const defaultMsg = `আপনার SwapnoPay যাচাইকরণ ওটিপি কোড হলো: ${otpCode}। কোডটির মেয়াদ ${expiryMinutes} মিনিট। কাউকে এটি জানাবেন না।`
       const messageText = template ? template.replace('{code}', otpCode).replace('{otp}', otpCode) : defaultMsg
 
       // Enqueue job for merchant Android device
@@ -131,12 +114,10 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
 
       return res.status(200).json({
         ok: true,
-        success: true,
         otp_id: otpId,
         job_id: jobId,
         phone: cleanPhone,
         purpose,
-        test_otp_code: is_test ? otpCode : undefined,
         expires_in_seconds: Math.floor(ttlMs / 1000),
         message: 'OTP queued for SIM dispatch',
       })
@@ -269,18 +250,10 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   // ────────────────────────────────────────────────────────────────────────────
   router.get('/device/pending', async (req, res) => {
     try {
-      const rawHeader = req.headers['x-api-key'] || req.headers['x-merchant-id'] || ''
-      const headerMerchantId = rawHeader.startsWith('sp_gw_m_') ? rawHeader.replace('sp_gw_m_', '').split('_')[0] : rawHeader
-      const merchantId = req.query.merchant_id || headerMerchantId || '00000000-0000-0000-0000-000000000001'
+      const merchantId = req.query.merchant_id || '00000000-0000-0000-0000-000000000001'
       const pendingJobs = []
-      const now = Date.now()
 
       for (const [id, job] of jobQueue.entries()) {
-        // Recover stale IN_PROGRESS jobs if device hasn't reported back within 5 minutes
-        if (job.status === 'IN_PROGRESS' && job.in_progress_at && (now - job.in_progress_at > 5 * 60 * 1000)) {
-          job.status = 'QUEUED'
-        }
-
         if (job.merchant_id === merchantId && job.status === 'QUEUED') {
           pendingJobs.push({
             job_id: job.job_id,
@@ -290,7 +263,6 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
             created_at: job.created_at,
           })
           job.status = 'IN_PROGRESS'
-          job.in_progress_at = now
           if (pendingJobs.length >= 20) break
         }
       }
@@ -336,7 +308,7 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
         }
       }
 
-      return res.status(200).json({ ok: true, updated: !!job })
+      return res.status(200).json({ ok: true, updated: true })
     } catch (err) {
       return res.status(500).json({ ok: false, error: err.message })
     }
@@ -346,7 +318,7 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   // 6. GET /v1/sms-gateway/stats
   // Gateway throughput and device status summary
   // ────────────────────────────────────────────────────────────────────────────
-  router.get('/stats', authenticateGatewayApiKey, async (req, res) => {
+  router.get('/stats', authenticateGatewayApiKey, (req, res) => {
     let queued = 0
     let sent = 0
     let failed = 0
@@ -359,13 +331,7 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
       }
     }
 
-    let isOnline = heartbeatMap.has(req.merchant_id)
-    if (!isOnline && typeof getMerchantDeviceStatus === 'function') {
-      try {
-        const devStatus = await getMerchantDeviceStatus(req.merchant_id, heartbeatMap)
-        isOnline = !!devStatus?.active
-      } catch (_) {}
-    }
+    const isOnline = heartbeatMap.has(req.merchant_id)
 
     return res.status(200).json({
       ok: true,

@@ -31,6 +31,28 @@ object OpenRouterClient {
         "meta-llama/llama-3-8b-instruct:free"
     )
 
+    private val roundRobinCursor = java.util.concurrent.atomic.AtomicInteger(0)
+    private val keyCooldownUntilMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun parseKeyPool(keysCsv: String): List<String> {
+        return keysCsv.split(Regex("[\\r\\n,;]+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
+    private fun getOrderedKeys(rawKeys: List<String>): List<String> {
+        if (rawKeys.size <= 1) return rawKeys
+        val count = rawKeys.size
+        val start = (roundRobinCursor.getAndIncrement() and Int.MAX_VALUE) % count
+        val rotated = (0 until count).map { idx -> rawKeys[(start + idx) % count] }
+        val now = System.currentTimeMillis()
+        val (healthy, cooling) = rotated.partition { key ->
+            (keyCooldownUntilMs[key] ?: 0L) <= now
+        }
+        return healthy + cooling.sortedBy { keyCooldownUntilMs[it] ?: 0L }
+    }
+
     suspend fun getChatCompletion(
         keysCsv: String,
         messages: JSONArray,
@@ -38,9 +60,7 @@ object OpenRouterClient {
         onSuccess: (response: String) -> Unit,
         onFailure: (error: String) -> Unit
     ) {
-        val rawKeys = keysCsv.split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        val rawKeys = parseKeyPool(keysCsv)
 
         if (rawKeys.isEmpty()) {
             onFailure("No OpenRouter API keys configured. Please add keys in Settings.")
@@ -89,9 +109,11 @@ object OpenRouterClient {
                 })
             }
         }
-        
-        // Loop through keys and models
-        for (currentKey in rawKeys) {
+
+        val orderedKeys = getOrderedKeys(rawKeys)
+
+        // Loop through pooled keys (in Round-Robin + healthy-first order) and models
+        for (currentKey in orderedKeys) {
             for (currentModel in modelsToTry) {
                 Log.d("OpenRouterClient", "Attempting request with model $currentModel")
 
@@ -111,6 +133,7 @@ object OpenRouterClient {
                     .build()
 
                 try {
+                    var rotateKeyImmediately = false
                     val contentResult = withContext(Dispatchers.IO) {
                         client.newCall(request).execute().use { response ->
                             val bodyStr = response.body?.string()
@@ -124,6 +147,7 @@ object OpenRouterClient {
                                     val messageObj = choice.optJSONObject("message")
                                     val content = messageObj?.optString("content", "") ?: ""
                                     if (content.isNotEmpty()) {
+                                        keyCooldownUntilMs.remove(currentKey)
                                         return@use content
                                     }
                                 }
@@ -132,6 +156,11 @@ object OpenRouterClient {
                                 val errorDetail = bodyStr ?: "HTTP error $code"
                                 lastError = "Model $currentModel failed: Code $code - $errorDetail"
                                 Log.w("OpenRouterClient", "Call failed for model $currentModel: $errorDetail")
+                                if (code == 429 || code == 401 || code == 402 || code == 403) {
+                                    val cooldownMs = if (code == 429) 60_000L else 300_000L
+                                    keyCooldownUntilMs[currentKey] = System.currentTimeMillis() + cooldownMs
+                                    rotateKeyImmediately = true
+                                }
                             }
                             null
                         }
@@ -139,6 +168,9 @@ object OpenRouterClient {
                     if (contentResult != null) {
                         onSuccess(contentResult)
                         return
+                    }
+                    if (rotateKeyImmediately) {
+                        break // Rotate to next OpenRouter key in the pool
                     }
                 } catch (e: Exception) {
                     lastError = "Model $currentModel network exception: ${e.localizedMessage ?: "timeout"}"

@@ -52,25 +52,52 @@ try {
         $datetime = date('Y-m-d H:i:s');
         $timestamp = time();
 
-        $insertStmt = $pdo->prepare("INSERT INTO tbl_customer (
-            cust_name, cust_email, cust_password, cust_token,
-            cust_datetime, cust_timestamp, cust_status,
-            supabase_uid, google_id, avatar_url
-        ) VALUES (?, ?, '', ?, ?, ?, 1, ?, ?, ?) RETURNING cust_id");
+        try {
+            $insertStmt = $pdo->prepare("INSERT INTO tbl_customer (
+                cust_name, cust_cname, cust_email, cust_phone, cust_country,
+                cust_address, cust_city, cust_state, cust_zip,
+                cust_b_name, cust_b_cname, cust_b_phone, cust_b_country, cust_b_address, cust_b_city, cust_b_state, cust_b_zip,
+                cust_s_name, cust_s_cname, cust_s_phone, cust_s_country, cust_s_address, cust_s_city, cust_s_state, cust_s_zip,
+                cust_password, cust_token, cust_datetime, cust_timestamp, cust_status,
+                supabase_uid, google_id, avatar_url
+            ) VALUES (
+                ?, '', ?, '', 0,
+                '', '', '', '',
+                ?, '', '', 0, '', '', '', '',
+                ?, '', '', 0, '', '', '', '',
+                '', ?, ?, ?, 1,
+                ?, ?, ?
+            ) RETURNING cust_id");
 
-        $insertStmt->execute([
-            $name ?: 'Google User',
-            $email,
-            $token,
-            $datetime,
-            $timestamp,
-            $supabase_uid,
-            $google_id,
-            $avatar_url
-        ]);
-
-        $newId = $insertStmt->fetchColumn();
-        if (!$newId) {
+            $insertStmt->execute([
+                $name ?: 'Google User',
+                $email,
+                $name ?: 'Google User',
+                $name ?: 'Google User',
+                $token,
+                $datetime,
+                $timestamp,
+                $supabase_uid,
+                $google_id,
+                $avatar_url
+            ]);
+            $newId = $insertStmt->fetchColumn();
+        } catch (Throwable $e) {
+            $fallbackStmt = $pdo->prepare("INSERT INTO tbl_customer (
+                cust_name, cust_email, cust_password, cust_token,
+                cust_datetime, cust_timestamp, cust_status,
+                supabase_uid, google_id, avatar_url
+            ) VALUES (?, ?, '', ?, ?, ?, 1, ?, ?, ?)");
+            $fallbackStmt->execute([
+                $name ?: 'Google User',
+                $email,
+                $token,
+                $datetime,
+                $timestamp,
+                $supabase_uid,
+                $google_id,
+                $avatar_url
+            ]);
             $newId = $pdo->lastInsertId();
         }
 
@@ -82,6 +109,10 @@ try {
     if ($customer) {
         unset($customer['cust_password']);
         $_SESSION['customer'] = $customer;
+
+        if (defined('MERCHANT_ID') && MERCHANT_ID) {
+            $_SESSION['shop_merchant_id'] = MERCHANT_ID;
+        }
 
         // Restore cart from DB
         if (function_exists('loadCartFromDatabase')) {

@@ -52,6 +52,8 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
 </style>
 <?php endif; ?>
 
+</div><!-- /.content-wrapper-main -->
+
 <footer class="sn-footer-wrap <?php echo ($mobile_footer_on_off == 0 ? 'sn-mobile-footer-hidden' : ''); ?>">
     <div class="sn-container">
         <div class="sn-footer-top">
@@ -135,6 +137,128 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
         </div>
     </div>
 </footer>
+
+<?php
+$chat_floating_icon_on_off = isset($settings['chat_floating_icon_on_off']) ? (int)$settings['chat_floating_icon_on_off'] : 1;
+$cur_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+?>
+
+<?php if ($chat_floating_icon_on_off == 1 && $cur_script !== 'messages.php'): ?>
+<!-- ========================================================
+     PC / DESKTOP FLOATING LIVE CHAT & AI COPILOT WIDGET
+     ======================================================== -->
+<style>
+@media (max-width: 768px) {
+    #snDesktopChatTrigger,
+    #snDesktopChatWindow {
+        display: none !important;
+    }
+}
+#snDesktopChatTrigger {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999998;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #111827 0%, #1F2937 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid rgba(245, 158, 11, 0.5);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#snDesktopChatTrigger:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 16px 30px -4px rgba(0, 0, 0, 0.35);
+    border-color: #F59E0B;
+}
+#snDesktopChatWindow {
+    position: fixed;
+    bottom: 94px;
+    right: 24px;
+    width: 390px;
+    height: 600px;
+    max-height: calc(100vh - 120px);
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    z-index: 999999;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.25s ease-out;
+}
+#snDesktopChatWindow.active {
+    display: flex;
+    animation: snChatSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes snChatSlideIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+</style>
+
+<!-- Floating Button on Desktop -->
+<div id="snDesktopChatTrigger" onclick="toggleSnDesktopChat()" title="Chat with AI Copilot & Live Support">
+    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; background-color: #10B981; border: 2px solid #111827; border-radius: 50%;"></span>
+    </div>
+</div>
+
+<!-- Floating Chat Drawer Window -->
+<div id="snDesktopChatWindow">
+    <!-- Window Bar -->
+    <div style="background: #111827; color: #ffffff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10B981;"></span>
+            <strong style="font-size: 13px; font-weight: 700; color: #F9FAFB;">Shop Assistant & Live Chat</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <a href="messages.php" target="_blank" title="Open Fullscreen" style="color: #9CA3AF; text-decoration: none; padding: 4px; display: flex; align-items: center;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#9CA3AF'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <polyline points="9 21 3 21 3 15"></polyline>
+                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+            </a>
+            <button onclick="toggleSnDesktopChat()" style="background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 4px; display: flex; align-items: center;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#9CA3AF'">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <!-- Embedded Live Chat View -->
+    <iframe id="snChatIframe" src="about:blank" style="width: 100%; height: 100%; border: none; flex: 1;" allow="camera; microphone; autoplay; display-capture"></iframe>
+</div>
+
+<script>
+function toggleSnDesktopChat() {
+    const win = document.getElementById('snDesktopChatWindow');
+    const iframe = document.getElementById('snChatIframe');
+    if (!win) return;
+    
+    if (win.classList.contains('active')) {
+        win.classList.remove('active');
+    } else {
+        if (iframe.getAttribute('src') === 'about:blank') {
+            iframe.setAttribute('src', 'messages.php?embed=1');
+        }
+        win.classList.add('active');
+    }
+}
+</script>
+<?php endif; ?>
 
 <script src="assets/js/jquery-2.2.4.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>

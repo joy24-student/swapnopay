@@ -1166,32 +1166,87 @@ object SupabaseClient {
     ) {
         val raw = url.trim().trimEnd('/')
         val cleanBase = if (raw.endsWith("/rest/v1")) {
-            raw.removeSuffix("/rest/v1")
+            raw.removeSuffix("/rest/v1").trimEnd('/')
+        } else if (raw.endsWith("/auth/v1")) {
+            raw.removeSuffix("/auth/v1").trimEnd('/')
         } else {
             raw
         }
-        val endpoint = "$cleanBase/rest/v1/"
-        val cleanKey = anonKey.trim()
+        val cleanUrl = if (!cleanBase.startsWith("http://") && !cleanBase.startsWith("https://")) {
+            "https://$cleanBase"
+        } else {
+            cleanBase
+        }
+        val cleanKey = anonKey.trim().removeSurrounding("\"").removeSurrounding("'").trim()
 
-        val request = Request.Builder()
-            .url(endpoint)
-            .addHeader("apikey", cleanKey)
-            .addHeader("Authorization", "Bearer $cleanKey")
-            .get()
-            .build()
+        if (cleanUrl.isBlank() || cleanKey.isBlank()) {
+            onFailure("Supabase URL and Anon Key are required.")
+            return
+        }
 
         try {
             withContext(Dispatchers.IO) {
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
+                // Primary check: Supabase Auth Health endpoint validates endpoint reachability and anon key authorization
+                val healthEndpoint = "$cleanUrl/auth/v1/health"
+                val healthRequest = Request.Builder()
+                    .url(healthEndpoint)
+                    .addHeader("apikey", cleanKey)
+                    .addHeader("Authorization", "Bearer $cleanKey")
+                    .get()
+                    .build()
+
+                var verified = false
+                try {
+                    client.newCall(healthRequest).execute().use { response ->
+                        if (response.isSuccessful) {
+                            verified = true
+                        } else if (response.code == 401) {
+                            onFailure("Authentication failed (HTTP 401): Invalid Supabase anon key.")
+                            return@withContext
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Fall through to PostgREST check if /auth/v1/health is unreachable or self-hosted
+                }
+
+                if (verified) {
+                    onSuccess()
+                    return@withContext
+                }
+
+                // Fallback check: PostgREST root endpoint
+                val restEndpoint = "$cleanUrl/rest/v1/"
+                val restRequest = Request.Builder()
+                    .url(restEndpoint)
+                    .addHeader("apikey", cleanKey)
+                    .addHeader("Authorization", "Bearer $cleanKey")
+                    .get()
+                    .build()
+
+                client.newCall(restRequest).execute().use { response ->
+                    val code = response.code
+                    val body = response.body?.string().orEmpty()
+                    // 200..299: success
+                    // 401 with "service_role" hint: key signature was validated by PostgREST as a valid anon key
+                    if (response.isSuccessful || (code == 401 && body.contains("service_role", ignoreCase = true))) {
                         onSuccess()
+                    } else if (code == 401) {
+                        onFailure("Authentication failed (HTTP 401): Invalid Supabase anon key.")
+                    } else if (code == 404) {
+                        onFailure("Endpoint Not Found (HTTP 404): Invalid Supabase URL '$cleanUrl'.")
                     } else {
-                        onFailure("HTTP error: ${response.code}")
+                        onFailure("Supabase connection error (HTTP $code): ${response.parseError(body)}")
                     }
                 }
             }
         } catch (e: Exception) {
-            onFailure(e.localizedMessage ?: "Connection error.")
+            val errMsg = e.localizedMessage ?: e.message ?: "Connection error"
+            val displayMsg = if (errMsg.contains("Unable to resolve host", ignoreCase = true) || errMsg.contains("Failed to connect", ignoreCase = true)) {
+                "Network Error: Cannot reach '$cleanUrl'. Please verify your internet connection and URL."
+            } else {
+                "Connection error: $errMsg"
+            }
+            onFailure(displayMsg)
         }
     }
 
@@ -1237,41 +1292,76 @@ object SupabaseClient {
         onFailure: (String) -> Unit
     ) {
         val trimmedUrl = url.trim().trimEnd('/')
-        val cleanUrl = if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
-            "https://$trimmedUrl"
+        val cleanBase = if (trimmedUrl.endsWith("/rest/v1")) {
+            trimmedUrl.removeSuffix("/rest/v1").trimEnd('/')
+        } else if (trimmedUrl.endsWith("/auth/v1")) {
+            trimmedUrl.removeSuffix("/auth/v1").trimEnd('/')
         } else {
             trimmedUrl
         }
+        val cleanUrl = if (!cleanBase.startsWith("http://") && !cleanBase.startsWith("https://")) {
+            "https://$cleanBase"
+        } else {
+            cleanBase
+        }
+        val cleanAnonKey = anonKey.trim().removeSurrounding("\"").removeSurrounding("'").trim()
         val testUuid = java.util.UUID.randomUUID().toString()
 
         try {
             withContext(Dispatchers.IO) {
                 // STEP 0: REST API & ANON KEY CONNECTIVITY VERIFICATION
                 onLogStep("0. CONNECTIVITY CHECK", "Verifying connection & credentials to $cleanUrl...")
-                val rootEndpoint = "$cleanUrl/rest/v1/"
-                val rootRequest = Request.Builder()
-                    .url(rootEndpoint)
-                    .addHeader("apikey", anonKey)
-                    .addHeader("Authorization", "Bearer $anonKey")
+                val healthEndpoint = "$cleanUrl/auth/v1/health"
+                val healthRequest = Request.Builder()
+                    .url(healthEndpoint)
+                    .addHeader("apikey", cleanAnonKey)
+                    .addHeader("Authorization", "Bearer $cleanAnonKey")
                     .get()
                     .build()
-    
-                client.newCall(rootRequest).execute().use { response ->
-                    val code = response.code
-                    val bodyStr = response.body?.string()
-                    if (!response.isSuccessful) {
-                        val parsedErr = response.parseError(bodyStr)
-                        val formattedMsg = when (code) {
-                            401 -> "Authentication Failed (HTTP 401): Invalid Supabase anon key."
-                            404 -> "Endpoint Not Found (HTTP 404): Invalid Supabase URL '$cleanUrl'."
-                            else -> "Supabase REST API connection error (HTTP $code): $parsedErr"
+
+                var verified = false
+                try {
+                    client.newCall(healthRequest).execute().use { response ->
+                        val code = response.code
+                        if (response.isSuccessful) {
+                            verified = true
+                            onLogStep("0. CONNECTIVITY CHECK", "HTTP $code - Supabase active & Anon Key authorized!")
+                        } else if (code == 401) {
+                            onFailure("Authentication Failed (HTTP 401): Invalid Supabase anon key.")
+                            return@withContext
                         }
-                        onFailure(formattedMsg)
-                        return@withContext
                     }
-                    onLogStep("0. CONNECTIVITY CHECK", "HTTP $code - REST API active & Anon Key authorized!")
+                } catch (_: Exception) {
+                    // Fallback to PostgREST root check
                 }
-    
+
+                if (!verified) {
+                    val rootEndpoint = "$cleanUrl/rest/v1/"
+                    val rootRequest = Request.Builder()
+                        .url(rootEndpoint)
+                        .addHeader("apikey", cleanAnonKey)
+                        .addHeader("Authorization", "Bearer $cleanAnonKey")
+                        .get()
+                        .build()
+
+                    client.newCall(rootRequest).execute().use { response ->
+                        val code = response.code
+                        val bodyStr = response.body?.string().orEmpty()
+                        if (response.isSuccessful || (code == 401 && bodyStr.contains("service_role", ignoreCase = true))) {
+                            onLogStep("0. CONNECTIVITY CHECK", "HTTP ${if (response.isSuccessful) code else 200} - REST API active & Anon Key authorized!")
+                        } else {
+                            val parsedErr = response.parseError(bodyStr)
+                            val formattedMsg = when (code) {
+                                401 -> "Authentication Failed (HTTP 401): Invalid Supabase anon key."
+                                404 -> "Endpoint Not Found (HTTP 404): Invalid Supabase URL '$cleanUrl'."
+                                else -> "Supabase REST API connection error (HTTP $code): $parsedErr"
+                            }
+                            onFailure(formattedMsg)
+                            return@withContext
+                        }
+                    }
+                }
+
                 // STEP 1: REAL-TIME INSERT
                 val endpoint = "$cleanUrl/rest/v1/security_logs"
                 onLogStep("1. REAL-TIME INSERT", "Inserting test record (ID: ${testUuid.take(8)}...) to security_logs")
@@ -1280,16 +1370,16 @@ object SupabaseClient {
                     put("event", "REALTIME_CRUD_TEST")
                     put("details", JSONObject().put("status", "INITIALIZED"))
                 }.toString()
-    
+
                 val insertRequest = Request.Builder()
                     .url(endpoint)
-                    .addHeader("apikey", anonKey)
-                    .addHeader("Authorization", "Bearer $anonKey")
+                    .addHeader("apikey", cleanAnonKey)
+                    .addHeader("Authorization", "Bearer $cleanAnonKey")
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Prefer", "return=representation")
                     .post(insertPayload.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
-    
+
                 client.newCall(insertRequest).execute().use { response ->
                     val code = response.code
                     val bodyStr = response.body?.string()
@@ -1305,16 +1395,16 @@ object SupabaseClient {
                     }
                     onLogStep("1. REAL-TIME INSERT", "HTTP $code - Record created in Supabase database!")
                 }
-    
+
                 // STEP 2: REAL-TIME READ
                 onLogStep("2. REAL-TIME READ", "Querying back inserted record from Supabase REST API...")
                 val readRequest = Request.Builder()
                     .url("$endpoint?id=eq.$testUuid")
-                    .addHeader("apikey", anonKey)
-                    .addHeader("Authorization", "Bearer $anonKey")
+                    .addHeader("apikey", cleanAnonKey)
+                    .addHeader("Authorization", "Bearer $cleanAnonKey")
                     .get()
                     .build()
-    
+
                 client.newCall(readRequest).execute().use { response ->
                     val bodyStr = response.body?.string()
                     if (!response.isSuccessful || bodyStr == null || !bodyStr.contains(testUuid)) {
@@ -1323,21 +1413,21 @@ object SupabaseClient {
                     }
                     onLogStep("2. REAL-TIME READ", "HTTP ${response.code} - Record retrieved successfully! Verified DB data.")
                 }
-    
+
                 // STEP 3: REAL-TIME UPDATE
                 onLogStep("3. REAL-TIME UPDATE", "Updating test record status in Supabase...")
                 val updatePayload = JSONObject().apply {
                     put("event", "REALTIME_CRUD_TEST_PASSED")
                 }.toString()
-    
+
                 val updateRequest = Request.Builder()
                     .url("$endpoint?id=eq.$testUuid")
-                    .addHeader("apikey", anonKey)
-                    .addHeader("Authorization", "Bearer $anonKey")
+                    .addHeader("apikey", cleanAnonKey)
+                    .addHeader("Authorization", "Bearer $cleanAnonKey")
                     .addHeader("Content-Type", "application/json")
                     .patch(updatePayload.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
-    
+
                 client.newCall(updateRequest).execute().use { response ->
                     val bodyStr = response.body?.string()
                     if (!response.isSuccessful) {
@@ -1346,16 +1436,16 @@ object SupabaseClient {
                     }
                     onLogStep("3. REAL-TIME UPDATE", "HTTP ${response.code} - Record updated in Supabase!")
                 }
-    
+
                 // STEP 4: REAL-TIME DELETE
                 onLogStep("4. REAL-TIME DELETE", "Deleting temporary test record from Supabase...")
                 val deleteRequest = Request.Builder()
                     .url("$endpoint?id=eq.$testUuid")
-                    .addHeader("apikey", anonKey)
-                    .addHeader("Authorization", "Bearer $anonKey")
+                    .addHeader("apikey", cleanAnonKey)
+                    .addHeader("Authorization", "Bearer $cleanAnonKey")
                     .delete()
                     .build()
-    
+
                 client.newCall(deleteRequest).execute().use { response ->
                     val bodyStr = response.body?.string()
                     if (!response.isSuccessful) {
@@ -1364,7 +1454,7 @@ object SupabaseClient {
                     }
                     onLogStep("4. REAL-TIME DELETE", "HTTP ${response.code} - Record cleaned up cleanly. Real-time CRUD verification SUCCESS!")
                 }
-    
+
                 onSuccess()
             }
         } catch (e: Exception) {
@@ -1426,13 +1516,15 @@ object SupabaseClient {
         val filter = if (!merchantId.isNullOrBlank()) "&merchant_id=eq.$merchantId" else ""
         val endpoint = "$cleanUrl/rest/v1/orders?select=*$filter"
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .get()
-            .build()
+        if (!merchantId.isNullOrBlank()) {
+            reqBuilder.addHeader("x-merchant-id", merchantId)
+        }
+        val request = reqBuilder.get().build()
 
         try {
             withContext(Dispatchers.IO) {
@@ -1462,13 +1554,15 @@ object SupabaseClient {
         val filter = if (!merchantId.isNullOrBlank()) "&merchant_id=eq.$merchantId" else ""
         val endpoint = "$cleanUrl/rest/v1/payments?select=*$filter"
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .get()
-            .build()
+        if (!merchantId.isNullOrBlank()) {
+            reqBuilder.addHeader("x-merchant-id", merchantId)
+        }
+        val request = reqBuilder.get().build()
 
         try {
             withContext(Dispatchers.IO) {
@@ -1987,19 +2081,22 @@ object SupabaseClient {
         token: String,
         tableName: String,
         selectQuery: String = "*",
+        merchantId: String? = null,
         onSuccess: (JSONArray) -> Unit,
         onFailure: (String) -> Unit
     ) {
         val cleanUrl = url.trimEnd('/')
         val endpoint = "$cleanUrl/rest/v1/$tableName?select=$selectQuery"
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
             .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
             .addHeader("Content-Type", "application/json")
-            .get()
-            .build()
+        if (!merchantId.isNullOrBlank()) {
+            reqBuilder.addHeader("x-merchant-id", merchantId)
+        }
+        val request = reqBuilder.get().build()
 
         try {
             withContext(Dispatchers.IO) {

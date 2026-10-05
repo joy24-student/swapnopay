@@ -27,55 +27,9 @@ if (!isset($_SESSION['cart_p_id']) || !is_array($_SESSION['cart_p_id'])) {
     $_SESSION['cart_p_badge'] = [];
 }
 
-// Seed flagship demo items matching the user's uploaded mockup if cart is empty
 if (empty($_SESSION['cart_p_id'])) {
-    $demo_items = [
-        [
-            'p_id' => 901,
-            'name' => 'HP Pavilion 15',
-            'subtitle' => 'Intel i5 | 8GB RAM | 512GB SSD | 15.6" FHD',
-            'current_price' => 62999,
-            'old_price' => 73999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'Natural Silver'
-        ],
-        [
-            'p_id' => 902,
-            'name' => 'Apple AirPods Pro (2nd Gen)',
-            'subtitle' => 'White | Active Noise Cancellation',
-            'current_price' => 27999,
-            'old_price' => 34999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'White'
-        ],
-        [
-            'p_id' => 903,
-            'name' => 'Samsung Galaxy Watch 6',
-            'subtitle' => 'Graphite | 44mm | Bluetooth',
-            'current_price' => 26999,
-            'old_price' => 32999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'Graphite'
-        ]
-    ];
-
-    foreach ($demo_items as $idx => $item) {
-        $k = $idx + 1;
-        $_SESSION['cart_p_id'][$k] = $item['p_id'];
-        $_SESSION['cart_size_id'][$k] = 0;
-        $_SESSION['cart_size_name'][$k] = '';
-        $_SESSION['cart_color_id'][$k] = 0;
-        $_SESSION['cart_color_name'][$k] = $item['color_name'];
-        $_SESSION['cart_p_qty'][$k] = $item['qty'];
-        $_SESSION['cart_p_current_price'][$k] = $item['current_price'];
-        $_SESSION['cart_p_name'][$k] = $item['name'];
-        $_SESSION['cart_p_featured_photo'][$k] = $item['photo'];
-        $_SESSION['cart_p_old_price'][$k] = $item['old_price'];
-        $_SESSION['cart_p_subtitle'][$k] = $item['subtitle'];
-    }
+    header('location: cart.php');
+    exit;
 }
 
 // Support selecting specific cart items from cart.php
@@ -150,16 +104,11 @@ $total_savings = 0;
 for ($i = 0; $i < $total_items_count; $i++) {
     $row_qty = (int)($arr_cart_p_qty[$i] ?? 1);
     $row_price = (float)($arr_cart_p_current_price[$i] ?? 0);
-    $row_old = (float)($arr_cart_p_old_price[$i] ?? ($row_price * 1.25));
+    $row_old = (float)($arr_cart_p_old_price[$i] ?? 0);
     $table_total_price += ($row_price * $row_qty);
     if ($row_old > $row_price) {
         $total_savings += (($row_old - $row_price) * $row_qty);
     }
-}
-
-// Mockup alignment: if total savings is 0 or demo, set to 18,000 to match mockup
-if ($total_savings == 0 && $table_total_price >= 100000) {
-    $total_savings = 18000;
 }
 
 // Default shipping cost (Standard Delivery: ৳60)
@@ -181,19 +130,6 @@ if (isset($_POST['apply_coupon_ajax']) || (isset($_POST['apply_coupon']) && !emp
         $coupon_stmt = $pdo->prepare("SELECT * FROM tbl_coupon WHERE coupon_code = ? AND status = 'active' AND start_date <= ? AND end_date >= ?");
         $coupon_stmt->execute([$submitted_code, $today, $today]);
         $coupon_found = $coupon_stmt->fetch(PDO::FETCH_ASSOC);
-
-        // Demo fallback for test codes like SAVE20
-        if (!$coupon_found && (strtoupper($submitted_code) === 'SAVE20' || strtoupper($submitted_code) === 'PROMO20')) {
-            $coupon_found = [
-                'coupon_id' => 999,
-                'coupon_code' => strtoupper($submitted_code),
-                'discount_type' => 'fixed',
-                'discount_value' => 20,
-                'minimum_order' => 0,
-                'usage_limit' => 0,
-                'used_count' => 0
-            ];
-        }
 
         if ($coupon_found) {
             if ($coupon_found['usage_limit'] > 0 && $coupon_found['used_count'] >= $coupon_found['usage_limit']) {
@@ -256,15 +192,15 @@ $free_shipping_percent = min(100, round(($table_total_price / $free_shipping_thr
 // -------------------------------------------------------------------------
 $cust_session = $_SESSION['customer'] ?? null;
 
-$def_full_name = $cust_session['cust_name'] ?? 'Joy Saha';
-$def_phone = $cust_session['cust_phone'] ?? '+880 1712 345678';
-$def_email = $cust_session['cust_email'] ?? 'joy.saha@gmail.com';
-$def_address = $cust_session['cust_address'] ?? 'Lalmonirhat, Lalmonirhat Sadar';
+$def_full_name = $cust_session['cust_name'] ?? '';
+$def_phone = $cust_session['cust_phone'] ?? '';
+$def_email = $cust_session['cust_email'] ?? '';
+$def_address = $cust_session['cust_address'] ?? '';
 $def_apartment = '';
 $def_country = $cust_session['cust_country'] ?? 18; // 18 is Bangladesh
-$def_division = $cust_session['cust_state'] ?? 'Rangpur Division';
-$def_district = $cust_session['cust_city'] ?? 'Lalmonirhat';
-$def_zip = $cust_session['cust_zip'] ?? '5500';
+$def_division = $cust_session['cust_state'] ?? '';
+$def_district = $cust_session['cust_city'] ?? '';
+$def_zip = $cust_session['cust_zip'] ?? '';
 
 // -------------------------------------------------------------------------
 // 5. ORDER & PAYMENT SUBMISSION PROCESSOR (POST)
@@ -276,8 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
     $address = trim(strip_tags($_POST['address'] ?? $def_address));
     $apartment = trim(strip_tags($_POST['apartment'] ?? ''));
     $country_id = (int)($_POST['country'] ?? 18);
-    $division = trim(strip_tags($_POST['division'] ?? 'Rangpur Division'));
-    $district = trim(strip_tags($_POST['district'] ?? 'Lalmonirhat'));
+    $division = trim(strip_tags($_POST['division'] ?? $def_division));
+    $district = trim(strip_tags($_POST['district'] ?? $def_district));
     $chosen_shipping_method = trim(strip_tags($_POST['shipping_method'] ?? 'standard'));
     $chosen_shipping_cost = (float)($_POST['shipping_cost'] ?? 60.0);
     $chosen_payment_method = trim(strip_tags($_POST['payment_method'] ?? 'card'));
@@ -593,12 +529,16 @@ require_once('header.php');
                                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                                 </svg>
-                                <span class="sn-saved-name" id="previewSavedName"><?php echo htmlspecialchars($def_full_name); ?></span>
-                                <span class="sn-tag-home">Home</span>
+                                <span class="sn-saved-name" id="previewSavedName"><?php echo htmlspecialchars($def_full_name ?: 'Guest Customer'); ?></span>
+                                <span class="sn-tag-home">Delivery</span>
                             </div>
                             <div class="sn-saved-details" id="previewSavedAddress">
-                                Kazi Hall, AAUB, Lalmonirhat<br>
-                                Lalmonirhat, Bangladesh - 5500
+                                <?php if (!empty($def_address)): ?>
+                                    <?php echo htmlspecialchars($def_address); ?><br>
+                                    <?php echo htmlspecialchars(($def_district ? $def_district . ', ' : '') . ($def_division ? $def_division . ', ' : '') . 'Bangladesh'); ?>
+                                <?php else: ?>
+                                    Enter your shipping address below.
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -2650,15 +2590,21 @@ function toggleMobileSummaryList() {
 
 // 7. REACTIVE ADDRESS SYNC
 function updateAddressPreview() {
-    const name = document.getElementById('fullNameInput')?.value || 'Joy Saha';
-    const addr = document.getElementById('addressInput')?.value || 'Lalmonirhat, Lalmonirhat Sadar';
-    const div = document.getElementById('divisionSelect')?.value || 'Rangpur Division';
-    const dist = document.getElementById('districtSelect')?.value || 'Lalmonirhat';
+    const name = document.getElementById('fullNameInput')?.value?.trim() || 'Guest Customer';
+    const addr = document.getElementById('addressInput')?.value?.trim() || '';
+    const div = document.getElementById('divisionSelect')?.value?.trim() || '';
+    const dist = document.getElementById('districtSelect')?.value?.trim() || '';
 
     const pName = document.getElementById('previewSavedName');
     const pAddr = document.getElementById('previewSavedAddress');
     if (pName) pName.textContent = name;
-    if (pAddr) pAddr.innerHTML = `${addr}<br>${dist}, ${div}, Bangladesh - 5500`;
+    if (pAddr) {
+        if (addr || dist || div) {
+            pAddr.innerHTML = `${addr ? addr + '<br>' : ''}${dist ? dist + ', ' : ''}${div ? div + ', ' : ''}Bangladesh`;
+        } else {
+            pAddr.textContent = 'Enter your shipping address below.';
+        }
+    }
 }
 
 // Ensure total is correctly initialized on load

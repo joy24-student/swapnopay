@@ -73,7 +73,7 @@ fun WebShopLaunchScreen(viewModel: AppViewModel) {
             storeSubdomain = sSlug
         } else if (storeSubdomain.isBlank() || storeSubdomain.equals("null", ignoreCase = true)) {
             val merchantDigits = activeProfile.id.filter { it.isDigit() }.takeLast(4).ifBlank { "1001" }
-            val cleanStore = (activeProfile.businessName.ifBlank { activeProfile.name })
+            val cleanStore = (activeProfile.businessName.ifBlank { activeProfile.accountHolder.ifBlank { "store" } })
                 .lowercase()
                 .replace(Regex("[^a-z0-9]+"), "-")
                 .trim('-')

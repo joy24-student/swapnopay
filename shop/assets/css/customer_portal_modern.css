@@ -1921,6 +1921,9 @@
    RESPONSIVE DESIGN
    ────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
+    .sn-portal-sidebar {
+        display: none !important;
+    }
     .sn-portal-layout {
         grid-template-columns: 1fr;
     }
