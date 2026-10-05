@@ -509,6 +509,79 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
 }
 </style>
 
+<style>
+/* ===== Yellow theme + mobile responsive overrides (My Orders) ===== */
+.sn-portal-wrapper { --sn-primary:#fab802; --sn-primary-hover:#e0a400; --sn-primary-light:#fff8e1; --sn-primary-border:#fde8a1; --sn-border-focus:#fab802; }
+.sn-portal-wrapper .sn-portal-main { min-width:0; max-width:100%; overflow-x:hidden; }
+.sn-portal-title { color:#111827; }
+.sn-portal-wrapper .sn-status-pill-btn.active { background:#fab802 !important; border-color:#fab802 !important; color:#111827 !important; font-weight:700; box-shadow:0 2px 8px rgba(250,184,2,.3); }
+.sn-portal-wrapper .sn-status-pill-btn:hover { border-color:#fab802; }
+.sn-order-card-detailed { border-color:#f1f5f9; }
+.sn-order-card-detailed:hover { border-color:#fab802; box-shadow:0 6px 18px rgba(250,184,2,.15); }
+.sn-order-view-details-link { color:#b45309; }
+.sn-order-view-details-link:hover { color:#92400e; }
+.sn-status-pill-shipped { background:#fff8e1; color:#b45309; }
+.sn-status-pill-processing { background:#fef3c7; color:#92400e; }
+.sn-track-dot.active-blue, .sn-track-dot.active-orange { background:#fab802; border-color:#fab802; color:#111827; }
+.sn-track-line.filled-blue { background:#fab802; }
+.sn-btn-order-buy-again, .sn-btn-order-track:first-child:not(:only-child) { }
+.sn-btn-order-buy-again { background:#fab802; color:#111827; border:1px solid #fab802; box-shadow:0 2px 6px rgba(250,184,2,.3); }
+.sn-btn-order-buy-again:hover { background:#e0a400; border-color:#e0a400; color:#111827; }
+.sn-btn-order-track:hover { border-color:#fab802; background:#fff8e1; }
+.sn-orders-search-form { margin:0; }
+.sn-portal-wrapper .sn-search-input-wrap input:focus, .sn-time-select:focus { border-color:#fab802; outline:none; box-shadow:0 0 0 3px rgba(250,184,2,.2); }
+.sn-modal-box #modalContent i.fa-spin { color:#fab802 !important; }
+
+@media (max-width:768px) {
+    .sn-portal-wrapper { padding:12px 0 90px; background:#fffdf5; }
+    .sn-portal-container { padding:0 12px; }
+    .sn-portal-layout { display:block; }
+    .sn-breadcrumb { display:none; }
+    .sn-orders-header-row { display:flex !important; flex-direction:column !important; align-items:stretch !important; gap:12px !important; margin-bottom:12px !important; }
+    .sn-portal-title { font-size:22px !important; margin:0 !important; }
+    .sn-portal-subtitle { font-size:12.5px !important; margin:2px 0 0 !important; }
+    .sn-orders-controls { display:flex !important; flex-direction:row !important; gap:8px !important; width:100% !important; }
+    .sn-orders-controls .sn-orders-search-form { flex:1 1 auto; min-width:0; }
+    .sn-orders-controls .sn-search-input-wrap { width:100% !important; max-width:none !important; height:42px !important; border-radius:999px !important; }
+    .sn-orders-controls .sn-search-input-wrap input { width:100% !important; min-width:0; font-size:13px !important; }
+    .sn-orders-controls .sn-filter-dropdown-wrap { flex:0 0 auto; max-width:46%; }
+    .sn-orders-controls .sn-time-select { width:100% !important; height:42px !important; font-size:13px !important; border-radius:999px !important; }
+
+    .sn-orders-tabs-row { margin:0 -12px 14px !important; }
+    .sn-status-pills-bar { display:flex !important; flex-wrap:nowrap !important; overflow-x:auto; gap:8px !important; padding:2px 12px 6px !important; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    .sn-status-pills-bar::-webkit-scrollbar { display:none; }
+    .sn-status-pill-btn { flex:0 0 auto; white-space:nowrap; font-size:12.5px !important; padding:8px 14px !important; }
+
+    .sn-order-card-detailed { display:grid !important; grid-template-columns:64px minmax(0,1fr) !important; gap:12px !important; padding:14px !important; margin-bottom:12px !important; border-radius:16px !important; align-items:start !important; }
+    .sn-order-thumb-large { width:64px; height:64px; border-radius:10px; }
+    .sn-order-summary-col { min-width:0; gap:3px; }
+    .sn-order-id-title { font-size:14px; white-space:normal; word-break:break-all; }
+    .sn-order-placed-text { font-size:11.5px; }
+    .sn-order-price-val { font-size:17px; margin-top:4px; color:#111827; }
+    .sn-order-stepper-col { grid-column:1 / -1 !important; padding:10px 0 0 !important; border-top:1px dashed #f1e3b0; }
+    .sn-order-status-badge-row { flex-wrap:wrap; gap:6px 8px; margin-bottom:12px; }
+    .sn-order-status-subtext { font-size:11.5px; }
+    .sn-track-step { min-width:0; flex:0 0 auto; width:52px; }
+    .sn-track-step-label { font-size:10px; line-height:1.15; }
+    .sn-track-step-date { font-size:9.5px; }
+    .sn-track-line { margin-bottom:30px; }
+    .sn-order-actions-col { grid-column:1 / -1 !important; flex-direction:row !important; gap:8px !important; }
+    .sn-order-actions-col > button, .sn-order-actions-col > a { flex:1 1 0; min-width:0; padding:11px 8px !important; font-size:12.5px !important; border-radius:999px !important; }
+
+    .sn-empty-state-box { padding:32px 16px !important; }
+
+    /* modal -> bottom sheet */
+    .sn-modal-backdrop { align-items:flex-end !important; padding:0 !important; }
+    .sn-modal-box { max-width:100% !important; border-radius:20px 20px 0 0 !important; max-height:88vh !important; padding:20px 16px calc(20px + env(safe-area-inset-bottom)) !important; animation:snSheetUp .28s cubic-bezier(.16,1,.3,1); }
+    .sn-modal-close-btn { top:12px !important; right:12px !important; }
+    #modalContent h3 { padding-right:36px; }
+}
+@keyframes snSheetUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+@media (max-width:380px) {
+    .sn-orders-controls { flex-direction:column !important; }
+    .sn-orders-controls .sn-filter-dropdown-wrap { max-width:none; }
+}
+</style>
 <div class="sn-portal-wrapper">
     <div class="sn-portal-container">
         <div class="sn-portal-layout">
@@ -532,7 +605,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
                     </div>
                     <div class="sn-orders-controls">
                         <!-- Search Input -->
-                        <form method="get" action="" class="sn-search-form" style="margin: 0;">
+                        <form method="get" action="" class="sn-orders-search-form" style="margin: 0;">
                             <?php if ($filter_status !== 'all'): ?>
                                 <input type="hidden" name="status" value="<?= htmlspecialchars($filter_status) ?>">
                             <?php endif; ?>
@@ -760,7 +833,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
         <button type="button" class="sn-modal-close-btn" onclick="closeOrderModal()">&times;</button>
         <div id="modalContent">
             <div style="text-align: center; padding: 40px 0;">
-                <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #2563eb;"></i>
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #fab802;"></i>
                 <p style="margin-top: 12px; color: #64748b; font-size: 14px;">Loading order details...</p>
             </div>
         </div>
@@ -774,7 +847,7 @@ function openOrderModal(paymentId) {
     modal.style.display = 'flex';
     content.innerHTML = `
         <div style="text-align: center; padding: 40px 0;">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #2563eb;"></i>
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #fab802;"></i>
             <p style="margin-top: 12px; color: #64748b; font-size: 14px;">Loading order details...</p>
         </div>
     `;
@@ -805,7 +878,7 @@ function openOrderModal(paymentId) {
                     <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Placed on ${ord.payment_date} • Payment Method: ${ord.payment_method}</p>
                     
                     <div style="background: #f8fafc; border-radius: 12px; padding: 14px; margin-bottom: 20px;">
-                        <div style="font-size: 13px; color: #334155; margin-bottom: 4px;"><strong>Status:</strong> <span style="font-weight: 700; color: #2563eb;">${ord.shipping_status}</span></div>
+                        <div style="font-size: 13px; color: #334155; margin-bottom: 4px;"><strong>Status:</strong> <span style="font-weight: 700; color: #b45309;">${ord.shipping_status}</span></div>
                         <div style="font-size: 13px; color: #334155;"><strong>Transaction ID:</strong> ${ord.txnid || 'N/A'}</div>
                     </div>
 

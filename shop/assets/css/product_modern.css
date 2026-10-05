@@ -1660,38 +1660,29 @@ a, button {
         max-width: 100% !important;
     }
 
-    /* The sub-header (back + search) IS the mobile header on product pages.
-       Hide the global header (its search is hidden here, which left an empty strip). */
-    body.sn-product-page .sn-header-wrap {
-        display: none !important;
-    }
-    body.sn-product-page.shopnext-theme .content-wrapper-main {
-        padding-top: 0 !important;
-    }
-
     /* 1. Mobile Sub-Header Navigation Bar */
     .sn-mobile-sub-header {
         display: flex !important;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         position: sticky !important;
-        top: 0 !important;
+        top: 46px !important;
         z-index: 998 !important;
         background: #ffffff !important;
-        padding: 10px 14px !important;
-        margin: 0 -14px 12px -14px !important;
-        width: calc(100% + 28px) !important;
-        border-bottom: 1px solid #f1f5f9;
-        transition: box-shadow 0.2s ease, background-color 0.2s ease !important;
+        padding: 6px 0 !important;
+        margin-bottom: 12px;
+        width: 100%;
+        transition: top 0.25s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
     }
 
-    body.sn-product-page .sn-mobile-sub-header {
-        top: 0 !important;
+    /* When header collapses to search-bar only, sub-header moves up */
+    body.sn-header-scrolled-away .sn-mobile-sub-header {
+        top: 48px !important;
     }
 
     .sn-mobile-sub-header.is-scrolled {
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
-        padding: 8px 14px !important;
+        padding: 6px 2px !important;
     }
 
     .sn-mobile-sub-header.is-scrolled .sn-sub-search-form {
