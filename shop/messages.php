@@ -571,13 +571,17 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 // Render existing messages
                 let hasProductInThread = false;
                 if (data.messages && data.messages.length > 0) {
+                    let maxId = 0;
                     data.messages.forEach(msg => {
                         appendMessageBubble(msg);
+                        if (msg.id) {
+                            maxId = Math.max(maxId, parseInt(msg.id, 10) || 0);
+                        }
                         if (currentProductInfo && msg.message && msg.message.includes(currentProductInfo.name)) {
                             hasProductInThread = true;
                         }
                     });
-                    lastMessageId = data.messages[data.messages.length - 1].id;
+                    lastMessageId = Math.max(lastMessageId, maxId);
                     scrollChatToBottom();
                 }
 
@@ -835,6 +839,20 @@ if (!empty($_SESSION['cart_p_qty'])) {
     // Append Message Bubble into DOM
     function appendMessageBubble(msg) {
         const container = document.getElementById('chatMessages');
+        if (!container) return;
+
+        // Deduplication 1: If message with this ID already rendered, skip
+        if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) {
+            lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
+            return;
+        }
+
+        // Deduplication 2: If message with this attachment URL already rendered, skip
+        if (msg.attachment_url && container.querySelector(`[data-attachment-url="${encodeURIComponent(msg.attachment_url)}"]`)) {
+            if (msg.id) lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
+            return;
+        }
+
         const isUser = msg.sender_type === 'customer';
         const isSystem = msg.sender_type === 'system';
 
@@ -845,6 +863,12 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
         const wrap = document.createElement('div');
         wrap.className = `flex items-start gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`;
+        if (msg.id) {
+            wrap.setAttribute('data-msg-id', msg.id);
+        }
+        if (msg.attachment_url) {
+            wrap.setAttribute('data-attachment-url', encodeURIComponent(msg.attachment_url));
+        }
 
         let avatar = '';
         if (!isUser) {
@@ -1012,6 +1036,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 const sendRes = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: msgFd });
                 const sendData = await sendRes.json();
                 if (sendData.message) {
+                    if (sendData.message.id) {
+                        lastMessageId = Math.max(lastMessageId, parseInt(sendData.message.id, 10) || 0);
+                    }
                     appendMessageBubble(sendData.message);
                     scrollChatToBottom();
                 }
@@ -1036,7 +1063,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 if (data.status === 'success' && data.messages && data.messages.length > 0) {
                     data.messages.forEach(m => {
                         appendMessageBubble(m);
-                        lastMessageId = Math.max(lastMessageId, m.id);
+                        if (m.id) {
+                            lastMessageId = Math.max(lastMessageId, parseInt(m.id, 10) || 0);
+                        }
                     });
                     scrollChatToBottom();
                 }

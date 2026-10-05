@@ -1218,6 +1218,16 @@ body {
         background: #ffffff !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
     }
+    .sn-search-icon-left {
+        display: block !important;
+        width: 16px !important;
+        height: 16px !important;
+        min-width: 16px !important;
+        min-height: 16px !important;
+        flex-shrink: 0 !important;
+        margin-right: 6px !important;
+        stroke: #64748b !important;
+    }
     .sn-search-input {
         flex: 1 1 0 !important;
         min-width: 0 !important;
@@ -1231,12 +1241,33 @@ body {
     .sn-search-btn {
         background: #fab802 !important;
         color: #111827 !important;
-        font-weight: 700 !important;
-        font-size: 12px !important;
-        padding: 0 16px !important;
-        height: 30px !important;
-        border-radius: 999px !important;
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
         border: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 2px 6px rgba(250, 184, 2, 0.28) !important;
+    }
+    .sn-search-btn-icon {
+        display: block !important;
+        width: 16px !important;
+        height: 16px !important;
+        min-width: 16px !important;
+        min-height: 16px !important;
+        flex-shrink: 0 !important;
+        stroke: #111827 !important;
+        stroke-width: 2.5 !important;
+        margin: 0 !important;
+    }
+    .sn-search-btn-text {
+        display: none !important;
     }
     .sn-hero-section {
         margin-top: 0 !important;

@@ -994,6 +994,52 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             }
         }
 
+        /* Search Bar & Search Icons Global Rules */
+        .sn-search-icon-left {
+            display: inline-block !important;
+            width: 16px !important;
+            height: 16px !important;
+            min-width: 16px !important;
+            min-height: 16px !important;
+            flex-shrink: 0 !important;
+            margin-right: 8px !important;
+            stroke: #64748b !important;
+        }
+        .sn-search-btn-icon {
+            display: inline-block !important;
+            width: 15px !important;
+            height: 15px !important;
+            min-width: 15px !important;
+            min-height: 15px !important;
+            flex-shrink: 0 !important;
+            stroke: currentColor !important;
+        }
+        .sn-scan-btn {
+            background: none !important;
+            border: none !important;
+            padding: 0 6px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            flex-shrink: 0 !important;
+        }
+        .sn-scan-btn svg {
+            display: block !important;
+            width: 16px !important;
+            height: 16px !important;
+            min-width: 16px !important;
+            min-height: 16px !important;
+            flex-shrink: 0 !important;
+            stroke: #64748b !important;
+        }
+        .sn-search-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+        }
+
         @media (max-width: 768px) {
             .sn-header-wrap {
                 position: fixed !important;
@@ -1074,6 +1120,16 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 padding: 0 4px 0 12px !important;
                 background: #ffffff !important;
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+            }
+            .sn-search-icon-left {
+                display: block !important;
+                width: 16px !important;
+                height: 16px !important;
+                min-width: 16px !important;
+                min-height: 16px !important;
+                flex-shrink: 0 !important;
+                margin-right: 6px !important;
+                stroke: #64748b !important;
             }
             .sn-search-input {
                 flex: 1 1 0 !important;
