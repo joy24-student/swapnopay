@@ -1,5 +1,6 @@
 <?php
 $_SERVER['HTTP_HOST'] = 'shop.swapnopay.top';
+$_SERVER['REQUEST_URI'] = '/self-hosted-supabase-store-0558/admin/settings.php';
 require_once __DIR__ . '/inc/config.php';
 
 echo "=== TESTING ALL SETTINGS SECTIONS & DATABASE INTEGRITY ===\n";
