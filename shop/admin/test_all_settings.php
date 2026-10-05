@@ -5,6 +5,75 @@ require_once __DIR__ . '/inc/config.php';
 
 echo "=== TESTING ALL SETTINGS SECTIONS & DATABASE INTEGRITY ===\n";
 
+$migrations = [
+    "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1",
+    "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_btn_text varchar(100) DEFAULT 'Claim Now'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_animation varchar(50) DEFAULT 'spin-zoom'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_end varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_delay integer DEFAULT 2",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_show_again varchar(50) DEFAULT 'session'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_image text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_image text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_api_key text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_provider varchar(50) DEFAULT 'auto'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_pool_strategy varchar(50) DEFAULT 'round_robin'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_model varchar(120) DEFAULT 'openrouter/free'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_whatsapp_url varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_messenger_url varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_floating_icon_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_call_enabled smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_slider_autoplay smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_slider_interval integer DEFAULT 4500",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_tag text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn2_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn2_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_badge1_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_badge2_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS categories_title text DEFAULT 'Shop by Category'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS categories_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_tag varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_tag varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS featured_products_title text DEFAULT 'Featured Products'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS featured_products_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item1_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item1_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item2_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item2_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item3_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item3_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item4_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item4_desc text DEFAULT ''"
+];
+
+echo "Running migrations...\n";
+foreach ($migrations as $sql) {
+    try {
+        $pdo->exec($sql);
+    } catch (Throwable $e) {
+        echo "Migration failed: {$sql} - " . $e->getMessage() . "\n";
+    }
+}
+echo "Migrations executed successfully.\n";
+
 // 1. Check if tbl_settings exists and has id=1
 $s = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
 if (!$s) {
