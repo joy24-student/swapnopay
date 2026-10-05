@@ -367,6 +367,24 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
     document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', closeAll); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
 
+    // Keep the sticky chip row flush under the header (no gap), whatever its real height
+    var chips = document.getElementById('srp-chips');
+    var hdr = document.querySelector('.sn-header-wrap');
+    function syncChips() {
+        if (!chips) return;
+        if (window.innerWidth >= 900) { chips.style.removeProperty('top'); return; }
+        var b = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 0;
+        chips.style.setProperty('top', Math.max(0, b - 1) + 'px', 'important');
+    }
+    syncChips();
+    window.addEventListener('scroll', syncChips, { passive: true });
+    window.addEventListener('resize', syncChips);
+    window.addEventListener('load', syncChips);
+    if (hdr) {
+        hdr.addEventListener('transitionend', syncChips);
+        if (window.ResizeObserver) new ResizeObserver(syncChips).observe(hdr);
+    }
+
     // Keep the header search box showing the current query
     var inp = document.getElementById('sn-search-input');
     if (inp && !inp.value) inp.value = <?php echo json_encode($search_text); ?>;
