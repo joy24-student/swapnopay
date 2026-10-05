@@ -186,19 +186,23 @@ switch ($action) {
         $message = trim($_POST['message'] ?? '');
         $attachment = trim($_POST['attachment_url'] ?? '');
         $attachmentType = trim($_POST['attachment_type'] ?? '');
+        $productData = !empty($_POST['product_data']) ? $_POST['product_data'] : null;
+        if (is_array($productData)) {
+            $productData = json_encode($productData);
+        }
 
-        if ($message === '' && $attachment === '') {
+        if ($message === '' && $attachment === '' && empty($productData)) {
             echo json_encode(['status' => 'error', 'message' => 'Empty message']);
             exit;
         }
 
         // Insert customer message
         $stmt = $pdo->prepare("
-            INSERT INTO tbl_shop_chat_messages (thread_id, sender_type, message, attachment_url, attachment_type)
-            VALUES (?, 'customer', ?, ?, ?)
+            INSERT INTO tbl_shop_chat_messages (thread_id, sender_type, message, attachment_url, attachment_type, product_data)
+            VALUES (?, 'customer', ?, ?, ?, ?)
             RETURNING *
         ");
-        $stmt->execute([$thread['id'], $message, $attachment, $attachmentType]);
+        $stmt->execute([$thread['id'], $message, $attachment, $attachmentType, $productData]);
         $newMsg = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Update thread stats

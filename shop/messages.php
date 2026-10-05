@@ -40,6 +40,35 @@ if (empty($chat_messenger_url)) {
 $chat_call_enabled = isset($settings['chat_call_enabled']) ? (int)$settings['chat_call_enabled'] : 1;
 $is_embed = isset($_GET['embed']) && $_GET['embed'] === '1';
 
+// Product context (forwarded from product page)
+$product_id = isset($_GET['product_id']) ? (int)$_GET['product_id'] : 0;
+$product_info = null;
+$product_url = '';
+if ($product_id > 0) {
+    try {
+        $stmt_p = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_id = ?");
+        $stmt_p->execute([$product_id]);
+        $product_info = $stmt_p->fetch(PDO::FETCH_ASSOC);
+        if ($product_info) {
+            $is_https = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            $scheme = $is_https ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $base = defined('BASE_URL') ? BASE_URL : '/shop/';
+            $product_url = rtrim($base, '/') . '/product.php?id=' . $product_id;
+            if (!preg_match('/^https?:\/\//i', $product_url)) {
+                $product_url = $scheme . '://' . $host . (str_starts_with($product_url, '/') ? '' : '/') . $product_url;
+            }
+
+            // Pre-fill WhatsApp inquiry URL
+            $wa_inquiry = "Hi! I am inquiring about: " . $product_info['p_name'] . " (৳ " . number_format((float)$product_info['p_current_price']) . ")\n" . $product_url;
+            $wa_separator = (strpos($chat_whatsapp_url, '?') !== false) ? '&' : '?';
+            $chat_whatsapp_url .= $wa_separator . 'text=' . urlencode($wa_inquiry);
+        }
+    } catch (Throwable $e) {
+        $product_info = null;
+    }
+}
+
 // Calculate cart count
 $cart_count = 0;
 if (!empty($_SESSION['cart_p_qty'])) {
@@ -230,10 +259,10 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
     </style>
 </head>
-<body class="bg-slate-100 flex justify-center items-center min-h-screen text-slate-900 <?php echo $is_embed ? 'p-0 bg-white' : 'p-0 sm:p-4'; ?>">
+<body class="bg-slate-100 flex justify-center items-center min-h-screen text-slate-900 <?php echo $is_embed ? 'p-0 bg-white h-screen overflow-hidden' : 'p-0 sm:p-4'; ?>">
 
 <!-- MAIN APP CONTAINER -->
-<div class="w-full <?php echo $is_embed ? 'max-w-none h-screen rounded-none shadow-none' : 'max-w-md h-screen sm:h-[90vh] sm:rounded-3xl sm:shadow-2xl'; ?> bg-white flex flex-col relative overflow-hidden border border-slate-200">
+<div class="w-full <?php echo $is_embed ? 'max-w-none h-full rounded-none shadow-none border-0' : 'max-w-md h-screen sm:h-[90vh] sm:rounded-3xl sm:shadow-2xl border border-slate-200'; ?> bg-white flex flex-col relative overflow-hidden">
 
     <!-- TOP HEADER -->
     <header class="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between z-20 shadow-sm shrink-0">
@@ -279,6 +308,32 @@ if (!empty($_SESSION['cart_p_qty'])) {
         </div>
     </header>
 
+    <!-- PINNED PRODUCT CONTEXT BANNER (When opened from product page) -->
+    <?php if (!empty($product_info)): ?>
+    <div id="pinnedProductBanner" class="px-3.5 py-2 bg-gradient-to-r from-amber-50 to-orange-50/70 border-b border-amber-200/70 flex items-center justify-between gap-2.5 shrink-0 shadow-2xs">
+        <div class="flex items-center gap-2.5 min-w-0">
+            <img src="<?php echo !empty($product_info['p_featured_photo']) ? 'assets/uploads/' . htmlspecialchars($product_info['p_featured_photo']) : 'assets/uploads/product_featured_default.jpg'; ?>" class="w-9 h-9 object-cover rounded-lg border border-amber-200/90 shrink-0 shadow-2xs" alt="<?php echo htmlspecialchars($product_info['p_name']); ?>">
+            <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded">Inquiring Item</span>
+                    <span class="text-[11px] font-extrabold text-amber-600">৳ <?php echo number_format((float)$product_info['p_current_price']); ?></span>
+                </div>
+                <div class="text-[11.5px] font-bold text-slate-800 truncate" title="<?php echo htmlspecialchars($product_info['p_name']); ?>">
+                    <?php echo htmlspecialchars($product_info['p_name']); ?>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+            <a href="<?php echo htmlspecialchars($product_url); ?>" target="_top" class="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-[10.5px] font-semibold rounded-lg flex items-center gap-1 transition active:scale-95" title="View Product Details">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> View
+            </a>
+            <button type="button" onclick="forwardProductLinkToChat(false)" class="px-2 py-1 bg-slate-900 hover:bg-black text-white text-[10.5px] font-bold rounded-lg flex items-center gap-1 shadow-2xs transition active:scale-95" title="Re-send product card to chat">
+                <i class="fa-solid fa-paper-plane text-[9px]"></i> Send
+            </button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- SOCIAL CHANNELS BANNER (WHATSAPP & MESSENGER) -->
     <!-- Vanishes completely as requested once the user sends a prompt -->
     <div id="socialChannelsBar" class="social-channel-box px-4 pt-3 pb-2 bg-gradient-to-r from-amber-50/60 to-orange-50/60 border-b border-amber-100/60 shrink-0">
@@ -310,13 +365,29 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
             </div>
             <div class="max-w-[85%] bg-white rounded-2xl rounded-tl-sm p-3 shadow-sm border border-slate-100 text-xs text-slate-800 leading-relaxed">
+                <?php if (!empty($product_info)): ?>
+                <p class="font-semibold text-slate-900 mb-1">Hello! Ask me anything about <?php echo htmlspecialchars($product_info['p_name']); ?>!</p>
+                <p>I can provide technical specs, warranty & delivery info, or help you add it directly to your cart!</p>
+                <?php else: ?>
                 <p class="font-semibold text-slate-900 mb-1">Hello! How can I assist your shopping today?</p>
                 <p>I can recommend best-sellers, find discounts, answer product questions, or add items directly to your cart!</p>
+                <?php endif; ?>
             </div>
         </div>
 
         <!-- Suggestion Pills -->
         <div id="quickPrompts" class="flex flex-wrap gap-1.5 pt-1 pl-9">
+            <?php if (!empty($product_info)): ?>
+            <button onclick="sendQuickPrompt('What are the key specifications and features of <?php echo addslashes($product_info['p_name']); ?>?')" class="text-[11px] bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-full shadow-2xs transition active:scale-95">
+                ⚡ Key Specs
+            </button>
+            <button onclick="sendQuickPrompt('What warranty and delivery timeframe apply to this item?')" class="text-[11px] bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-full shadow-2xs transition active:scale-95">
+                🛡️ Warranty & Delivery
+            </button>
+            <button onclick="sendQuickPrompt('Is this product currently in stock and ready to ship?')" class="text-[11px] bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-full shadow-2xs transition active:scale-95">
+                📦 In Stock?
+            </button>
+            <?php else: ?>
             <button onclick="sendQuickPrompt('What are your top trending products today?')" class="text-[11px] bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-full shadow-2xs transition active:scale-95">
                 🔥 Top Trending
             </button>
@@ -326,6 +397,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
             <button onclick="sendQuickPrompt('Can you suggest stylish men and women items?')" class="text-[11px] bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-full shadow-2xs transition active:scale-95">
                 ✨ Style Guide
             </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -469,6 +541,15 @@ if (!empty($_SESSION['cart_p_qty'])) {
     let pollInterval = null;
     let hasSentFirstPrompt = localStorage.getItem('sn_chat_prompt_sent') === 'true';
 
+    // Pinned / Inquiring Product Context
+    const currentProductInfo = <?php echo !empty($product_info) ? json_encode([
+        'id' => (int)$product_info['p_id'],
+        'name' => $product_info['p_name'],
+        'price' => number_format((float)$product_info['p_current_price']),
+        'photo' => !empty($product_info['p_featured_photo']) ? 'assets/uploads/' . $product_info['p_featured_photo'] : 'assets/uploads/product_featured_default.jpg',
+        'url' => $product_url
+    ]) : 'null'; ?>;
+
     // Check if WhatsApp/Messenger vanished state should be restored
     if (hasSentFirstPrompt) {
         document.addEventListener('DOMContentLoaded', () => {
@@ -488,17 +569,107 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 updateModeUI();
 
                 // Render existing messages
+                let hasProductInThread = false;
                 if (data.messages && data.messages.length > 0) {
-                    data.messages.forEach(msg => appendMessageBubble(msg));
+                    data.messages.forEach(msg => {
+                        appendMessageBubble(msg);
+                        if (currentProductInfo && msg.message && msg.message.includes(currentProductInfo.name)) {
+                            hasProductInThread = true;
+                        }
+                    });
                     lastMessageId = data.messages[data.messages.length - 1].id;
                     scrollChatToBottom();
                 }
 
                 // Start polling for new messages & signals
                 startPolling();
+
+                // Auto-forward product link if inquiring from product page
+                if (currentProductInfo && currentProductInfo.id) {
+                    const sessionKey = 'sn_chat_p_auto_forwarded_' + currentProductInfo.id;
+                    const alreadyForwarded = sessionStorage.getItem(sessionKey) === 'true' || hasProductInThread;
+                    if (!alreadyForwarded) {
+                        sessionStorage.setItem(sessionKey, 'true');
+                        setTimeout(() => {
+                            forwardProductLinkToChat(true);
+                        }, 350);
+                    }
+                }
             }
         } catch (e) {
             console.error('Failed to init chat:', e);
+        }
+    }
+
+    // Forward Product Link into Chat Thread
+    async function forwardProductLinkToChat(isAuto = false) {
+        if (!currentProductInfo) return;
+
+        // Vanish WhatsApp/Messenger banner immediately
+        vanishSocialChannels();
+
+        const messageText = `Hi! I'm inquiring about this product:\n"${currentProductInfo.name}"\nPrice: ৳ ${currentProductInfo.price}\nProduct Link: ${currentProductInfo.url}`;
+
+        // Render user message bubble with product card
+        appendMessageBubble({
+            sender_type: 'customer',
+            message: messageText,
+            product_data: currentProductInfo,
+            created_at: new Date().toISOString()
+        });
+        scrollChatToBottom();
+
+        if (chatMode === 'ai') {
+            showTyping(true);
+            try {
+                const fd = new FormData();
+                const aiPrompt = isAuto
+                    ? `Hi, I am inquiring about "${currentProductInfo.name}". Could you give me a clear overview of this item, its key features, warranty, stock availability, and delivery options?`
+                    : `Please tell me more about "${currentProductInfo.name}".`;
+                fd.append('prompt', aiPrompt);
+                fd.append('product_id', currentProductInfo.id);
+
+                const res = await fetch('gemini_chat.php', { method: 'POST', body: fd });
+                const aiData = await res.json();
+                showTyping(false);
+
+                if (aiData.status === 'success') {
+                    appendMessageBubble({
+                        sender_type: 'ai',
+                        message: aiData.reply || aiData.response || `Here is the product information for ${currentProductInfo.name}!`,
+                        product_data: currentProductInfo
+                    });
+                } else {
+                    appendMessageBubble({
+                        sender_type: 'ai',
+                        message: aiData.message || `I am ready to help you with ${currentProductInfo.name}. Feel free to ask about specifications or delivery!`,
+                        product_data: currentProductInfo
+                    });
+                }
+                scrollChatToBottom();
+            } catch (err) {
+                showTyping(false);
+                appendMessageBubble({
+                    sender_type: 'ai',
+                    message: `Welcome! Feel free to ask any questions about ${currentProductInfo.name}, or click WhatsApp above for instant direct chat!`,
+                    product_data: currentProductInfo
+                });
+                scrollChatToBottom();
+            }
+        } else {
+            // Live human support mode
+            try {
+                const fd = new FormData();
+                fd.append('message', messageText);
+                fd.append('product_data', JSON.stringify(currentProductInfo));
+                const res = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: fd });
+                const d = await res.json();
+                if (d.message) {
+                    lastMessageId = d.message.id;
+                }
+            } catch (err) {
+                console.error('Error forwarding product in live chat:', err);
+            }
         }
     }
 
@@ -578,6 +749,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
             try {
                 const fd = new FormData();
                 fd.append('prompt', messageText);
+                if (currentProductInfo && currentProductInfo.id) {
+                    fd.append('product_id', currentProductInfo.id);
+                }
 
                 const res = await fetch('gemini_chat.php', {
                     method: 'POST',
@@ -589,8 +763,8 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 if (aiData.status === 'success') {
                     appendMessageBubble({
                         sender_type: 'ai',
-                        message: aiData.reply || 'Here is what I found for you!',
-                        product_data: aiData.product || null
+                        message: aiData.reply || aiData.response || 'Here is what I found for you!',
+                        product_data: aiData.product || (currentProductInfo || null)
                     });
                 } else {
                     appendMessageBubble({
@@ -611,6 +785,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
             try {
                 const fd = new FormData();
                 fd.append('message', messageText);
+                if (currentProductInfo && currentProductInfo.id) {
+                    fd.append('product_data', JSON.stringify(currentProductInfo));
+                }
                 const res = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: fd });
                 const d = await res.json();
                 if (d.message) {
@@ -695,24 +872,42 @@ if (!empty($_SESSION['cart_p_qty'])) {
         let productCardHtml = '';
         if (msg.product_data) {
             let p = typeof msg.product_data === 'string' ? JSON.parse(msg.product_data) : msg.product_data;
+            const pPrice = p.current_price || p.price || '';
+            const pPhoto = p.photo || 'assets/uploads/product_featured_default.jpg';
+            const pUrl = p.url || `product.php?id=${p.id}`;
             productCardHtml = `
-                <div class="mt-3 p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-3 shadow-2xs">
-                    <img src="${p.photo || 'assets/uploads/product_featured_default.jpg'}" class="w-14 h-14 object-cover rounded-lg shrink-0 border border-slate-200" alt="${p.name}">
+                <div class="mt-2.5 p-2.5 bg-slate-50 border border-slate-200/90 rounded-xl flex items-center gap-3 shadow-2xs">
+                    <img src="${pPhoto}" class="w-12 h-12 object-cover rounded-lg shrink-0 border border-slate-200" alt="${escapeHtml(p.name)}">
                     <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-slate-800 text-xs truncate">${p.name}</h4>
-                        <div class="text-amber-600 font-bold text-xs mt-0.5">$${p.current_price}</div>
-                        <button onclick="quickAddToCart(${p.id}, this)" class="mt-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-[10px] rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
-                            <i class="fa-solid fa-cart-plus"></i> Add to Cart
-                        </button>
+                        <a href="${pUrl}" target="_top" class="font-bold text-slate-800 text-xs truncate block hover:text-amber-600 transition">${escapeHtml(p.name)}</a>
+                        <div class="text-amber-600 font-bold text-xs mt-0.5">৳ ${escapeHtml(pPrice)}</div>
+                        <div class="flex items-center gap-1.5 mt-1.5">
+                            <button onclick="quickAddToCart(${p.id}, this)" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-[10px] rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                <i class="fa-solid fa-cart-plus"></i> Add to Cart
+                            </button>
+                            <a href="${pUrl}" target="_top" class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-[10px] rounded-lg transition active:scale-95">
+                                View
+                            </a>
+                        </div>
                     </div>
                 </div>
             `;
         }
 
+        let bubbleContent = '';
+        if (isUser) {
+            bubbleContent = `<p class="whitespace-pre-wrap">${escapeHtml(msg.message)}</p>`;
+        } else {
+            const hasHtml = /<[a-z][\s\S]*>/i.test(msg.message);
+            bubbleContent = hasHtml
+                ? `<div class="prose prose-sm max-w-none text-slate-800 leading-relaxed text-xs">${msg.message}</div>`
+                : `<p class="whitespace-pre-wrap">${escapeHtml(msg.message)}</p>`;
+        }
+
         wrap.innerHTML = `
             ${avatar}
             <div class="${bubbleClasses}">
-                <p class="whitespace-pre-wrap">${escapeHtml(msg.message)}</p>
+                ${bubbleContent}
                 ${attachmentHtml}
                 ${productCardHtml}
             </div>
@@ -763,13 +958,23 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
             if (data.success || data.status === 'success') {
                 btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Added!';
-                btnElement.className = 'mt-1.5 px-3 py-1 bg-emerald-600 text-white font-semibold text-[10px] rounded-lg shadow-sm';
+                btnElement.className = 'px-2.5 py-1 bg-emerald-600 text-white font-semibold text-[10px] rounded-lg shadow-sm';
                 
                 // Update badge
                 const badge = document.getElementById('dockCartBadge');
                 if (badge) {
                     badge.textContent = data.cart_count || ((parseInt(badge.textContent) || 0) + 1);
                     badge.classList.remove('hidden');
+                }
+
+                // If running in embed/iframe, notify parent window to update cart badge!
+                if (window.parent && window.parent !== window) {
+                    try {
+                        window.parent.postMessage({
+                            type: 'CART_UPDATED',
+                            cart_count: data.cart_count || ((parseInt(badge ? badge.textContent : 0) || 0) + 1)
+                        }, '*');
+                    } catch (e) {}
                 }
             } else {
                 btnElement.innerHTML = origHtml;

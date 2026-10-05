@@ -696,6 +696,249 @@ require_once('header.php');
         line-height: 1 !important;
         border: 1.5px solid #ffffff !important;
     }
+
+    /* ================= GESTURE-CONTROLLED DIRECT CHAT BOTTOM SHEET ================= */
+    .sn-chat-sheet-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 99998;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sn-chat-sheet-backdrop.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sn-chat-sheet-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 92vh;
+        max-height: 94vh;
+        background: #ffffff;
+        border-radius: 24px 24px 0 0;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.28);
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transform: translateY(105%);
+        transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+        touch-action: pan-y;
+        box-sizing: border-box;
+    }
+    .sn-chat-sheet-container.active {
+        transform: translateY(0);
+    }
+
+    @media (min-width: 769px) {
+        .sn-chat-sheet-container {
+            left: auto;
+            right: 28px;
+            bottom: 0;
+            width: 440px;
+            height: 86vh;
+            max-height: 740px;
+            border-radius: 20px 20px 0 0;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 -12px 48px rgba(15, 23, 42, 0.22);
+        }
+    }
+
+    .sn-chat-drag-area {
+        width: 100%;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        background: #ffffff;
+        flex-shrink: 0;
+        user-select: none;
+        touch-action: none;
+    }
+    .sn-chat-drag-pill {
+        width: 44px;
+        height: 5px;
+        background: #cbd5e1;
+        border-radius: 999px;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+    .sn-chat-drag-area:active .sn-chat-drag-pill {
+        background: #94a3b8;
+        transform: scaleX(1.15);
+    }
+
+    .sn-chat-sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2px 16px 10px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #ffffff;
+        flex-shrink: 0;
+        user-select: none;
+    }
+    .sn-chat-sheet-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .sn-chat-avatar-pulse {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+    .sn-chat-online-dot {
+        position: absolute;
+        bottom: -1px;
+        right: -1px;
+        width: 10px;
+        height: 10px;
+        background: #10b981;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+    }
+    .sn-chat-sheet-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.2;
+        letter-spacing: -0.2px;
+    }
+    .sn-chat-sheet-sub {
+        font-size: 11px;
+        font-weight: 500;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 1px;
+    }
+    .sn-chat-pulse-indicator {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: snPulse 1.8s infinite;
+    }
+    @keyframes snPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .sn-chat-sheet-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .sn-chat-sheet-action-btn,
+    .sn-chat-sheet-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-decoration: none;
+    }
+    .sn-chat-sheet-action-btn:hover,
+    .sn-chat-sheet-close-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+    .sn-chat-sheet-close-btn:active,
+    .sn-chat-sheet-action-btn:active {
+        transform: scale(0.92);
+    }
+
+    .sn-chat-sheet-product-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 14px;
+        background: #fffbeb;
+        border-bottom: 1px solid #fef3c7;
+        flex-shrink: 0;
+    }
+    .sn-chat-sheet-p-thumb {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        object-fit: cover;
+        border: 1px solid #fde68a;
+        flex-shrink: 0;
+    }
+    .sn-chat-sheet-p-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+    }
+    .sn-chat-sheet-p-name {
+        font-size: 11px;
+        font-weight: 700;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sn-chat-sheet-p-price {
+        font-size: 11px;
+        font-weight: 800;
+        color: #d97706;
+        flex-shrink: 0;
+    }
+    .sn-chat-sheet-p-badge {
+        font-size: 10px;
+        font-weight: 700;
+        color: #059669;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        padding: 2px 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .sn-chat-iframe-wrapper {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: #ffffff;
+        overflow: hidden;
+    }
+    .sn-chat-iframe-wrapper iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+    }
 }
 </style>
 
@@ -1441,44 +1684,62 @@ require_once('header.php');
     </button>
 </div>
 
-<!-- ================= AI ASSISTANT MODAL ================= -->
-<div class="sn-ai-modal-backdrop" id="snAiModal">
-    <div class="sn-ai-modal-card">
-        <div class="sn-ai-modal-header">
-            <div class="sn-ai-modal-title-wrap">
-                <div class="sn-ai-modal-icon-badge">✨</div>
-                <div>
-                    <div class="sn-ai-modal-title">ShopNext AI Shopping Assistant</div>
-                    <div class="sn-ai-modal-subtitle">Instant answers for <?php echo htmlspecialchars($p_name); ?></div>
-                </div>
+<!-- ================= GESTURE-CONTROLLED DIRECT CHAT BOTTOM SHEET ================= -->
+<div class="sn-chat-sheet-backdrop" id="snChatSheetBackdrop"></div>
+
+<div class="sn-chat-sheet-container" id="snChatSheetContainer" role="dialog" aria-modal="true" aria-labelledby="snChatSheetTitle">
+    <!-- Top Drag Handle & Gesture Area -->
+    <div class="sn-chat-drag-area" id="snChatDragArea">
+        <div class="sn-chat-drag-pill"></div>
+    </div>
+
+    <!-- Sheet Header -->
+    <div class="sn-chat-sheet-header" id="snChatSheetHeader">
+        <div class="sn-chat-sheet-brand">
+            <div class="sn-chat-avatar-pulse">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                <span class="sn-chat-online-dot"></span>
             </div>
-            <button type="button" class="sn-ai-modal-close" id="snAiModalClose">&times;</button>
-        </div>
-
-        <!-- Quick Query Suggestion Chips -->
-        <div class="sn-ai-chips-bar">
-            <button type="button" class="sn-ai-prompt-chip" data-prompt="Summarize this laptop's top 3 benefits in brief bullet points.">⚡ 30-Sec Summary</button>
-            <button type="button" class="sn-ai-prompt-chip" data-prompt="Is this laptop suitable for programming, multitasking, and college studies?">💻 Good for Study & Work?</button>
-            <button type="button" class="sn-ai-prompt-chip" data-prompt="How good is the battery life, weight, and portability?">🔋 Battery & Portability</button>
-            <button type="button" class="sn-ai-prompt-chip" data-prompt="What comes inside the package, and what warranty is included?">📦 In The Box</button>
-        </div>
-
-        <!-- Messages Area -->
-        <div class="sn-ai-messages-area" id="snAiMessages">
-            <div class="sn-ai-msg ai">
-                <div class="sn-ai-msg-bubble">
-                    👋 Hi there! I'm your AI shopping assistant. Ask me anything about the <strong><?php echo htmlspecialchars($p_name); ?></strong> — specifications, everyday performance, gaming, or delivery!
+            <div>
+                <div class="sn-chat-sheet-title" id="snChatSheetTitle">ShopNext AI & Live Support</div>
+                <div class="sn-chat-sheet-sub">
+                    <span class="sn-chat-pulse-indicator"></span> Direct Chat • Live Specialist & AI
                 </div>
             </div>
         </div>
 
-        <!-- Input Area -->
-        <div class="sn-ai-input-area">
-            <input type="text" class="sn-ai-input" id="snAiInput" placeholder="Ask about specifications, performance, usage...">
-            <button type="button" class="sn-ai-send-btn" id="snAiSendBtn">
-                <i class="fas fa-paper-plane"></i>
+        <div class="sn-chat-sheet-actions">
+            <!-- Open In Full Tab button -->
+            <a href="<?php echo BASE_URL; ?>messages.php?product_id=<?php echo $p_id; ?>" target="_blank" class="sn-chat-sheet-action-btn" title="Open full chat in new window" aria-label="Open full chat">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+            </a>
+            <!-- Close Button -->
+            <button type="button" class="sn-chat-sheet-close-btn" id="snChatSheetCloseBtn" aria-label="Close Chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
             </button>
         </div>
+    </div>
+
+    <!-- Pinned Product Quick Bar in Header (Mobile/Desktop Preview) -->
+    <div class="sn-chat-sheet-product-bar">
+        <img src="<?php echo !empty($p_featured_photo) ? BASE_URL . 'assets/uploads/' . htmlspecialchars($p_featured_photo) : BASE_URL . 'assets/uploads/product_featured_default.jpg'; ?>" alt="<?php echo htmlspecialchars($p_name); ?>" class="sn-chat-sheet-p-thumb">
+        <div class="sn-chat-sheet-p-info">
+            <span class="sn-chat-sheet-p-name"><?php echo htmlspecialchars($p_name); ?></span>
+            <span class="sn-chat-sheet-p-price"><?php echo $cur . number_format((float)$p_current_price); ?></span>
+        </div>
+        <span class="sn-chat-sheet-p-badge"><i class="fas fa-paper-plane" style="font-size:9px;"></i> Forwarded</span>
+    </div>
+
+    <!-- Direct Chat Screen Iframe -->
+    <div class="sn-chat-iframe-wrapper">
+        <iframe id="snProductChatIframe" src="about:blank" data-src="<?php echo BASE_URL; ?>messages.php?embed=1&product_id=<?php echo $p_id; ?>" title="Direct Store Chat" allow="camera; microphone; autoplay; clipboard-write"></iframe>
     </div>
 </div>
 
@@ -2035,7 +2296,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     stickyMsgBtn?.addEventListener('click', function(e) {
         e.preventDefault();
-        openModal();
+        openProductChatSheet();
     });
 
     stickyCartBtn?.addEventListener('click', function(e) {
@@ -2096,94 +2357,145 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error(err));
     });
 
-    // 7. Little AI Assistant Modal & Logic
+    // 7. Gesture-Controlled Direct Chat Bottom Sheet Logic
     const openAiBtn = document.getElementById('openAiAssistantBtn');
-    const aiModal = document.getElementById('snAiModal');
-    const aiClose = document.getElementById('snAiModalClose');
-    const aiMessages = document.getElementById('snAiMessages');
-    const aiInput = document.getElementById('snAiInput');
-    const aiSendBtn = document.getElementById('snAiSendBtn');
-    const aiChips = document.querySelectorAll('.sn-ai-prompt-chip');
+    const chatBackdrop = document.getElementById('snChatSheetBackdrop');
+    const chatContainer = document.getElementById('snChatSheetContainer');
+    const chatCloseBtn = document.getElementById('snChatSheetCloseBtn');
+    const chatIframe = document.getElementById('snProductChatIframe');
+    const chatDragArea = document.getElementById('snChatDragArea');
+    const chatHeader = document.getElementById('snChatSheetHeader');
+
+    let isChatOpen = false;
+    let touchStartY = 0;
+    let touchCurrentY = 0;
+    let isDragging = false;
+
+    function openProductChatSheet() {
+        if (!chatContainer || !chatBackdrop) return;
+
+        // Lazy-load iframe source if not loaded
+        if (chatIframe && (!chatIframe.src || chatIframe.src === 'about:blank' || chatIframe.src.endsWith('about:blank'))) {
+            const targetSrc = chatIframe.getAttribute('data-src');
+            if (targetSrc) {
+                chatIframe.src = targetSrc;
+            }
+        }
+
+        isChatOpen = true;
+        chatBackdrop.classList.add('active');
+        chatContainer.classList.add('active');
+        chatContainer.style.transform = 'translateY(0)';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeProductChatSheet() {
+        if (!chatContainer || !chatBackdrop) return;
+        isChatOpen = false;
+        chatContainer.classList.remove('active');
+        chatContainer.style.transform = 'translateY(105%)';
+        chatBackdrop.classList.remove('active');
+        chatBackdrop.style.opacity = '';
+        document.body.style.overflow = '';
+    }
 
     function openModal() {
-        if (aiModal) {
-            aiModal.classList.add('open');
-            aiInput?.focus();
-        }
+        openProductChatSheet();
     }
 
     function closeModal() {
-        if (aiModal) aiModal.classList.remove('open');
+        closeProductChatSheet();
     }
 
-    openAiBtn?.addEventListener('click', openModal);
-    aiClose?.addEventListener('click', closeModal);
-    aiModal?.addEventListener('click', (e) => {
-        if (e.target === aiModal) closeModal();
+    openAiBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openProductChatSheet();
     });
 
-    function appendAiMsg(text, sender = 'ai') {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `sn-ai-msg ${sender}`;
-        const bubble = document.createElement('div');
-        bubble.className = 'sn-ai-msg-bubble';
-        bubble.innerHTML = text;
-        msgDiv.appendChild(bubble);
-        aiMessages.appendChild(msgDiv);
-        aiMessages.scrollTop = aiMessages.scrollHeight;
-        return msgDiv;
-    }
-
-    function sendAiPrompt(promptText) {
-        if (!promptText.trim()) return;
-        appendAiMsg(promptText, 'user');
-        if (aiInput) aiInput.value = '';
-
-        const thinkingMsg = appendAiMsg('<em>Thinking... ✨</em>', 'ai');
-
-        const formData = new FormData();
-        formData.append('prompt', promptText);
-        formData.append('product_id', '<?php echo $p_id; ?>');
-
-        fetch('<?php echo BASE_URL; ?>gemini_chat.php', {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin'
-        })
-        .then(r => r.json())
-        .then(data => {
-            thinkingMsg.remove();
-            if (data.status === 'success' && data.response) {
-                appendAiMsg(data.response, 'ai');
-            } else {
-                appendAiMsg('Sorry, I encountered an issue: ' + (data.message || 'Please check your connection and try again.'), 'ai');
-            }
-        })
-        .catch(err => {
-            thinkingMsg.remove();
-            appendAiMsg('Unable to connect to AI assistant right now. Please try again.', 'ai');
-            console.error(err);
-        });
-    }
-
-    aiSendBtn?.addEventListener('click', () => {
-        const text = aiInput?.value.trim();
-        if (text) sendAiPrompt(text);
+    chatCloseBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        closeProductChatSheet();
     });
 
-    aiInput?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const text = aiInput.value.trim();
-            if (text) sendAiPrompt(text);
+    chatBackdrop?.addEventListener('click', function() {
+        closeProductChatSheet();
+    });
+
+    // ESC key closes modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isChatOpen) {
+            closeProductChatSheet();
         }
     });
 
-    aiChips.forEach(chip => {
-        chip.addEventListener('click', function() {
-            const prompt = this.dataset.prompt;
-            sendAiPrompt(prompt);
+    // Touch gesture drag down to close
+    function initChatSheetGesture() {
+        if (!chatContainer) return;
+
+        const gestureElements = [chatDragArea, chatHeader].filter(Boolean);
+
+        gestureElements.forEach(el => {
+            el.addEventListener('touchstart', function(e) {
+                if (!isChatOpen) return;
+                touchStartY = e.touches[0].clientY;
+                touchCurrentY = touchStartY;
+                isDragging = true;
+                chatContainer.style.transition = 'none';
+            }, { passive: true });
         });
+
+        window.addEventListener('touchmove', function(e) {
+            if (!isDragging || !isChatOpen) return;
+            touchCurrentY = e.touches[0].clientY;
+            const deltaY = touchCurrentY - touchStartY;
+            if (deltaY > 0) {
+                chatContainer.style.transform = `translateY(${deltaY}px)`;
+                if (chatBackdrop) {
+                    const progress = Math.max(0.1, 1 - (deltaY / 400));
+                    chatBackdrop.style.opacity = progress.toString();
+                }
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', function() {
+            if (!isDragging || !isChatOpen) return;
+            isDragging = false;
+            chatContainer.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1)';
+            if (chatBackdrop) {
+                chatBackdrop.style.transition = 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+            }
+            const deltaY = touchCurrentY - touchStartY;
+            if (deltaY > 80) {
+                closeProductChatSheet();
+            } else {
+                chatContainer.style.transform = 'translateY(0)';
+                if (chatBackdrop) chatBackdrop.style.opacity = '1';
+            }
+        });
+    }
+
+    initChatSheetGesture();
+
+    // Listen for iframe events (e.g. cart badge update from direct chat)
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'CART_UPDATED') {
+            const count = e.data.cart_count;
+            const cartBadge = document.getElementById('sn-cart-badge-count');
+            if (cartBadge) {
+                cartBadge.textContent = count;
+                cartBadge.style.display = count > 0 ? '' : 'none';
+            }
+            const dockCartBadge = document.getElementById('sn-dock-cart-count');
+            if (dockCartBadge) {
+                dockCartBadge.textContent = count;
+                dockCartBadge.style.display = count > 0 ? '' : 'none';
+            }
+            const subCartBadge = document.getElementById('snSubCartCount');
+            if (subCartBadge) {
+                subCartBadge.textContent = count;
+                subCartBadge.style.display = count > 0 ? '' : 'none';
+            }
+        }
     });
 });
 </script>
