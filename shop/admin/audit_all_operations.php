@@ -36,6 +36,10 @@ $directory = dirname(__DIR__);
 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
 $syntaxErrors = [];
 foreach ($iterator as $file) {
+    $p = str_replace('\\', '/', $file->getPathname());
+    if (strpos($p, '/vendor/') !== false || strpos($p, '/.git/') !== false) {
+        continue;
+    }
     if ($file->isFile() && $file->getExtension() === 'php') {
         $filePath = $file->getRealPath();
         $output = [];
