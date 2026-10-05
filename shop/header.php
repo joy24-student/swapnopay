@@ -992,15 +992,79 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 border-bottom: 1px solid #f1f5f9 !important;
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
                 z-index: 1000 !important;
-                transition: box-shadow 0.25s ease;
+                padding: 0 !important;
+            }
+            .sn-header-wrap .sn-container {
+                padding: 0 14px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .sn-header-top {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                padding: 8px 0 6px 0 !important;
+                gap: 8px 0 !important;
+                width: 100% !important;
+            }
+            .sn-brand-logo {
+                order: 1 !important;
+                font-size: 20px !important;
+            }
+            .sn-header-actions {
+                order: 2 !important;
+                margin-left: auto !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 14px !important;
+            }
+            .sn-search-form {
+                order: 3 !important;
+                flex: 0 0 100% !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 2px 0 0 0 !important;
+                max-height: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+                pointer-events: auto !important;
+                visibility: visible !important;
+            }
+            .sn-search-input-wrap {
+                height: 38px !important;
+                display: flex !important;
+                align-items: center !important;
+                width: 100% !important;
+                border-radius: 999px !important;
+                border: 1.5px solid #f1f5f9 !important;
+                padding: 0 4px 0 12px !important;
+                background: #ffffff !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+            }
+            .sn-search-input {
+                flex: 1 1 0 !important;
+                min-width: 0 !important;
+                width: auto !important;
+                border: none !important;
+                outline: none !important;
+                background: transparent !important;
+                padding: 0 6px !important;
+                font-size: 11.5px !important;
+            }
+            .sn-search-btn {
+                background: #fab802 !important;
+                color: #111827 !important;
+                font-weight: 700 !important;
+                font-size: 12px !important;
+                padding: 0 16px !important;
+                height: 30px !important;
+                border-radius: 999px !important;
+                border: none !important;
             }
             body.shopnext-theme .content-wrapper-main {
                 padding-top: 96px !important;
                 padding-bottom: 72px !important;
-                transition: padding-top 0.3s ease;
-            }
-            body.shopnext-theme.sn-search-scrolled .content-wrapper-main {
-                padding-top: 56px !important;
             }
         }
 
@@ -1455,9 +1519,11 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             searchForm.classList.remove('sn-search-hidden');
             body.classList.remove('sn-search-scrolled');
         } else if (currentScrollY > lastScrollY + scrollDelta && currentScrollY > 60) {
-            // Scroll down -> hide search input field
-            searchForm.classList.add('sn-search-hidden');
-            body.classList.add('sn-search-scrolled');
+            // Scroll down -> hide search input field on desktop only
+            if (window.innerWidth > 768) {
+                searchForm.classList.add('sn-search-hidden');
+                body.classList.add('sn-search-scrolled');
+            }
         } else if (currentScrollY < lastScrollY - scrollDelta) {
             // Scroll up -> show search input field
             searchForm.classList.remove('sn-search-hidden');

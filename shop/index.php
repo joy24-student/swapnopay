@@ -69,24 +69,17 @@ if (empty($heroSlides)) {
     $heroSlides = [['id' => 1, 'photo' => $fallbackImg]];
 }
 
-// Categories Section Defaults & Data (Top 10 categories matching mockup)
+// Categories Section Defaults & Data
 $categories_title = !empty($s['categories_title']) ? $s['categories_title'] : 'Shop by Category';
-$catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
-$categories = $catStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-if (empty($categories)) {
-    $categories = [
-        ['tcat_id' => 7, 'tcat_name' => 'Laptops & Computers', 'photo' => 'assets/uploads/cat_mockup/hero_laptop.png'],
-        ['tcat_id' => 6, 'tcat_name' => 'Phones & Tablets', 'photo' => 'assets/uploads/deal_iphone_15.jpg'],
-        ['tcat_id' => 8, 'tcat_name' => 'Audio', 'photo' => 'assets/uploads/deal_airpods.jpg'],
-        ['tcat_id' => 11, 'tcat_name' => 'Fashion', 'photo' => 'assets/uploads/deal_fashion.jpg'],
-        ['tcat_id' => 12, 'tcat_name' => 'Home & Living', 'photo' => 'assets/uploads/deal_kitchen.jpg'],
-        ['tcat_id' => 9, 'tcat_name' => 'Watches', 'photo' => 'assets/uploads/deal_galaxy_watch.jpg'],
-        ['tcat_id' => 14, 'tcat_name' => 'Gaming', 'photo' => 'assets/uploads/deal_asus_rog.jpg'],
-        ['tcat_id' => 10, 'tcat_name' => 'Shoes', 'photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/cat_shoes.jpg'],
-        ['tcat_id' => 13, 'tcat_name' => 'Beauty & Health', 'photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/cat_beauty.jpg'],
-        ['tcat_id' => 15, 'tcat_name' => 'Cameras', 'photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/cat_cameras.jpg']
-    ];
-}
+$categories = [];
+try {
+    $catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 AND LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
+    $categories = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    if (empty($categories)) {
+        $catStmt2 = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_id ASC LIMIT 10");
+        $categories = $catStmt2 ? ($catStmt2->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    }
+} catch (Throwable $_) {}
 
 // Dual Promo Banners Defaults
 $promo1_tag   = !empty($s['promo_banner1_tag']) ? $s['promo_banner1_tag'] : 'Up to 50% Off';
@@ -103,24 +96,48 @@ $promo2_btn   = !empty($s['promo_banner2_btn_text']) ? $s['promo_banner2_btn_tex
 $promo2_url   = !empty($s['promo_banner2_btn_url']) ? $s['promo_banner2_btn_url'] : 'product-category.php?id=1&type=top-category';
 $promo2_img   = !empty($s['promo_banner2_image']) ? $s['promo_banner2_image'] : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/promo_fashion.jpg';
 
-// Featured Products Defaults & Data (Exactly 5 products matching mockup)
+// Featured Products Defaults & Data
 $featured_products_title = !empty($s['featured_products_title']) ? $s['featured_products_title'] : 'Featured Products';
-$prodStmt = $pdo->prepare("SELECT p_id, p_name, p_short_description, p_current_price, p_old_price, p_featured_photo, is_top_sale 
-                         FROM tbl_product 
-                         WHERE p_is_featured = 1 AND p_is_active = 1 
-                         ORDER BY (CASE WHEN p_id >= 103 AND p_id <= 107 THEN 0 ELSE 1 END), p_id ASC 
-                         LIMIT 5");
-$prodStmt->execute();
-$featuredProducts = $prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$featuredProducts = [];
+try {
+    $prodStmt = $pdo->prepare("SELECT p_id, p_name, p_short_description, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                             FROM tbl_product 
+                             WHERE p_is_featured = 1 AND p_is_active = 1 
+                             ORDER BY p_id DESC 
+                             LIMIT 8");
+    $prodStmt->execute();
+    $featuredProducts = $prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $_) {}
 
-// Review Ratings Mock & Fallbacks matching mockup perfectly
-$ratingMap = [
-    103 => ['rating' => '4.8', 'count' => '2.4k'],
-    104 => ['rating' => '4.6', 'count' => '892'],
-    105 => ['rating' => '4.9', 'count' => '3.2k'],
-    106 => ['rating' => '4.7', 'count' => '1.1k'],
-    107 => ['rating' => '4.5', 'count' => '678'],
-];
+if (empty($featuredProducts)) {
+    // If no products explicitly marked featured, display active store products
+    try {
+        $prodStmt = $pdo->prepare("SELECT p_id, p_name, p_short_description, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                                 FROM tbl_product 
+                                 WHERE p_is_active = 1 
+                                 ORDER BY p_id DESC 
+                                 LIMIT 8");
+        $prodStmt->execute();
+        $featuredProducts = $prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $_) {}
+}
+
+// Fetch Real Ratings from Database
+$ratingMap = [];
+if (!empty($featuredProducts)) {
+    try {
+        $prodIds = array_column($featuredProducts, 'p_id');
+        $inClause = implode(',', array_map('intval', $prodIds));
+        $rStmt = $pdo->query("SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count FROM tbl_rating WHERE p_id IN ($inClause) GROUP BY p_id");
+        $rRows = $rStmt ? $rStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rRows as $rr) {
+            $ratingMap[$rr['p_id']] = [
+                'rating' => round((float)$rr['avg_rating'], 1),
+                'count' => $rr['rev_count']
+            ];
+        }
+    } catch (Throwable $_) {}
+}
 
 // Trust Bar Defaults
 $trust1_title = !empty($s['trust_item1_title']) ? $s['trust_item1_title'] : 'Free Shipping';
@@ -198,9 +215,11 @@ body {
     padding: 0;
 }
 
-.content-wrapper-main {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
+@media (min-width: 769px) {
+    .content-wrapper-main {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
 }
 
 .sn-main-content {
@@ -1145,10 +1164,79 @@ body {
         border-bottom: 1px solid #f1f5f9 !important;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
         z-index: 1000 !important;
+        padding: 0 !important;
+    }
+    .sn-header-wrap .sn-container {
+        padding: 0 14px !important;
+        width: 100% !important;
+        max-width: 100% !important;
     }
     body.shopnext-theme .content-wrapper-main {
         padding-top: 96px !important;
         padding-bottom: 72px !important;
+    }
+    .sn-header-top {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 8px 0 6px 0 !important;
+        gap: 8px 0 !important;
+        width: 100% !important;
+    }
+    .sn-brand-logo {
+        order: 1 !important;
+        font-size: 20px !important;
+    }
+    .sn-header-actions {
+        order: 2 !important;
+        margin-left: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 14px !important;
+    }
+    .sn-search-form {
+        order: 3 !important;
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 2px 0 0 0 !important;
+        max-height: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        pointer-events: auto !important;
+        visibility: visible !important;
+    }
+    .sn-search-input-wrap {
+        height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+        border-radius: 999px !important;
+        border: 1.5px solid #f1f5f9 !important;
+        padding: 0 4px 0 12px !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    }
+    .sn-search-input {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: auto !important;
+        border: none !important;
+        outline: none !important;
+        background: transparent !important;
+        padding: 0 6px !important;
+        font-size: 11.5px !important;
+    }
+    .sn-search-btn {
+        background: #fab802 !important;
+        color: #111827 !important;
+        font-weight: 700 !important;
+        font-size: 12px !important;
+        padding: 0 16px !important;
+        height: 30px !important;
+        border-radius: 999px !important;
+        border: none !important;
     }
     .sn-hero-section {
         margin-top: 0 !important;
@@ -1414,10 +1502,20 @@ body {
              ============================================================ -->
         <?php if ($category_on == 1): ?>
         <section class="sn-category-section">
-            <div class="sn-section-header sn-desktop-only">
-                <h2 class="sn-section-title"><?php echo htmlspecialchars($categories_title); ?></h2>
-                <a href="<?php echo BASE_URL; ?>product-category.php?id=7&type=top-category" class="sn-view-all">
-                    <span>View All</span>
+            <div class="sn-section-header" style="margin-bottom: 10px;">
+                <h2 class="sn-section-title" style="display:flex; align-items:center; gap:7px;">
+                    <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:7px; background:#fef3c7; color:#d97706;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
+                    <span><?php echo htmlspecialchars($categories_title); ?></span>
+                </h2>
+                <a href="<?php echo BASE_URL; ?>categories.php" class="sn-view-all">
+                    <span>See All</span>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                 </a>
             </div>
@@ -1425,21 +1523,21 @@ body {
             <!-- Horizontal Swipe Container -->
             <div class="sn-category-scroll-wrap">
                 <!-- 1. All Categories -->
-                <a href="<?php echo BASE_URL; ?>product-category.php?id=7&type=top-category" class="sn-category-scroll-item">
-                    <div class="sn-category-scroll-box">
-                        <img src="assets/uploads/cat_all.jpg" alt="All Categories" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/cat_mockup/hero_laptop.png';">
+                <a href="<?php echo BASE_URL; ?>categories.php" class="sn-category-scroll-item">
+                    <div class="sn-category-scroll-box" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a;">
+                        <img src="assets/uploads/cat_all.jpg" alt="All Categories" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/cat_mockup/sub_matching_sets.png';">
                     </div>
                     <span class="sn-category-scroll-name">All Categories</span>
                 </a>
 
                 <?php 
                 foreach ($categories as $cat):
-                    $cPhoto = !empty($cat['photo']) ? $cat['photo'] : 'assets/images/no-image.png';
+                    $cPhoto = !empty($cat['photo']) ? $cat['photo'] : 'cat_all.jpg';
                     if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
                         $cPhoto = 'assets/uploads/' . $cPhoto;
                     }
                 ?>
-                    <a href="<?php echo BASE_URL; ?>product-category.php?id=<?php echo $cat['tcat_id']; ?>&type=top-category" class="sn-category-scroll-item">
+                    <a href="<?php echo BASE_URL; ?>categories.php?cat_id=<?php echo $cat['tcat_id']; ?>" class="sn-category-scroll-item">
                         <div class="sn-category-scroll-box">
                             <img src="<?php echo htmlspecialchars($cPhoto); ?>" alt="<?php echo htmlspecialchars($cat['tcat_name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/cat_all.jpg';">
                         </div>
@@ -1531,7 +1629,7 @@ body {
                 <div class="sn-payday-center">
                     <div class="sn-payday-center-title">Extra 15% OFF</div>
                     <div class="sn-payday-center-sub">On Your First Order</div>
-                    <a href="<?php echo BASE_URL; ?>product-category.php?id=7&type=top-category" class="sn-payday-btn">
+                    <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-payday-btn">
                         <span>Claim Now</span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </a>
@@ -1630,38 +1728,47 @@ body {
 
             <div class="sn-shira-grid">
                 <?php
-                $shiraDeals = [
-                    [
-                        'name' => 'Groceries',
-                        'badge' => 'Up to 58%',
-                        'img' => 'assets/uploads/deal_groceries.jpg',
-                        'url' => BASE_URL . 'product-category.php?id=5&type=top-category'
-                    ],
-                    [
-                        'name' => 'Snacks & Beverages',
-                        'badge' => 'Up to 40%',
-                        'img' => 'assets/uploads/deal_snacks.jpg',
-                        'url' => BASE_URL . 'product-category.php?id=5&type=top-category'
-                    ],
-                    [
-                        'name' => 'Home & Kitchen',
-                        'badge' => 'Up to 35%',
-                        'img' => 'assets/uploads/deal_kitchen.jpg',
-                        'url' => BASE_URL . 'product-category.php?id=12&type=top-category'
-                    ],
-                    [
-                        'name' => 'Fashion',
-                        'badge' => 'Up to 60%',
-                        'img' => 'assets/uploads/deal_fashion.jpg',
-                        'url' => BASE_URL . 'product-category.php?id=11&type=top-category'
-                    ]
-                ];
+                $shiraDeals = [];
+                try {
+                    $sdCats = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($sdCats as $sc) {
+                        $cPhoto = !empty($sc['photo']) ? $sc['photo'] : 'cat_all.jpg';
+                        if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
+                            $cPhoto = 'assets/uploads/' . $cPhoto;
+                        }
+                        $shiraDeals[] = [
+                            'name' => $sc['tcat_name'],
+                            'badge' => 'Featured',
+                            'img' => $cPhoto,
+                            'url' => BASE_URL . 'categories.php?cat_id=' . $sc['tcat_id']
+                        ];
+                    }
+                } catch (Throwable $_) {}
+
+                if (empty($shiraDeals)) {
+                    try {
+                        $pDeals = $pdo->query("SELECT p_id, p_name, p_featured_photo, p_current_price, p_old_price FROM tbl_product WHERE p_is_active = 1 ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), p_id DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+                        foreach ($pDeals as $pd) {
+                            $rPhoto = $pd['p_featured_photo'] ?? '';
+                            $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
+                            $pOld = (float)($pd['p_old_price'] ?? 0);
+                            $pCurr = (float)($pd['p_current_price'] ?? 0);
+                            $badge = ($pOld > $pCurr && $pOld > 0) ? ('-' . round((($pOld - $pCurr) / $pOld) * 100) . '%') : 'Hot Deal';
+                            $shiraDeals[] = [
+                                'name' => $pd['p_name'],
+                                'badge' => $badge,
+                                'img' => $rPhotoUrl,
+                                'url' => BASE_URL . 'product.php?id=' . $pd['p_id']
+                            ];
+                        }
+                    } catch (Throwable $_) {}
+                }
 
                 foreach ($shiraDeals as $sd):
                 ?>
                     <a href="<?php echo htmlspecialchars($sd['url']); ?>" class="sn-shira-card">
                         <div class="sn-shira-img-box">
-                            <img src="<?php echo htmlspecialchars($sd['img']); ?>" alt="<?php echo htmlspecialchars($sd['name']); ?>" loading="lazy">
+                            <img src="<?php echo htmlspecialchars($sd['img']); ?>" alt="<?php echo htmlspecialchars($sd['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/images/no-image.png';">
                         </div>
                         <span class="sn-shira-badge"><?php echo $sd['badge']; ?></span>
                         <span class="sn-shira-name"><?php echo htmlspecialchars($sd['name']); ?></span>
@@ -1677,7 +1784,7 @@ body {
         <section class="sn-featured-section sn-desktop-only">
             <div class="sn-section-header">
                 <h2 class="sn-section-title"><?php echo htmlspecialchars($featured_products_title); ?></h2>
-                <a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category" class="sn-view-all">
+                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-view-all">
                     <span>View All</span>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                 </a>
@@ -1690,9 +1797,9 @@ body {
                     $hasDiscount = ($oldPrice > $currPrice);
                     $discountPct = $hasDiscount ? round((($oldPrice - $currPrice) / $oldPrice) * 100) : 0;
                     
-                    $rInfo = $ratingMap[$p['p_id']] ?? ['rating' => '4.8', 'count' => '1.2k'];
-                    $score = $rInfo['rating'];
-                    $reviewsLabel = $rInfo['count'];
+                    $rInfo = $ratingMap[$p['p_id']] ?? null;
+                    $score = $rInfo ? $rInfo['rating'] : 0;
+                    $reviewsLabel = $rInfo ? $rInfo['count'] : 0;
 
                     $prodPhoto = !empty($p['p_featured_photo']) ? $p['p_featured_photo'] : 'assets/images/no-image.png';
                     if (!str_starts_with($prodPhoto, 'http')) {
@@ -1713,11 +1820,13 @@ body {
                             <h3 class="sn-product-title"><?php echo htmlspecialchars($p['p_name']); ?></h3>
                             <p class="sn-product-spec"><?php echo htmlspecialchars($p['p_short_description'] ?? ''); ?></p>
                             
+                            <?php if ($score > 0 && $reviewsLabel > 0): ?>
                             <div class="sn-product-rating">
                                 <span class="sn-rating-star">★</span>
                                 <span><?php echo $score; ?></span>
                                 <span class="sn-rating-count">(<?php echo $reviewsLabel; ?>)</span>
                             </div>
+                            <?php endif; ?>
                         </a>
 
                         <div class="sn-product-bottom">

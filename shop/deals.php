@@ -25,90 +25,77 @@ if (isset($_SESSION['customer']['cust_id'])) {
     $customerWishlist = $wlStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 }
 
-// Curated Top Deals matching the user's reference mockup (media_1790249867147.png)
-$curatedDeals = [
-    [
-        'id' => 105,
-        'category' => 'audio',
-        'name' => 'Apple AirPods Pro (2nd Gen)',
-        'specs' => '',
-        'curr_price' => '28,999',
-        'old_price' => '52,999',
-        'discount' => '-45%',
-        'rating' => '4.8',
-        'reviews' => '12.4k',
-        'coupon' => 'AIRPODS45',
-        'img' => BASE_URL . 'assets/uploads/deal_airpods.jpg',
-        'url' => 'product/apple-airpods-pro-2nd-gen-105'
-    ],
-    [
-        'id' => 107,
-        'category' => 'watches',
-        'name' => 'Samsung Galaxy Watch 6',
-        'specs' => '',
-        'curr_price' => '30,999',
-        'old_price' => '49,999',
-        'discount' => '-38%',
-        'rating' => '4.7',
-        'reviews' => '8.9k',
-        'coupon' => 'SAMSUNG38',
-        'img' => BASE_URL . 'assets/uploads/deal_galaxy_watch.jpg',
-        'url' => 'product/samsung-galaxy-watch-6-107'
-    ],
-    [
-        'id' => 103,
-        'category' => 'phones',
-        'name' => 'iPhone 15',
-        'specs' => '',
-        'curr_price' => '84,999',
-        'old_price' => '124,999',
-        'discount' => '-32%',
-        'rating' => '4.6',
-        'reviews' => '15.2k',
-        'coupon' => 'IPHONE32',
-        'img' => BASE_URL . 'assets/uploads/deal_iphone_15.jpg',
-        'url' => 'product/iphone-15-103'
-    ],
-    [
-        'id' => 104,
-        'category' => 'laptops',
-        'name' => 'ASUS ROG Strix G15',
-        'specs' => 'Ryzen 7 | 16GB | 1TB SSD',
-        'curr_price' => '112,999',
-        'old_price' => '224,999',
-        'discount' => '-50%',
-        'rating' => '4.5',
-        'reviews' => '6.7k',
-        'coupon' => 'ROG50',
-        'img' => BASE_URL . 'assets/uploads/deal_asus_rog.jpg',
-        'url' => 'product/hp-pavilion-15-104'
-    ]
-];
+$curatedDeals = [];
+$categoriesList = [];
 
-// Additional deals from DB to enrich PC view
+// Fetch real discounted or active products from database
 try {
-    $dbDealsStmt = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active = 1 AND p_old_price > p_current_price AND p_id NOT IN (103, 104, 105, 107) ORDER BY (p_old_price - p_current_price) DESC LIMIT 8");
-    $dbDeals = $dbDealsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $dbDealsStmt = $pdo->query("
+        SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_feature, ecat_id
+        FROM tbl_product 
+        WHERE p_is_active = 1 
+        ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), (p_old_price - p_current_price) DESC, p_id DESC 
+        LIMIT 20
+    ");
+    $dbDeals = $dbDealsStmt ? ($dbDealsStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+
+    // Fetch ratings for these products
+    $prodIds = array_column($dbDeals, 'p_id');
+    $ratingMap = [];
+    if (!empty($prodIds)) {
+        $inClause = implode(',', array_map('intval', $prodIds));
+        $rStmt = $pdo->query("SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count FROM tbl_rating WHERE p_id IN ($inClause) GROUP BY p_id");
+        if ($rStmt) {
+            foreach ($rStmt->fetchAll(PDO::FETCH_ASSOC) as $rr) {
+                $ratingMap[$rr['p_id']] = [
+                    'rating' => round((float)$rr['avg_rating'], 1),
+                    'reviews' => (int)$rr['rev_count']
+                ];
+            }
+        }
+    }
+
+    // Try fetching categories for filter
+    try {
+        $catsStmt = $pdo->query("SELECT tcat_id, tcat_name FROM tbl_top_category ORDER BY tcat_order ASC, tcat_id ASC LIMIT 6");
+        if ($catsStmt) {
+            foreach ($catsStmt->fetchAll(PDO::FETCH_ASSOC) as $tc) {
+                $categoriesList['cat_' . $tc['tcat_id']] = $tc['tcat_name'];
+            }
+        }
+    } catch (Throwable $_) {}
+
     foreach ($dbDeals as $dbItem) {
-        $discPct = round((($dbItem['p_old_price'] - $dbItem['p_current_price']) / $dbItem['p_old_price']) * 100);
+        $curr = (float)str_replace(',', '', (string)$dbItem['p_current_price']);
+        $old = (float)str_replace(',', '', (string)($dbItem['p_old_price'] ?? '0'));
+        $hasDiscount = ($old > $curr && $old > 0);
+        $discPct = $hasDiscount ? round((($old - $curr) / $old) * 100) : 0;
+        
+        $pId = (int)$dbItem['p_id'];
+        $rInfo = $ratingMap[$pId] ?? null;
+        $ratingStr = $rInfo ? (string)$rInfo['rating'] : '5.0';
+        $reviewsStr = $rInfo ? ($rInfo['reviews'] > 0 ? (string)$rInfo['reviews'] : 'Verified') : 'Verified';
+        
+        $photo = !empty($dbItem['p_featured_photo']) ? $dbItem['p_featured_photo'] : '';
+        $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : (function_exists('get_media_url') ? get_media_url($photo) : BASE_URL . 'assets/uploads/' . $photo)) : BASE_URL . 'assets/images/no-image.png';
+        $prodUrl = function_exists('getProductURL') ? getProductURL($pId, $dbItem['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $pId;
+
         $curatedDeals[] = [
-            'id' => (int)$dbItem['p_id'],
-            'category' => 'more',
+            'id' => $pId,
+            'category' => 'all',
             'name' => $dbItem['p_name'],
             'specs' => 'Verified Authentic • In Stock',
-            'curr_price' => number_format($dbItem['p_current_price']),
-            'old_price' => number_format($dbItem['p_old_price']),
-            'discount' => '-' . $discPct . '%',
-            'rating' => '4.7',
-            'reviews' => '1.2k',
-            'coupon' => 'SAVE' . min(50, max(10, $discPct)),
-            'img' => get_media_url($dbItem['p_featured_photo']),
-            'url' => getProductURL($dbItem['p_id'], $dbItem['p_name'], BASE_URL)
+            'curr_price' => number_format($curr),
+            'old_price' => $hasDiscount ? number_format($old) : '',
+            'discount' => $hasDiscount ? ('-' . $discPct . '%') : 'HOT DEAL',
+            'rating' => $ratingStr,
+            'reviews' => $reviewsStr,
+            'coupon' => $hasDiscount ? ('SAVE' . min(50, max(10, $discPct))) : 'SPECIAL',
+            'img' => $imgUrl,
+            'url' => $prodUrl
         ];
     }
-} catch (Exception $e) {
-    // Graceful fallback
-}
+} catch (Throwable $e) {}
 
 // Require Site Header
 require_once('header.php');
@@ -119,26 +106,6 @@ require_once('header.php');
 
 <div class="sn-deals-page-wrap">
     
-    <!-- 1. Top Title Bar (< Deals 🏷️) -->
-    <div class="sn-deals-title-bar">
-        <a href="<?php echo BASE_URL; ?>" class="sn-deals-back-btn" aria-label="Go Back">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-        </a>
-        <div class="sn-deals-title-content">
-            <h1 class="sn-deals-title">
-                <span>Deals</span>
-                <span class="sn-deals-badge-sparkle">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#fab802">
-                        <path d="M12 2l2.4 7.2h7.6l-6 4.8 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.8h7.6z"/>
-                    </svg>
-                </span>
-            </h1>
-            <p class="sn-deals-subtitle">Top offers, limited time. Grab your favorites at the best prices!</p>
-        </div>
-    </div>
-
     <!-- 2. Hero Banner Card ("Up to 70% OFF") -->
     <div class="sn-deals-hero-card">
         <!-- Top Right Corner Badge -->
@@ -185,21 +152,30 @@ require_once('header.php');
     </div>
 
     <!-- 3. Category Filter Bar (Desktop) -->
+    <?php if (!empty($categoriesList)): ?>
     <div class="sn-deals-filter-bar sn-desktop-only" id="snDealsFilterBar">
         <button type="button" class="sn-filter-pill active" data-filter="all">All Deals</button>
-        <button type="button" class="sn-filter-pill" data-filter="audio">🎧 Audio</button>
-        <button type="button" class="sn-filter-pill" data-filter="watches">⌚ Watches</button>
-        <button type="button" class="sn-filter-pill" data-filter="phones">📱 Phones</button>
-        <button type="button" class="sn-filter-pill" data-filter="laptops">💻 Laptops</button>
+        <?php foreach ($categoriesList as $cKey => $cName): ?>
+            <button type="button" class="sn-filter-pill" data-filter="<?php echo htmlspecialchars($cKey); ?>"><?php echo htmlspecialchars($cName); ?></button>
+        <?php endforeach; ?>
     </div>
+    <?php endif; ?>
 
     <!-- 4. Deals Product Grid (2 columns on mobile, 4 columns on desktop) -->
     <div class="sn-deals-grid" id="snDealsGrid">
+        <?php if (empty($curatedDeals)): ?>
+            <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; color: #64748b;">
+                <i class="fas fa-tags" style="font-size: 36px; color: #cbd5e1; margin-bottom: 12px; display: block;"></i>
+                <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 6px;">No Active Deals Right Now</h3>
+                <p style="font-size: 14px;">Check back soon for new promotions and seasonal discounts!</p>
+                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-deals-shop-btn" style="display: inline-block; margin-top: 16px; padding: 10px 24px; text-decoration: none;">Browse Products</a>
+            </div>
+        <?php endif; ?>
+
         <?php foreach ($curatedDeals as $idx => $item): 
             $isWishlisted = in_array($item['id'], $customerWishlist);
-            $extraClass = ($idx >= 4) ? 'sn-desktop-only' : '';
         ?>
-            <div class="sn-deal-card <?php echo $extraClass; ?>" data-category="<?php echo htmlspecialchars($item['category']); ?>">
+            <div class="sn-deal-card" data-category="<?php echo htmlspecialchars($item['category']); ?>">
                 <!-- Card Top: Discount Badge & Wishlist Button -->
                 <div class="sn-deal-card-top">
                     <span class="sn-deal-discount-badge"><?php echo htmlspecialchars($item['discount']); ?></span>
