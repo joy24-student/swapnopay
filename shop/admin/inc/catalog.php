@@ -6,8 +6,9 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
     $stock=filter_var($data['p_qty'] ?? '',FILTER_VALIDATE_INT);
     if(!$name || strlen($name)>255 || $price===false || !is_finite($price) || $price<0 || $price>99999999 || $old===false || $old<0 || $old>99999999 || $stock===false || $stock<0 || $stock>2147483647) throw new RuntimeException('Check the product name, price and whole-number stock quantity.');
     $category=(int)($data['ecat_id'] ?? 0);
-    $stmt=$pdo->prepare('SELECT e.ecat_id FROM tbl_end_category e JOIN tbl_mid_category m ON e.mcat_id=m.mcat_id WHERE e.ecat_id=? AND m.mcat_id=? AND m.tcat_id=?');
-    $stmt->execute([$category,(int)($data['mcat_id'] ?? 0),(int)($data['tcat_id'] ?? 0)]);
+    if($category <= 0) throw new RuntimeException('Choose a valid product category.');
+    $stmt=$pdo->prepare('SELECT ecat_id FROM tbl_end_category WHERE ecat_id=?');
+    $stmt->execute([$category]);
     if(!$stmt->fetchColumn()) throw new RuntimeException('Choose a valid product category.');
     $uploaded=[];
     $saveImage=static function(array $file,string $folder='') use (&$uploaded): ?string {

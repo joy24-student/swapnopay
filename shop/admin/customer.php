@@ -26,27 +26,33 @@
 						</thead>
 						<tbody>
 							<?php
+							try {
+								$pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_country integer DEFAULT 0");
+								$pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_status smallint DEFAULT 1");
+							} catch (Throwable $e) {}
+
 							$i=0;
-							$statement = $pdo->prepare("SELECT * 
+							$statement = $pdo->prepare("SELECT t1.*, t2.country_name 
 														FROM tbl_customer t1
-														JOIN tbl_country t2
+														LEFT JOIN tbl_country t2
 														ON t1.cust_country = t2.country_id
+														ORDER BY t1.cust_id DESC
 													");
 							$statement->execute();
 							$result = $statement->fetchAll(PDO::FETCH_ASSOC);						
 							foreach ($result as $row) {
 								$i++;
 								?>
-								<tr class="<?php if($row['cust_status']==1) {echo 'bg-g';}else {echo 'bg-r';} ?>">
+								<tr class="<?php if(($row['cust_status'] ?? 1) == 1) {echo 'bg-g';}else {echo 'bg-r';} ?>">
 									<td><?php echo $i; ?></td>
-									<td><?php echo $row['cust_name']; ?></td>
-									<td><?php echo $row['cust_email']; ?></td>
+									<td><?php echo htmlspecialchars($row['cust_name'] ?? ''); ?></td>
+									<td><?php echo htmlspecialchars($row['cust_email'] ?? ''); ?></td>
 									<td>
-										<?php echo $row['country_name']; ?><br>
-										<?php echo $row['cust_city']; ?><br>
-										<?php echo $row['cust_state']; ?>
+										<?php echo htmlspecialchars($row['country_name'] ?? 'N/A'); ?><br>
+										<?php echo htmlspecialchars($row['cust_city'] ?? ''); ?><br>
+										<?php echo htmlspecialchars($row['cust_state'] ?? ''); ?>
 									</td>
-									<td><?php if($row['cust_status']==1) {echo 'Active';} else {echo 'Inactive';} ?></td>
+									<td><?php if(($row['cust_status'] ?? 1) == 1) {echo 'Active';} else {echo 'Inactive';} ?></td>
 									<td>
 										<a href="customer-change-status.php?id=<?php echo $row['cust_id']; ?>" class="btn btn-success btn-xs">Change Status</a>
 									</td>

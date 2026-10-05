@@ -38,10 +38,29 @@ $supabase_service_key = defined('SUPABASE_SERVICE_KEY') && !empty(SUPABASE_SERVI
 $supabase_order_id = null;
 $gateway_order_id = null;
 
+// Retrieve merchant settings from tbl_settings if not set in runtime/constants
 $merchant_id = $runtime['merchant_id'] ?? (defined('MERCHANT_ID') ? MERCHANT_ID : (getenv('MERCHANT_ID') ?: null));
+$gateway_api_key = trim((string)($runtime['gateway_api_key'] ?? (defined('SWAPNOPAY_API_KEY') ? SWAPNOPAY_API_KEY : (getenv('SWAPNOPAY_API_KEY') ?: ''))));
+$api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
+
+try {
+    $stmt_sett = $pdo->query("SELECT swapnopay_merchant_id, swapnopay_api_key, swapnopay_api_url FROM tbl_settings WHERE id=1");
+    if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
+        if (empty($merchant_id) && !empty($sett_row['swapnopay_merchant_id'])) {
+            $merchant_id = trim($sett_row['swapnopay_merchant_id']);
+        }
+        if (empty($gateway_api_key) && !empty($sett_row['swapnopay_api_key'])) {
+            $gateway_api_key = trim($sett_row['swapnopay_api_key']);
+        }
+        if (!empty($sett_row['swapnopay_api_url'])) {
+            $api_url = rtrim(trim($sett_row['swapnopay_api_url']), '/');
+        }
+    }
+} catch (Throwable $e) {}
+
 if (!$merchant_id) {
     http_response_code(503);
-    exit('This store is not connected to a payment merchant. Please contact the store owner.');
+    exit('This store is not connected to a payment merchant. Please set Merchant ID in Payment Settings.');
 }
 
 // If dedicated Supabase and service key are available, attempt direct insert

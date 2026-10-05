@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
     $district = trim(strip_tags($_POST['district'] ?? $def_district));
     $chosen_shipping_method = trim(strip_tags($_POST['shipping_method'] ?? 'standard'));
     $chosen_shipping_cost = (float)($_POST['shipping_cost'] ?? 60.0);
-    $chosen_payment_method = trim(strip_tags($_POST['payment_method'] ?? 'card'));
+    $chosen_payment_method = trim(strip_tags($_POST['payment_method'] ?? 'swapnopay'));
     $customer_note = trim(strip_tags($_POST['customer_note'] ?? ''));
 
     // Full delivery address string
@@ -400,15 +400,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
         } catch (Exception $e) {
             $order_error = "Order processing error: " . $e->getMessage();
         }
-    } elseif ($chosen_payment_method === 'bkash' || $chosen_payment_method === 'nagad') {
-        // SwapnoPay instant mobile auto-verification
-        $_POST['mfs_provider'] = ($chosen_payment_method === 'nagad') ? 'Nagad' : 'bKash';
-        header("Location: payment/swapnopay/process.php?provider=" . urlencode($_POST['mfs_provider']));
-        exit;
     } else {
-        // Credit / Debit Card (SSLCommerz)
-        $_POST['final_total'] = $submitted_final_total;
-        header("Location: payment/sslcommerz/process.php");
+        // SwapnoPay Unified Gateway (bKash, Nagad, Rocket, Upay, Cards, Net Banking)
+        $_SESSION['mfs_provider'] = 'SwapnoPay';
+        header("Location: payment/swapnopay/process.php?provider=SwapnoPay");
         exit;
     }
 }
@@ -499,7 +494,7 @@ require_once('header.php');
             <input type="hidden" name="checkout_token" value="<?php echo htmlspecialchars($_SESSION['checkout_token'], ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="shipping_cost" id="inputShippingCost" value="<?php echo number_format($shipping_cost, 2, '.', ''); ?>">
             <input type="hidden" name="shipping_method" id="inputShippingMethod" value="standard">
-            <input type="hidden" name="payment_method" id="inputPaymentMethod" value="card">
+            <input type="hidden" name="payment_method" id="inputPaymentMethod" value="swapnopay">
 
             <div class="sn-checkout-grid">
 
@@ -940,69 +935,33 @@ require_once('header.php');
                         </div>
 
                         <div class="sn-payment-options-list">
-                            <!-- Option 1: Credit / Debit Card -->
-                            <div class="sn-pay-card active" id="payCardCard" onclick="selectPayment('card')">
+                            <!-- Option 1: SwapnoPay Payment Gateway -->
+                            <div class="sn-pay-card active" id="payCardSwapnopay" onclick="selectPayment('swapnopay')">
                                 <div class="sn-radio-indicator">
                                     <div class="sn-radio-dot"></div>
                                 </div>
-                                <div class="sn-pay-icon-box">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                                <div class="sn-pay-icon-box swapnopay-icon-bg" style="background:#4F46E5; color:#FFF;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                        <line x1="2" y1="10" x2="22" y2="10"></line>
                                     </svg>
                                 </div>
                                 <div class="sn-pay-title-col">
-                                    <div class="sn-pay-name">Credit / Debit Card</div>
-                                    <div class="sn-pay-desc sn-pay-desc-desktop">Visa, Mastercard, Amex</div>
-                                    <div class="sn-pay-desc sn-pay-desc-mobile">Visa, Mastercard, American Express</div>
+                                    <div class="sn-pay-name" style="font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
+                                        <span>Swapnopay Payment Gateway</span>
+                                        <span class="badge" style="background:#EEF2FF; color:#4F46E5; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Official</span>
+                                    </div>
+                                    <div class="sn-pay-desc sn-pay-desc-desktop">bKash, Nagad, Rocket, Upay, Cards &amp; Net Banking</div>
+                                    <div class="sn-pay-desc sn-pay-desc-mobile">bKash, Nagad, Rocket, Upay &amp; Cards</div>
                                 </div>
-                                <div class="sn-card-brand-pills">
-                                    <span class="sn-brand-pill visa">VISA</span>
-                                    <span class="sn-brand-pill mc">
-                                        <span class="dot-red"></span><span class="dot-yel"></span>
-                                    </span>
-                                    <span class="sn-brand-pill amex">AMEX</span>
-                                </div>
-                            </div>
-
-                            <!-- Option 2: bKash (Mobile Banking) -->
-                            <div class="sn-pay-card" id="payCardBkash" onclick="selectPayment('bkash')">
-                                <div class="sn-radio-indicator">
-                                    <div class="sn-radio-dot"></div>
-                                </div>
-                                <div class="sn-pay-icon-box bkash-bg">
-                                    <svg width="24" height="24" viewBox="-6.6741 -11.07275 57.8422 66.4365">
-                                        <path fill="#DF146E" d="M42.31 44.291H2.182C.981 44.291 0 43.308 0 42.107V2.186C0 .982.981 0 2.182 0H42.31c1.203 0 2.184.982 2.184 2.186v39.921c0 1.201-.981 2.184-2.184 2.184"/>
-                                        <path fill="#FFF" d="M31.894 24.251l-14.107-2.246 1.909 8.329zm.572-.682L21.374 8.16l-3.623 13.106zm-15.402-2.482L5.441 6.239l15.221 1.819zm-5.639-6.154l-6.449-6.08h1.695zm24.504 1.15L33.2 23.486l-4.426-6.118zM21.417 30.232l10.71-4.3.454-1.365zm-8.933 7.821l4.589-16.102 2.326 10.479zm24.099-21.914l-1.128 3.056 4.059-.07z"/>
-                                    </svg>
-                                </div>
-                                <div class="sn-pay-title-col">
-                                    <div class="sn-pay-name">bKash</div>
-                                    <div class="sn-pay-desc sn-pay-desc-desktop">Mobile Banking</div>
-                                    <div class="sn-pay-desc sn-pay-desc-mobile">Pay with bKash</div>
+                                <div class="sn-mfs-badges" style="display:flex; align-items:center; gap:4px;">
+                                    <span style="font-size:10px; font-weight:700; color:#E11D48; background:#FFE4E6; padding:2px 6px; border-radius:4px;">bKash</span>
+                                    <span style="font-size:10px; font-weight:700; color:#EA580C; background:#FFEDD5; padding:2px 6px; border-radius:4px;">Nagad</span>
+                                    <span style="font-size:10px; font-weight:700; color:#9333EA; background:#F3E8FF; padding:2px 6px; border-radius:4px;">Rocket</span>
                                 </div>
                             </div>
 
-                            <!-- Option 3: Nagad (Mobile Banking) -->
-                            <div class="sn-pay-card" id="payCardNagad" onclick="selectPayment('nagad')">
-                                <div class="sn-radio-indicator">
-                                    <div class="sn-radio-dot"></div>
-                                </div>
-                                <div class="sn-pay-icon-box nagad-bg">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                        <circle cx="12" cy="12" r="10" fill="#F7941D"/>
-                                        <path d="M12 4c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z" fill="#ED1C24"/>
-                                        <circle cx="12" cy="12" r="2.5" fill="#FFF"/>
-                                    </svg>
-                                </div>
-                                <div class="sn-pay-title-col">
-                                    <div class="sn-pay-name">Nagad</div>
-                                    <div class="sn-pay-desc sn-pay-desc-desktop">Mobile Banking</div>
-                                    <div class="sn-pay-desc sn-pay-desc-mobile">Pay with Nagad</div>
-                                </div>
-                            </div>
-
-                            <!-- Option 4: Cash on Delivery -->
+                            <!-- Option 2: Cash on Delivery -->
                             <div class="sn-pay-card" id="payCardCod" onclick="selectPayment('cod')">
                                 <div class="sn-radio-indicator">
                                     <div class="sn-radio-dot"></div>
@@ -1015,9 +974,9 @@ require_once('header.php');
                                     </svg>
                                 </div>
                                 <div class="sn-pay-title-col">
-                                    <div class="sn-pay-name">Cash on Delivery</div>
-                                    <div class="sn-pay-desc sn-pay-desc-desktop">Pay when you receive</div>
-                                    <div class="sn-pay-desc sn-pay-desc-mobile">Pay when you receive the product</div>
+                                    <div class="sn-pay-name">Cash on Delivery (COD)</div>
+                                    <div class="sn-pay-desc sn-pay-desc-desktop">Pay with cash when your package is delivered</div>
+                                    <div class="sn-pay-desc sn-pay-desc-mobile">Pay cash upon delivery</div>
                                 </div>
                             </div>
                         </div>
@@ -2472,20 +2431,25 @@ function selectPayment(method) {
 
     // Update active class on payment cards
     document.querySelectorAll('.sn-pay-card').forEach(el => el.classList.remove('active'));
-    if (method === 'card') document.getElementById('payCardCard')?.classList.add('active');
-    if (method === 'bkash') document.getElementById('payCardBkash')?.classList.add('active');
-    if (method === 'nagad') document.getElementById('payCardNagad')?.classList.add('active');
+    if (method === 'swapnopay') document.getElementById('payCardSwapnopay')?.classList.add('active');
     if (method === 'cod') document.getElementById('payCardCod')?.classList.add('active');
 
     // Update CTA button label
     const submitBtn = document.getElementById('btnSubmitText');
     if (submitBtn) {
         if (method === 'cod') {
-            submitBtn.textContent = 'Place Order';
-        } else if (method === 'bkash' || method === 'nagad') {
-            submitBtn.textContent = 'Continue to Payment';
+            submitBtn.textContent = 'Place Order (COD)';
         } else {
-            submitBtn.textContent = 'Continue to Payment';
+            submitBtn.textContent = 'Pay with SwapnoPay';
+        }
+    }
+
+    const mobBtn = document.querySelector('.sn-btn-mobile-place-order span');
+    if (mobBtn) {
+        if (method === 'cod') {
+            mobBtn.textContent = 'Place Order (COD)';
+        } else {
+            mobBtn.textContent = 'Pay with SwapnoPay';
         }
     }
 }
@@ -2610,10 +2574,7 @@ function updateAddressPreview() {
 // Ensure total is correctly initialized on load
 document.addEventListener('DOMContentLoaded', () => {
     recalculateTotal();
-    // Default Cash on Delivery selected on mobile if requested
-    if (window.innerWidth <= 1024) {
-        selectPayment('cod');
-    }
+    selectPayment('swapnopay');
 });
 </script>
 

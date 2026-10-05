@@ -43,13 +43,20 @@
 	        	height: 300
 	        });
 	    });
+		if (window.jQuery) {
+			$.ajaxSetup({
+				headers: {
+					'X-CSRF-TOKEN': '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>'
+				}
+			});
+		}
 		$(".top-cat").on('change',function(){
 			var id=$(this).val();
 			if(id != '') {
 				$.ajax({
 					type: "POST",
 					url: "get-mid-category.php",
-					data: {id: id},
+					data: {id: id, _csrf: '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>'},
 					cache: false,
 					success: function(html) {
 						$(".mid-cat").html(html);
@@ -66,7 +73,7 @@
 				$.ajax({
 					type: "POST",
 					url: "get-end-category.php",
-					data: {id: id},
+					data: {id: id, _csrf: '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>'},
 					cache: false,
 					success: function(html) {
 						$(".end-cat").html(html);

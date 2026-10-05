@@ -15,8 +15,13 @@ if(isset($_SESSION['shop_admin_version']) && !hash_equals($_SESSION['shop_admin_
     unset($_SESSION['user'],$_SESSION['shop_admin_version']);header('Location: ' . BASE_URL . 'admin/login.php');exit;
 }
 $_SESSION['shop_admin_version']=$passwordVersion;
-$method=$_SERVER['REQUEST_METHOD'] ?? 'GET';
-if($method==='POST' && !$csrf->checkToken() && !$csrf->isTokenValid($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) { http_response_code(403);exit('Your form session expired. Refresh the page and try again.'); }
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$adminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
+$ajaxReadOnly = in_array($adminPage, ['get-mid-category.php', 'get-end-category.php', 'fetch_sorted_products.php'], true);
+if($method === 'POST' && !$ajaxReadOnly && !$csrf->checkToken() && !$csrf->isTokenValid($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+    http_response_code(403);
+    exit('Your form session expired. Refresh the page and try again.');
+}
 
 // All rendered forms receive the same server-verified CSRF token, including
 // legacy forms that did not previously include one. Scripts are left intact.

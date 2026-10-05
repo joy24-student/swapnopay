@@ -8,7 +8,7 @@ if(isset($_POST['form1'])) {
         $savedProduct=saveStoreProduct($pdo,$_POST,$_FILES,(int)($_REQUEST['id'] ?? 0));
         header('Location: product-edit.php?id=' . $savedProduct . '&saved=1');exit;
     } catch(Throwable $error) {
-        $error_message=$error instanceof PDOException ? 'The product could not be saved. Check its fields and try again.' : htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8');
+        $error_message = htmlspecialchars($error->getMessage(), ENT_QUOTES, 'UTF-8');
     }
 }
 if(isset($_GET['saved'])) $success_message='Product saved successfully.';
@@ -60,6 +60,12 @@ foreach ($result as $row) {
 	$p_is_active = $row['p_is_active'];
 	$ecat_id = $row['ecat_id'];
 }
+
+$ecat_name = '';
+$mcat_id = 0;
+$tcat_id = 0;
+$size_id = [];
+$color_id = [];
 
 $statement = $pdo->prepare("SELECT * 
                         FROM tbl_end_category t1

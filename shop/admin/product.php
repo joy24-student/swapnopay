@@ -32,77 +32,84 @@
 							</tr>
 						</thead>
 						<tbody>
-							<?php
-							$i=0;
-							$statement = $pdo->prepare("SELECT
-														
-														t1.p_id,
-														t1.p_name,
-														t1.p_old_price,
-														t1.p_current_price,
-														t1.p_qty,
-														t1.p_featured_photo,
-														t1.p_is_featured,
-														t1.p_is_active,
-														t1.ecat_id,
-														t1.business_id,
+<?php
+try {
+    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS business_id integer DEFAULT NULL");
+    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_total_view integer DEFAULT 0");
+    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS cust_id integer DEFAULT 0");
+    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_video_link text DEFAULT ''");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tbl_businesses (business_id SERIAL PRIMARY KEY, business_name varchar(255), owner_user_id integer)");
+} catch (Throwable $e) {}
 
-														t2.ecat_id,
-														t2.ecat_name,
+$i=0;
+$statement = $pdo->prepare("SELECT
+							t1.p_id,
+							t1.p_name,
+							t1.p_old_price,
+							t1.p_current_price,
+							t1.p_qty,
+							t1.p_featured_photo,
+							t1.p_is_featured,
+							t1.p_is_active,
+							t1.ecat_id,
+							t1.business_id,
 
-														t3.mcat_id,
-														t3.mcat_name,
+							t2.ecat_id AS end_ecat_id,
+							t2.ecat_name,
 
-														t4.tcat_id,
-														t4.tcat_name,
-														
-														b.business_name,
-														b.owner_user_id
+							t3.mcat_id,
+							t3.mcat_name,
 
-							                           	FROM tbl_product t1
-							                           	JOIN tbl_end_category t2
-							                           	ON t1.ecat_id = t2.ecat_id
-							                           	JOIN tbl_mid_category t3
-							                           	ON t2.mcat_id = t3.mcat_id
-							                           	JOIN tbl_top_category t4
-							                           	ON t3.tcat_id = t4.tcat_id
-							                           	LEFT JOIN tbl_businesses b
-							                           	ON t1.business_id = b.business_id
-							                           	ORDER BY t1.p_id DESC
-							                           	");
-							$statement->execute();
-							$result = $statement->fetchAll(PDO::FETCH_ASSOC);
-							foreach ($result as $row) {
-								$i++;
-								?>
-								<tr>
-									<td><?php echo $i; ?></td>
-									<td style="width:82px;"><img src="../assets/uploads/<?php echo $row['p_featured_photo']; ?>" alt="<?php echo $row['p_name']; ?>" style="width:80px;"></td>
-									<td><?php echo $row['p_name']; ?></td>
-									<td>
-										<?php 
-										if(!empty($row['business_name'])) {
-											echo '<span class="badge badge-info">' . htmlspecialchars($row['business_name']) . '</span>';
-										} else {
-											echo '<span class="badge badge-secondary">Admin Product</span>';
-										}
-										?>
-									</td>
-									<td>BDT <?php echo number_format((float)$row['p_old_price'], 2); ?></td>
-									<td>BDT <?php echo number_format((float)$row['p_current_price'], 2); ?></td>
-									<td><?php echo $row['p_qty']; ?></td>
-									<td>
-										<?php if($row['p_is_featured'] == 1) {echo '<span class="badge badge-success" style="background-color:green;">Yes</span>';} else {echo '<span class="badge badge-success" style="background-color:red;">No</span>';} ?>
-									</td>
-									<td>
-										<?php if($row['p_is_active'] == 1) {echo '<span class="badge badge-success" style="background-color:green;">Yes</span>';} else {echo '<span class="badge badge-danger" style="background-color:red;">No</span>';} ?>
-									</td>
-									<td><?php echo $row['tcat_name']; ?><br><?php echo $row['mcat_name']; ?><br><?php echo $row['ecat_name']; ?></td>
-									<td>										
-										<a href="product-edit.php?id=<?php echo $row['p_id']; ?>" class="btn btn-primary btn-xs">Edit</a>
-										<a href="#" class="btn btn-danger btn-xs" data-href="product-delete.php?id=<?php echo $row['p_id']; ?>" data-toggle="modal" data-target="#confirm-delete">Delete</a>  
-									</td>
-								</tr>
+							t4.tcat_id,
+							t4.tcat_name,
+							
+							b.business_name,
+							b.owner_user_id
+
+							FROM tbl_product t1
+							LEFT JOIN tbl_end_category t2
+							ON t1.ecat_id = t2.ecat_id
+							LEFT JOIN tbl_mid_category t3
+							ON t2.mcat_id = t3.mcat_id
+							LEFT JOIN tbl_top_category t4
+							ON t3.tcat_id = t4.tcat_id
+							LEFT JOIN tbl_businesses b
+							ON t1.business_id = b.business_id
+							ORDER BY t1.p_id DESC
+							");
+$statement->execute();
+$result = $statement->fetchAll(PDO::FETCH_ASSOC);
+foreach ($result as $row) {
+	$i++;
+	?>
+	<tr>
+		<td><?php echo $i; ?></td>
+		<td style="width:82px;"><img src="../assets/uploads/<?php echo htmlspecialchars($row['p_featured_photo'] ?: 'placeholder.svg'); ?>" alt="<?php echo htmlspecialchars($row['p_name']); ?>" style="width:80px;"></td>
+		<td><?php echo htmlspecialchars($row['p_name']); ?></td>
+		<td>
+			<?php 
+			if(!empty($row['business_name'])) {
+				echo '<span class="badge badge-info">' . htmlspecialchars($row['business_name']) . '</span>';
+			} else {
+				echo '<span class="badge badge-secondary">Admin Product</span>';
+			}
+			?>
+		</td>
+		<td>BDT <?php echo number_format((float)$row['p_old_price'], 2); ?></td>
+		<td>BDT <?php echo number_format((float)$row['p_current_price'], 2); ?></td>
+		<td><?php echo $row['p_qty']; ?></td>
+		<td>
+			<?php if($row['p_is_featured'] == 1) {echo '<span class="badge badge-success" style="background-color:green;">Yes</span>';} else {echo '<span class="badge badge-success" style="background-color:red;">No</span>';} ?>
+		</td>
+		<td>
+			<?php if($row['p_is_active'] == 1) {echo '<span class="badge badge-success" style="background-color:green;">Yes</span>';} else {echo '<span class="badge badge-danger" style="background-color:red;">No</span>';} ?>
+		</td>
+		<td><?php echo htmlspecialchars($row['tcat_name'] ?? 'Uncategorized'); ?><?php if(!empty($row['mcat_name'])): ?><br><?php echo htmlspecialchars($row['mcat_name']); ?><?php endif; ?><?php if(!empty($row['ecat_name'])): ?><br><?php echo htmlspecialchars($row['ecat_name']); ?><?php endif; ?></td>
+		<td>										
+			<a href="product-edit.php?id=<?php echo $row['p_id']; ?>" class="btn btn-primary btn-xs">Edit</a>
+			<a href="#" class="btn btn-danger btn-xs" data-href="product-delete.php?id=<?php echo $row['p_id']; ?>" data-toggle="modal" data-target="#confirm-delete">Delete</a>  
+		</td>
+	</tr>
 								<?php
 							}
 							?>							
