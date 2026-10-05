@@ -118,9 +118,107 @@ if (!empty($_SESSION['cart_p_qty'])) {
             opacity: 0 !important;
             margin-top: 0 !important;
             margin-bottom: 0 !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            pointer-events: none;
+        /* Pixel-perfect bottom nav matching global header */
+        .sn-mobile-bottom-nav {
+            display: flex !important;
+            position: relative !important;
+            width: 100% !important;
+            height: 56px !important;
+            min-height: 56px !important;
+            max-height: 56px !important;
+            background: #ffffff !important;
+            border-top: 1px solid #f1f5f9 !important;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+            z-index: 20 !important;
+            align-items: center !important;
+            justify-content: space-around !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-item {
+            flex: 1 1 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 56px !important;
+            max-height: 56px !important;
+            padding: 4px 2px !important;
+            margin: 0 !important;
+            text-decoration: none !important;
+            color: #64748b !important;
+            background: transparent !important;
+            border: none !important;
+            position: relative !important;
+            box-sizing: border-box !important;
+            -webkit-tap-highlight-color: transparent !important;
+            transition: color 0.15s ease !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-item.active {
+            color: #fab802 !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-icon-box {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: relative !important;
+            width: 26px !important;
+            height: 22px !important;
+            line-height: 1 !important;
+            margin: 0 0 2px 0 !important;
+            background: transparent !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-icon-box svg {
+            width: 20px !important;
+            height: 20px !important;
+            display: block !important;
+            flex-shrink: 0 !important;
+            stroke: #64748b !important;
+            stroke-width: 2px !important;
+            transition: stroke 0.15s ease, fill 0.15s ease !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box svg {
+            stroke: #fab802 !important;
+            fill: #fab802 !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-badge-count {
+            position: absolute !important;
+            top: -4px !important;
+            right: -7px !important;
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            font-size: 9px !important;
+            font-weight: 800 !important;
+            min-width: 14px !important;
+            height: 14px !important;
+            border-radius: 999px !important;
+            padding: 0 3px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            margin: 0 !important;
+            border: 1.5px solid #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+            z-index: 5 !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-item > span:not(.sn-dock-badge-count) {
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            line-height: 1.15 !important;
+            letter-spacing: -0.2px !important;
+            color: #64748b !important;
+            text-align: center !important;
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            transition: color 0.15s ease !important;
+        }
+        .sn-mobile-bottom-nav .sn-dock-item.active > span:not(.sn-dock-badge-count) {
+            color: #fab802 !important;
+            font-weight: 700 !important;
         }
     </style>
 </head>
@@ -259,32 +357,61 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
     <!-- 5-TAB MOBILE BOTTOM DOCK (Hidden when in desktop embed mode) -->
     <?php if (!$is_embed): ?>
-    <div class="bg-white border-t border-slate-200 px-3 py-2 flex items-center justify-around shrink-0 z-10">
-        <a href="index.php" class="flex flex-col items-center text-slate-400 hover:text-slate-800 transition">
-            <i class="fa-solid fa-house text-sm"></i>
-            <span class="text-[10px] font-medium mt-1">Home</span>
-        </a>
-        <a href="deals.php" class="flex flex-col items-center text-slate-400 hover:text-slate-800 transition">
-            <i class="fa-solid fa-bolt text-sm"></i>
-            <span class="text-[10px] font-medium mt-1">Deals</span>
-        </a>
-        <a href="messages.php" class="flex flex-col items-center text-amber-500 font-bold">
-            <div class="relative">
-                <i class="fa-solid fa-comment-dots text-base"></i>
-                <span class="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
+    <div class="mobile-bottom-nav sn-mobile-bottom-nav">
+        <!-- 1. Home -->
+        <a href="index.php" class="sn-dock-item">
+            <div class="sn-dock-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
             </div>
-            <span class="text-[10px] font-bold mt-0.5">Messages</span>
+            <span>Home</span>
         </a>
-        <a href="cart.php" class="flex flex-col items-center text-slate-400 hover:text-slate-800 transition relative">
-            <div class="relative">
-                <i class="fa-solid fa-cart-shopping text-sm"></i>
-                <span id="dockCartBadge" class="absolute -top-1.5 -right-2 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full <?php echo $cart_count > 0 ? '' : 'hidden'; ?>"><?php echo $cart_count; ?></span>
+
+        <!-- 2. Deals -->
+        <a href="deals.php" class="sn-dock-item">
+            <div class="sn-dock-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
             </div>
-            <span class="text-[10px] font-medium mt-1">Cart</span>
+            <span>Deals</span>
         </a>
-        <a href="<?php echo isset($_SESSION['customer']) ? 'dashboard.php' : 'login.php'; ?>" class="flex flex-col items-center text-slate-400 hover:text-slate-800 transition">
-            <i class="fa-regular fa-user text-sm"></i>
-            <span class="text-[10px] font-medium mt-1">Account</span>
+
+        <!-- 3. Messages (Active) -->
+        <a href="messages.php" class="sn-dock-item active">
+            <div class="sn-dock-icon-box sn-dock-has-badge">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#fab802" stroke="#fab802" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="sn-dock-badge-count" style="display:none;" id="sn-dock-messages-badge">1</span>
+            </div>
+            <span>Messages</span>
+        </a>
+
+        <!-- 4. Cart -->
+        <a href="cart.php" class="sn-dock-item">
+            <div class="sn-dock-icon-box sn-dock-has-badge">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span class="sn-dock-badge-count" id="dockCartBadge" style="<?php echo $cart_count > 0 ? '' : 'display:none;'; ?>"><?php echo $cart_count; ?></span>
+            </div>
+            <span>Cart</span>
+        </a>
+
+        <!-- 5. Account -->
+        <a href="<?php echo isset($_SESSION['customer']) ? 'dashboard.php' : 'login.php'; ?>" class="sn-dock-item">
+            <div class="sn-dock-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <span>Account</span>
         </a>
     </div>
     <?php endif; ?>

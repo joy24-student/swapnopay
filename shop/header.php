@@ -759,7 +759,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         .mobile-bottom-nav .sn-dock-item.active,
         .sn-mobile-bottom-nav .sn-dock-item.active,
         .mobile-bottom-nav .nav-item.active {
-            color: #0f172a !important;
+            color: #fab802 !important;
             background: transparent !important;
             border-radius: 0 !important;
             padding: 4px 2px !important;
@@ -773,6 +773,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             align-items: center !important;
             justify-content: center !important;
             position: relative !important;
+            width: 26px !important;
             height: 22px !important;
             line-height: 1 !important;
             margin: 0 0 2px 0 !important;
@@ -792,25 +793,37 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
         .mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box svg,
         .sn-mobile-bottom-nav .sn-dock-item.active .sn-dock-icon-box svg {
-            stroke: #0f172a !important;
+            stroke: #fab802 !important;
+            fill: #fab802 !important;
         }
 
         .mobile-bottom-nav .sn-dock-item.active svg[fill="currentColor"],
         .sn-mobile-bottom-nav .sn-dock-item.active svg[fill="currentColor"] {
-            fill: #0f172a !important;
+            fill: #fab802 !important;
+            stroke: #fab802 !important;
         }
 
         .mobile-bottom-nav .sn-dock-badge-count,
         .sn-mobile-bottom-nav .sn-dock-badge-count {
-            font-size: 11px !important;
-            font-weight: 700 !important;
-            color: #0f172a !important;
-            margin-left: 3px !important;
+            position: absolute !important;
+            top: -4px !important;
+            right: -7px !important;
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            font-size: 9px !important;
+            font-weight: 800 !important;
+            min-width: 14px !important;
+            height: 14px !important;
+            border-radius: 999px !important;
+            padding: 0 3px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             line-height: 1 !important;
-            display: inline-block !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
+            margin: 0 !important;
+            border: 1.5px solid #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+            z-index: 5 !important;
         }
 
         .mobile-bottom-nav .sn-dock-item > span:not(.sn-dock-badge-count),
@@ -832,7 +845,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         .mobile-bottom-nav .sn-dock-item.active > span:not(.sn-dock-badge-count),
         .sn-mobile-bottom-nav .sn-dock-item.active > span:not(.sn-dock-badge-count),
         .mobile-bottom-nav .nav-item.active span {
-            color: #0f172a !important;
+            color: #fab802 !important;
             font-weight: 700 !important;
         }
 
@@ -1731,9 +1744,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
          ============================================================ -->
     <div class="mobile-bottom-nav sn-mobile-bottom-nav">
         <!-- 1. Home (Active on homepage & product detail) -->
-        <a href="<?php echo BASE_URL; ?>" class="sn-dock-item <?php echo ($cur_page == 'index.php' || $cur_page == '' || $cur_page == 'product.php') ? 'active' : ''; ?>">
+        <?php $is_home_active = ($cur_page == 'index.php' || $cur_page == '' || $cur_page == 'product.php'); ?>
+        <a href="<?php echo BASE_URL; ?>" class="sn-dock-item <?php echo $is_home_active ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'index.php' || $cur_page == '' || $cur_page == 'product.php') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_home_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_home_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                 </svg>
@@ -1742,9 +1756,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         </a>
 
         <!-- 2. Deals -->
-        <a href="<?php echo BASE_URL; ?>deals.php" class="sn-dock-item <?php echo ($cur_page == 'deals.php') ? 'active' : ''; ?>">
+        <?php $is_deals_active = ($cur_page == 'deals.php'); ?>
+        <a href="<?php echo BASE_URL; ?>deals.php" class="sn-dock-item <?php echo $is_deals_active ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'deals.php') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_deals_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_deals_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
             </div>
@@ -1752,9 +1767,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         </a>
 
         <!-- 3. Messages / AI Support -->
-        <a href="<?php echo BASE_URL; ?>messages.php" class="sn-dock-item <?php echo ($cur_page == 'messages.php') ? 'active' : ''; ?>">
+        <?php $is_messages_active = ($cur_page == 'messages.php'); ?>
+        <a href="<?php echo BASE_URL; ?>messages.php" class="sn-dock-item <?php echo $is_messages_active ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box sn-dock-has-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'messages.php') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_messages_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_messages_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
                 <span class="sn-dock-badge-count" style="display:none;" id="sn-dock-messages-badge">1</span>
@@ -1763,9 +1779,10 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         </a>
 
         <!-- 4. Cart -->
-        <a href="<?php echo BASE_URL; ?>cart.php" class="sn-dock-item <?php echo ($cur_page == 'cart.php') ? 'active' : ''; ?>">
+        <?php $is_cart_active = ($cur_page == 'cart.php'); ?>
+        <a href="<?php echo BASE_URL; ?>cart.php" class="sn-dock-item <?php echo $is_cart_active ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box sn-dock-has-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_cart_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_cart_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="9" cy="21" r="1"></circle>
                     <circle cx="20" cy="21" r="1"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -1782,10 +1799,13 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         </a>
 
         <!-- 5. Account -->
+        <?php 
+            $is_account_active = in_array($cur_page, ['dashboard.php', 'customer-profile-update.php', 'customer-order.php', 'customer-billing-shipping-update.php', 'customer-wishlist.php', 'customer-password-update.php', 'login.php', 'registration.php']);
+        ?>
         <?php if(isset($_SESSION['customer'])): ?>
-            <a href="<?php echo BASE_URL; ?>dashboard.php" class="sn-dock-item <?php echo ($cur_page == 'dashboard.php' || $cur_page == 'customer-profile-update.php' || $cur_page == 'customer-order.php') ? 'active' : ''; ?>">
+            <a href="<?php echo BASE_URL; ?>dashboard.php" class="sn-dock-item <?php echo $is_account_active ? 'active' : ''; ?>">
                 <div class="sn-dock-icon-box">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_account_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_account_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
@@ -1793,9 +1813,9 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 <span>Account</span>
             </a>
         <?php else: ?>
-            <a href="<?php echo BASE_URL; ?>login.php" class="sn-dock-item <?php echo ($cur_page == 'login.php' || $cur_page == 'registration.php') ? 'active' : ''; ?>">
+            <a href="<?php echo BASE_URL; ?>login.php" class="sn-dock-item <?php echo $is_account_active ? 'active' : ''; ?>">
                 <div class="sn-dock-icon-box">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_account_active ? '#fab802' : 'none'; ?>" stroke="<?php echo $is_account_active ? '#fab802' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>

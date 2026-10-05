@@ -1,6 +1,14 @@
-<?php require_once('header.php'); ?>
-
 <?php
+$is_ajax = isset($_REQUEST['ajax']) && $_REQUEST['ajax'] === '1';
+
+if ($is_ajax) {
+    ob_start();
+    require_once('header.php');
+    ob_end_clean();
+} else {
+    require_once('header.php');
+}
+
 if (!isset($_REQUEST['search_text']) || $_REQUEST['search_text'] === '') {
     if (isset($_REQUEST['q']) && $_REQUEST['q'] !== '') {
         $_REQUEST['search_text'] = $_REQUEST['q'];
@@ -91,9 +99,10 @@ $buildUrl = function (array $override = []) use ($base, $state) {
 };
 $activeFilters = ($onSale ? 1 : 0) + ($inStock ? 1 : 0) + ($minRating ? 1 : 0) + ($priceMin !== null ? 1 : 0) + ($priceMax !== null ? 1 : 0);
 $sortLabels = ['best' => 'Best match', 'popular' => 'Popular', 'newest' => 'Newest', 'price_asc' => 'Price: Low to High', 'price_desc' => 'Price: High to Low'];
-$cur = LANG_VALUE_1;
+$cur = defined('LANG_VALUE_1') ? LANG_VALUE_1 : '৳ ';
 ?>
 
+<?php if (!$is_ajax): ?>
 <style>
 /* ===== Search Results (yellow theme) ===== */
 .srp { --y:#fab802; --y-d:#e0a400; --y-l:#fff8e1; --ink:#111827; --mut:#6b7280; --line:#f1f5f9; background:#fff; font-family:inherit; }
@@ -103,8 +112,11 @@ $cur = LANG_VALUE_1;
 .srp-title { font-size:14px; color:var(--mut); margin:0; min-width:0; }
 .srp-title b { color:var(--ink); }
 .srp-title strong { color:var(--ink); word-break:break-word; }
-.srp-sale-banner { display:flex; align-items:center; justify-content:center; gap:6px; background:var(--y-l); border:1px solid #fde8a1; color:#92400e; font-size:12px; font-weight:700; border-radius:10px; padding:8px 10px; margin:4px 0 10px; }
-.srp-sale-banner i { color:var(--y-d); }
+
+/* Dynamic content wrapper transition */
+#srp-dynamic-area {
+    transition: opacity 0.18s ease;
+}
 
 /* sticky chip row */
 .srp-chips { position:sticky; top:96px; z-index:90; background:#fff; margin:0 -12px; padding:8px 12px; display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; border-bottom:1px solid var(--line); transition:top .25s ease; }
@@ -192,7 +204,9 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
 
 <div class="srp">
 <div class="srp-wrap">
+<?php endif; ?>
 
+<div id="srp-dynamic-area">
     <div class="srp-bar">
         <p class="srp-title">
             <b><?php echo number_format($total_pages); ?></b> result<?php echo $total_pages === 1 ? '' : 's'; ?> for
@@ -250,7 +264,7 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
         ?>
             <article class="srp-card">
                 <a class="srp-thumb" href="<?php echo $link; ?>">
-                    <img src="assets/uploads/<?php echo htmlspecialchars($row['p_featured_photo']); ?>" alt="<?php echo htmlspecialchars($row['p_name']); ?>" loading="lazy">
+                    <img src="assets/uploads/<?php echo htmlspecialchars($row['p_featured_photo']); ?>" alt="<?php echo htmlspecialchars($row['p_name']); ?>" loading="lazy" onerror="this.src='assets/uploads/no-image.jpg';">
                     <?php if ($oos): ?><span class="srp-badge oos">Sold out</span>
                     <?php elseif ($off): ?><span class="srp-badge">-<?php echo $off; ?>%</span><?php endif; ?>
                 </a>
@@ -294,9 +308,7 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
     <?php endif; ?>
 </div>
 
-<!-- Overlay + sheets -->
-<div class="srp-ov" id="srp-ov"></div>
-
+<!-- Sort sheet -->
 <div class="srp-sheet" id="srp-sort" role="dialog" aria-label="Sort">
     <div class="srp-sh-head"><h4>Sort by</h4><button class="srp-x" data-close type="button" aria-label="Close">&times;</button></div>
     <div class="srp-sh-body srp-sort-list">
@@ -308,6 +320,7 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
     </div>
 </div>
 
+<!-- Filter sheet -->
 <div class="srp-sheet" id="srp-filter" role="dialog" aria-label="Filters">
     <form method="get" action="<?php echo $base; ?>" style="display:flex;flex-direction:column;min-height:0;flex:1">
         <input type="hidden" name="search_text" value="<?php echo htmlspecialchars($search_text, ENT_QUOTES, 'UTF-8'); ?>">
@@ -344,35 +357,70 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
         </div>
     </form>
 </div>
+
+<?php 
+if ($is_ajax) {
+    exit;
+}
+?>
+
+</div>
+<!-- Overlay -->
+<div class="srp-ov" id="srp-ov"></div>
 </div>
 
 <script>
 (function () {
     var ov = document.getElementById('srp-ov');
-    var sheets = { sort: document.getElementById('srp-sort'), filter: document.getElementById('srp-filter') };
+    
     function closeAll() {
-        ov.classList.remove('open');
-        Object.keys(sheets).forEach(function (k) { sheets[k].classList.remove('open'); });
+        if (ov) ov.classList.remove('open');
+        var sortSheet = document.getElementById('srp-sort');
+        var filterSheet = document.getElementById('srp-filter');
+        if (sortSheet) sortSheet.classList.remove('open');
+        if (filterSheet) filterSheet.classList.remove('open');
         document.body.style.overflow = '';
     }
-    document.querySelectorAll('[data-open]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            closeAll();
-            ov.classList.add('open');
-            sheets[b.getAttribute('data-open')].classList.add('open');
-            document.body.style.overflow = 'hidden';
-        });
-    });
-    ov.addEventListener('click', closeAll);
-    document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', closeAll); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
 
-    // Keep the sticky chip row flush under the header (no gap), whatever its real height
-    var chips = document.getElementById('srp-chips');
-    var hdr = document.querySelector('.sn-header-wrap');
+    // Modal open buttons (Filters & Sort By)
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-open]');
+        if (btn) {
+            e.preventDefault();
+            closeAll();
+            var target = btn.getAttribute('data-open');
+            var sheet = document.getElementById(target === 'sort' ? 'srp-sort' : 'srp-filter');
+            if (sheet && ov) {
+                ov.classList.add('open');
+                sheet.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    });
+
+    if (ov) ov.addEventListener('click', closeAll);
+
+    // Close button inside sheets
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('[data-close]')) {
+            e.preventDefault();
+            closeAll();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) { 
+        if (e.key === 'Escape') closeAll(); 
+    });
+
+    // Keep sticky chips flush under header
     function syncChips() {
+        var chips = document.getElementById('srp-chips');
+        var hdr = document.querySelector('.sn-header-wrap');
         if (!chips) return;
-        if (window.innerWidth >= 900) { chips.style.removeProperty('top'); return; }
+        if (window.innerWidth >= 900) { 
+            chips.style.removeProperty('top'); 
+            return; 
+        }
         var b = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 0;
         chips.style.setProperty('top', Math.max(0, b - 1) + 'px', 'important');
     }
@@ -380,12 +428,106 @@ body.sn-header-scrolled-away .srp-chips { top:58px; }
     window.addEventListener('scroll', syncChips, { passive: true });
     window.addEventListener('resize', syncChips);
     window.addEventListener('load', syncChips);
+    var hdr = document.querySelector('.sn-header-wrap');
     if (hdr) {
         hdr.addEventListener('transitionend', syncChips);
         if (window.ResizeObserver) new ResizeObserver(syncChips).observe(hdr);
     }
 
-    // Keep the header search box showing the current query
+    // AJAX FILTERING ENGINE (NO PAGE RELOAD)
+    function loadFilteredResults(targetUrl, pushHistory) {
+        if (pushHistory === undefined) pushHistory = true;
+        var dynamicArea = document.getElementById('srp-dynamic-area');
+        if (!dynamicArea) return;
+
+        dynamicArea.style.opacity = '0.45';
+        dynamicArea.style.pointerEvents = 'none';
+
+        var fetchUrl = targetUrl + (targetUrl.indexOf('?') > -1 ? '&' : '?') + 'ajax=1';
+
+        fetch(fetchUrl)
+            .then(function(res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.text();
+            })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+
+                var newArea = doc.getElementById('srp-dynamic-area');
+                if (newArea) {
+                    dynamicArea.innerHTML = newArea.innerHTML;
+                }
+
+                var newSort = doc.getElementById('srp-sort');
+                var curSort = document.getElementById('srp-sort');
+                if (newSort && curSort) curSort.innerHTML = newSort.innerHTML;
+
+                var newFilter = doc.getElementById('srp-filter');
+                var curFilter = document.getElementById('srp-filter');
+                if (newFilter && curFilter) curFilter.innerHTML = newFilter.innerHTML;
+
+                dynamicArea.style.opacity = '1';
+                dynamicArea.style.pointerEvents = '';
+
+                if (pushHistory) {
+                    try {
+                        history.pushState({ srpUrl: targetUrl }, '', targetUrl);
+                    } catch (e) {}
+                }
+
+                closeAll();
+                syncChips();
+            })
+            .catch(function(err) {
+                dynamicArea.style.opacity = '1';
+                dynamicArea.style.pointerEvents = '';
+                // Fallback to normal navigation if fetch failed
+                window.location.href = targetUrl;
+            });
+    }
+
+    // Intercept clicks on links that filter (Chips, Applied tags, Pagination, Sort links)
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('.srp-chip[href], .srp-tag[href], .srp-clear[href], .srp-pg[href], .srp-sort-list a[href]');
+        if (link && link.getAttribute('href')) {
+            var href = link.getAttribute('href');
+            if (href.indexOf('search-result.php') > -1 || href.startsWith('?')) {
+                e.preventDefault();
+                loadFilteredResults(link.href);
+            }
+        }
+    });
+
+    // Intercept Filter Sheet form submit
+    document.addEventListener('submit', function(e) {
+        var form = e.target.closest('#srp-filter form');
+        if (form) {
+            e.preventDefault();
+            var formData = new FormData(form);
+            var params = new URLSearchParams(formData);
+            var targetUrl = form.action + '?' + params.toString();
+            closeAll();
+            loadFilteredResults(targetUrl);
+        }
+    });
+
+    // Intercept Filter Sheet Reset button
+    document.addEventListener('click', function(e) {
+        var resetBtn = e.target.closest('#srp-filter .srp-btn.ghost');
+        if (resetBtn && resetBtn.getAttribute('href')) {
+            e.preventDefault();
+            closeAll();
+            loadFilteredResults(resetBtn.href);
+        }
+    });
+
+    // Browser back/forward button support
+    window.addEventListener('popstate', function(e) {
+        loadFilteredResults(window.location.href, false);
+    });
+
+    // Keep header search box showing the current query
     var inp = document.getElementById('sn-search-input');
     if (inp && !inp.value) inp.value = <?php echo json_encode($search_text); ?>;
 })();

@@ -87,6 +87,26 @@ $is_official = (int)($product_data['is_official'] ?? 0);
 $statement = $pdo->prepare("UPDATE tbl_product SET p_total_view = p_total_view + 1 WHERE p_id = ?");
 $statement->execute([$p_id]);
 
+// Track recently viewed products in session and persistent cookie
+if (!isset($_SESSION['recently_viewed']) || !is_array($_SESSION['recently_viewed'])) {
+    $_SESSION['recently_viewed'] = [];
+}
+$_SESSION['recently_viewed'] = array_values(array_diff($_SESSION['recently_viewed'], [$p_id]));
+array_unshift($_SESSION['recently_viewed'], $p_id);
+$_SESSION['recently_viewed'] = array_slice($_SESSION['recently_viewed'], 0, 20);
+
+$c_viewed = [];
+if (!empty($_COOKIE['sn_recently_viewed'])) {
+    $c_decoded = json_decode($_COOKIE['sn_recently_viewed'], true);
+    if (is_array($c_decoded)) {
+        $c_viewed = $c_decoded;
+    }
+}
+$c_viewed = array_values(array_diff($c_viewed, [$p_id]));
+array_unshift($c_viewed, $p_id);
+$c_viewed = array_slice($c_viewed, 0, 20);
+@setcookie('sn_recently_viewed', json_encode($c_viewed), time() + (86400 * 30), '/');
+
 // Handle Add to Cart & Buy Now Form Submissions
 if (isset($_POST['form_add_to_cart']) || isset($_POST['form_buy_now'])) {
     $valid = 1;

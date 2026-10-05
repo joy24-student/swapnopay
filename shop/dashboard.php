@@ -148,11 +148,44 @@ try {
     unset($ro);
 } catch (Throwable $e) {}
 
-// --- 6. Fetch Recently Viewed / Featured Products ---
+// --- 6. Fetch Recently Viewed / Featured Products Dynamically ---
 $recent_products = [];
 try {
-    $stmt_rp = $pdo->query("SELECT p_id, p_name, p_current_price, p_featured_photo FROM tbl_product WHERE p_is_active = 1 ORDER BY p_id DESC LIMIT 5");
-    $recent_products = $stmt_rp->fetchAll(PDO::FETCH_ASSOC);
+    $recent_ids = [];
+    if (!empty($_SESSION['recently_viewed']) && is_array($_SESSION['recently_viewed'])) {
+        $recent_ids = array_map('intval', $_SESSION['recently_viewed']);
+    } elseif (!empty($_COOKIE['sn_recently_viewed'])) {
+        $c_ids = json_decode($_COOKIE['sn_recently_viewed'], true);
+        if (is_array($c_ids)) {
+            $recent_ids = array_map('intval', $c_ids);
+        }
+    }
+    
+    if (!empty($recent_ids)) {
+        $placeholders = implode(',', array_fill(0, count($recent_ids), '?'));
+        $stmt_rp = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_qty, p_is_featured FROM tbl_product WHERE p_id IN ($placeholders) AND p_is_active = 1");
+        $stmt_rp->execute($recent_ids);
+        $fetched = $stmt_rp->fetchAll(PDO::FETCH_ASSOC);
+        $fetched_map = [];
+        foreach ($fetched as $f) { $fetched_map[$f['p_id']] = $f; }
+        foreach ($recent_ids as $rid) {
+            if (isset($fetched_map[$rid])) {
+                $recent_products[] = $fetched_map[$rid];
+            }
+        }
+    }
+    
+    // If fewer than 6 products, fill with popular active products so it is never empty
+    if (count($recent_products) < 6) {
+        $exclude_ids = !empty($recent_products) ? array_map('intval', array_column($recent_products, 'p_id')) : [];
+        $exclude_sql = !empty($exclude_ids) ? " AND p_id NOT IN (" . implode(',', $exclude_ids) . ")" : "";
+        $limit_needed = 6 - count($recent_products);
+        $stmt_fill = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_qty, p_is_featured FROM tbl_product WHERE p_is_active = 1 $exclude_sql ORDER BY p_is_featured DESC, p_id DESC LIMIT $limit_needed");
+        $filled = $stmt_fill->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($filled as $fp) {
+            $recent_products[] = $fp;
+        }
+    }
 } catch (Throwable $e) {}
 ?>
 
@@ -691,57 +724,46 @@ try {
         </div>
     </section>
 
-    <!-- Card 2: Recently Viewed -->
-    <section class="sn-mob-card">
+    <!-- Card 2: Recently Viewed (Dynamic) -->
+    <section class="sn-mob-card" id="snRecentlyViewedSection">
         <div class="sn-mob-card-header">
             <h2 class="sn-mob-card-title">Recently Viewed</h2>
-            <a href="product-category.php" class="sn-mob-card-link">
-                View More <i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i>
+            <a href="javascript:void(0)" class="sn-mob-card-link" id="snRecentViewMoreBtn" onclick="openRecentlyViewedModal(event)">
+                <span>View More</span> <i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i>
             </a>
         </div>
 
-        <div class="sn-mob-recent-grid">
-            <!-- Product 1: 3.5mm Jack -->
-            <a href="product-category.php" class="sn-mob-product-card">
-                <span class="sn-mob-prod-badge">&darr; 47%</span>
-                <div class="sn-mob-prod-img-box">
-                    <img src="<?= BASE_URL ?>assets/uploads/mob_prod_earphone_jack.png" alt="3.5mm Jack">
+        <div class="sn-mob-recent-grid" id="snMobRecentGrid">
+            <?php if (empty($recent_products)): ?>
+                <div style="grid-column: 1 / -1; text-align: center; padding: 18px 10px; color: #64748b; font-size: 12px;">
+                    No recently viewed products yet. <a href="index.php" style="color: #fab802; font-weight: 700; text-decoration: underline;">Discover deals &rarr;</a>
                 </div>
-                <div class="sn-mob-prod-title">3.5mm Jack</div>
-                <div class="sn-mob-prod-sub">Earphone with Mic</div>
-                <div class="sn-mob-prod-prices">
-                    <span class="sn-mob-prod-price">৳ 105</span>
-                    <span class="sn-mob-prod-old-price">৳200</span>
-                </div>
-            </a>
-
-            <!-- Product 2: Samsung Earphones -->
-            <a href="product-category.php" class="sn-mob-product-card">
-                <span class="sn-mob-prod-badge">&darr; 30%</span>
-                <div class="sn-mob-prod-img-box">
-                    <img src="<?= BASE_URL ?>assets/uploads/mob_prod_samsung_earphone.png" alt="Samsung Earphones">
-                </div>
-                <div class="sn-mob-prod-title">Samsung Earphones</div>
-                <div class="sn-mob-prod-sub">In-Ear with Mic</div>
-                <div class="sn-mob-prod-prices">
-                    <span class="sn-mob-prod-price">৳ 70</span>
-                    <span class="sn-mob-prod-old-price">৳100</span>
-                </div>
-            </a>
-
-            <!-- Product 3: Oraimo Bass -->
-            <a href="product-category.php" class="sn-mob-product-card">
-                <span class="sn-mob-prod-badge">&darr; 60%</span>
-                <div class="sn-mob-prod-img-box">
-                    <img src="<?= BASE_URL ?>assets/uploads/mob_prod_oraimo_bass.png" alt="Oraimo Bass">
-                </div>
-                <div class="sn-mob-prod-title">Oraimo Bass</div>
-                <div class="sn-mob-prod-sub">Wired Earphones</div>
-                <div class="sn-mob-prod-prices">
-                    <span class="sn-mob-prod-price">৳ 120</span>
-                    <span class="sn-mob-prod-old-price">৳299</span>
-                </div>
-            </a>
+            <?php else: ?>
+                <?php foreach ($recent_products as $idx => $rp): 
+                    $rp_photo = !empty($rp['p_featured_photo']) 
+                        ? 'assets/uploads/' . $rp['p_featured_photo'] 
+                        : 'assets/uploads/no-image.jpg';
+                    $has_discount = (!empty($rp['p_old_price']) && (float)$rp['p_old_price'] > (float)$rp['p_current_price']);
+                    $disc_pct = $has_discount ? round((((float)$rp['p_old_price'] - (float)$rp['p_current_price']) / (float)$rp['p_old_price']) * 100) : 0;
+                    $is_extra = ($idx >= 3);
+                ?>
+                    <a href="product.php?id=<?= (int)$rp['p_id'] ?>" class="sn-mob-product-card <?= $is_extra ? 'sn-recent-extra' : '' ?>" style="<?= $is_extra ? 'display: none;' : '' ?>">
+                        <?php if ($has_discount && $disc_pct > 0): ?>
+                            <span class="sn-mob-prod-badge">&darr; <?= $disc_pct ?>%</span>
+                        <?php endif; ?>
+                        <div class="sn-mob-prod-img-box">
+                            <img src="<?= htmlspecialchars($rp_photo) ?>" alt="<?= htmlspecialchars($rp['p_name']) ?>" loading="lazy" onerror="this.src='assets/uploads/no-image.jpg';">
+                        </div>
+                        <div class="sn-mob-prod-title" title="<?= htmlspecialchars($rp['p_name']) ?>"><?= htmlspecialchars($rp['p_name']) ?></div>
+                        <div class="sn-mob-prod-prices">
+                            <span class="sn-mob-prod-price">৳ <?= number_format((float)$rp['p_current_price'], 0) ?></span>
+                            <?php if ($has_discount): ?>
+                                <span class="sn-mob-prod-old-price">৳<?= number_format((float)$rp['p_old_price'], 0) ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </section>
 
@@ -1122,5 +1144,380 @@ try {
         </div>
     </div>
 </div>
+
+<!-- ========================================================================
+     RECENTLY VIEWED SLIDE-UP BOTTOM SHEET MODAL (WITH GESTURE CONTROL)
+     ======================================================================== -->
+<div id="snRecentModalBackdrop" class="sn-sheet-backdrop" onclick="closeRecentlyViewedModal()"></div>
+<div id="snRecentModalSheet" class="sn-sheet-container" role="dialog" aria-modal="true" aria-labelledby="snRecentModalTitle">
+    <!-- Gesture Drag Handle -->
+    <div class="sn-sheet-drag-area" id="snRecentDragArea">
+        <div class="sn-sheet-drag-handle"></div>
+    </div>
+    
+    <!-- Modal Header -->
+    <div class="sn-sheet-header">
+        <div class="sn-sheet-title-box">
+            <h3 id="snRecentModalTitle">Recently Viewed</h3>
+            <span class="sn-sheet-badge"><?= count($recent_products) ?> items</span>
+        </div>
+        <button type="button" class="sn-sheet-close-btn" onclick="closeRecentlyViewedModal()" aria-label="Close modal">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Modal Body with 2-Column Product Grid -->
+    <div class="sn-sheet-body" id="snRecentSheetBody">
+        <?php if (empty($recent_products)): ?>
+            <div style="text-align: center; padding: 40px 16px; color: #64748b;">
+                <i class="fa-solid fa-clock-rotate-left" style="font-size: 32px; color: #fab802; margin-bottom: 12px; display: block;"></i>
+                <h4 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">No Recently Viewed Items</h4>
+                <p style="font-size: 13px; margin: 0 0 16px 0;">Start browsing to track products you like.</p>
+                <a href="index.php" class="sn-sheet-explore-btn" style="background: #fab802; color: #111827; border-color: #fab802;">Start Shopping</a>
+            </div>
+        <?php else: ?>
+            <div class="sn-sheet-grid">
+                <?php foreach ($recent_products as $rp): 
+                    $rp_photo = !empty($rp['p_featured_photo']) 
+                        ? 'assets/uploads/' . $rp['p_featured_photo'] 
+                        : 'assets/uploads/no-image.jpg';
+                    $has_discount = (!empty($rp['p_old_price']) && (float)$rp['p_old_price'] > (float)$rp['p_current_price']);
+                    $disc_pct = $has_discount ? round((((float)$rp['p_old_price'] - (float)$rp['p_current_price']) / (float)$rp['p_old_price']) * 100) : 0;
+                ?>
+                    <div class="sn-sheet-card">
+                        <a href="product.php?id=<?= (int)$rp['p_id'] ?>" class="sn-sheet-thumb">
+                            <img src="<?= htmlspecialchars($rp_photo) ?>" alt="<?= htmlspecialchars($rp['p_name']) ?>" loading="lazy" onerror="this.src='assets/uploads/no-image.jpg';">
+                            <?php if ($has_discount && $disc_pct > 0): ?>
+                                <span class="sn-sheet-disc-badge">-<?= $disc_pct ?>%</span>
+                            <?php endif; ?>
+                        </a>
+                        <div class="sn-sheet-card-info">
+                            <a href="product.php?id=<?= (int)$rp['p_id'] ?>" class="sn-sheet-card-title"><?= htmlspecialchars($rp['p_name']) ?></a>
+                            <div class="sn-sheet-price-row">
+                                <span class="sn-sheet-price">৳ <?= number_format((float)$rp['p_current_price'], 0) ?></span>
+                                <?php if ($has_discount): ?>
+                                    <span class="sn-sheet-old-price">৳<?= number_format((float)$rp['p_old_price'], 0) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <a href="product.php?id=<?= (int)$rp['p_id'] ?>" class="sn-sheet-view-btn">
+                                <i class="fa-solid fa-eye" style="font-size: 10px;"></i> View
+                            </a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <div style="text-align: center; margin-top: 18px;">
+                <a href="deals.php" class="sn-sheet-explore-btn">
+                    <span>Browse All Deals</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px;"></i>
+                </a>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<style>
+/* Bottom Sheet & Gesture Styles */
+.sn-sheet-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 10001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+.sn-sheet-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+}
+.sn-sheet-container {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    max-height: 86vh;
+    background: #ffffff;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
+    z-index: 10002;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(105%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+    touch-action: pan-y;
+}
+.sn-sheet-container.open {
+    transform: translateY(0);
+}
+.sn-sheet-container.dragging {
+    transition: none !important;
+}
+.sn-sheet-drag-area {
+    padding: 10px 0 6px 0;
+    cursor: grab;
+    display: flex;
+    justify-content: center;
+    touch-action: none;
+}
+.sn-sheet-drag-handle {
+    width: 44px;
+    height: 5px;
+    background: #cbd5e1;
+    border-radius: 999px;
+    transition: background-color 0.15s ease;
+}
+.sn-sheet-drag-area:active .sn-sheet-drag-handle {
+    background: #94a3b8;
+}
+.sn-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 18px 12px 18px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.sn-sheet-title-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sn-sheet-title-box h3 {
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+.sn-sheet-badge {
+    background: #fff8e1;
+    color: #92400e;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid #fde8a1;
+}
+.sn-sheet-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #f1f5f9;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.sn-sheet-close-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.sn-sheet-body {
+    overflow-y: auto;
+    padding: 14px 16px calc(24px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+.sn-sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+.sn-sheet-card {
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.sn-sheet-card:hover {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+}
+.sn-sheet-thumb {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    background: #f8fafc;
+    overflow: hidden;
+    display: block;
+}
+.sn-sheet-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.sn-sheet-disc-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: #fab802;
+    color: #111827;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 5px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.sn-sheet-card-info {
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.sn-sheet-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-decoration: none;
+    margin-bottom: 4px;
+}
+.sn-sheet-card-title:hover {
+    color: #fab802;
+}
+.sn-sheet-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: auto;
+    margin-bottom: 8px;
+}
+.sn-sheet-price {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+}
+.sn-sheet-old-price {
+    font-size: 11px;
+    color: #94a3b8;
+    text-decoration: line-through;
+}
+.sn-sheet-view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 32px;
+    border-radius: 999px;
+    background: #fab802;
+    color: #111827;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+.sn-sheet-view-btn:hover {
+    background: #e0a400;
+    color: #111827;
+    text-decoration: none;
+}
+.sn-sheet-explore-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 20px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.sn-sheet-explore-btn:hover {
+    background: #fff8e1;
+    border-color: #fab802;
+    color: #92400e;
+    text-decoration: none;
+}
+</style>
+
+<script>
+// Modal Open/Close & Gesture Controls
+function openRecentlyViewedModal(e) {
+    if (e) e.preventDefault();
+    const backdrop = document.getElementById('snRecentModalBackdrop');
+    const sheet = document.getElementById('snRecentModalSheet');
+    if (!sheet) return;
+    backdrop.classList.add('open');
+    sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeRecentlyViewedModal() {
+    const backdrop = document.getElementById('snRecentModalBackdrop');
+    const sheet = document.getElementById('snRecentModalSheet');
+    if (!sheet) return;
+    sheet.style.transform = '';
+    sheet.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+// Touch gesture drag-down to dismiss
+(function() {
+    const sheet = document.getElementById('snRecentModalSheet');
+    const dragArea = document.getElementById('snRecentDragArea');
+    if (!sheet || !dragArea) return;
+
+    let touchStartY = 0;
+    let touchDeltaY = 0;
+
+    function handleStart(e) {
+        touchStartY = e.touches[0].clientY;
+        touchDeltaY = 0;
+        sheet.classList.add('dragging');
+    }
+
+    function handleMove(e) {
+        const currentY = e.touches[0].clientY;
+        touchDeltaY = currentY - touchStartY;
+        // Only allow downward drag
+        if (touchDeltaY > 0) {
+            e.preventDefault();
+            sheet.style.transform = `translateY(${touchDeltaY}px)`;
+        }
+    }
+
+    function handleEnd() {
+        sheet.classList.remove('dragging');
+        // If dragged down by 80px or more, dismiss modal
+        if (touchDeltaY > 80) {
+            closeRecentlyViewedModal();
+        } else {
+            // Spring back
+            sheet.style.transform = '';
+        }
+        touchDeltaY = 0;
+    }
+
+    dragArea.addEventListener('touchstart', handleStart, { passive: true });
+    dragArea.addEventListener('touchmove', handleMove, { passive: false });
+    dragArea.addEventListener('touchend', handleEnd);
+
+    // Also support drag on header
+    const sheetHeader = sheet.querySelector('.sn-sheet-header');
+    if (sheetHeader) {
+        sheetHeader.addEventListener('touchstart', handleStart, { passive: true });
+        sheetHeader.addEventListener('touchmove', handleMove, { passive: false });
+        sheetHeader.addEventListener('touchend', handleEnd);
+    }
+
+    // Escape key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeRecentlyViewedModal();
+    });
+})();
+</script>
 
 <?php require_once('footer.php'); ?>
