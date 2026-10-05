@@ -603,61 +603,31 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
                         <h1 class="sn-portal-title">My Orders</h1>
                         <p class="sn-portal-subtitle">Track, view and manage your orders all in one place.</p>
                     </div>
-                    <div class="sn-orders-controls">
-                        <!-- Search Input -->
-                        <form method="get" action="" class="sn-orders-search-form" style="margin: 0;">
-                            <?php if ($filter_status !== 'all'): ?>
-                                <input type="hidden" name="status" value="<?= htmlspecialchars($filter_status) ?>">
-                            <?php endif; ?>
-                            <div class="sn-search-input-wrap">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <input 
-                                    type="text" 
-                                    name="search" 
-                                    placeholder="Search orders..." 
-                                    value="<?= htmlspecialchars($search_query) ?>"
-                                    onchange="this.form.submit()"
-                                >
-                            </div>
-                        </form>
-
-                        <!-- Time Filter Dropdown -->
-                        <div class="sn-filter-dropdown-wrap">
-                            <i class="fa-regular fa-calendar"></i>
-                            <select class="sn-time-select" onchange="window.location.href='customer-order.php?time='+this.value">
-                                <option value="all" <?= ($time_filter === 'all') ? 'selected' : '' ?>>All Time</option>
-                                <option value="30" <?= ($time_filter === '30') ? 'selected' : '' ?>>Last 30 Days</option>
-                                <option value="60" <?= ($time_filter === '60') ? 'selected' : '' ?>>Last 60 Days</option>
-                                <option value="2026" <?= ($time_filter === '2026') ? 'selected' : '' ?>>2026</option>
-                                <option value="2025" <?= ($time_filter === '2025') ? 'selected' : '' ?>>2025</option>
-                            </select>
-                        </div>
                     </div>
-                </div>
 
                 <!-- Status Filter Pills Bar -->
                 <div class="sn-orders-tabs-row" style="margin-bottom: 24px;">
                     <div class="sn-status-pills-bar">
-                        <a href="customer-order.php?status=all" class="sn-status-pill-btn <?= ($filter_status === 'all') ? 'active' : '' ?>">
+                        <a data-filter="all" href="customer-order.php?status=all" class="sn-status-pill-btn <?= ($filter_status === 'all') ? 'active' : '' ?>">
                             All Orders (<?= $count_all ?>)
                         </a>
-                        <a href="customer-order.php?status=processing" class="sn-status-pill-btn <?= ($filter_status === 'processing') ? 'active' : '' ?>">
+                        <a data-filter="processing" href="customer-order.php?status=processing" class="sn-status-pill-btn <?= ($filter_status === 'processing') ? 'active' : '' ?>">
                             Processing (<?= $count_processing ?>)
                         </a>
-                        <a href="customer-order.php?status=shipped" class="sn-status-pill-btn <?= ($filter_status === 'shipped') ? 'active' : '' ?>">
+                        <a data-filter="shipped" href="customer-order.php?status=shipped" class="sn-status-pill-btn <?= ($filter_status === 'shipped') ? 'active' : '' ?>">
                             Shipped (<?= $count_shipped ?>)
                         </a>
-                        <a href="customer-order.php?status=delivered" class="sn-status-pill-btn <?= ($filter_status === 'delivered') ? 'active' : '' ?>">
+                        <a data-filter="delivered" href="customer-order.php?status=delivered" class="sn-status-pill-btn <?= ($filter_status === 'delivered') ? 'active' : '' ?>">
                             Delivered (<?= $count_delivered ?>)
                         </a>
-                        <a href="customer-order.php?status=cancelled" class="sn-status-pill-btn <?= ($filter_status === 'cancelled') ? 'active' : '' ?>">
+                        <a data-filter="cancelled" href="customer-order.php?status=cancelled" class="sn-status-pill-btn <?= ($filter_status === 'cancelled') ? 'active' : '' ?>">
                             Cancelled (<?= $count_cancelled ?>)
                         </a>
                     </div>
                 </div>
 
                 <!-- Orders List -->
-                <?php if (empty($filtered_orders)): ?>
+                <?php if (empty($all_orders)): ?>
                     <div class="sn-empty-state-box">
                         <div class="sn-empty-icon-circle">
                             <i class="fa-solid fa-box-open"></i>
@@ -669,8 +639,9 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
                         </a>
                     </div>
                 <?php else: ?>
+                    <div class="sn-empty-state-box" id="snFilterEmpty" style="display:none"><div class="sn-empty-icon-circle"><i class="fa-solid fa-box-open"></i></div><h3>No orders here</h3><p>You have no orders in this status.</p></div>
                     <div class="sn-orders-list">
-                        <?php foreach ($filtered_orders as $ord): 
+                        <?php foreach ($all_orders as $ord): 
                             $first_item = $ord['items'][0] ?? null;
                             $first_photo = !empty($first_item['p_featured_photo']) 
                                 ? 'assets/uploads/' . $first_item['p_featured_photo'] 
@@ -683,7 +654,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
                             
                             $cat = $ord['status_category'];
                         ?>
-                            <div class="sn-order-card-detailed">
+                            <div class="sn-order-card-detailed" data-status="<?= htmlspecialchars($cat) ?>"<?= ($filter_status !== 'all' && $filter_status !== $cat) ? ' style="display:none"' : '' ?>>
                                 <!-- Col 1: Large Product Thumbnail -->
                                 <div class="sn-order-thumb-large">
                                     <img src="<?= htmlspecialchars($first_photo) ?>" alt="<?= htmlspecialchars($first_item['product_name'] ?? 'Product') ?>">
@@ -954,4 +925,32 @@ function cancelOrder(paymentId) {
 }
 </script>
 
+<script>
+// Instant client-side status filtering (no page reload)
+(function () {
+    var pills = document.querySelectorAll('.sn-status-pill-btn[data-filter]');
+    var cards = document.querySelectorAll('.sn-order-card-detailed[data-status]');
+    var empty = document.getElementById('snFilterEmpty');
+    function apply(f) {
+        var shown = 0;
+        cards.forEach(function (c) {
+            var ok = (f === 'all' || c.dataset.status === f);
+            c.style.display = ok ? '' : 'none';
+            if (ok) shown++;
+        });
+        pills.forEach(function (p) { p.classList.toggle('active', p.dataset.filter === f); });
+        if (empty) empty.style.display = shown ? 'none' : '';
+    }
+    pills.forEach(function (p) {
+        p.addEventListener('click', function (e) {
+            e.preventDefault();
+            var f = p.dataset.filter;
+            apply(f);
+            try { history.replaceState(null, '', f === 'all' ? 'customer-order.php' : 'customer-order.php?status=' + f); } catch (x) {}
+        });
+    });
+    var init = new URLSearchParams(location.search).get('status') || 'all';
+    apply(init.toLowerCase());
+})();
+</script>
 <?php require_once('footer.php'); ?>
