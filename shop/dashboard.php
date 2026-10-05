@@ -813,13 +813,16 @@ try {
             <i class="fa-solid fa-chevron-right sn-mob-chevron"></i>
         </a>
 
-        <!-- 2. My Reviews -->
-        <a href="customer-reviews.php" class="sn-mob-menu-row">
+        <!-- 2. Feedback (Opens Gesture Bottom Sheet Modal) -->
+        <a href="javascript:void(0)" class="sn-mob-menu-row" id="snFeedbackMenuRow" onclick="openFeedbackModal(event)">
             <div class="sn-mob-menu-left">
-                <i class="fa-regular fa-star sn-mob-menu-icon"></i>
-                <span class="sn-mob-menu-text">My Reviews</span>
+                <i class="fa-regular fa-comment-dots sn-mob-menu-icon" style="color: #fab802;"></i>
+                <span class="sn-mob-menu-text">Feedback</span>
             </div>
-            <i class="fa-solid fa-chevron-right sn-mob-chevron"></i>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="background: #fff8e1; color: #b45309; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #fde8a1;">Help Us Improve</span>
+                <i class="fa-solid fa-chevron-right sn-mob-chevron"></i>
+            </div>
         </a>
 
         <!-- 3. Vouchers -->
@@ -1215,6 +1218,102 @@ try {
     </div>
 </div>
 
+<!-- ========================================================================
+     FEEDBACK SLIDE-UP BOTTOM SHEET MODAL (WITH GESTURE CONTROL)
+     ======================================================================== -->
+<div id="snFeedbackModalBackdrop" class="sn-sheet-backdrop" onclick="closeFeedbackModal()"></div>
+<div id="snFeedbackModalSheet" class="sn-sheet-container" role="dialog" aria-modal="true" aria-labelledby="snFeedbackModalTitle">
+    <!-- Gesture Drag Handle -->
+    <div class="sn-sheet-drag-area" id="snFeedbackDragArea">
+        <div class="sn-sheet-drag-handle"></div>
+    </div>
+    
+    <!-- Modal Header -->
+    <div class="sn-sheet-header">
+        <div class="sn-sheet-title-box">
+            <span style="display: inline-flex; width: 32px; height: 32px; border-radius: 50%; background: #fff8e1; align-items: center; justify-content: center; color: #fab802; font-size: 15px;">
+                <i class="fa-regular fa-comment-dots"></i>
+            </span>
+            <div>
+                <h3 id="snFeedbackModalTitle" style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0; line-height: 1.2;">Share Your Feedback</h3>
+                <p style="font-size: 11px; color: #64748b; margin: 0; line-height: 1.2;">Help us improve your shopping experience</p>
+            </div>
+        </div>
+        <button type="button" class="sn-sheet-close-btn" onclick="closeFeedbackModal()" aria-label="Close modal">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="sn-sheet-body" id="snFeedbackSheetBody">
+        <!-- Interactive Form Container -->
+        <div id="snFeedbackFormWrap">
+            <!-- 1. Star Rating Selector -->
+            <div style="text-align: center; margin-bottom: 16px; padding: 14px 12px; background: #fafafa; border-radius: 16px; border: 1px solid #f1f5f9;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">How was your experience?</label>
+                <div class="sn-feedback-stars" id="snFeedbackStarBox" style="display: inline-flex; gap: 8px; font-size: 28px; cursor: pointer;">
+                    <i class="fa-solid fa-star sn-star active" data-rating="1"></i>
+                    <i class="fa-solid fa-star sn-star active" data-rating="2"></i>
+                    <i class="fa-solid fa-star sn-star active" data-rating="3"></i>
+                    <i class="fa-solid fa-star sn-star active" data-rating="4"></i>
+                    <i class="fa-solid fa-star sn-star active" data-rating="5"></i>
+                </div>
+                <div id="snRatingDescriptor" style="font-size: 12px; font-weight: 700; color: #b45309; margin-top: 5px;">Outstanding! Loved it ❤️</div>
+                <input type="hidden" id="snFeedbackRatingVal" value="5">
+            </div>
+
+            <!-- 2. Topic / Category Chips -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">What would you like to talk about?</label>
+                <div class="sn-feedback-chip-row" id="snFeedbackChips" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    <button type="button" class="sn-fb-chip active" data-topic="App & Website" onclick="selectFeedbackTopic(this)">🛍️ App & Website</button>
+                    <button type="button" class="sn-fb-chip" data-topic="Delivery & Shipping" onclick="selectFeedbackTopic(this)">📦 Delivery & Shipping</button>
+                    <button type="button" class="sn-fb-chip" data-topic="Product & Quality" onclick="selectFeedbackTopic(this)">🏷️ Product Quality</button>
+                    <button type="button" class="sn-fb-chip" data-topic="Payment & Checkout" onclick="selectFeedbackTopic(this)">💳 Checkout</button>
+                    <button type="button" class="sn-fb-chip" data-topic="Feature Suggestion" onclick="selectFeedbackTopic(this)">💡 Suggestion</button>
+                    <button type="button" class="sn-fb-chip" data-topic="Report an Issue" onclick="selectFeedbackTopic(this)">🐛 Report Bug</button>
+                </div>
+                <input type="hidden" id="snFeedbackTopicVal" value="App & Website">
+            </div>
+
+            <!-- 3. Message Textarea -->
+            <div style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label for="snFeedbackMessage" style="font-size: 12px; font-weight: 700; color: #0f172a; margin: 0;">Tell us more</label>
+                    <span id="snFeedbackCharCount" style="font-size: 11px; color: #94a3b8;">0/500</span>
+                </div>
+                <textarea id="snFeedbackMessage" rows="3" maxlength="500" placeholder="What worked well, or what could we do better?" oninput="updateFeedbackCharCount(this)" class="sn-fb-textarea"></textarea>
+            </div>
+
+            <!-- 4. User Identity Badge -->
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8fafc; border-radius: 12px; margin-bottom: 16px; border: 1px solid #f1f5f9;">
+                <i class="fa-solid fa-circle-user" style="color: #64748b; font-size: 14px;"></i>
+                <span style="font-size: 11px; color: #64748b;">Submitting as <strong style="color: #0f172a;"><?= htmlspecialchars($cust_name) ?></strong> (<?= htmlspecialchars($cust_email) ?>)</span>
+            </div>
+
+            <!-- 5. Submit Button -->
+            <button type="button" id="snBtnSubmitFeedback" onclick="submitFeedbackForm(event)" class="sn-fb-submit-btn">
+                <span id="snFbBtnText">Submit Feedback</span>
+                <i class="fa-solid fa-paper-plane" id="snFbBtnIcon" style="font-size: 12px;"></i>
+            </button>
+        </div>
+
+        <!-- Success Animation State Screen -->
+        <div id="snFeedbackSuccessWrap" style="display: none; text-align: center; padding: 28px 16px 20px 16px;">
+            <div class="sn-fb-success-icon-box">
+                <i class="fa-solid fa-heart" style="color: #fab802; font-size: 32px;"></i>
+            </div>
+            <h4 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 14px 0 6px 0;">Thank You for Your Feedback!</h4>
+            <p style="font-size: 13px; color: #64748b; margin: 0 0 20px 0; line-height: 1.45;">
+                Your feedback has been received and directly helps our team improve your shopping experience.
+            </p>
+            <button type="button" class="sn-sheet-explore-btn" onclick="closeFeedbackModal()" style="background: #fab802; color: #111827; border-color: #fab802; padding: 10px 28px; font-weight: 700;">
+                <span>Done</span> <i class="fa-solid fa-check" style="font-size: 11px;"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
 /* Bottom Sheet & Gesture Styles */
 .sn-sheet-backdrop {
@@ -1440,6 +1539,101 @@ try {
     color: #92400e;
     text-decoration: none;
 }
+
+/* Feedback Specific Styles */
+.sn-feedback-stars .sn-star {
+    color: #e2e8f0;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+.sn-feedback-stars .sn-star.active {
+    color: #fab802;
+}
+.sn-feedback-stars .sn-star:hover {
+    transform: scale(1.18);
+}
+.sn-fb-chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.sn-fb-chip:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.sn-fb-chip.active {
+    background: #fab802;
+    border-color: #fab802;
+    color: #111827;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(250, 184, 2, 0.25);
+}
+.sn-fb-textarea {
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #0f172a;
+    background: #ffffff;
+    outline: none;
+    resize: none;
+    box-sizing: border-box;
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sn-fb-textarea:focus {
+    border-color: #fab802;
+    box-shadow: 0 0 0 3px rgba(250, 184, 2, 0.18);
+}
+.sn-fb-submit-btn {
+    width: 100%;
+    height: 44px;
+    border-radius: 999px;
+    background: #fab802;
+    border: none;
+    color: #111827;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(250, 184, 2, 0.28);
+    transition: all 0.15s ease;
+}
+.sn-fb-submit-btn:hover {
+    background: #e0a400;
+}
+.sn-fb-submit-btn:active {
+    transform: scale(0.98);
+}
+.sn-fb-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.sn-fb-success-icon-box {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #fff8e1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #fde8a1;
+    animation: snPopIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes snPopIn {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
 </style>
 
 <script>
@@ -1515,8 +1709,190 @@ function closeRecentlyViewedModal() {
 
     // Escape key to close
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeRecentlyViewedModal();
+        if (e.key === 'Escape') {
+            closeRecentlyViewedModal();
+            closeFeedbackModal();
+        }
     });
+})();
+
+// ========================================================================
+// FEEDBACK MODAL: CONTROLS, STAR RATINGS, TOPIC CHIPS & AJAX SUBMISSION
+// ========================================================================
+const snFbRatingLabels = {
+    1: 'Needs Improvement 🙁',
+    2: 'Could be Better 😐',
+    3: 'It is Okay 🙂',
+    4: 'Great Experience! 😊',
+    5: 'Outstanding! Loved it ❤️'
+};
+
+function openFeedbackModal(e) {
+    if (e) e.preventDefault();
+    const backdrop = document.getElementById('snFeedbackModalBackdrop');
+    const sheet = document.getElementById('snFeedbackModalSheet');
+    if (!sheet) return;
+    backdrop.classList.add('open');
+    sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeFeedbackModal() {
+    const backdrop = document.getElementById('snFeedbackModalBackdrop');
+    const sheet = document.getElementById('snFeedbackModalSheet');
+    if (!sheet) return;
+    sheet.style.transform = '';
+    sheet.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function setFeedbackRating(stars) {
+    const hiddenRating = document.getElementById('snFeedbackRatingVal');
+    if (hiddenRating) hiddenRating.value = stars;
+    const starBox = document.getElementById('snFeedbackStarBox');
+    if (starBox) {
+        const allStars = starBox.querySelectorAll('.sn-star');
+        allStars.forEach((s, idx) => {
+            if (idx < stars) {
+                s.classList.add('active');
+            } else {
+                s.classList.remove('active');
+            }
+        });
+    }
+    const desc = document.getElementById('snRatingDescriptor');
+    if (desc) desc.textContent = snFbRatingLabels[stars] || 'Great Experience!';
+}
+
+function selectFeedbackTopic(btn) {
+    const chips = document.querySelectorAll('.sn-fb-chip');
+    chips.forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const hiddenTopic = document.getElementById('snFeedbackTopicVal');
+    if (hiddenTopic) hiddenTopic.value = btn.getAttribute('data-topic') || 'App & Website';
+}
+
+function updateFeedbackCharCount(textarea) {
+    const count = textarea.value.length;
+    const counterEl = document.getElementById('snFeedbackCharCount');
+    if (counterEl) counterEl.textContent = `${count}/500`;
+}
+
+async function submitFeedbackForm(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('snBtnSubmitFeedback');
+    const btnText = document.getElementById('snFbBtnText');
+    const btnIcon = document.getElementById('snFbBtnIcon');
+    const rating = document.getElementById('snFeedbackRatingVal') ? document.getElementById('snFeedbackRatingVal').value : 5;
+    const topic = document.getElementById('snFeedbackTopicVal') ? document.getElementById('snFeedbackTopicVal').value : 'App & Website';
+    const messageEl = document.getElementById('snFeedbackMessage');
+    const message = messageEl ? messageEl.value : '';
+
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.textContent = 'Submitting...';
+    if (btnIcon) btnIcon.className = 'fa-solid fa-spinner fa-spin';
+
+    try {
+        const fd = new FormData();
+        fd.append('rating', rating);
+        fd.append('topic', topic);
+        fd.append('message', message);
+
+        const res = await fetch('submit-feedback-ajax.php', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+        
+        // Show success state screen
+        const formWrap = document.getElementById('snFeedbackFormWrap');
+        const successWrap = document.getElementById('snFeedbackSuccessWrap');
+        if (formWrap) formWrap.style.display = 'none';
+        if (successWrap) successWrap.style.display = 'block';
+
+        // Auto close after 2.5 seconds
+        setTimeout(() => {
+            closeFeedbackModal();
+            setTimeout(() => {
+                if (formWrap) formWrap.style.display = 'block';
+                if (successWrap) successWrap.style.display = 'none';
+                if (messageEl) {
+                    messageEl.value = '';
+                    updateFeedbackCharCount(messageEl);
+                }
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = 'Submit Feedback';
+                if (btnIcon) btnIcon.className = 'fa-solid fa-paper-plane';
+            }, 350);
+        }, 2500);
+
+    } catch (err) {
+        console.error('Feedback submit error:', err);
+        alert('Could not submit feedback at this moment. Please try again.');
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = 'Submit Feedback';
+        if (btnIcon) btnIcon.className = 'fa-solid fa-paper-plane';
+    }
+}
+
+// Attach star click handlers and swipe gesture for feedback modal
+(function() {
+    // Star rating click listeners
+    const starBox = document.getElementById('snFeedbackStarBox');
+    if (starBox) {
+        starBox.querySelectorAll('.sn-star').forEach(star => {
+            star.addEventListener('click', function() {
+                const r = parseInt(this.getAttribute('data-rating')) || 5;
+                setFeedbackRating(r);
+            });
+        });
+    }
+
+    // Touch gesture swipe-down to dismiss
+    const sheet = document.getElementById('snFeedbackModalSheet');
+    const dragArea = document.getElementById('snFeedbackDragArea');
+    if (!sheet || !dragArea) return;
+
+    let touchStartY = 0;
+    let touchDeltaY = 0;
+
+    function handleStart(e) {
+        touchStartY = e.touches[0].clientY;
+        touchDeltaY = 0;
+        sheet.classList.add('dragging');
+    }
+
+    function handleMove(e) {
+        const currentY = e.touches[0].clientY;
+        touchDeltaY = currentY - touchStartY;
+        // Only allow downward drag
+        if (touchDeltaY > 0) {
+            e.preventDefault();
+            sheet.style.transform = `translateY(${touchDeltaY}px)`;
+        }
+    }
+
+    function handleEnd() {
+        sheet.classList.remove('dragging');
+        if (touchDeltaY > 80) {
+            closeFeedbackModal();
+        } else {
+            sheet.style.transform = '';
+        }
+        touchDeltaY = 0;
+    }
+
+    dragArea.addEventListener('touchstart', handleStart, { passive: true });
+    dragArea.addEventListener('touchmove', handleMove, { passive: false });
+    dragArea.addEventListener('touchend', handleEnd);
+
+    const sheetHeader = sheet.querySelector('.sn-sheet-header');
+    if (sheetHeader) {
+        sheetHeader.addEventListener('touchstart', handleStart, { passive: true });
+        sheetHeader.addEventListener('touchmove', handleMove, { passive: false });
+        sheetHeader.addEventListener('touchend', handleEnd);
+    }
 })();
 </script>
 
