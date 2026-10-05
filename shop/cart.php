@@ -1,4 +1,5 @@
 <?php 
+$cur_page = 'cart.php';
 require_once('header.php'); 
 
 // -------------------------------------------------------------------------
@@ -61,81 +62,11 @@ if (empty($_SESSION['cart_p_id']) && isset($_SESSION['customer']['cust_id'])) {
 }
 
 // -------------------------------------------------------------------------
-// 3. FLAGSHIP DEMO INITIALIZER (Matches user design mockup if cart is empty)
-// -------------------------------------------------------------------------
-$allow_demo_seed = !isset($_GET['empty']) && empty($_SESSION['cart_p_id']);
-if ($allow_demo_seed) {
-    // Flagship items matching the user's uploaded mockup perfectly
-    $demo_items = [
-        [
-            'p_id' => 901,
-            'name' => 'HP Pavilion 15',
-            'subtitle' => 'Intel i5 | 8GB RAM | 512GB SSD | 15.6" FHD',
-            'current_price' => 62999,
-            'old_price' => 73999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'Natural Silver',
-            'badge' => '',
-            'colors' => [
-                ['name' => 'Natural Silver', 'hex' => '#cbd5e1', 'active' => true],
-                ['name' => 'Dark Gray', 'hex' => '#475569', 'active' => false]
-            ]
-        ],
-        [
-            'p_id' => 902,
-            'name' => 'Apple AirPods Pro (2nd Gen)',
-            'subtitle' => 'Active Noise Cancellation',
-            'current_price' => 27999,
-            'old_price' => 34999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'White',
-            'badge' => 'Top Rated',
-            'colors' => [
-                ['name' => 'White', 'hex' => '#ffffff', 'active' => true]
-            ]
-        ],
-        [
-            'p_id' => 903,
-            'name' => 'Samsung Galaxy Watch 6',
-            'subtitle' => 'Bluetooth • 44mm',
-            'current_price' => 26999,
-            'old_price' => 32999,
-            'qty' => 1,
-            'photo' => 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500&auto=format&fit=crop&q=80',
-            'color_name' => 'Graphite',
-            'badge' => '',
-            'colors' => [
-                ['name' => 'Graphite', 'hex' => '#1e293b', 'active' => true],
-                ['name' => 'Silver', 'hex' => '#e2e8f0', 'active' => false]
-            ]
-        ]
-    ];
-
-    foreach ($demo_items as $idx => $item) {
-        $k = $idx + 1;
-        $_SESSION['cart_p_id'][$k] = $item['p_id'];
-        $_SESSION['cart_size_id'][$k] = 0;
-        $_SESSION['cart_size_name'][$k] = '';
-        $_SESSION['cart_color_id'][$k] = 0;
-        $_SESSION['cart_color_name'][$k] = $item['color_name'];
-        $_SESSION['cart_p_qty'][$k] = $item['qty'];
-        $_SESSION['cart_p_current_price'][$k] = $item['current_price'];
-        $_SESSION['cart_p_name'][$k] = $item['name'];
-        $_SESSION['cart_p_featured_photo'][$k] = $item['photo'];
-        $_SESSION['cart_p_old_price'][$k] = $item['old_price'];
-        $_SESSION['cart_p_subtitle'][$k] = $item['subtitle'];
-        $_SESSION['cart_p_badge'][$k] = $item['badge'];
-    }
-}
-
-// -------------------------------------------------------------------------
-// 4. LIVE PRODUCT DATA HYDRATION FROM DATABASE (tbl_product)
+// 3. LIVE PRODUCT DATA HYDRATION FROM DATABASE (tbl_product)
 // -------------------------------------------------------------------------
 if (!empty($_SESSION['cart_p_id'])) {
     $numeric_pids = array_unique(array_filter($_SESSION['cart_p_id'], function($id) {
-        return is_numeric($id) && (int)$id < 900; // Hydrate real DB products (IDs < 900)
+        return is_numeric($id) && (int)$id > 0;
     }));
 
     if (!empty($numeric_pids)) {
@@ -222,82 +153,40 @@ try {
     foreach ($dbRecRows as $dr) {
         $p_id = (int)$dr['p_id'];
         $p_price = (float)$dr['p_current_price'];
-        $p_old = !empty($dr['p_old_price']) ? (float)$dr['p_old_price'] : round($p_price * 1.25);
-        $disc = round((($p_old - $p_price) / max(1, $p_old)) * 100);
+        $p_old = !empty($dr['p_old_price']) ? (float)$dr['p_old_price'] : 0;
+        $disc = ($p_old > $p_price && $p_old > 0) ? round((($p_old - $p_price) / $p_old) * 100) . '% OFF' : '';
         $img = !empty($dr['p_featured_photo']) 
             ? (str_starts_with($dr['p_featured_photo'], 'http') ? $dr['p_featured_photo'] : 'assets/uploads/' . $dr['p_featured_photo']) 
             : 'assets/uploads/default_product.jpg';
         $recommendations[] = [
             'id' => $p_id,
             'name' => $dr['p_name'],
-            'subtitle' => !empty($dr['p_short_description']) ? strip_tags($dr['p_short_description']) : 'Official Store Product',
+            'subtitle' => !empty($dr['p_short_description']) ? strip_tags($dr['p_short_description']) : '',
             'price' => $p_price,
             'old_price' => $p_old,
-            'discount' => $disc . '% OFF',
+            'discount' => $disc,
             'image' => $img
         ];
     }
 } catch (Exception $e) {}
-
-// If DB has fewer than 4 products, supplement with flagship mockup items
-if (count($recommendations) < 4) {
-    $defaultMockups = [
-        [
-            'id' => 911,
-            'name' => 'OnePlus Buds 3',
-            'subtitle' => 'ANC • 38h Battery',
-            'price' => 12999,
-            'old_price' => 16999,
-            'discount' => '24% OFF',
-            'image' => 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80'
-        ],
-        [
-            'id' => 912,
-            'name' => 'Mi Backpack',
-            'subtitle' => '25L • Water Resistant',
-            'price' => 2499,
-            'old_price' => 3499,
-            'discount' => '29% OFF',
-            'image' => 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&auto=format&fit=crop&q=80'
-        ],
-        [
-            'id' => 913,
-            'name' => 'Logitech K380',
-            'subtitle' => 'Bluetooth • Multi-Device',
-            'price' => 4299,
-            'old_price' => 5999,
-            'discount' => '28% OFF',
-            'image' => 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&auto=format&fit=crop&q=80'
-        ],
-        [
-            'id' => 914,
-            'name' => 'Logitech MX Master 3S',
-            'subtitle' => 'Wireless • Ergonomic',
-            'price' => 9999,
-            'old_price' => 12999,
-            'discount' => '23% OFF',
-            'image' => 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=400&auto=format&fit=crop&q=80'
-        ]
-    ];
-
-    foreach ($defaultMockups as $dm) {
-        if (count($recommendations) >= 4) break;
-        $recommendations[] = $dm;
-    }
-}
 ?>
 
 <div class="sn-cart-page-wrapper">
     <div class="sn-container">
         
-        <!-- Breadcrumbs (Home > Cart) -->
-        <nav class="sn-breadcrumbs" aria-label="breadcrumb">
-            <a href="index.php">Home</a>
-            <span class="sn-bc-sep">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </span>
-            <span class="sn-bc-current">Cart</span>
-        </nav>
+        <!-- Top Title Bar (Identical layout to deals.php) -->
+        <div class="sn-deals-title-bar">
+            <a href="index.php" class="sn-deals-back-btn" aria-label="Go back">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <div class="sn-deals-title-content">
+                <h1 class="sn-deals-title">Cart <span class="sn-deals-badge-sparkle">🛒</span></h1>
+                <p class="sn-deals-subtitle">Review items, apply coupons & quick checkout <span id="pageItemCount" style="display:none;"><?php echo $total_cart_items; ?></span></p>
+            </div>
+        </div>
 
         <?php if ($total_cart_items === 0): ?>
             <!-- ========================================================
@@ -312,47 +201,12 @@ if (count($recommendations) < 4) {
                     </svg>
                 </div>
                 <h2>Your Cart is Empty</h2>
-                <p>Looks like you haven't added anything to your cart yet. Discover trending deals and gadgets today!</p>
+                <p>Looks like you haven't added anything to your cart yet.</p>
                 <div class="sn-empty-actions">
                     <a href="index.php" class="sn-btn-primary">Start Shopping</a>
-                    <a href="cart.php" class="sn-btn-secondary">Reload Cart Demo</a>
                 </div>
             </div>
         <?php else: ?>
-
-            <!-- ========================================================
-                 PAGE TITLE BAR (Desktop Header Area)
-                 ======================================================== -->
-            <div class="sn-cart-page-header">
-                <div class="sn-cart-heading-wrap">
-                    <div class="sn-cart-title-icon">
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="9" cy="21" r="1"></circle>
-                            <circle cx="20" cy="21" r="1"></circle>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="sn-page-title">Your Cart</h1>
-                        <p class="sn-page-subtitle">
-                            <span id="pageItemCount"><?php echo $total_cart_items; ?></span> items • Save for later • Easy checkout
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Auto-Saved Cart Pill -->
-                <div class="sn-auto-saved-badge">
-                    <div class="sn-saved-icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="sn-saved-title">Your cart is saved automatically</div>
-                        <div class="sn-saved-desc">Items will be here even if you close the page.</div>
-                    </div>
-                </div>
-            </div>
 
             <!-- ========================================================
                  MAIN TWO-COLUMN GRID (Desktop & Tablet)
@@ -438,17 +292,11 @@ if (count($recommendations) < 4) {
                                     <?php endif; ?>
 
                                     <!-- Color Swatch Row -->
+                                    <?php if (!empty($p_color) && $p_color !== 'Default'): ?>
                                     <div class="sn-item-variant-swatches">
                                         <span class="sn-swatch-label">Color: <strong class="sn-active-color-name"><?php echo htmlspecialchars($p_color); ?></strong></span>
-                                        <div class="sn-swatch-dots">
-                                            <span class="sn-color-dot active" title="<?php echo htmlspecialchars($p_color); ?>" onclick="selectColor(this, '<?php echo htmlspecialchars($p_color); ?>')"></span>
-                                            <?php if ($i === 0): ?>
-                                                <span class="sn-color-dot dark" title="Dark Gray" onclick="selectColor(this, 'Dark Gray')"></span>
-                                            <?php elseif ($i === 2): ?>
-                                                <span class="sn-color-dot silver" title="Silver" onclick="selectColor(this, 'Silver')"></span>
-                                            <?php endif; ?>
-                                        </div>
                                     </div>
+                                    <?php endif; ?>
 
                                     <!-- Stock Status Badge -->
                                     <div class="sn-stock-status">
@@ -667,7 +515,7 @@ if (count($recommendations) < 4) {
         <section class="sn-recommendations-section">
             <div class="sn-recom-head">
                 <h2 class="sn-recom-title">You Might Also Like</h2>
-                <a href="product-category.php?id=1&type=top-category" class="sn-recom-link">
+                <a href="product-category.php" class="sn-recom-link">
                     <span>View All</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </a>
@@ -676,20 +524,28 @@ if (count($recommendations) < 4) {
             <div class="sn-recom-grid">
                 <?php foreach ($recommendations as $rec): ?>
                 <div class="sn-recom-card">
-                    <div class="sn-recom-img-box">
-                        <img src="<?php echo htmlspecialchars($rec['image']); ?>" alt="<?php echo htmlspecialchars($rec['name']); ?>" loading="lazy">
-                    </div>
+                    <a href="product.php?id=<?php echo $rec['id']; ?>" class="sn-recom-img-box">
+                        <img src="<?php echo htmlspecialchars($rec['image']); ?>" alt="<?php echo htmlspecialchars($rec['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/default_product.jpg';">
+                    </a>
                     <div class="sn-recom-content">
-                        <h4 class="sn-recom-item-name"><?php echo htmlspecialchars($rec['name']); ?></h4>
-                        <div class="sn-recom-item-sub"><?php echo htmlspecialchars($rec['subtitle']); ?></div>
+                        <h4 class="sn-recom-item-name">
+                            <a href="product.php?id=<?php echo $rec['id']; ?>"><?php echo htmlspecialchars($rec['name']); ?></a>
+                        </h4>
+                        <?php if (!empty($rec['subtitle'])): ?>
+                            <div class="sn-recom-item-sub"><?php echo htmlspecialchars($rec['subtitle']); ?></div>
+                        <?php endif; ?>
                         
                         <div class="sn-recom-price-row">
                             <span class="sn-recom-price">৳ <?php echo number_format($rec['price']); ?></span>
-                            <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
+                            <?php if ($rec['old_price'] > $rec['price']): ?>
+                                <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
+                            <?php endif; ?>
                         </div>
-                        <div class="sn-recom-discount"><?php echo htmlspecialchars($rec['discount']); ?></div>
+                        <?php if (!empty($rec['discount'])): ?>
+                            <div class="sn-recom-discount"><?php echo htmlspecialchars($rec['discount']); ?></div>
+                        <?php endif; ?>
 
-                        <button type="button" class="sn-recom-add-btn" onclick="quickAddToCart(<?php echo $rec['id']; ?>, '<?php echo addslashes($rec['name']); ?>', <?php echo $rec['price']; ?>, '<?php echo htmlspecialchars($rec['image']); ?>', '<?php echo addslashes($rec['subtitle']); ?>')" title="Add to Cart">
+                        <button type="button" class="sn-recom-add-btn" onclick="quickAddToCart(<?php echo $rec['id']; ?>, '<?php echo addslashes($rec['name']); ?>', <?php echo $rec['price']; ?>, '<?php echo htmlspecialchars($rec['image']); ?>', '<?php echo addslashes($rec['subtitle']); ?>')" title="Add to Cart" aria-label="Add to cart">
                             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="9" cy="21" r="1"></circle>
                                 <circle cx="20" cy="21" r="1"></circle>
@@ -797,7 +653,7 @@ if (count($recommendations) < 4) {
             <div class="sn-mob-shipping">Shipping Fee: <span>৳ 0</span></div>
         </div>
 
-        <button type="button" class="sn-mobile-checkout-btn" onclick="document.getElementById('checkoutForm').submit()">
+        <button type="button" class="sn-mobile-checkout-btn" onclick="submitMobileCheckout()">
             Checkout(<span id="mobileCheckoutBadge"><?php echo $total_cart_items; ?></span>)
         </button>
     </div>
@@ -853,65 +709,69 @@ body.shopnext-theme {
     padding: 24px 0 60px 0;
 }
 
-/* 1. BREADCRUMBS */
-.sn-breadcrumbs {
+/* 1. TOP TITLE BAR (MATCHING DEALS SCREEN) */
+.sn-deals-title-bar {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13.5px;
-    color: var(--sn-muted);
-    margin-bottom: 24px;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
 }
-.sn-breadcrumbs a {
-    color: var(--sn-muted);
-    text-decoration: none;
-    transition: color 0.2s;
-}
-.sn-breadcrumbs a:hover {
-    color: var(--sn-dark);
-}
-.sn-bc-sep {
-    display: flex;
-    align-items: center;
-    color: #cbd5e1;
-}
-.sn-bc-current {
-    color: var(--sn-dark);
-    font-weight: 600;
-}
-
-/* 2. PAGE HEADER BAR */
-.sn-cart-page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 28px;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-.sn-cart-heading-wrap {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.sn-cart-title-icon {
-    display: flex;
+.sn-deals-back-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 34px;
+    height: 34px;
+    color: var(--sn-dark);
+    text-decoration: none;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-top: 1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.sn-deals-back-btn:hover {
+    background-color: #f1f5f9;
+    transform: translateX(-2px);
     color: var(--sn-dark);
 }
-.sn-page-title {
-    font-size: 28px;
+.sn-deals-title-content {
+    flex: 1;
+}
+.sn-deals-title {
+    font-size: 22px;
     font-weight: 800;
     color: var(--sn-dark);
-    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 2px 0;
     line-height: 1.2;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.3px;
 }
-.sn-page-subtitle {
-    font-size: 13.5px;
+.sn-deals-badge-sparkle {
+    font-size: 20px;
+    line-height: 1;
+}
+.sn-deals-subtitle {
+    font-size: 13px;
     color: var(--sn-muted);
-    margin: 4px 0 0 0;
+    margin: 0;
+    line-height: 1.35;
+    font-weight: 500;
+}
+@media (min-width: 769px) {
+    .sn-deals-title-bar {
+        margin-bottom: 24px;
+    }
+    .sn-deals-title {
+        font-size: 26px;
+    }
+    .sn-deals-subtitle {
+        font-size: 14px;
+    }
 }
 
 /* Auto-saved notification badge */
@@ -1920,8 +1780,132 @@ body.shopnext-theme {
     .sn-item-pricing-cell { grid-area: pricing; }
     .sn-item-total-cell { grid-area: total; text-align: left; margin-top: -6px; }
 
+    /* Hide Order Summary Card on Mobile as requested */
+    .sn-cart-right-col {
+        display: none !important;
+    }
+    .sn-cart-layout-grid {
+        margin-bottom: 20px !important;
+    }
+
+    /* "You Might Also Like" section: 2 columns on mobile */
+    .sn-recommendations-section {
+        margin-top: 16px !important;
+        margin-bottom: 24px !important;
+    }
+    .sn-recom-head {
+        margin-bottom: 12px !important;
+    }
+    .sn-recom-title {
+        font-size: 16.5px !important;
+    }
     .sn-recom-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+    .sn-recom-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 10px 10px 12px 10px !important;
+        border-radius: 14px !important;
+        position: relative !important;
+        gap: 0 !important;
+        background: #ffffff !important;
+        border: 1px solid #f1f5f9 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    }
+    .sn-recom-img-box {
+        width: 100% !important;
+        height: 120px !important;
+        background: #f8fafc !important;
+        border-radius: 10px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-bottom: 8px !important;
+        overflow: hidden !important;
+        text-decoration: none !important;
+    }
+    .sn-recom-img-box img {
+        max-width: 90% !important;
+        max-height: 90% !important;
+        object-fit: contain !important;
+    }
+    .sn-recom-content {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        padding-right: 30px !important;
+    }
+    .sn-recom-item-name {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        margin: 0 0 3px 0 !important;
+        height: 31px !important;
+        white-space: normal !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        color: var(--sn-dark) !important;
+    }
+    .sn-recom-item-name a {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
+    .sn-recom-item-sub {
+        font-size: 10px !important;
+        color: var(--sn-muted) !important;
+        margin-bottom: 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .sn-recom-price-row {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 5px !important;
+        margin-bottom: 2px !important;
+        flex-wrap: wrap !important;
+    }
+    .sn-recom-price {
+        font-size: 13.5px !important;
+        font-weight: 800 !important;
+        color: var(--sn-dark) !important;
+    }
+    .sn-recom-old-price {
+        font-size: 10.5px !important;
+        color: #94a3b8 !important;
+        text-decoration: line-through !important;
+    }
+    .sn-recom-discount {
+        font-size: 9.5px !important;
+        font-weight: 700 !important;
+        color: #ef4444 !important;
+        min-height: 14px !important;
+    }
+    .sn-recom-add-btn {
+        position: absolute !important;
+        right: 8px !important;
+        bottom: 8px !important;
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        background: #fab802 !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 6px rgba(250, 184, 2, 0.3) !important;
+        cursor: pointer !important;
+        z-index: 2 !important;
+    }
+    .sn-recom-add-btn svg {
+        width: 14px !important;
+        height: 14px !important;
     }
     .sn-trust-assurance-bar {
         grid-template-columns: 1fr;
@@ -2420,6 +2404,24 @@ function updateHeaderCartBadges(count) {
     if (desktopBadge) desktopBadge.textContent = count;
     const mobileBadge = document.querySelector('.sn-dock-cart-badge');
     if (mobileBadge) mobileBadge.textContent = count;
+}
+
+// 12. MOBILE CHECKOUT SUBMISSION
+function submitMobileCheckout() {
+    const checked = document.querySelectorAll('.sn-item-checkbox:checked');
+    if (checked.length === 0) {
+        if (typeof showToast === 'function') {
+            showToast('Please select at least one item to proceed to checkout.', 'error');
+        } else {
+            alert('Please select at least one item to proceed to checkout.');
+        }
+        return;
+    }
+    recalculateCart();
+    const form = document.getElementById('checkoutForm');
+    if (form) {
+        form.submit();
+    }
 }
 
 // Form Checkout Submission Check
