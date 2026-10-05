@@ -1,4 +1,8 @@
 <?php
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('CLI execution only.');
+}
 $_SERVER['HTTP_HOST'] = 'shop.swapnopay.top';
 $_SERVER['REQUEST_URI'] = '/self-hosted-supabase-store-0558/admin/settings.php';
 require_once __DIR__ . '/inc/config.php';

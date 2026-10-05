@@ -13,33 +13,99 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
 }
 
 // Ensure required columns exist across all tenant schemas safely
-try {
-    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1");
-    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_btn_text varchar(100) DEFAULT 'Claim Now'");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_animation varchar(50) DEFAULT 'spin-zoom'");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_on_off smallint DEFAULT 1");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_end varchar(50) DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_delay integer DEFAULT 2");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_show_again varchar(50) DEFAULT 'session'");
-    $pdo->exec("ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_image text DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_image text DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_url text DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_url text DEFAULT ''");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0");
-    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1");
-} catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ALTER COLUMN gemini_api_key TYPE text"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_api_key text DEFAULT ''"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_provider varchar(50) DEFAULT 'auto'"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_pool_strategy varchar(50) DEFAULT 'round_robin'"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_model varchar(120) DEFAULT 'openrouter/free'"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_whatsapp_url varchar(255) DEFAULT ''"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_messenger_url varchar(255) DEFAULT ''"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_floating_icon_on_off smallint DEFAULT 1"); } catch (Throwable $e) {}
-try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_call_enabled smallint DEFAULT 1"); } catch (Throwable $e) {}
+$settings_migrations = [
+    "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1",
+    "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_btn_text varchar(100) DEFAULT 'Claim Now'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_animation varchar(50) DEFAULT 'spin-zoom'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_countdown_end varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_delay integer DEFAULT 2",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_show_again varchar(50) DEFAULT 'session'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_image text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_image text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ALTER COLUMN gemini_api_key TYPE text",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_api_key text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_provider varchar(50) DEFAULT 'auto'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_pool_strategy varchar(50) DEFAULT 'round_robin'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_model varchar(120) DEFAULT 'openrouter/free'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_whatsapp_url varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_messenger_url varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_floating_icon_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_call_enabled smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_slider_autoplay smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_slider_interval integer DEFAULT 4500",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_tag text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn2_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_btn2_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_badge1_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS hero_badge2_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS categories_title text DEFAULT 'Shop by Category'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS categories_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_tag varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner1_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_tag varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_title text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_btn_text varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS promo_banner2_btn_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS featured_products_title text DEFAULT 'Featured Products'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS featured_products_subtitle text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item1_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item1_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item2_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item2_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item3_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item3_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item4_title varchar(200) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS trust_item4_desc text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS stripe_public_key text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS stripe_secret_key text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS paypal_client_id text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS paypal_secret text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS paypal_sandbox_mode smallint DEFAULT 0",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS paypal_email varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sslcz_store_id text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sslcz_store_pass text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sslcz_mode varchar(20) DEFAULT 'sandbox'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS cod_enabled smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS payment_methods text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS bank_detail text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS facebook_app_id varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS facebook_app_secret varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS google_client_id text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS google_client_secret text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS twilio_account_sid varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS twilio_auth_token varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS twilio_phone_number varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS review_feature_on_off smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS estimated_delivery_time_local varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS estimated_delivery_time_global varchar(100) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS return_policy_days integer DEFAULT 7",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold numeric(12,2) DEFAULT 0",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_feature_on_off smallint DEFAULT 0",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_api_key text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_sender_id varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_provider varchar(50) DEFAULT 'bulk'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_order_placed_template text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_order_shipped_template text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_order_completed_template text DEFAULT ''"
+];
+foreach ($settings_migrations as $sql) {
+    try { $pdo->exec($sql); } catch (Throwable $e) {}
+}
 
 // Fetch all settings data from the database
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
@@ -1112,9 +1178,25 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 }
 } catch(Throwable $error) {
     if($pdo->inTransaction()) $pdo->rollBack();
-    $success_message='';$error_message='Settings could not be saved. Check the entered values and try again.';
-    error_log('Store settings update failed: ' . $error->getCode());
+    $success_message='';
+    $error_message='Settings could not be saved: ' . htmlspecialchars($error->getMessage());
+    error_log('Store settings update failed: ' . $error->getMessage());
 }
+
+$active_tab = '';
+if (isset($_POST['form_home_features']) || (isset($_GET['action']) && $_GET['action'] === 'delete_slide')) $active_tab = '#tab_home_features';
+elseif (isset($_POST['form_page_settings'])) $active_tab = '#tab_page_settings';
+elseif (isset($_POST['form_language_converter'])) $active_tab = '#tab_language_converter';
+elseif (isset($_POST['form_payment_gateways'])) $active_tab = '#tab_payment_gateways';
+elseif (isset($_POST['form_api_integrations'])) $active_tab = '#tab_api_integrations';
+elseif (isset($_POST['form_review_delivery'])) $active_tab = '#tab_review_delivery';
+elseif (isset($_POST['form_sms'])) $active_tab = '#tab_sms';
+elseif (isset($_POST['form_banners'])) $active_tab = '#tab_banners';
+elseif (isset($_POST['form_social_media'])) $active_tab = '#tab_social_media';
+elseif (isset($_POST['form_email']) || isset($_POST['form_email_template']) || isset($_POST['form_email_content'])) $active_tab = '#tab_email';
+elseif (isset($_POST['form_footer_settings'])) $active_tab = '#tab_footer';
+elseif (isset($_POST['form_popup_settings'])) $active_tab = '#tab_ads';
+elseif (isset($_POST['form_general_settings'])) $active_tab = '#tab_general';
 // Re-fetch settings after any update to ensure displayed values are current
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $statement->execute();
@@ -2057,7 +2139,7 @@ $lang_sections = [
                                                 </div>
                                                 <div class="form-group">
                                                     <label>Main Headline / Hero Title</label>
-                                                    <input type="text" name="hero_title" class="form-control input-lg" value="<?php echo htmlspecialchars($settings_data['hero_title'] ?? 'Upgrade Your Everyday Life'); ?>" required>
+                                                    <input type="text" name="hero_title" class="form-control input-lg" value="<?php echo htmlspecialchars($settings_data['hero_title'] ?? 'Upgrade Your Everyday Life'); ?>">
                                                 </div>
                                                 <div class="form-group">
                                                     <label>Hero Subtitle / Description</label>
@@ -3710,9 +3792,13 @@ $lang_sections = [
 if (window.jQuery) {
     jQuery(document).ready(function($) {
         // Keep active tab on page refresh / hash change
-        var hash = window.location.hash;
+        var serverActiveTab = <?php echo json_encode($active_tab ?? ''); ?>;
+        var hash = serverActiveTab || window.location.hash;
         if (hash) {
             $('.nav-tabs a[href="' + hash + '"]').tab('show');
+            if (history.replaceState) {
+                history.replaceState(null, null, hash);
+            }
         }
         $('.nav-tabs a').on('shown.bs.tab', function(e) {
             if (history.pushState) {
