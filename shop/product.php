@@ -172,22 +172,102 @@ if (isset($_SESSION['customer']['cust_id'])) {
     }
 }
 
-// Fetch Gallery Photos
+// Parse Product Media (Support Images, YouTube links, and Cloudflare R2 / direct MP4 videos)
+if (!function_exists('parse_product_media')) {
+    function parse_product_media($url, $fallback_poster = '') {
+        $url = trim((string)$url);
+        if (empty($url)) {
+            return null;
+        }
+
+        // 1. YouTube Video Link
+        if (preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i', $url, $matches)) {
+            $youtube_id = $matches[1];
+            return [
+                'type' => 'youtube',
+                'video_id' => $youtube_id,
+                'src' => "https://www.youtube.com/embed/{$youtube_id}?autoplay=1&rel=0",
+                'thumb' => "https://img.youtube.com/vi/{$youtube_id}/hqdefault.jpg",
+                'raw' => $url
+            ];
+        }
+
+        // 2. Direct Video / Cloudflare R2 Object Storage / MP4 / WebM / MOV / M4V
+        $lower = strtolower($url);
+        $isVideoExt = preg_match('/\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i', $lower);
+        $isR2OrStorage = (str_contains($lower, 'r2.dev') || str_contains($lower, 'r2.cloudflarestorage.com') || str_contains($lower, '/video/'));
+
+        if ($isVideoExt || ($isR2OrStorage && !preg_match('/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i', $lower))) {
+            $video_src = str_starts_with($url, 'http') ? $url : (function_exists('get_media_url') ? get_media_url($url) : $url);
+            $poster_thumb = !empty($fallback_poster) ? (function_exists('get_media_url') ? get_media_url($fallback_poster) : $fallback_poster) : $video_src;
+            return [
+                'type' => 'video',
+                'src' => $video_src,
+                'thumb' => $poster_thumb,
+                'raw' => $url
+            ];
+        }
+
+        // 3. Regular Image
+        $imgUrl = str_starts_with($url, 'http') ? $url : (function_exists('get_media_url') ? get_media_url($url) : $url);
+        return [
+            'type' => 'image',
+            'src' => $imgUrl,
+            'thumb' => $imgUrl,
+            'raw' => $url
+        ];
+    }
+}
+
+// Fetch Gallery Media (Photos & Videos)
 $stmt_photos = $pdo->prepare("SELECT photo FROM tbl_product_photo WHERE p_id = ? ORDER BY pp_id ASC");
 $stmt_photos->execute([$p_id]);
 $photo_rows = $stmt_photos->fetchAll(PDO::FETCH_ASSOC);
 
-$gallery_photos = [];
+$raw_media_list = [];
+
 if (!empty($p_featured_photo)) {
-    $gallery_photos[] = $p_featured_photo;
+    $raw_media_list[] = $p_featured_photo;
 }
-foreach ($photo_rows as $pr) {
-    if (!empty($pr['photo']) && !in_array($pr['photo'], $gallery_photos)) {
-        $gallery_photos[] = $pr['photo'];
+
+if (!empty($p_video_link)) {
+    $video_urls = preg_split('/[\r\n,\s]+/', $p_video_link);
+    foreach ($video_urls as $v_url) {
+        $v_url = trim($v_url);
+        if (!empty($v_url) && !in_array($v_url, $raw_media_list)) {
+            $raw_media_list[] = $v_url;
+        }
     }
 }
-if (empty($gallery_photos)) {
-    $gallery_photos[] = 'assets/images/no-image.png';
+
+foreach ($photo_rows as $pr) {
+    if (!empty($pr['photo']) && !in_array($pr['photo'], $raw_media_list)) {
+        $raw_media_list[] = $pr['photo'];
+    }
+}
+
+$gallery_items = [];
+$fallback_poster = !empty($p_featured_photo) ? $p_featured_photo : 'assets/images/no-image.png';
+
+foreach ($raw_media_list as $media_raw) {
+    $parsed = parse_product_media($media_raw, $fallback_poster);
+    if ($parsed) {
+        $gallery_items[] = $parsed;
+    }
+}
+
+if (empty($gallery_items)) {
+    $gallery_items[] = [
+        'type' => 'image',
+        'src' => (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png',
+        'thumb' => (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png',
+        'raw' => 'assets/images/no-image.png'
+    ];
+}
+
+$gallery_photos = [];
+foreach ($gallery_items as $gi) {
+    $gallery_photos[] = $gi['thumb'];
 }
 
 // Fetch Product Sizes & Colors
@@ -214,28 +294,44 @@ $related_products_on_off = isset($settings_data['related_products_on_off']) ? (i
 $mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
 
 // Fetch Ratings & Reviews
-$avg_rating = 4.6;
-$total_reviews_count = 892;
+$avg_rating = 0;
+$total_reviews_count = 0;
 $reviews_list = [];
 
 if ($review_feature_on_off == 1) {
-    $stmt_rating = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(review_id) as total_count FROM tbl_review WHERE product_id = ? AND status = 'Approved'");
-    $stmt_rating->execute([$p_id]);
-    $rating_res = $stmt_rating->fetch(PDO::FETCH_ASSOC);
-    if ($rating_res && $rating_res['total_count'] > 0) {
-        $avg_rating = round((float)$rating_res['avg_rating'], 1);
-        $total_reviews_count = (int)$rating_res['total_count'];
+    try {
+        $stmt_rating = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_rating WHERE p_id = ?");
+        $stmt_rating->execute([$p_id]);
+        $rating_res = $stmt_rating->fetch(PDO::FETCH_ASSOC);
+        if ($rating_res && $rating_res['total_count'] > 0) {
+            $avg_rating = round((float)$rating_res['avg_rating'], 1);
+            $total_reviews_count = (int)$rating_res['total_count'];
+        }
+    } catch (Throwable $e) {}
+
+    if ($total_reviews_count == 0) {
+        try {
+            $stmt_rev2 = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_review WHERE product_id = ? AND status = 'Approved'");
+            $stmt_rev2->execute([$p_id]);
+            $res2 = $stmt_rev2->fetch(PDO::FETCH_ASSOC);
+            if ($res2 && $res2['total_count'] > 0) {
+                $avg_rating = round((float)$res2['avg_rating'], 1);
+                $total_reviews_count = (int)$res2['total_count'];
+            }
+        } catch (Throwable $e) {}
     }
-    
-    $stmt_reviews = $pdo->prepare("SELECT r.*, c.cust_name FROM tbl_review r LEFT JOIN tbl_customer c ON r.cust_id = c.cust_id WHERE r.product_id = ? AND r.status = 'Approved' ORDER BY r.created_at DESC LIMIT 10");
-    $stmt_reviews->execute([$p_id]);
-    $reviews_list = $stmt_reviews->fetchAll(PDO::FETCH_ASSOC);
+
+    try {
+        $stmt_reviews = $pdo->prepare("SELECT r.*, c.cust_name FROM tbl_review r LEFT JOIN tbl_customer c ON r.cust_id = c.cust_id WHERE r.product_id = ? AND r.status = 'Approved' ORDER BY r.created_at DESC LIMIT 10");
+        $stmt_reviews->execute([$p_id]);
+        $reviews_list = $stmt_reviews->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {}
 }
 
 // Fetch Category Breadcrumbs
-$tcat_name = 'Laptops & Computers';
-$mcat_name = 'Laptops';
-$ecat_name = 'Laptops';
+$tcat_name = 'Home';
+$mcat_name = '';
+$ecat_name = '';
 
 if ($ecat_id > 0) {
     $stmt_cat = $pdo->prepare("SELECT e.ecat_name, m.mcat_name, t.tcat_name 
@@ -252,7 +348,7 @@ if ($ecat_id > 0) {
     }
 }
 
-// Parse Specification Highlights for the 8 Cards
+// Parse Specification Highlights for Cards
 $spec_cards = [];
 if (!empty($p_feature)) {
     $lines = explode("\n", $p_feature);
@@ -294,54 +390,24 @@ if (!empty($p_feature)) {
 }
 
 // Brand name determination
-$brand_name = 'Samsung';
+$brand_name = '';
 if (preg_match('/^(Samsung|Apple|HP|Dell|Lenovo|Asus|Sony|Xiaomi|Google|OnePlus|Huawei|Realme|Oppo|Vivo|Rolex|Casio|Amazfit|Garmin)/i', $p_name, $bm)) {
     $brand_name = ucfirst($bm[1]);
 } elseif (!empty($mcat_name) && strtolower($mcat_name) !== 'default' && strtolower($mcat_name) !== 'uncategorized') {
     $brand_name = $mcat_name;
-} elseif (!empty($tcat_name) && strtolower($tcat_name) !== 'default') {
+} elseif (!empty($tcat_name) && strtolower($tcat_name) !== 'default' && strtolower($tcat_name) !== 'home') {
     $brand_name = $tcat_name;
+} else {
+    $brand_name = 'Official Store';
 }
 
-// Fallback highlight specification cards (Top 3 for mobile layout)
-if (count($spec_cards) < 3) {
-    $is_watch = (bool)preg_match('/(watch|band|wearable|tracker|galaxy|clock)/i', $p_name . ' ' . $tcat_name . ' ' . $mcat_name);
-    if ($is_watch || $p_id == 3 || $p_id == 4) {
-        $spec_cards = [
-            ['icon' => 'fas fa-mobile-alt', 'title' => '1.5" AMOLED', 'sub' => 'Display'],
-            ['icon' => 'fas fa-heartbeat', 'title' => 'Health Tracking', 'sub' => '(Heart Rate, SpO2)'],
-            ['icon' => 'fas fa-battery-three-quarters', 'title' => 'Up to 40 Hours', 'sub' => 'Battery Life'],
-            ['icon' => 'fas fa-microchip', 'title' => 'Exynos W930', 'sub' => 'Dual-Core 1.4GHz'],
-            ['icon' => 'fas fa-memory', 'title' => '2GB RAM', 'sub' => '16GB Storage'],
-            ['icon' => 'fas fa-shield-alt', 'title' => '5ATM + IP68', 'sub' => 'Water Resistant'],
-        ];
-    } else {
-        $spec_cards = [
-            ['icon' => 'fas fa-desktop', 'title' => '1.5" AMOLED', 'sub' => 'Display'],
-            ['icon' => 'fas fa-heartbeat', 'title' => 'Health Tracking', 'sub' => '(Heart Rate, SpO2)'],
-            ['icon' => 'fas fa-battery-three-quarters', 'title' => 'Up to 40 Hours', 'sub' => 'Battery Life'],
-            ['icon' => 'fas fa-microchip', 'title' => 'Fast Processor', 'sub' => 'High Speed Chipset'],
-            ['icon' => 'fas fa-memory', 'title' => 'High Speed RAM', 'sub' => 'Smooth Multitasking'],
-            ['icon' => 'fas fa-hdd', 'title' => 'Fast Storage', 'sub' => 'Ultra Speed NVMe'],
-        ];
-    }
-}
-
-// Discount & EMI calculations matching mockup
-$discount_pct = 12;
+// Discount & EMI calculations
+$discount_pct = 0;
 if ($p_old_price > $p_current_price && $p_current_price > 0) {
     $discount_pct = round((($p_old_price - $p_current_price) / $p_old_price) * 100);
-} elseif ($p_old_price <= 0 && $p_current_price > 0) {
-    $p_old_price = round($p_current_price * 1.136);
-    $discount_pct = 12;
 }
 $emi_monthly = round($p_current_price / 12);
-if ($p_id == 104) {
-    $emi_monthly = 5833;
-    $discount_pct = 15;
-}
 
-// Default brand and lifestyle photo from Supabase Storage
 $hp_logo_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_logo.jpg';
 $lifestyle_img_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_lifestyle.jpg';
 
@@ -372,63 +438,13 @@ try {
             $related_products = array_merge($related_products, $more_prods);
         }
     }
-
-    // Ensure catalog is nicely filled for visual completeness if small store
-    if (count($related_products) < 4) {
-        $mock_related = [
-            [
-                'p_id' => 103,
-                'p_name' => 'Galaxy Watch 6 Pro 44mm LTE Smartwatch',
-                'p_current_price' => 28500,
-                'p_old_price' => 32000,
-                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_galaxy_watch.jpg',
-                'is_top_sale' => 1
-            ],
-            [
-                'p_id' => 104,
-                'p_name' => 'HP Pavilion 15-eg3027TU Core i5 13th Gen 15.6" FHD Laptop',
-                'p_current_price' => 74500,
-                'p_old_price' => 82000,
-                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_laptop_main.jpg',
-                'is_top_sale' => 1
-            ],
-            [
-                'p_id' => 105,
-                'p_name' => 'AirPods Pro 2nd Gen with MagSafe Charging Case',
-                'p_current_price' => 26900,
-                'p_old_price' => 29500,
-                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_airpods.jpg',
-                'is_top_sale' => 0
-            ],
-            [
-                'p_id' => 106,
-                'p_name' => 'iPhone 15 Pro Max 256GB Natural Titanium',
-                'p_current_price' => 152000,
-                'p_old_price' => 165000,
-                'p_featured_photo' => 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/deal_iphone_15.jpg',
-                'is_top_sale' => 1
-            ]
-        ];
-        foreach ($mock_related as $mock) {
-            if ($mock['p_id'] != $p_id) {
-                $already = false;
-                foreach ($related_products as $rp) {
-                    if ($rp['p_id'] == $mock['p_id'] || $rp['p_name'] == $mock['p_name']) {
-                        $already = true; break;
-                    }
-                }
-                if (!$already) {
-                    $related_products[] = $mock;
-                }
-                if (count($related_products) >= 6) break;
-            }
-        }
-    }
 } catch (Throwable $e) {
     error_log('Related products error: ' . $e->getMessage());
 }
 
 // Require site header
+$cur_page = 'product.php';
+$firstPhotoUrl = !empty($gallery_items[0]['thumb']) ? $gallery_items[0]['thumb'] : (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png';
 require_once('header.php');
 ?>
 
@@ -488,11 +504,19 @@ require_once('header.php');
                         <i class="fas fa-chevron-up"></i>
                     </button>
                     <div class="sn-thumb-list" id="snThumbList">
-                        <?php foreach ($gallery_photos as $idx => $photo): 
-                            $photoUrl = get_media_url($photo);
-                        ?>
-                            <div class="sn-thumb-item <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>" data-src="<?php echo htmlspecialchars($photoUrl); ?>">
-                                <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                        <?php foreach ($gallery_items as $idx => $item): ?>
+                            <div class="sn-thumb-item <?php echo $idx === 0 ? 'active' : ''; ?>" 
+                                 data-index="<?php echo $idx; ?>" 
+                                 data-type="<?php echo $item['type']; ?>" 
+                                 data-src="<?php echo htmlspecialchars($item['src']); ?>"
+                                 data-thumb="<?php echo htmlspecialchars($item['thumb']); ?>">
+                                <img src="<?php echo htmlspecialchars($item['thumb']); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                                <?php if ($item['type'] === 'youtube' || $item['type'] === 'video'): ?>
+                                    <div class="sn-thumb-video-overlay">
+                                        <i class="fas fa-play sn-thumb-play-icon"></i>
+                                    </div>
+                                    <span class="sn-thumb-video-badge"><?php echo $item['type'] === 'youtube' ? 'YT' : 'VIDEO'; ?></span>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -505,7 +529,7 @@ require_once('header.php');
                 <div class="sn-gallery-main-card">
                     <span class="sn-bestseller-badge sn-desktop-only">Best Seller</span>
                     <span class="sn-mob-discount-badge">-<?php echo $discount_pct; ?>%</span>
-                    <span class="sn-mob-counter-badge" id="snMobCounter">1/<?php echo count($gallery_photos); ?></span>
+                    <span class="sn-mob-counter-badge" id="snMobCounter">1/<?php echo count($gallery_items); ?></span>
 
                     <!-- Mobile Left/Right Slider Chevrons -->
                     <button type="button" class="sn-mob-nav-btn sn-mob-prev" id="snMobPrev" aria-label="Previous Photo">
@@ -520,17 +544,30 @@ require_once('header.php');
                     </button>
                     
                     <div class="sn-gallery-viewport">
-                        <?php $firstPhotoUrl = get_media_url($gallery_photos[0] ?? $p_featured_photo); ?>
-                        <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" 
+                        <?php $firstItem = $gallery_items[0] ?? ['type' => 'image', 'src' => (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png', 'thumb' => (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png']; ?>
+                        <img src="<?php echo htmlspecialchars($firstItem['type'] === 'image' ? $firstItem['src'] : $firstItem['thumb']); ?>" 
                              alt="<?php echo htmlspecialchars($p_name); ?>" 
                              class="sn-gallery-main-img" 
                              id="snMainImg"
+                             style="<?php echo $firstItem['type'] !== 'image' ? 'display:none;' : ''; ?>"
                              onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                        
+                        <iframe id="snMainIframe" class="sn-gallery-main-frame" 
+                                src="<?php echo $firstItem['type'] === 'youtube' ? htmlspecialchars($firstItem['src']) : ''; ?>" 
+                                style="<?php echo $firstItem['type'] === 'youtube' ? '' : 'display:none;'; ?>" 
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen></iframe>
+
+                        <video id="snMainVideo" class="sn-gallery-main-video" 
+                               src="<?php echo $firstItem['type'] === 'video' ? htmlspecialchars($firstItem['src']) : ''; ?>" 
+                               controls playsinline 
+                               style="<?php echo $firstItem['type'] === 'video' ? '' : 'display:none;'; ?>"></video>
                     </div>
 
                     <!-- Dots indicator (Desktop Only) -->
                     <div class="sn-gallery-dots sn-desktop-only">
-                        <?php foreach ($gallery_photos as $idx => $photo): ?>
+                        <?php foreach ($gallery_items as $idx => $item): ?>
                             <span class="sn-gallery-dot <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>"></span>
                         <?php endforeach; ?>
                     </div>
@@ -539,11 +576,19 @@ require_once('header.php');
 
             <!-- Horizontal Thumbnails Strip (Mobile Only) -->
             <div class="sn-mob-thumbs-strip" id="snMobThumbList">
-                <?php foreach ($gallery_photos as $idx => $photo): 
-                    $photoUrl = get_media_url($photo);
-                ?>
-                    <div class="sn-mob-thumb <?php echo $idx === 0 ? 'active' : ''; ?>" data-index="<?php echo $idx; ?>" data-src="<?php echo htmlspecialchars($photoUrl); ?>">
-                        <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                <?php foreach ($gallery_items as $idx => $item): ?>
+                    <div class="sn-mob-thumb <?php echo $idx === 0 ? 'active' : ''; ?>" 
+                         data-index="<?php echo $idx; ?>" 
+                         data-type="<?php echo $item['type']; ?>" 
+                         data-src="<?php echo htmlspecialchars($item['src']); ?>"
+                         data-thumb="<?php echo htmlspecialchars($item['thumb']); ?>">
+                        <img src="<?php echo htmlspecialchars($item['thumb']); ?>" alt="<?php echo htmlspecialchars($p_name); ?> Thumbnail <?php echo $idx+1; ?>" onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
+                        <?php if ($item['type'] === 'youtube' || $item['type'] === 'video'): ?>
+                            <div class="sn-thumb-video-overlay">
+                                <i class="fas fa-play sn-thumb-play-icon"></i>
+                            </div>
+                            <span class="sn-thumb-video-badge"><?php echo $item['type'] === 'youtube' ? 'YT' : 'VIDEO'; ?></span>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -582,169 +627,199 @@ require_once('header.php');
                 <!-- Tab 1: Description / Overview -->
                 <div class="sn-tab-pane active" id="tab-desc">
                     <h3 class="sn-desc-heading sn-desktop-only">Powerful Performance for Everyday Tasks</h3>
-                    <div class="sn-desc-text">
-                        <?php if (!empty($p_description)): ?>
-                            <?php echo $p_description; ?>
-                        <?php else: ?>
-                            <p><?php echo htmlspecialchars($p_name); ?> combines style, health, and productivity in one smart device. With a vibrant AMOLED display, advanced health tracking features, and long battery life, it's the perfect companion for your everyday life.</p>
-                        <?php endif; ?>
-                    </div>
+                    <div class="sn-desc-wrapper" id="snDescWrapper">
+                        <div class="sn-desc-text">
+                            <?php if (!empty($p_description)): ?>
+                                <?php echo $p_description; ?>
+                            <?php else: ?>
+                                <p><?php echo htmlspecialchars($p_name); ?> combines style, health, and productivity in one smart device. With a vibrant AMOLED display, advanced health tracking features, and long battery life, it's the perfect companion for your everyday life.</p>
+                            <?php endif; ?>
+                        </div>
 
-                    <ul class="sn-feature-bullet-list sn-mob-bullet-list">
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span>Advanced health & fitness tracking</span>
-                        </li>
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span>Water resistant (5ATM)</span>
-                        </li>
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span>Works with Android & iOS</span>
-                        </li>
-                    </ul>
+                        <ul class="sn-feature-bullet-list sn-mob-bullet-list">
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span>Advanced health & fitness tracking</span>
+                            </li>
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span>Water resistant (5ATM)</span>
+                            </li>
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span>Works with Android & iOS</span>
+                            </li>
+                        </ul>
+                        <div class="sn-desc-fade-overlay" id="snDescFadeOverlay"></div>
+                    </div>
+                    <button type="button" class="sn-btn-see-more" id="btnDescSeeMore" aria-label="Toggle full description">
+                        <span class="sn-see-more-text">See More</span>
+                        <i class="fas fa-chevron-down sn-see-more-icon"></i>
+                    </button>
                 </div>
 
                 <!-- Tab 2: Specifications -->
-                <div class="sn-tab-pane" id="tab-specs">
-                    <table class="sn-specs-table">
-                        <tbody>
-                            <?php foreach ($spec_cards as $sc): ?>
+                <div class="sn-tab-pane sn-accordion-pane collapsed" id="tab-specs">
+                    <div class="sn-accordion-header" data-toggle="tab-specs">
+                        <div class="sn-accordion-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="21" x2="4" y2="14"></line>
+                                <line x1="4" y1="10" x2="4" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12" y2="3"></line>
+                                <line x1="20" y1="21" x2="20" y2="16"></line>
+                                <line x1="20" y1="12" x2="20" y2="3"></line>
+                                <line x1="1" y1="14" x2="7" y2="14"></line>
+                                <line x1="9" y1="8" x2="15" y2="8"></line>
+                                <line x1="17" y1="16" x2="23" y2="16"></line>
+                            </svg>
+                            <span>Specifications</span>
+                        </div>
+                        <i class="fas fa-chevron-down sn-accordion-arrow"></i>
+                    </div>
+                    <div class="sn-accordion-content">
+                        <table class="sn-specs-table">
+                            <tbody>
+                                <?php foreach ($spec_cards as $sc): ?>
+                                    <tr>
+                                        <td class="sn-spec-label"><?php echo htmlspecialchars($sc['title']); ?></td>
+                                        <td class="sn-spec-val"><?php echo htmlspecialchars($sc['sub']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
                                 <tr>
-                                    <td class="sn-spec-label"><?php echo htmlspecialchars($sc['title']); ?></td>
-                                    <td class="sn-spec-val"><?php echo htmlspecialchars($sc['sub']); ?></td>
+                                    <td class="sn-spec-label">Warranty</td>
+                                    <td class="sn-spec-val">1 Year Official Manufacturer Warranty</td>
                                 </tr>
-                            <?php endforeach; ?>
-                            <tr>
-                                <td class="sn-spec-label">Warranty</td>
-                                <td class="sn-spec-val">1 Year Official Manufacturer Warranty</td>
-                            </tr>
-                            <tr>
-                                <td class="sn-spec-label">Condition</td>
-                                <td class="sn-spec-val"><?php echo htmlspecialchars($p_condition ?: 'Brand New (Sealed)'); ?></td>
-                            </tr>
-                            <tr>
-                                <td class="sn-spec-label">Stock Availability</td>
-                                <td class="sn-spec-val"><?php echo $p_qty > 0 ? $p_qty . ' units in stock' : 'Out of stock'; ?></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                <tr>
+                                    <td class="sn-spec-label">Condition</td>
+                                    <td class="sn-spec-val"><?php echo htmlspecialchars($p_condition ?: 'Brand New (Sealed)'); ?></td>
+                                </tr>
+                                <tr>
+                                    <td class="sn-spec-label">Stock Availability</td>
+                                    <td class="sn-spec-val"><?php echo $p_qty > 0 ? $p_qty . ' units in stock' : 'Out of stock'; ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tab 3: Reviews -->
-                <div class="sn-tab-pane" id="tab-reviews">
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">Customer Reviews & Ratings</h4>
-                        <p style="font-size: 13px; color: #64748b;">Showing authentic reviews from verified buyers.</p>
+                <div class="sn-tab-pane sn-accordion-pane collapsed" id="tab-reviews">
+                    <div class="sn-accordion-header" data-toggle="tab-reviews">
+                        <div class="sn-accordion-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                            <span>Customer Reviews (<?php echo $total_reviews_count > 0 ? $total_reviews_count : count($reviews_list); ?>)</span>
+                        </div>
+                        <i class="fas fa-chevron-down sn-accordion-arrow"></i>
                     </div>
+                    <div class="sn-accordion-content">
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">Customer Reviews & Ratings</h4>
+                            <p style="font-size: 13px; color: #64748b;">Showing authentic reviews from verified buyers.</p>
+                        </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <?php if (!empty($reviews_list)): ?>
-                            <?php foreach ($reviews_list as $rev): ?>
-                                <div class="sn-review-card-item">
-                                    <div class="sn-reviewer-row">
-                                        <div class="sn-reviewer-meta">
-                                            <div class="sn-reviewer-avatar">
-                                                <?php echo strtoupper(substr($rev['cust_name'] ?: 'Customer', 0, 1)); ?>
-                                            </div>
-                                            <div>
-                                                <div class="sn-reviewer-name">
-                                                    <?php echo htmlspecialchars($rev['cust_name'] ?: 'Verified Customer'); ?>
-                                                    <i class="fas fa-check-circle sn-verified-check"></i>
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <?php if (!empty($reviews_list)): ?>
+                                <?php foreach ($reviews_list as $rev): ?>
+                                    <div class="sn-review-card-item">
+                                        <div class="sn-reviewer-row">
+                                            <div class="sn-reviewer-meta">
+                                                <div class="sn-reviewer-avatar">
+                                                    <?php echo strtoupper(substr($rev['cust_name'] ?: 'Customer', 0, 1)); ?>
                                                 </div>
-                                                <div class="sn-review-date">Verified Purchase • <?php echo date('M d, Y', strtotime($rev['created_at'])); ?></div>
+                                                <div>
+                                                    <div class="sn-reviewer-name">
+                                                        <?php echo htmlspecialchars($rev['cust_name'] ?: 'Verified Customer'); ?>
+                                                        <i class="fas fa-check-circle sn-verified-check"></i>
+                                                    </div>
+                                                    <div class="sn-review-date">Verified Purchase • <?php echo date('M d, Y', strtotime($rev['created_at'])); ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="sn-stars-wrap">
+                                                <?php for($i=1; $i<=5; $i++): ?>
+                                                    <i class="<?php echo $i <= (int)$rev['rating'] ? 'fas' : 'far'; ?> fa-star"></i>
+                                                <?php endfor; ?>
                                             </div>
                                         </div>
-                                        <div class="sn-stars-wrap">
-                                            <?php for($i=1; $i<=5; $i++): ?>
-                                                <i class="<?php echo $i <= (int)$rev['rating'] ? 'fas' : 'far'; ?> fa-star"></i>
-                                            <?php endfor; ?>
+                                        <div class="sn-review-body">
+                                            <?php echo nl2br(htmlspecialchars($rev['review_text'])); ?>
+                                        </div>
+                                        <div class="sn-review-footer">
+                                            <button type="button" class="sn-btn-helpful">
+                                                <i class="far fa-thumbs-up"></i> Helpful (24)
+                                            </button>
+                                            <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" alt="Product" class="sn-review-thumb-item">
                                         </div>
                                     </div>
-                                    <div class="sn-review-body">
-                                        <?php echo nl2br(htmlspecialchars($rev['review_text'])); ?>
-                                    </div>
-                                    <div class="sn-review-footer">
-                                        <button type="button" class="sn-btn-helpful">
-                                            <i class="far fa-thumbs-up"></i> Helpful (24)
-                                        </button>
-                                        <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" alt="Product" class="sn-review-thumb-item">
-                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div style="text-align: center; padding: 32px 16px; color: #64748b; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+                                    <i class="far fa-comment-dots" style="font-size: 28px; margin-bottom: 8px; color: #94a3b8; display: block;"></i>
+                                    <div style="font-weight: 600; color: #334155; margin-bottom: 4px;">No reviews yet</div>
+                                    <div style="font-size: 13px;">Be the first to review this product after purchase!</div>
                                 </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="sn-review-card-item">
-                                <div class="sn-reviewer-row">
-                                    <div class="sn-reviewer-meta">
-                                        <div class="sn-reviewer-avatar">R</div>
-                                        <div>
-                                            <div class="sn-reviewer-name">
-                                                Rafiq Islam <i class="fas fa-check-circle sn-verified-check"></i>
-                                            </div>
-                                            <div class="sn-review-date">Verified Purchase • 2 weeks ago</div>
-                                        </div>
-                                    </div>
-                                    <div class="sn-stars-wrap">
-                                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
-                                    </div>
-                                </div>
-                                <div class="sn-review-body">
-                                    Very good laptop for the price. Performance is smooth and display quality is excellent. Highly recommended!
-                                </div>
-                                <div class="sn-review-footer">
-                                    <button type="button" class="sn-btn-helpful">
-                                        <i class="far fa-thumbs-up"></i> Helpful (24)
-                                    </button>
-                                    <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" alt="Product" class="sn-review-thumb-item">
-                                </div>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Tab 4: Q&A and Shipping & Return -->
-                <div class="sn-tab-pane" id="tab-qa">
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #0f172a;">Customer Questions & Answers</h4>
-                        <p style="font-size: 13px; color: #64748b;">Common inquiries about authenticity, delivery, and warranty.</p>
+                <div class="sn-tab-pane sn-accordion-pane collapsed" id="tab-qa">
+                    <div class="sn-accordion-header" data-toggle="tab-qa">
+                        <div class="sn-accordion-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <span>Questions & Answers</span>
+                        </div>
+                        <i class="fas fa-chevron-down sn-accordion-arrow"></i>
                     </div>
+                    <div class="sn-accordion-content">
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #0f172a;">Customer Questions & Answers</h4>
+                            <p style="font-size: 13px; color: #64748b;">Common inquiries about authenticity, delivery, and warranty.</p>
+                        </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
-                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
-                            <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
-                                <span style="color: #fab802; margin-right: 6px;">Q:</span> Is this product 100% original & authentic?
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
+                                <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                                    <span style="color: #fab802; margin-right: 6px;">Q:</span> Is this product 100% original & authentic?
+                                </div>
+                                <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                    <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Yes, all items sold on ShopNext are 100% brand new, authentic, and backed by official manufacturer warranty.
+                                </div>
                             </div>
-                            <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
-                                <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Yes, all items sold on ShopNext are 100% brand new, authentic, and backed by official manufacturer warranty.
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
+                                <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                                    <span style="color: #fab802; margin-right: 6px;">Q:</span> What is the estimated delivery time?
+                                </div>
+                                <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                    <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Standard local delivery takes <?php echo htmlspecialchars($estimated_delivery_time_local); ?>. Express tracking is sent via SMS upon confirmation.
+                                </div>
                             </div>
                         </div>
-                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
-                            <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
-                                <span style="color: #fab802; margin-right: 6px;">Q:</span> What is the estimated delivery time?
-                            </div>
-                            <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
-                                <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Standard local delivery takes <?php echo htmlspecialchars($estimated_delivery_time_local); ?>. Express tracking is sent via SMS upon confirmation.
-                            </div>
-                        </div>
-                    </div>
 
-                    <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #0f172a;">Shipping & Return Guarantee</h4>
-                    <p class="sn-desc-text">We provide express, tracked door-to-door delivery throughout Bangladesh and internationally. Every device is packaged in shock-proof reinforced packaging with tamper-evident seals.</p>
-                    <ul class="sn-feature-bullet-list sn-mob-bullet-list">
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span><strong>Local Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_local); ?></span>
-                        </li>
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span><strong>International Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_international); ?></span>
-                        </li>
-                        <li class="sn-feature-bullet-item sn-mob-bullet-item">
-                            <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
-                            <span><strong>7 Days Return Policy:</strong> Return easily within 7 days of receipt if unopened or defective.</span>
-                        </li>
-                    </ul>
+                        <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #0f172a;">Shipping & Return Guarantee</h4>
+                        <p class="sn-desc-text">We provide express, tracked door-to-door delivery throughout Bangladesh and internationally. Every device is packaged in shock-proof reinforced packaging with tamper-evident seals.</p>
+                        <ul class="sn-feature-bullet-list sn-mob-bullet-list">
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span><strong>Local Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_local); ?></span>
+                            </li>
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span><strong>International Delivery:</strong> <?php echo htmlspecialchars($estimated_delivery_time_international); ?></span>
+                            </li>
+                            <li class="sn-feature-bullet-item sn-mob-bullet-item">
+                                <span class="sn-bullet-check-icon sn-mob-check-circle"><i class="fas fa-check"></i></span>
+                                <span><strong>7 Days Return Policy:</strong> Return easily within 7 days of receipt if unopened or defective.</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -753,71 +828,99 @@ require_once('header.php');
         <!-- ================= RIGHT COLUMN ================= -->
         <div class="sn-product-right-col">
             
-            <!-- Mobile Brand & Title & Rating Block (Mockup Pixel-Perfect) -->
-            <div class="sn-product-header-block">
-                <div class="sn-mob-brand-actions-row">
-                    <div class="sn-mob-brand-pill"><?php echo htmlspecialchars($brand_name); ?></div>
-                    <div class="sn-mob-gallery-actions">
-                        <button type="button" class="sn-mob-circle-action-btn" id="snShareBtn" aria-label="Share">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="18" cy="5" r="3"></circle>
-                                <circle cx="6" cy="12" r="3"></circle>
-                                <circle cx="18" cy="19" r="3"></circle>
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                            </svg>
-                        </button>
-                        <button type="button" class="sn-mob-circle-action-btn <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="snMobileWishlistBtn" data-product-id="<?php echo htmlspecialchars($p_id); ?>" aria-label="Wishlist">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_product_in_wishlist ? '#ef4444' : 'none'; ?>" stroke="<?php echo $is_product_in_wishlist ? '#ef4444' : '#111827'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                            </svg>
-                        </button>
-                    </div>
+            <!-- Brand Badge & Header Action Buttons (Share, Wishlist, Ask AI) -->
+            <div class="sn-brand-header-row">
+                <div class="sn-brand-badge-box">
+                    <span class="sn-brand-icon-circle">
+                        <i class="fas fa-certificate"></i>
+                    </span>
+                    <span class="sn-brand-name"><?php echo htmlspecialchars(!empty($brand_name) ? $brand_name : ($tcat_name ?? 'Official Store')); ?></span>
                 </div>
-                <h1 class="sn-mob-prod-title"><?php echo htmlspecialchars($p_name); ?></h1>
 
-                <div class="sn-mob-rating-store-row">
-                    <div class="sn-mob-rating-left">
-                        <span class="sn-mob-star">★</span>
-                        <span class="sn-mob-score"><?php echo $avg_rating; ?></span>
-                        <span class="sn-mob-reviews">(<?php echo number_format($total_reviews_count); ?> reviews)</span>
-                    </div>
-                    <a href="javascript:void(0)" class="sn-mob-store-badge">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            <polyline points="9 12 11 14 15 10"/>
+                <div class="sn-header-action-btns">
+                    <!-- Share Button -->
+                    <button type="button" class="sn-action-icon-btn" id="snShareBtn" title="Share Product" aria-label="Share">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="18" cy="5" r="3"></circle>
+                            <circle cx="6" cy="12" r="3"></circle>
+                            <circle cx="18" cy="19" r="3"></circle>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                         </svg>
-                        <span>Official Store</span>
-                        <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
-                    </a>
+                    </button>
+
+                    <!-- Wishlist Button -->
+                    <button type="button" class="sn-action-icon-btn <?php echo $is_product_in_wishlist ? 'active' : ''; ?>" id="btnWishlistToggle" data-product-id="<?php echo htmlspecialchars($p_id); ?>" title="Save to Wishlist" aria-label="Wishlist">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_product_in_wishlist ? '#ef4444' : 'none'; ?>" stroke="<?php echo $is_product_in_wishlist ? '#ef4444' : 'currentColor'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Ask AI Gemini Button -->
+                    <button type="button" class="sn-btn-little-ai" id="openAiAssistantBtn" title="Ask AI about this product">
+                        <span class="sn-ai-sparkle">✨</span>
+                        <span>Ask AI</span>
+                        <span class="sn-ai-badge">Gemini</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Price Block -->
-            <div class="sn-price-block">
-                <span class="sn-mob-curr-price">৳ <?php echo number_format($p_current_price); ?></span>
-                <?php if ($p_old_price > 0 && $p_old_price > $p_current_price): ?>
-                    <span class="sn-mob-old-price">৳ <?php echo number_format($p_old_price); ?></span>
-                    <span class="sn-mob-discount-tag">-<?php echo $discount_pct; ?>%</span>
-                <?php elseif ($discount_pct > 0): ?>
-                    <span class="sn-mob-discount-tag">-<?php echo $discount_pct; ?>%</span>
+            <!-- Product Main Title -->
+            <h1 class="sn-product-title-main"><?php echo htmlspecialchars($p_name); ?></h1>
+
+            <?php if (!empty($p_short_description)): ?>
+                <p class="sn-prod-subtitle"><?php echo htmlspecialchars(strip_tags($p_short_description)); ?></p>
+            <?php endif; ?>
+
+            <!-- Rating, Sold Status & Stock Availability Row -->
+            <div class="sn-rating-meta-row">
+                <div class="sn-rating-box">
+                    <div class="sn-stars-gold">
+                        <?php 
+                        $rating_val = $avg_rating > 0 ? $avg_rating : 5.0;
+                        for($i=1; $i<=5; $i++): 
+                        ?>
+                            <i class="<?php echo $i <= round($rating_val) ? 'fas' : 'far'; ?> fa-star"></i>
+                        <?php endfor; ?>
+                    </div>
+                    <span class="sn-rating-score-num"><?php echo number_format($rating_val, 1); ?></span>
+                    <span class="sn-review-count-lbl">(<?php echo $total_reviews_count > 0 ? number_format($total_reviews_count) . ' reviews' : 'New Arrival'; ?>)</span>
+                </div>
+
+                <span class="sn-dot-sep">•</span>
+
+                <!-- Sold Count -->
+                <span class="sn-sold-badge">
+                    <i class="fas fa-fire-alt" style="color:#f59e0b;margin-right:4px;"></i>
+                    <?php 
+                    $sold_count = max((int)($p_total_view / 3), 24);
+                    echo number_format($sold_count) . '+ sold';
+                    ?>
+                </span>
+
+                <span class="sn-dot-sep">•</span>
+
+                <!-- Stock Badge -->
+                <?php if ($p_qty > 0): ?>
+                    <span class="sn-stock-badge-tag in-stock">
+                        <i class="fas fa-check-circle" style="color:#10b981;margin-right:4px;"></i> In Stock (<?php echo $p_qty; ?> units)
+                    </span>
+                <?php else: ?>
+                    <span class="sn-stock-badge-tag out-stock">
+                        <i class="fas fa-times-circle" style="color:#ef4444;margin-right:4px;"></i> Out of Stock
+                    </span>
                 <?php endif; ?>
             </div>
 
-            <!-- Desktop-Only Brand & AI Row -->
-            <div class="sn-brand-ai-row sn-desktop-only">
-                <div class="sn-brand-badge-box">
-                    <div class="sn-brand-icon-circle">
-                        <img src="<?php echo htmlspecialchars($hp_logo_url); ?>" alt="Brand">
-                    </div>
-                    <span class="sn-brand-name"><?php echo htmlspecialchars($brand_name); ?></span>
-                </div>
-
-                <button type="button" class="sn-btn-little-ai" id="openAiAssistantBtn" title="Ask AI about this product">
-                    <span class="sn-ai-sparkle">✨</span>
-                    <span>Ask AI</span>
-                    <span class="sn-ai-badge">Gemini</span>
-                </button>
+            <!-- Price Main Block -->
+            <div class="sn-price-main-block">
+                <span class="sn-price-curr">৳ <?php echo number_format($p_current_price); ?></span>
+                <?php if ($p_old_price > 0 && $p_old_price > $p_current_price): ?>
+                    <span class="sn-price-old">৳ <?php echo number_format($p_old_price); ?></span>
+                    <span class="sn-price-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
+                <?php elseif ($discount_pct > 0): ?>
+                    <span class="sn-price-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
+                <?php endif; ?>
             </div>
 
             <!-- Trust / Guarantees Bar (3 Columns matching mockup) -->
@@ -929,53 +1032,38 @@ require_once('header.php');
                 </button>
             </div>
 
-            <!-- Lifestyle Highlight ("Work. Study. Play.") -->
-            <div class="sn-lifestyle-card">
-                <img src="<?php echo htmlspecialchars($lifestyle_img_url); ?>" alt="Lifestyle Laptop" class="sn-lifestyle-img">
-                <div class="sn-lifestyle-content">
-                    <div class="sn-lifestyle-title">Work. Study. Play.</div>
-                    <div class="sn-lifestyle-sub">All in one laptop.</div>
-                    <div class="sn-lifestyle-features-grid">
-                        <div class="sn-lifestyle-item"><i class="fas fa-briefcase"></i> Great for Office & College</div>
-                        <div class="sn-lifestyle-item"><i class="fas fa-bolt"></i> Smooth Multitasking</div>
-                        <div class="sn-lifestyle-item"><i class="fas fa-desktop"></i> Stunning Display</div>
-                        <div class="sn-lifestyle-item"><i class="fas fa-battery-full"></i> Long Battery Life</div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Customer Reviews Preview Card -->
+            <?php if (!empty($reviews_list)): 
+                $first_rev = $reviews_list[0];
+            ?>
             <div class="sn-reviews-preview-box">
                 <a href="#tab-reviews" class="sn-reviews-header-link" id="linkToReviewsTab">
-                    <span>Customer Reviews</span>
+                    <span>Customer Reviews (<?php echo count($reviews_list); ?>)</span>
                     <i class="fas fa-arrow-right"></i>
                 </a>
                 <div class="sn-review-card-item">
                     <div class="sn-reviewer-row">
                         <div class="sn-reviewer-meta">
-                            <div class="sn-reviewer-avatar">R</div>
+                            <div class="sn-reviewer-avatar"><?php echo strtoupper(substr($first_rev['cust_name'] ?: 'C', 0, 1)); ?></div>
                             <div>
                                 <div class="sn-reviewer-name">
-                                    Rafiq Islam <i class="fas fa-check-circle sn-verified-check"></i>
+                                    <?php echo htmlspecialchars($first_rev['cust_name'] ?: 'Verified Customer'); ?> <i class="fas fa-check-circle sn-verified-check"></i>
                                 </div>
-                                <div class="sn-review-date">Verified Purchase • 2 weeks ago</div>
+                                <div class="sn-review-date">Verified Purchase • <?php echo date('M d, Y', strtotime($first_rev['created_at'])); ?></div>
                             </div>
                         </div>
                         <div class="sn-stars-wrap">
-                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            <?php for($i=1; $i<=5; $i++): ?>
+                                <i class="<?php echo $i <= (int)$first_rev['rating'] ? 'fas' : 'far'; ?> fa-star"></i>
+                            <?php endfor; ?>
                         </div>
                     </div>
                     <div class="sn-review-body">
-                        Very good laptop for the price. Performance is smooth and display quality is excellent. Highly recommended!
-                    </div>
-                    <div class="sn-review-footer">
-                        <button type="button" class="sn-btn-helpful">
-                            <i class="far fa-thumbs-up"></i> Helpful (24)
-                        </button>
-                        <img src="<?php echo htmlspecialchars($firstPhotoUrl); ?>" alt="Thumbnail" class="sn-review-thumb-item">
+                        <?php echo nl2br(htmlspecialchars($first_rev['review_text'])); ?>
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
         </div>
     </div>
@@ -1031,8 +1119,7 @@ require_once('header.php');
                         <a href="<?php echo htmlspecialchars($rUrl); ?>" class="sn-rel-title"><?php echo htmlspecialchars($rel['p_name']); ?></a>
                         <div class="sn-rel-rating-row">
                             <span class="sn-rel-star">★</span>
-                            <span class="sn-rel-score">4.8</span>
-                            <span class="sn-rel-count">(120+)</span>
+                            <span class="sn-rel-score">Verified</span>
                         </div>
                     </div>
 
@@ -1231,16 +1318,18 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('snRelNext')?.addEventListener('click', () => {
         document.getElementById('snRelatedTrack')?.scrollBy({ left: 260, behavior: 'smooth' });
     });
-    // 1. Gallery Thumbnail Switcher
+    // 1. Gallery Media Switcher
     const thumbs = document.querySelectorAll('.sn-thumb-item');
     const mobThumbs = document.querySelectorAll('.sn-mob-thumb');
     const mainImg = document.getElementById('snMainImg');
+    const mainIframe = document.getElementById('snMainIframe');
+    const mainVideo = document.getElementById('snMainVideo');
     const dots = document.querySelectorAll('.sn-gallery-dot');
     const mobCounter = document.getElementById('snMobCounter');
     let currentPhotoIdx = 0;
     const totalPhotos = Math.max(thumbs.length, mobThumbs.length, 1);
 
-    function setActiveImage(index, src) {
+    function setActiveMedia(index, type, src, thumb) {
         currentPhotoIdx = index;
         thumbs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.index) === index));
         mobThumbs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.index) === index));
@@ -1252,43 +1341,67 @@ document.addEventListener('DOMContentLoaded', function() {
         if (activeMobThumb) {
             activeMobThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
-        if (mainImg) {
-            mainImg.style.opacity = '0.4';
-            mainImg.style.transform = 'scale(0.96)';
-            setTimeout(() => {
+
+        // Stop current playing media
+        if (mainIframe) { mainIframe.src = ''; mainIframe.style.display = 'none'; }
+        if (mainVideo) { mainVideo.pause(); mainVideo.src = ''; mainVideo.style.display = 'none'; }
+        if (mainImg) { mainImg.style.display = 'none'; }
+
+        if (type === 'youtube') {
+            if (mainIframe) {
+                mainIframe.src = src;
+                mainIframe.style.display = 'block';
+            }
+        } else if (type === 'video') {
+            if (mainVideo) {
+                mainVideo.src = src;
+                mainVideo.style.display = 'block';
+                mainVideo.play().catch(() => {});
+            }
+        } else {
+            if (mainImg) {
+                mainImg.style.display = 'block';
+                mainImg.style.opacity = '0.4';
+                mainImg.style.transform = 'scale(0.96)';
                 mainImg.src = src;
-                mainImg.style.opacity = '1';
-                mainImg.style.transform = 'scale(1)';
-            }, 120);
+                setTimeout(() => {
+                    mainImg.style.opacity = '1';
+                    mainImg.style.transform = 'scale(1)';
+                }, 120);
+            }
         }
     }
 
     thumbs.forEach(thumb => {
         thumb.addEventListener('click', function() {
             const idx = parseInt(this.dataset.index);
+            const type = this.dataset.type || 'image';
             const src = this.dataset.src;
-            setActiveImage(idx, src);
+            const thumbUrl = this.dataset.thumb;
+            setActiveMedia(idx, type, src, thumbUrl);
         });
     });
 
     mobThumbs.forEach(thumb => {
         thumb.addEventListener('click', function() {
             const idx = parseInt(this.dataset.index);
+            const type = this.dataset.type || 'image';
             const src = this.dataset.src;
-            setActiveImage(idx, src);
+            const thumbUrl = this.dataset.thumb;
+            setActiveMedia(idx, type, src, thumbUrl);
         });
     });
 
     document.getElementById('snMobPrev')?.addEventListener('click', () => {
         const nextIdx = (currentPhotoIdx - 1 + totalPhotos) % totalPhotos;
         const target = document.querySelector(`.sn-mob-thumb[data-index="${nextIdx}"]`) || document.querySelector(`.sn-thumb-item[data-index="${nextIdx}"]`);
-        if (target) setActiveImage(nextIdx, target.dataset.src);
+        if (target) setActiveMedia(nextIdx, target.dataset.type || 'image', target.dataset.src, target.dataset.thumb);
     });
 
     document.getElementById('snMobNext')?.addEventListener('click', () => {
         const nextIdx = (currentPhotoIdx + 1) % totalPhotos;
         const target = document.querySelector(`.sn-mob-thumb[data-index="${nextIdx}"]`) || document.querySelector(`.sn-thumb-item[data-index="${nextIdx}"]`);
-        if (target) setActiveImage(nextIdx, target.dataset.src);
+        if (target) setActiveMedia(nextIdx, target.dataset.type || 'image', target.dataset.src, target.dataset.thumb);
     });
 
     // Native Share / Copy link
@@ -1371,6 +1484,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (window.innerWidth > 768) {
             tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+        } else {
+            // On mobile, ensure the target accordion pane is uncollapsed
+            const targetPane = document.getElementById(targetId);
+            if (targetPane && targetPane.classList.contains('collapsed')) {
+                targetPane.classList.remove('collapsed');
+            }
         }
 
         if (shouldScroll) {
@@ -1404,6 +1523,35 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         switchTab('tab-reviews', true);
     });
+
+    // Mobile Accordion Section Toggling
+    document.querySelectorAll('.sn-accordion-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const targetId = this.dataset.toggle;
+            const pane = document.getElementById(targetId);
+            if (pane) {
+                const wasCollapsed = pane.classList.contains('collapsed');
+                pane.classList.toggle('collapsed');
+                if (wasCollapsed) {
+                    topNavPills.forEach(p => p.classList.toggle('active', p.dataset.target === targetId));
+                }
+            }
+        });
+    });
+
+    // Description "See More / See Less" Toggle
+    const btnDescSeeMore = document.getElementById('btnDescSeeMore');
+    const snDescWrapper = document.getElementById('snDescWrapper');
+    if (btnDescSeeMore && snDescWrapper) {
+        btnDescSeeMore.addEventListener('click', function() {
+            const isExpanded = snDescWrapper.classList.toggle('expanded');
+            btnDescSeeMore.classList.toggle('expanded', isExpanded);
+            const textSpan = btnDescSeeMore.querySelector('.sn-see-more-text');
+            if (textSpan) {
+                textSpan.textContent = isExpanded ? 'See Less' : 'See More';
+            }
+        });
+    }
 
     // On-Scroll Handler: Changes Search Bar <-> Specification Tabs and updates active tab
     let isScrollTicking = false;
