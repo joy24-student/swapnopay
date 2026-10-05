@@ -113,18 +113,27 @@ foreach ($banner_fields as $bf) {
     ];
 }
 
-$pdo->beginTransaction();
 $failed = 0;
 foreach ($queries as $name => $test) {
     try {
+        $pdo->beginTransaction();
         $stmt = $pdo->prepare($test['sql']);
         $stmt->execute($test['params']);
+        $pdo->rollBack();
         echo "[PASS] {$name}\n";
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         $failed++;
         echo "[FAIL] {$name}: " . $e->getMessage() . "\n";
     }
 }
-$pdo->rollBack();
 
 echo "\n=== AUDIT COMPLETE: " . (count($queries) - $failed) . " passed, {$failed} failed. ===\n";
+
+// List all existing columns in tbl_settings
+echo "\n=== EXISTING COLUMNS IN tbl_settings ===\n";
+$cols = array_keys($s);
+sort($cols);
+foreach ($cols as $c) {
+    echo " - {$c}\n";
+}
