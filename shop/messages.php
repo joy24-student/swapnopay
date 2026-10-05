@@ -118,9 +118,16 @@ if (!empty($_SESSION['cart_p_qty'])) {
             opacity: 0 !important;
             margin-top: 0 !important;
             margin-bottom: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            pointer-events: none;
+        }
+
         /* Pixel-perfect bottom nav matching global header */
+        .mobile-bottom-nav,
         .sn-mobile-bottom-nav {
             display: flex !important;
+            flex-direction: row !important;
             position: relative !important;
             width: 100% !important;
             height: 56px !important;
@@ -135,6 +142,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
             padding: 0 !important;
             margin: 0 !important;
             box-sizing: border-box !important;
+            flex-shrink: 0 !important;
         }
         .sn-mobile-bottom-nav .sn-dock-item {
             flex: 1 1 0 !important;
