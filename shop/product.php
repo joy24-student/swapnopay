@@ -631,6 +631,71 @@ require_once('header.php');
         padding: 0 !important;
         width: 100% !important;
     }
+
+    /* Zero Gap between Top and Mobile Sub-Header / Filter Tab Bar */
+    body.sn-product-page .sn-header-wrap {
+        display: none !important;
+    }
+    body.sn-product-page .content-wrapper-main {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    .sn-product-details-wrap {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    .sn-mobile-sub-header {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 1000 !important;
+        background: #ffffff !important;
+        padding: 8px 12px !important;
+        margin-top: 0 !important;
+        margin-bottom: 8px !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+    }
+    body.sn-header-scrolled-away .sn-mobile-sub-header,
+    .sn-mobile-sub-header.is-scrolled {
+        top: 0 !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
+    }
+    .sn-sub-cart-btn {
+        position: relative !important;
+        width: 36px !important;
+        height: 36px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #111827 !important;
+        text-decoration: none !important;
+        flex-shrink: 0 !important;
+        background: #f8fafc !important;
+        border-radius: 50% !important;
+        border: 1px solid #e2e8f0 !important;
+        transition: transform 0.15s ease !important;
+    }
+    .sn-sub-cart-btn:active {
+        transform: scale(0.92) !important;
+    }
+    .sn-sub-cart-badge {
+        position: absolute !important;
+        top: -3px !important;
+        right: -3px !important;
+        background: #fab802 !important;
+        color: #111827 !important;
+        font-size: 10px !important;
+        font-weight: 800 !important;
+        min-width: 16px !important;
+        height: 16px !important;
+        border-radius: 999px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 4px !important;
+        line-height: 1 !important;
+        border: 1.5px solid #ffffff !important;
+    }
 }
 </style>
 
@@ -660,6 +725,22 @@ require_once('header.php');
             <button type="button" class="sn-nav-tab-pill" data-target="tab-reviews">Reviews</button>
             <button type="button" class="sn-nav-tab-pill" data-target="tab-qa">Q&A</button>
         </div>
+
+        <!-- Quick Cart Shortcut on Mobile -->
+        <a href="<?php echo BASE_URL; ?>cart.php" class="sn-sub-cart-btn" aria-label="Cart">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <?php 
+                $p_cart_count = 0;
+                if (!empty($_SESSION['cart_p_qty'])) {
+                    foreach ($_SESSION['cart_p_qty'] as $q) { $p_cart_count += (int)$q; }
+                }
+            ?>
+            <span class="sn-sub-cart-badge" id="snSubCartCount" style="<?php echo $p_cart_count > 0 ? '' : 'display:none;'; ?>"><?php echo $p_cart_count; ?></span>
+        </a>
     </div>
 
     <!-- Breadcrumbs (Desktop Only) -->

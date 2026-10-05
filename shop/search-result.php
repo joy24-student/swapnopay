@@ -120,7 +120,7 @@ $cur = defined('LANG_VALUE_1') ? LANG_VALUE_1 : '৳ ';
 
 /* sticky chip row */
 .srp-chips { position:sticky; top:96px; z-index:90; background:#fff; margin:0 -12px; padding:8px 12px; display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; border-bottom:1px solid var(--line); transition:top .25s ease; }
-body.sn-header-scrolled-away .srp-chips { top:58px; }
+body.sn-header-scrolled-away .srp-chips { top:48px; }
 .srp-chips::-webkit-scrollbar { display:none; }
 .srp-chip { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px; border-radius:999px; border:1.5px solid #e5e7eb; background:#fff; color:var(--ink); font-size:13px; font-weight:600; text-decoration:none; white-space:nowrap; cursor:pointer; transition:all .15s; }
 .srp-chip:hover { border-color:var(--y); color:var(--ink); text-decoration:none; }
