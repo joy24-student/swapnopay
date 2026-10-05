@@ -448,8 +448,171 @@ $firstPhotoUrl = !empty($gallery_items[0]['thumb']) ? $gallery_items[0]['thumb']
 require_once('header.php');
 ?>
 
-<!-- Include Modern Product Stylesheet -->
-<link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/product_modern.css">
+<!-- Include Modern Product Stylesheet with Cache Buster -->
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
+
+<style>
+/* Robust Mobile Layout & Price Section Ordering (Ensures pricing appears after gallery) */
+@media (max-width: 768px) {
+    .sn-product-main-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0 !important;
+    }
+
+    .sn-product-left-col,
+    .sn-product-right-col {
+        display: contents !important;
+    }
+
+    /* 1. Showcase Gallery at Top */
+    .sn-gallery-container {
+        order: 1 !important;
+        width: 100% !important;
+        margin: 0 0 10px 0 !important;
+        display: block !important;
+    }
+
+    /* 2. Mobile Thumbnails */
+    .sn-mob-thumbs-strip {
+        order: 2 !important;
+        display: flex !important;
+        gap: 10px !important;
+        overflow-x: auto !important;
+        padding: 4px 2px 14px 2px !important;
+        margin-bottom: 4px !important;
+        width: 100% !important;
+    }
+
+    /* 3. Product Pricing Section placed directly AFTER gallery showcase */
+    .sn-price-main-block,
+    .sn-price-block {
+        order: 3 !important;
+        display: flex !important;
+        align-items: baseline !important;
+        flex-wrap: wrap !important;
+        gap: 8px 12px !important;
+        margin: 12px 0 10px 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+    }
+
+    .sn-price-curr,
+    .sn-current-price,
+    .sn-mob-curr-price {
+        font-size: 28px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        letter-spacing: -0.5px !important;
+        line-height: 1 !important;
+    }
+
+    .sn-price-old,
+    .sn-old-price,
+    .sn-mob-old-price {
+        font-size: 16px !important;
+        color: #94a3b8 !important;
+        text-decoration: line-through !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+    }
+
+    .sn-price-discount-tag,
+    .sn-discount-pill,
+    .sn-mob-discount-tag {
+        background: #fef08a !important;
+        color: #854d0e !important;
+        font-size: 12px !important;
+        font-weight: 800 !important;
+        padding: 3px 9px !important;
+        border-radius: 9999px !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
+    }
+
+    /* 4. Product Title & Subtitle */
+    .sn-product-title-main {
+        order: 4 !important;
+        display: block !important;
+        width: 100% !important;
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        line-height: 1.35 !important;
+        margin: 0 0 4px 0 !important;
+    }
+
+    .sn-prod-subtitle {
+        order: 4 !important;
+        display: block !important;
+        width: 100% !important;
+        font-size: 12px !important;
+        color: #64748b !important;
+        margin: 0 0 8px 0 !important;
+    }
+
+    /* 5. Rating & Sold Meta */
+    .sn-rating-meta-row {
+        order: 5 !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px 8px !important;
+        margin-bottom: 10px !important;
+        width: 100% !important;
+        font-size: 12px !important;
+    }
+
+    /* 6. Brand Header Row (Category Badge, Share, Wishlist, Ask AI) */
+    .sn-brand-header-row {
+        order: 6 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin: 4px 0 12px 0 !important;
+        width: 100% !important;
+    }
+
+    /* 7. Purchase Form */
+    #snAddToCartForm {
+        order: 7 !important;
+        width: 100% !important;
+        margin: 0 0 14px 0 !important;
+    }
+
+    /* 8. Guarantees Bar */
+    .sn-guarantees-bar {
+        order: 8 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
+        margin: 12px 0 16px 0 !important;
+        width: 100% !important;
+    }
+
+    /* 9. Specifications Highlights Grid */
+    .sn-specs-highlights-grid {
+        order: 9 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
+        margin: 0 0 16px 0 !important;
+        width: 100% !important;
+    }
+
+    /* 10. Tabs Container */
+    .sn-tabs-container {
+        order: 10 !important;
+        display: block !important;
+        margin-top: 8px !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+}
+</style>
 
 <div class="sn-product-details-wrap">
     <!-- Mobile Sub-Header Navigation Bar (Mockup Pixel-Perfect) -->
@@ -913,13 +1076,13 @@ require_once('header.php');
             </div>
 
             <!-- Price Main Block -->
-            <div class="sn-price-main-block">
-                <span class="sn-price-curr">৳ <?php echo number_format($p_current_price); ?></span>
+            <div class="sn-price-main-block sn-price-block">
+                <span class="sn-price-curr sn-current-price sn-mob-curr-price">৳ <?php echo number_format($p_current_price); ?></span>
                 <?php if ($p_old_price > 0 && $p_old_price > $p_current_price): ?>
-                    <span class="sn-price-old">৳ <?php echo number_format($p_old_price); ?></span>
-                    <span class="sn-price-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
+                    <span class="sn-price-old sn-old-price sn-mob-old-price">৳ <?php echo number_format($p_old_price); ?></span>
+                    <span class="sn-price-discount-tag sn-discount-pill sn-mob-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
                 <?php elseif ($discount_pct > 0): ?>
-                    <span class="sn-price-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
+                    <span class="sn-price-discount-tag sn-discount-pill sn-mob-discount-tag">-<?php echo $discount_pct; ?>% OFF</span>
                 <?php endif; ?>
             </div>
 

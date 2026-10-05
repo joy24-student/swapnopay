@@ -1843,11 +1843,14 @@ a, button {
     }
 
     /* Pricing section placed directly after gallery showcase and thumbs */
-    .sn-price-main-block {
+    .sn-price-main-block,
+    .sn-price-block {
         order: 3 !important;
         display: flex !important;
         align-items: baseline !important;
-        margin: 10px 0 14px 0 !important;
+        flex-wrap: wrap !important;
+        gap: 8px 12px !important;
+        margin: 12px 0 10px 0 !important;
         padding: 0 !important;
         background: transparent !important;
         border: none !important;
@@ -1855,34 +1858,79 @@ a, button {
         width: 100% !important;
     }
 
-    /* Brand Header Row (Brand, Share, Wishlist, Ask AI) */
-    .sn-brand-header-row {
-        order: 4 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        margin: 4px 0 8px 0 !important;
-        width: 100% !important;
+    .sn-price-curr,
+    .sn-current-price,
+    .sn-mob-curr-price {
+        font-size: 28px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        letter-spacing: -0.5px !important;
+        line-height: 1 !important;
     }
 
-    /* Product Title */
-    .sn-product-title-main,
-    .sn-prod-subtitle {
-        order: 5 !important;
+    .sn-price-old,
+    .sn-old-price,
+    .sn-mob-old-price {
+        font-size: 16px !important;
+        color: #94a3b8 !important;
+        text-decoration: line-through !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+    }
+
+    .sn-price-discount-tag,
+    .sn-discount-pill,
+    .sn-mob-discount-tag {
+        background: #fef08a !important;
+        color: #854d0e !important;
+        font-size: 12px !important;
+        font-weight: 800 !important;
+        padding: 3px 9px !important;
+        border-radius: 9999px !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Product Title & Subtitle */
+    .sn-product-title-main {
+        order: 4 !important;
         display: block !important;
         width: 100% !important;
-        margin-top: 0 !important;
-        margin-bottom: 6px !important;
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        line-height: 1.35 !important;
+        margin: 0 0 4px 0 !important;
+    }
+
+    .sn-prod-subtitle {
+        order: 4 !important;
+        display: block !important;
+        width: 100% !important;
+        font-size: 12px !important;
+        color: #64748b !important;
+        margin: 0 0 8px 0 !important;
     }
 
     /* Rating & Sold Meta */
     .sn-rating-meta-row {
-        order: 6 !important;
+        order: 5 !important;
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
-        gap: 8px !important;
-        margin-bottom: 14px !important;
+        gap: 6px 8px !important;
+        margin-bottom: 10px !important;
+        width: 100% !important;
+        font-size: 12px !important;
+    }
+
+    /* Brand Header Row (Brand, Share, Wishlist, Ask AI) */
+    .sn-brand-header-row {
+        order: 6 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin: 4px 0 12px 0 !important;
         width: 100% !important;
     }
 
@@ -2109,28 +2157,39 @@ a, button {
     }
 
     /* 6. Price Row */
+    .sn-price-curr,
+    .sn-current-price,
     .sn-mob-curr-price {
-        font-size: 25px !important;
+        font-size: 28px !important;
         font-weight: 800 !important;
         color: #0f172a !important;
+        letter-spacing: -0.5px !important;
+        line-height: 1 !important;
     }
 
+    .sn-price-old,
+    .sn-old-price,
     .sn-mob-old-price {
-        font-size: 14px !important;
+        font-size: 16px !important;
         color: #94a3b8 !important;
         text-decoration: line-through !important;
         margin-left: 8px !important;
         font-weight: 500 !important;
+        line-height: 1 !important;
     }
 
+    .sn-price-discount-tag,
+    .sn-discount-pill,
     .sn-mob-discount-tag {
         background: #fef08a !important;
         color: #854d0e !important;
         font-size: 12px !important;
-        font-weight: 700 !important;
-        padding: 2px 8px !important;
+        font-weight: 800 !important;
+        padding: 3px 9px !important;
         border-radius: 9999px !important;
         margin-left: 8px !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
     }
 
     /* 7. 3 Specification Cards in 1 Row */
