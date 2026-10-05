@@ -54,6 +54,7 @@ foreach ($result as $row) {
 
 <link rel="stylesheet" href="css/enterprise.css">
 <meta name="csrf-token" content="<?php echo $csrf->getToken(); ?>">
+<script src="js/jquery-2.2.4.min.js"></script>
 </head>
 
 <body class="hold-transition fixed skin-blue sidebar-mini">

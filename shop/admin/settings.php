@@ -3244,7 +3244,7 @@ $lang_sections = [
                                         <div class="form-group">
                                             <label class="col-sm-3 control-label">Select Animation Effect</label>
                                             <div class="col-sm-6">
-                                                <select name="popup_animation" id="popupAnimSelector" class="form-control" style="font-weight:600; border-radius:6px;">
+                                                <select name="popup_animation" id="popupAnimSelector" class="form-control" onchange="window.triggerPopupAnimPreview(this.value)" style="font-weight:600; border-radius:6px;">
                                                     <option value="spin-zoom" <?php if($popup_animation == 'spin-zoom') echo 'selected'; ?>>🌪️ 3D Spin & Zoom In (Full 360° Rotation Entrance)</option>
                                                     <option value="flip-3d" <?php if($popup_animation == 'flip-3d') echo 'selected'; ?>>🔄 3D Perspective Flip (Flips Into View)</option>
                                                     <option value="bounce-pop" <?php if($popup_animation == 'bounce-pop') echo 'selected'; ?>>⚡ Elastic Bounce Pop (Spring Jump Effect)</option>
@@ -3256,7 +3256,7 @@ $lang_sections = [
                                                 <small class="text-muted">The animation triggers as soon as the popup opens on the visitor's screen.</small>
                                             </div>
                                             <div class="col-sm-3">
-                                                <button type="button" class="btn btn-primary btn-block" id="btnPreviewAnim" style="border-radius:6px; font-weight:700; background:#6366f1; border-color:#4f46e5; color:#ffffff; padding:8px 12px; box-shadow:0 3px 10px rgba(99,102,241,0.3);">
+                                                <button type="button" class="btn btn-primary btn-block" id="btnPreviewAnim" onclick="window.triggerPopupAnimPreview()" style="border-radius:6px; font-weight:700; background:#6366f1; border-color:#4f46e5; color:#ffffff; padding:8px 12px; box-shadow:0 3px 10px rgba(99,102,241,0.3);">
                                                     <i class="fa fa-play-circle"></i> Preview Animation
                                                 </button>
                                             </div>
@@ -3270,10 +3270,10 @@ $lang_sections = [
                                                         <div style="font-size:26px; margin-bottom:6px;" id="inlineAnimEmoji">🌪️</div>
                                                         <h5 style="margin:0 0 4px 0; font-weight:700; color:#1e293b;" id="inlineAnimName">3D Spin & Zoom In</h5>
                                                         <p style="margin:0 0 14px 0; font-size:12px; color:#64748b;">Live entrance animation preview</p>
-                                                        <button type="button" class="btn btn-xs btn-default" id="btnReplayInline" style="border-radius:15px; font-weight:600; padding:5px 14px;">
+                                                        <button type="button" class="btn btn-xs btn-default" id="btnReplayInline" onclick="window.triggerPopupAnimPreview()" style="border-radius:15px; font-weight:600; padding:5px 14px;">
                                                             <i class="fa fa-refresh text-primary"></i> Replay Animation
                                                         </button>
-                                                        <button type="button" class="btn btn-xs btn-primary" id="btnLaunchFullModal" style="border-radius:15px; font-weight:600; padding:5px 14px; margin-left:6px; background:#4f46e5; border-color:#4338ca;">
+                                                        <button type="button" class="btn btn-xs btn-primary" id="btnLaunchFullModal" onclick="window.openFullModalPreview()" style="border-radius:15px; font-weight:600; padding:5px 14px; margin-left:6px; background:#4f46e5; border-color:#4338ca;">
                                                             <i class="fa fa-external-link"></i> Full Modal View
                                                         </button>
                                                     </div>
@@ -3373,27 +3373,16 @@ $lang_sections = [
                 <span id="previewCardCtaText"><?php echo htmlspecialchars(!empty($popup_btn_text) ? $popup_btn_text : 'Claim Offer Now'); ?></span> &rarr;
             </button>
             <div style="margin-top:12px;">
-                <a href="javascript:void(0)" id="adminClosePreviewLink" style="font-size:12px; color:#64748b; text-decoration:underline;">Close Preview (Esc)</a>
+                <a href="javascript:void(0)" id="adminClosePreviewLink" onclick="window.closeFullModalPreview()" style="font-size:12px; color:#64748b; text-decoration:underline;">Close Preview (Esc)</a>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-$(document).ready(function() {
-    // Keep active tab on page refresh / hash change
-    var hash = window.location.hash;
-    if (hash) {
-        $('.nav-tabs a[href="' + hash + '"]').tab('show');
-    }
-    $('.nav-tabs a').on('shown.bs.tab', function(e) {
-        if(history.pushState) {
-            history.pushState(null, null, e.target.hash);
-        } else {
-            window.location.hash = e.target.hash;
-        }
-    });
+<?php require_once('footer.php'); ?>
 
+<script>
+(function() {
     // Animation Metadata
     var animMeta = {
         'spin-zoom': { emoji: '🌪️', name: '3D Spin & Zoom In' },
@@ -3405,100 +3394,169 @@ $(document).ready(function() {
         'wiggle-swing': { emoji: '🎭', name: 'Pendulum Wiggle & Swing' }
     };
 
-    var animClasses = 'anim-spin-zoom anim-flip-3d anim-bounce-pop anim-slide-up anim-slide-down anim-glow-pulse anim-wiggle-swing';
+    var animClasses = ['anim-spin-zoom', 'anim-flip-3d', 'anim-bounce-pop', 'anim-slide-up', 'anim-slide-down', 'anim-glow-pulse', 'anim-wiggle-swing'];
 
     // Play Inline Preview Animation
-    function playInlineAnim(anim) {
-        anim = anim || $('#popupAnimSelector').val() || 'spin-zoom';
+    window.triggerPopupAnimPreview = function(anim) {
+        var sel = document.getElementById('popupAnimSelector');
+        if (!anim && sel) anim = sel.value;
+        if (!anim) anim = 'spin-zoom';
+
         var meta = animMeta[anim] || { emoji: '✨', name: anim };
-        $('#inlineAnimEmoji').text(meta.emoji);
-        $('#inlineAnimName').text(meta.name);
+        var emojiEl = document.getElementById('inlineAnimEmoji');
+        var nameEl = document.getElementById('inlineAnimName');
+        if (emojiEl) emojiEl.textContent = meta.emoji;
+        if (nameEl) nameEl.textContent = meta.name;
         
-        var $card = $('#animInlineCard');
-        $card.removeClass(animClasses);
-        void $card[0].offsetWidth; // trigger DOM reflow
-        setTimeout(function() {
-            $card.addClass('anim-' + anim);
-        }, 20);
-    }
+        var card = document.getElementById('animInlineCard');
+        if (card) {
+            animClasses.forEach(function(c) { card.classList.remove(c); });
+            void card.offsetWidth; // trigger DOM reflow
+            setTimeout(function() {
+                card.classList.add('anim-' + anim);
+            }, 20);
+        }
+
+        // Also trigger full modal view
+        window.openFullModalPreview(anim);
+    };
 
     // Play Full Modal Preview Animation
-    function openFullModalPreview(anim) {
-        anim = anim || $('#popupAnimSelector').val() || 'spin-zoom';
+    window.openFullModalPreview = function(anim) {
+        var sel = document.getElementById('popupAnimSelector');
+        if (!anim && sel) anim = sel.value;
+        if (!anim) anim = 'spin-zoom';
+
         var meta = animMeta[anim] || { emoji: '✨', name: anim };
-        $('#previewAnimBadge').text(meta.emoji + ' ' + meta.name);
+        var badgeEl = document.getElementById('previewAnimBadge');
+        if (badgeEl) badgeEl.textContent = meta.emoji + ' ' + meta.name;
 
         // Sync values from live form inputs
-        var titleVal = $('input[name="popup_title"]').val();
-        if (titleVal && titleVal.trim()) $('#previewCardTitle').text(titleVal.trim());
+        var titleInput = document.querySelector('input[name="popup_title"]');
+        var descInput = document.querySelector('textarea[name="popup_text"]');
+        var btnInput = document.querySelector('input[name="popup_btn_text"]');
+        var photoUrlInput = document.querySelector('input[name="popup_photo_url"]');
 
-        var descVal = $('textarea[name="popup_text"]').val();
-        if (descVal && descVal.trim()) $('#previewCardDesc').text(descVal.trim());
+        var titleEl = document.getElementById('previewCardTitle');
+        var descEl = document.getElementById('previewCardDesc');
+        var ctaTextEl = document.getElementById('previewCardCtaText');
+        var bannerImg = document.getElementById('previewCardBannerImg');
 
-        var btnVal = $('input[name="popup_btn_text"]').val();
-        if (btnVal && btnVal.trim()) $('#previewCardCtaText').text(btnVal.trim());
-
-        var photoUrl = $('input[name="popup_photo_url"]').val();
-        if (photoUrl && photoUrl.trim()) {
-            $('#previewCardBannerImg').attr('src', photoUrl.trim()).show();
+        if (titleEl && titleInput && titleInput.value.trim()) titleEl.textContent = titleInput.value.trim();
+        if (descEl && descInput && descInput.value.trim()) descEl.textContent = descInput.value.trim();
+        if (ctaTextEl && btnInput && btnInput.value.trim()) ctaTextEl.textContent = btnInput.value.trim();
+        if (bannerImg && photoUrlInput && photoUrlInput.value.trim()) {
+            bannerImg.src = photoUrlInput.value.trim();
+            bannerImg.style.display = 'block';
         }
 
-        var $overlay = $('#adminPopupPreviewOverlay');
-        var $card = $('#adminPopupPreviewCard');
+        var overlay = document.getElementById('adminPopupPreviewOverlay');
+        var card = document.getElementById('adminPopupPreviewCard');
         
-        $card.removeClass(animClasses);
-        $overlay.css('display', 'flex');
-        
-        void $card[0].offsetWidth; // trigger DOM reflow
-        setTimeout(function() {
-            $card.addClass('anim-' + anim);
-        }, 20);
+        if (card) {
+            animClasses.forEach(function(c) { card.classList.remove(c); });
+        }
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+        if (card) {
+            void card.offsetWidth; // trigger DOM reflow
+            setTimeout(function() {
+                card.classList.add('anim-' + anim);
+            }, 20);
+        }
+    };
+
+    window.closeFullModalPreview = function() {
+        var overlay = document.getElementById('adminPopupPreviewOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    };
+
+    function initPopupPreviewEvents() {
+        var sel = document.getElementById('popupAnimSelector');
+        if (sel) {
+            sel.addEventListener('change', function() {
+                window.triggerPopupAnimPreview(this.value);
+            });
+        }
+
+        var btnPreview = document.getElementById('btnPreviewAnim');
+        if (btnPreview) {
+            btnPreview.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.triggerPopupAnimPreview();
+            });
+        }
+
+        var btnModal = document.getElementById('btnLaunchFullModal');
+        if (btnModal) {
+            btnModal.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.openFullModalPreview();
+            });
+        }
+
+        var btnReplay = document.getElementById('btnReplayInline');
+        if (btnReplay) {
+            btnReplay.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.triggerPopupAnimPreview();
+            });
+        }
+
+        var closeBtn = document.getElementById('adminClosePreviewBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.closeFullModalPreview();
+            });
+        }
+
+        var closeLink = document.getElementById('adminClosePreviewLink');
+        if (closeLink) {
+            closeLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.closeFullModalPreview();
+            });
+        }
+
+        var overlay = document.getElementById('adminPopupPreviewOverlay');
+        if (overlay) {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    window.closeFullModalPreview();
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.closeFullModalPreview();
+            }
+        });
+
+        // Initialize inline animation preview on load
+        if (sel) {
+            var initialAnim = sel.value || 'spin-zoom';
+            var meta = animMeta[initialAnim] || { emoji: '✨', name: initialAnim };
+            var emojiEl = document.getElementById('inlineAnimEmoji');
+            var nameEl = document.getElementById('inlineAnimName');
+            if (emojiEl) emojiEl.textContent = meta.emoji;
+            if (nameEl) nameEl.textContent = meta.name;
+            var card = document.getElementById('animInlineCard');
+            if (card) {
+                card.classList.add('anim-' + initialAnim);
+            }
+        }
     }
 
-    function closeFullModalPreview() {
-        $('#adminPopupPreviewOverlay').hide();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPopupPreviewEvents);
+    } else {
+        initPopupPreviewEvents();
     }
-
-    // Initialize initial inline animation on tab load
-    playInlineAnim($('#popupAnimSelector').val());
-
-    // When dropdown changes, animate both inline and open preview modal
-    $('#popupAnimSelector').on('change', function() {
-        var anim = $(this).val();
-        playInlineAnim(anim);
-        openFullModalPreview(anim);
-    });
-
-    // Button click triggers
-    $('#btnPreviewAnim, #btnLaunchFullModal').on('click', function(e) {
-        e.preventDefault();
-        var anim = $('#popupAnimSelector').val();
-        playInlineAnim(anim);
-        openFullModalPreview(anim);
-    });
-
-    $('#btnReplayInline').on('click', function(e) {
-        e.preventDefault();
-        playInlineAnim($('#popupAnimSelector').val());
-    });
-
-    // Close Modal Events
-    $('#adminClosePreviewBtn, #adminClosePreviewLink').on('click', function(e) {
-        e.preventDefault();
-        closeFullModalPreview();
-    });
-
-    $('#adminPopupPreviewOverlay').on('click', function(e) {
-        if (e.target === this) {
-            closeFullModalPreview();
-        }
-    });
-
-    $(document).on('keydown', function(e) {
-        if (e.key === 'Escape' && $('#adminPopupPreviewOverlay').is(':visible')) {
-            closeFullModalPreview();
-        }
-    });
 
     // Live Urgency Countdown Ticker in Preview
     var pMins = 59, pSecs = 59;
@@ -3509,37 +3567,55 @@ $(document).ready(function() {
             pMins--;
             if (pMins < 0) pMins = 59;
         }
-        $('#prevTimerM').text(String(pMins).padStart(2, '0'));
-        $('#prevTimerS').text(String(pSecs).padStart(2, '0'));
+        var mEl = document.getElementById('prevTimerM');
+        var sEl = document.getElementById('prevTimerS');
+        if (mEl) mEl.textContent = String(pMins).padStart(2, '0');
+        if (sEl) sEl.textContent = String(pSecs).padStart(2, '0');
     }, 1000);
+})();
 
-    // Language Search / Filter
-    $('#langSearchBox').on('keyup', function() {
-        var query = $(this).val().toLowerCase().trim();
-        if (query === '') {
-            $('.lang-item-col').show();
-            $('.lang-group-box').show();
-            return;
+// jQuery dependent features (Tabs & Language search)
+if (window.jQuery) {
+    jQuery(document).ready(function($) {
+        // Keep active tab on page refresh / hash change
+        var hash = window.location.hash;
+        if (hash) {
+            $('.nav-tabs a[href="' + hash + '"]').tab('show');
         }
-        $('.lang-item-col').each(function() {
-            var label = $(this).find('label').text().toLowerCase();
-            var val = $(this).find('input').val().toLowerCase();
-            if (label.indexOf(query) > -1 || val.indexOf(query) > -1) {
-                $(this).show();
+        $('.nav-tabs a').on('shown.bs.tab', function(e) {
+            if (history.pushState) {
+                history.pushState(null, null, e.target.hash);
             } else {
-                $(this).hide();
+                window.location.hash = e.target.hash;
             }
         });
-        $('.lang-group-box').each(function() {
-            var visibleCount = $(this).find('.lang-item-col:visible').length;
-            if (visibleCount > 0) {
-                $(this).show();
-            } else {
-                $(this).hide();
+
+        // Language Search / Filter
+        $('#langSearchBox').on('keyup', function() {
+            var query = $(this).val().toLowerCase().trim();
+            if (query === '') {
+                $('.lang-item-col').show();
+                $('.lang-group-box').show();
+                return;
             }
+            $('.lang-item-col').each(function() {
+                var label = $(this).find('label').text().toLowerCase();
+                var val = $(this).find('input').val().toLowerCase();
+                if (label.indexOf(query) > -1 || val.indexOf(query) > -1) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+            $('.lang-group-box').each(function() {
+                var visibleCount = $(this).find('.lang-item-col:visible').length;
+                if (visibleCount > 0) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
         });
     });
-});
+}
 </script>
-
-<?php require_once('footer.php'); ?>
