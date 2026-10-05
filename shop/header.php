@@ -1231,6 +1231,199 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
 }
 
+/* --- Festive Die-Cut Sticker Popup Styles (Daraz App Style) --- */
+.sn-sticker-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 440px;
+    margin: auto;
+    padding: 20px 10px;
+    transform-origin: center center;
+}
+.sn-sticker-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 380px;
+    animation: snStickerLevitate 3.5s ease-in-out infinite alternate;
+    filter: drop-shadow(0 20px 35px rgba(0, 0, 0, 0.45));
+    transition: transform 0.3s ease;
+}
+.sn-sticker-wrapper:hover {
+    transform: scale(1.02) translateY(-4px);
+    filter: drop-shadow(0 25px 45px rgba(254, 87, 34, 0.4));
+}
+@keyframes snStickerLevitate {
+    0% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-8px) rotate(-0.5deg); }
+    100% { transform: translateY(4px) rotate(0.5deg); }
+}
+.sn-sticker-link {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    outline: none;
+}
+.sn-sticker-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 12px;
+    cursor: pointer;
+}
+/* Floating Product Bubble Orbs */
+.sn-floating-orb {
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.4) 60%, rgba(255, 255, 255, 0.2));
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 12;
+    pointer-events: none;
+    user-select: none;
+}
+.sn-floating-orb .orb-icon {
+    font-size: 24px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+.sn-floating-orb.orb-1 { top: 6%; left: -18px; animation: snOrbBob1 3s ease-in-out infinite alternate; width: 56px; height: 56px; }
+.sn-floating-orb.orb-2 { top: 4%; right: -14px; animation: snOrbBob2 3.6s ease-in-out infinite alternate; width: 52px; height: 52px; }
+.sn-floating-orb.orb-3 { top: 48%; left: -26px; animation: snOrbBob3 4.2s ease-in-out infinite alternate; width: 60px; height: 60px; }
+.sn-floating-orb.orb-4 { top: 52%; right: -22px; animation: snOrbBob4 3.4s ease-in-out infinite alternate; width: 58px; height: 58px; }
+.sn-floating-orb.orb-5 { bottom: 16%; left: 10px; animation: snOrbBob2 4s ease-in-out infinite alternate; width: 48px; height: 48px; }
+
+@keyframes snOrbBob1 { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-12px) scale(1.05); } }
+@keyframes snOrbBob2 { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-15px) scale(1.08); } }
+@keyframes snOrbBob3 { 0% { transform: translateY(0) scale(1.05); } 100% { transform: translateY(12px) scale(0.96); } }
+@keyframes snOrbBob4 { 0% { transform: translateY(0) scale(0.98); } 100% { transform: translateY(-14px) scale(1.06); } }
+
+/* Festive Confetti Streamers */
+.sn-streamer {
+    position: absolute;
+    z-index: 8;
+    pointer-events: none;
+    border-radius: 10px;
+    opacity: 0.85;
+}
+.sn-streamer.streamer-1 {
+    top: -15px; left: 20%;
+    width: 14px; height: 42px;
+    background: linear-gradient(135deg, #ec4899, #f43f5e);
+    transform: rotate(25deg) skewY(15deg);
+    animation: snStreamerFlutter 2.5s ease-in-out infinite alternate;
+}
+.sn-streamer.streamer-2 {
+    top: -20px; right: 25%;
+    width: 12px; height: 48px;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    transform: rotate(-35deg) skewY(-20deg);
+    animation: snStreamerFlutter 3s ease-in-out infinite alternate-reverse;
+}
+.sn-streamer.streamer-3 {
+    bottom: 22%; right: -10px;
+    width: 10px; height: 36px;
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    transform: rotate(45deg);
+    animation: snStreamerFlutter 2.8s ease-in-out infinite alternate;
+}
+@keyframes snStreamerFlutter {
+    0% { transform: rotate(15deg) translateY(0); }
+    100% { transform: rotate(35deg) translateY(-10px); }
+}
+
+/* Twinkle Sparkle Stars */
+.sn-sparkle {
+    position: absolute;
+    z-index: 14;
+    color: #fbbf24;
+    font-size: 20px;
+    pointer-events: none;
+    filter: drop-shadow(0 0 6px #f59e0b);
+    animation: snSparkleTwinkle 1.8s ease-in-out infinite alternate;
+}
+.sn-sparkle.sparkle-1 { top: -8px; left: 12%; font-size: 24px; animation-delay: 0.1s; }
+.sn-sparkle.sparkle-2 { top: 20px; right: 10%; font-size: 18px; color: #f43f5e; animation-delay: 0.5s; }
+.sn-sparkle.sparkle-3 { bottom: 25%; left: -10px; font-size: 22px; color: #60a5fa; animation-delay: 0.9s; }
+.sn-sparkle.sparkle-4 { bottom: 15%; right: 5%; font-size: 20px; color: #a78bfa; animation-delay: 0.3s; }
+
+@keyframes snSparkleTwinkle {
+    0% { transform: scale(0.6) rotate(0deg); opacity: 0.4; }
+    50% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+    100% { transform: scale(0.8) rotate(90deg); opacity: 0.6; }
+}
+
+/* Sticker Urgency Timer Pill */
+.sn-sticker-timer-pill {
+    position: relative;
+    z-index: 15;
+    margin-top: 14px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 30px;
+    padding: 6px 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+.sn-sticker-timer-pill .sn-pill-label { color: #fecdd3; font-size: 12px; font-weight: 600; }
+.sn-sticker-timer-pill .sn-pill-boxes { color: #fbbf24; font-family: monospace, sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 0.5px; }
+
+/* Bottom Circular Close Button (Daraz App Style) */
+.sn-sticker-close-btn {
+    position: relative;
+    z-index: 20;
+    margin-top: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.sn-sticker-close-btn:hover {
+    background: rgba(239, 68, 68, 0.9);
+    border-color: #ef4444;
+    transform: rotate(90deg) scale(1.15);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+}
+
+@media (max-width: 480px) {
+    .sn-sticker-stage { max-width: 320px; padding: 10px; }
+    .sn-sticker-wrapper { max-width: 290px; }
+    .sn-floating-orb { width: 42px !important; height: 42px !important; }
+    .sn-floating-orb .orb-icon { font-size: 18px !important; }
+    .sn-floating-orb.orb-1 { top: 4%; left: -10px; }
+    .sn-floating-orb.orb-2 { top: 2%; right: -8px; }
+    .sn-floating-orb.orb-3 { top: 46%; left: -14px; }
+    .sn-floating-orb.orb-4 { top: 50%; right: -12px; }
+    .sn-floating-orb.orb-5 { display: none; }
+}
+
 /* --- Entrance Animations --- */
 /* 1. 3D Spin & Zoom In */
 .anim-spin-zoom {
@@ -1607,12 +1800,12 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         </a>
 
         <!-- 3. Messages / AI Support -->
-        <a href="javascript:void(0)" onclick="typeof openShopAiModal === 'function' ? openShopAiModal() : (document.getElementById('openAiAssistantBtn') ? document.getElementById('openAiAssistantBtn').click() : alert('Support and messages'));" class="sn-dock-item">
+        <a href="<?php echo BASE_URL; ?>messages.php" class="sn-dock-item <?php echo ($cur_page == 'messages.php') ? 'active' : ''; ?>">
             <div class="sn-dock-icon-box sn-dock-has-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo ($cur_page == 'messages.php') ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
-                <span class="sn-dock-badge-count">5</span>
+                <span class="sn-dock-badge-count" style="display:none;" id="sn-dock-messages-badge">1</span>
             </div>
             <span>Messages</span>
         </a>
@@ -2112,13 +2305,12 @@ document.addEventListener("DOMContentLoaded", function(){
         if (popupFreq === 'once') localStorage.setItem('sn_popup_shown_forever', 'true');
     }
 
-    var closeBtn = document.querySelector(".close-popup");
-    if (closeBtn) {
-        closeBtn.onclick = function(e) {
+    document.querySelectorAll(".close-popup").forEach(function(btn) {
+        btn.onclick = function(e) {
             e.preventDefault();
             closeWelcomePopup();
         };
-    }
+    });
     var popupOverlay = document.getElementById('promoPopup');
     if (popupOverlay) {
         popupOverlay.addEventListener('click', function(e) {
@@ -2212,19 +2404,30 @@ window.sendShopAiMessage = function() {
 <?php if(($settings['popup_on_off']??0) == 1): 
     $popup_photo_src = '';
     $raw_photo = $settings['popup_photo'] ?? '';
+    $popup_style = $settings['popup_style'] ?? 'sticker';
+    $popup_floating_effects = isset($settings['popup_floating_effects']) ? (int)$settings['popup_floating_effects'] : 1;
+
     if (!empty($raw_photo)) {
         if (str_starts_with($raw_photo, 'http://') || str_starts_with($raw_photo, 'https://')) {
             $popup_photo_src = $raw_photo;
+        } elseif (str_starts_with($raw_photo, 'assets/uploads/')) {
+            $popup_photo_src = BASE_URL . htmlspecialchars($raw_photo);
         } elseif (file_exists(__DIR__ . '/assets/uploads/' . $raw_photo)) {
             $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($raw_photo);
         } else {
             $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($raw_photo);
         }
+    } else {
+        $popup_photo_src = BASE_URL . 'assets/uploads/welcome_voucher_sticker.svg';
     }
+
     $anim_class = 'anim-' . htmlspecialchars($settings['popup_animation'] ?? 'spin-zoom');
     $popup_target_link = !empty($settings['popup_link']) ? $settings['popup_link'] : '#';
 ?>
 <div id="promoPopup" class="custom-popup" role="dialog" aria-modal="true">
+
+  <?php if($popup_style === 'card'): ?>
+  <!-- Classic Card Modal Style -->
   <div class="custom-popup-content <?php echo $anim_class; ?>">
     <button type="button" class="close-popup" aria-label="Close dialog">&times;</button>
     
@@ -2268,6 +2471,57 @@ window.sendShopAiMessage = function() {
         <?php endif; ?>
     </div>
   </div>
+
+  <?php else: ?>
+  <!-- Festive Die-Cut Sticker Style (Daraz App Style) -->
+  <div class="sn-sticker-stage <?php echo $anim_class; ?>">
+    <?php if($popup_floating_effects == 1): ?>
+    <!-- Floating Product Orbs -->
+    <div class="sn-floating-orb orb-1" title="Cosmetics"><span class="orb-icon">💄</span></div>
+    <div class="sn-floating-orb orb-2" title="Perfume"><span class="orb-icon">🌸</span></div>
+    <div class="sn-floating-orb orb-3" title="Smart Phone"><span class="orb-icon">📱</span></div>
+    <div class="sn-floating-orb orb-4" title="Sneakers"><span class="orb-icon">👟</span></div>
+    <div class="sn-floating-orb orb-5" title="Gadgets"><span class="orb-icon">💻</span></div>
+
+    <!-- Festive Confetti Streamers & Sparkles -->
+    <div class="sn-streamer streamer-1"></div>
+    <div class="sn-streamer streamer-2"></div>
+    <div class="sn-streamer streamer-3"></div>
+    <div class="sn-sparkle sparkle-1">✦</div>
+    <div class="sn-sparkle sparkle-2">★</div>
+    <div class="sn-sparkle sparkle-3">✦</div>
+    <div class="sn-sparkle sparkle-4">★</div>
+    <?php endif; ?>
+
+    <!-- Main Floating Levitating Sticker -->
+    <div class="sn-sticker-wrapper">
+        <a href="<?php echo htmlspecialchars($popup_target_link); ?>" class="sn-sticker-link" aria-label="Claim Welcome Voucher">
+            <img src="<?php echo htmlspecialchars($popup_photo_src); ?>" alt="<?php echo htmlspecialchars($settings['popup_title'] ?? 'Welcome Voucher'); ?>" class="sn-sticker-img">
+        </a>
+    </div>
+
+    <!-- Live Urgency Countdown Pill (if enabled) -->
+    <?php if(($settings['popup_countdown_on_off']??1) == 1): ?>
+    <div class="sn-sticker-timer-pill" id="snPopupCountdown">
+        <span class="sn-pill-label">⏰ Offer expires in:</span>
+        <div class="sn-pill-boxes">
+            <span id="snTimerHours">01</span>h : 
+            <span id="snTimerMins">59</span>m : 
+            <span id="snTimerSecs">59</span>s
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Bottom Circular Close Button (as seen in Daraz screenshot) -->
+    <button type="button" class="sn-sticker-close-btn close-popup" aria-label="Close dialog">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+  </div>
+  <?php endif; ?>
+
 </div>
 <?php endif; ?>
 

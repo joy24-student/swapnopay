@@ -31,6 +31,15 @@ try {
     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS mobile_footer_on_off smallint DEFAULT 0");
     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS related_products_on_off smallint DEFAULT 1");
 } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ALTER COLUMN gemini_api_key TYPE text"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_api_key text DEFAULT ''"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_provider varchar(50) DEFAULT 'auto'"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS ai_pool_strategy varchar(50) DEFAULT 'round_robin'"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS openrouter_model varchar(120) DEFAULT 'openrouter/free'"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_whatsapp_url varchar(255) DEFAULT ''"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_messenger_url varchar(255) DEFAULT ''"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_floating_icon_on_off smallint DEFAULT 1"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS chat_call_enabled smallint DEFAULT 1"); } catch (Throwable $e) {}
 
 // Fetch all settings data from the database
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
@@ -138,6 +147,8 @@ $home_newsletter_on_off = $settings_data['home_newsletter_on_off'] ?? 0;
 $home_brand_on_off = $settings_data['home_brand_on_off'] ?? 0; // Assuming this exists or will be added
 // --- Variable Declarations for Popup ---
 $popup_on_off           = (int)($settings_data['popup_on_off'] ?? 0);
+$popup_style            = !empty($settings_data['popup_style']) ? $settings_data['popup_style'] : 'sticker';
+$popup_floating_effects = isset($settings_data['popup_floating_effects']) ? (int)$settings_data['popup_floating_effects'] : 1;
 $popup_text             = $settings_data['popup_text'] ?? '';
 $popup_link             = $settings_data['popup_link'] ?? '';
 $popup_photo            = $settings_data['popup_photo'] ?? '';
@@ -191,8 +202,16 @@ $enabled_payment_methods_array = explode(',', $payment_methods);
 
 
 
-// API Integrations
+// API Integrations & AI Engine
 $gemini_api_key = $settings_data['gemini_api_key'] ?? '';
+$openrouter_api_key = $settings_data['openrouter_api_key'] ?? '';
+$ai_provider = $settings_data['ai_provider'] ?? 'auto';
+$ai_pool_strategy = $settings_data['ai_pool_strategy'] ?? 'round_robin';
+$openrouter_model = $settings_data['openrouter_model'] ?? 'openrouter/free';
+$chat_whatsapp_url = $settings_data['chat_whatsapp_url'] ?? '';
+$chat_messenger_url = $settings_data['chat_messenger_url'] ?? '';
+$chat_floating_icon_on_off = isset($settings_data['chat_floating_icon_on_off']) ? (int)$settings_data['chat_floating_icon_on_off'] : 1;
+$chat_call_enabled = isset($settings_data['chat_call_enabled']) ? (int)$settings_data['chat_call_enabled'] : 1;
 $facebook_app_id = $settings_data['facebook_app_id'] ?? '';
 $facebook_app_secret = $settings_data['facebook_app_secret'] ?? '';
 $google_client_id = $settings_data['google_client_id'] ?? '';
@@ -419,6 +438,8 @@ if(isset($_POST['form_general_settings'])) {
 
 if(isset($_POST['form_popup_settings']) || isset($_POST['form_ads_settings'])) {
     $popup_on_off           = isset($_POST['popup_on_off']) ? (int)$_POST['popup_on_off'] : 0;
+    $popup_style            = trim($_POST['popup_style'] ?? 'sticker');
+    $popup_floating_effects = isset($_POST['popup_floating_effects']) ? (int)$_POST['popup_floating_effects'] : 0;
     $popup_title            = trim($_POST['popup_title'] ?? '');
     $popup_text             = trim($_POST['popup_text'] ?? '');
     $popup_link             = trim($_POST['popup_link'] ?? '');
@@ -449,6 +470,8 @@ if(isset($_POST['form_popup_settings']) || isset($_POST['form_ads_settings'])) {
 
     $statement = $pdo->prepare("UPDATE tbl_settings SET 
         popup_on_off=?, 
+        popup_style=?,
+        popup_floating_effects=?,
         popup_photo=?, 
         popup_link=?, 
         popup_title=?, 
@@ -462,6 +485,8 @@ if(isset($_POST['form_popup_settings']) || isset($_POST['form_ads_settings'])) {
         WHERE id=1");
     $statement->execute([
         $popup_on_off, 
+        $popup_style,
+        $popup_floating_effects,
         $file_name, 
         $popup_link, 
         $popup_title, 
@@ -684,12 +709,28 @@ if(isset($_POST['form_payment_gateways'])) {
 if(isset($_POST['form_api_integrations'])) {
     $statement = $pdo->prepare("UPDATE tbl_settings SET
                                 gemini_api_key=?,
+                                openrouter_api_key=?,
+                                ai_provider=?,
+                                ai_pool_strategy=?,
+                                openrouter_model=?,
+                                chat_whatsapp_url=?,
+                                chat_messenger_url=?,
+                                chat_floating_icon_on_off=?,
+                                chat_call_enabled=?,
                                 facebook_app_id=?, facebook_app_secret=?,
                                 google_client_id=?, google_client_secret=?,
                                 twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?
                                 WHERE id=1");
     $statement->execute(array(
         $_POST['gemini_api_key'] ?? '',
+        $_POST['openrouter_api_key'] ?? '',
+        $_POST['ai_provider'] ?? 'auto',
+        $_POST['ai_pool_strategy'] ?? 'round_robin',
+        $_POST['openrouter_model'] ?? 'openrouter/free',
+        $_POST['chat_whatsapp_url'] ?? '',
+        $_POST['chat_messenger_url'] ?? '',
+        isset($_POST['chat_floating_icon_on_off']) ? (int)$_POST['chat_floating_icon_on_off'] : 0,
+        isset($_POST['chat_call_enabled']) ? (int)$_POST['chat_call_enabled'] : 0,
         $_POST['facebook_app_id'] ?? '',
         $_POST['facebook_app_secret'] ?? '',
         $_POST['google_client_id'] ?? '',
@@ -698,7 +739,17 @@ if(isset($_POST['form_api_integrations'])) {
         $_POST['twilio_auth_token'] ?? '',
         $_POST['twilio_phone_number'] ?? ''
     ));
-    $success_message = 'API Integration Settings are updated successfully.';
+    $success_message = 'API Integration and Live Chat Settings are updated successfully.';
+
+    $gemini_api_key = $_POST['gemini_api_key'] ?? '';
+    $openrouter_api_key = $_POST['openrouter_api_key'] ?? '';
+    $ai_provider = $_POST['ai_provider'] ?? 'auto';
+    $ai_pool_strategy = $_POST['ai_pool_strategy'] ?? 'round_robin';
+    $openrouter_model = $_POST['openrouter_model'] ?? 'openrouter/free';
+    $chat_whatsapp_url = $_POST['chat_whatsapp_url'] ?? '';
+    $chat_messenger_url = $_POST['chat_messenger_url'] ?? '';
+    $chat_floating_icon_on_off = isset($_POST['chat_floating_icon_on_off']) ? (int)$_POST['chat_floating_icon_on_off'] : 0;
+    $chat_call_enabled = isset($_POST['chat_call_enabled']) ? (int)$_POST['chat_call_enabled'] : 0;
 }
 
 
@@ -1703,6 +1754,130 @@ $lang_sections = [
         text-align: center;
         transform-origin: center center;
     }
+
+    /* Festive Die-Cut Sticker Preview Styles */
+    #adminPopupPreviewSticker {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 440px;
+        transform-origin: center center;
+    }
+    .sn-preview-sticker-wrap {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 380px;
+        animation: snStickerLevitate 3.5s ease-in-out infinite alternate;
+        filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.45));
+    }
+    @keyframes snStickerLevitate {
+        0% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-8px) rotate(-0.5deg); }
+        100% { transform: translateY(4px) rotate(0.5deg); }
+    }
+    .sn-preview-sticker-img {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 12px;
+    }
+    .sn-preview-orb {
+        position: absolute;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.4) 60%, rgba(255, 255, 255, 0.2));
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 12;
+        pointer-events: none;
+    }
+    .sn-preview-orb .orb-icon { font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+    .sn-p-orb-1 { top: 6%; left: -16px; animation: snOrbBob1 3s ease-in-out infinite alternate; }
+    .sn-p-orb-2 { top: 4%; right: -12px; animation: snOrbBob2 3.6s ease-in-out infinite alternate; }
+    .sn-p-orb-3 { top: 48%; left: -22px; animation: snOrbBob3 4.2s ease-in-out infinite alternate; }
+    .sn-p-orb-4 { top: 52%; right: -18px; animation: snOrbBob4 3.4s ease-in-out infinite alternate; }
+    .sn-p-orb-5 { bottom: 16%; left: 8px; animation: snOrbBob2 4s ease-in-out infinite alternate; width: 44px; height: 44px; }
+    @keyframes snOrbBob1 { 0% { transform: translateY(0); } 100% { transform: translateY(-12px); } }
+    @keyframes snOrbBob2 { 0% { transform: translateY(0); } 100% { transform: translateY(-15px); } }
+    @keyframes snOrbBob3 { 0% { transform: translateY(0); } 100% { transform: translateY(12px); } }
+    @keyframes snOrbBob4 { 0% { transform: translateY(0); } 100% { transform: translateY(-14px); } }
+
+    .sn-preview-streamer {
+        position: absolute;
+        z-index: 8;
+        pointer-events: none;
+        border-radius: 10px;
+        opacity: 0.85;
+    }
+    .sn-p-streamer-1 {
+        top: -15px; left: 20%; width: 14px; height: 42px;
+        background: linear-gradient(135deg, #ec4899, #f43f5e);
+        transform: rotate(25deg) skewY(15deg);
+        animation: snStreamerFlutter 2.5s ease-in-out infinite alternate;
+    }
+    .sn-p-streamer-2 {
+        top: -20px; right: 25%; width: 12px; height: 48px;
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        transform: rotate(-35deg) skewY(-20deg);
+        animation: snStreamerFlutter 3s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes snStreamerFlutter {
+        0% { transform: rotate(15deg) translateY(0); }
+        100% { transform: rotate(35deg) translateY(-10px); }
+    }
+    .sn-preview-sparkle {
+        position: absolute;
+        z-index: 14;
+        color: #fbbf24;
+        font-size: 20px;
+        pointer-events: none;
+        filter: drop-shadow(0 0 6px #f59e0b);
+        animation: snSparkleTwinkle 1.8s ease-in-out infinite alternate;
+    }
+    .sn-p-sparkle-1 { top: -8px; left: 12%; font-size: 24px; }
+    .sn-p-sparkle-2 { top: 20px; right: 10%; font-size: 18px; color: #f43f5e; }
+    .sn-p-sparkle-3 { bottom: 25%; left: -10px; font-size: 22px; color: #60a5fa; }
+    @keyframes snSparkleTwinkle {
+        0% { transform: scale(0.6) rotate(0deg); opacity: 0.4; }
+        50% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+        100% { transform: scale(0.8) rotate(90deg); opacity: 0.6; }
+    }
+    .sn-preview-sticker-close-btn {
+        position: relative;
+        z-index: 20;
+        margin-top: 18px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .sn-preview-sticker-close-btn:hover {
+        background: rgba(239, 68, 68, 0.9);
+        border-color: #ef4444;
+        transform: rotate(90deg) scale(1.15);
+    }
 </style>
 
 <section class="content-header p-6 bg-white shadow-sm rounded-lg mb-6">
@@ -2629,12 +2804,101 @@ $lang_sections = [
                         <div class="tab-pane" id="tab_api_integrations">
                             <div class="box box-info">
                                 <div class="box-body">
-                                    <h3 class="seo-info">Google Gemini API (for AI Chat)</h3>
+                                    <div class="callout callout-info" style="border-left-width: 4px; margin-bottom: 25px;">
+                                        <h4><i class="fa fa-bolt"></i> AI Copilot & Live Chat Multi-Engine Pooling</h4>
+                                        <p>You can enter <strong>multiple API keys</strong> (one per line or comma-separated). The system will automatically pool, rotate (round-robin), and failover seamlessly if a key hits rate limits (HTTP 429) or quota errors.</p>
+                                    </div>
+
+                                    <h3 class="seo-info"><i class="fa fa-google text-danger"></i> Google Gemini Multi-Key Pool</h3>
                                     <div class="form-group">
-                                        <label for="gemini_api_key" class="col-sm-3 control-label">Gemini API Key</label>
+                                        <label for="gemini_api_key" class="col-sm-3 control-label">Gemini API Key(s)</label>
                                         <div class="col-sm-9">
-                                            <input type="text" name="gemini_api_key" id="gemini_api_key" class="form-control" value="<?php echo htmlspecialchars($gemini_api_key); ?>">
-                                            <p class="help-block">Get your API key from Google AI Studio for product inquiries.</p>
+                                            <textarea name="gemini_api_key" id="gemini_api_key" class="form-control" rows="3" placeholder="AIzaSy...&#10;AIzaSy...&#10;(Enter multiple keys, one per line or comma-separated)"><?php echo htmlspecialchars($gemini_api_key); ?></textarea>
+                                            <p class="help-block">Enter one or more Google Gemini keys from Google AI Studio. System auto-rotates them and protects against quotas.</p>
+                                        </div>
+                                    </div>
+
+                                    <h3 class="seo-info mt-8"><i class="fa fa-cube text-primary"></i> OpenRouter Multi-Key Pool (Backup / Primary)</h3>
+                                    <div class="form-group">
+                                        <label for="openrouter_api_key" class="col-sm-3 control-label">OpenRouter API Key(s)</label>
+                                        <div class="col-sm-9">
+                                            <textarea name="openrouter_api_key" id="openrouter_api_key" class="form-control" rows="3" placeholder="sk-or-v1-...&#10;sk-or-v1-...&#10;(Enter multiple keys, one per line or comma-separated)"><?php echo htmlspecialchars($openrouter_api_key); ?></textarea>
+                                            <p class="help-block">Access hundreds of models (Llama 3.3, Gemini 2.0 Flash, DeepSeek, Mistral, Free models) through OpenRouter.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="openrouter_model" class="col-sm-3 control-label">OpenRouter Model</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="openrouter_model" id="openrouter_model" class="form-control" value="<?php echo htmlspecialchars($openrouter_model ?: 'openrouter/free'); ?>" placeholder="e.g. openrouter/free, google/gemini-2.0-flash-exp:free, meta-llama/llama-3.3-70b-instruct:free">
+                                            <p class="help-block">Model identifier on OpenRouter. Defaults to <code>openrouter/free</code> for zero API cost.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ai_provider" class="col-sm-3 control-label">Active AI Provider</label>
+                                        <div class="col-sm-9">
+                                            <select name="ai_provider" id="ai_provider" class="form-control w-auto">
+                                                <option value="auto" <?php if($ai_provider === 'auto') echo 'selected'; ?>>Auto Failover (Gemini first &rarr; OpenRouter fallback)</option>
+                                                <option value="gemini" <?php if($ai_provider === 'gemini') echo 'selected'; ?>>Gemini Only</option>
+                                                <option value="openrouter" <?php if($ai_provider === 'openrouter') echo 'selected'; ?>>OpenRouter Only</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ai_pool_strategy" class="col-sm-3 control-label">Key Pooling Strategy</label>
+                                        <div class="col-sm-9">
+                                            <select name="ai_pool_strategy" id="ai_pool_strategy" class="form-control w-auto">
+                                                <option value="round_robin" <?php if($ai_pool_strategy === 'round_robin') echo 'selected'; ?>>Round-Robin (Even load distribution across all keys)</option>
+                                                <option value="failover" <?php if($ai_pool_strategy === 'failover') echo 'selected'; ?>>Failover (Use Primary key until rate limited, then rotate)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <h3 class="seo-info mt-8"><i class="fa fa-comments text-success"></i> Storefront Live Chat & Social Channels</h3>
+
+                                    <div class="form-group">
+                                        <label for="chat_whatsapp_url" class="col-sm-3 control-label">WhatsApp Target URL / Phone</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="chat_whatsapp_url" id="chat_whatsapp_url" class="form-control" value="<?php echo htmlspecialchars($chat_whatsapp_url); ?>" placeholder="e.g. https://wa.me/8801700000000 or +8801700000000">
+                                            <p class="help-block">Customer clicking WhatsApp icon will open this direct WhatsApp chat. (Vanishes automatically once customer sends an AI message).</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="chat_messenger_url" class="col-sm-3 control-label">Facebook Messenger URL</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="chat_messenger_url" id="chat_messenger_url" class="form-control" value="<?php echo htmlspecialchars($chat_messenger_url); ?>" placeholder="e.g. https://m.me/yourstore or yourstore">
+                                            <p class="help-block">Customer clicking Messenger icon will open this chat link. (Vanishes automatically once customer sends an AI message).</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="chat_floating_icon_on_off" class="col-sm-3 control-label">PC / Desktop Floating Chat Icon</label>
+                                        <div class="col-sm-9">
+                                            <select name="chat_floating_icon_on_off" id="chat_floating_icon_on_off" class="form-control w-auto">
+                                                <option value="1" <?php if($chat_floating_icon_on_off == 1) echo 'selected'; ?>>Enabled (Show floating bubble on all desktop pages)</option>
+                                                <option value="0" <?php if($chat_floating_icon_on_off == 0) echo 'selected'; ?>>Disabled</option>
+                                            </select>
+                                            <p class="help-block">Displays a sleek floating live chat / AI assistant trigger in the bottom-right corner of Desktop screens.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="chat_call_enabled" class="col-sm-3 control-label">WebRTC Audio & Video Calls</label>
+                                        <div class="col-sm-9">
+                                            <select name="chat_call_enabled" id="chat_call_enabled" class="form-control w-auto">
+                                                <option value="1" <?php if($chat_call_enabled == 1) echo 'selected'; ?>>Enabled (Allow in-browser Audio & Video calls)</option>
+                                                <option value="0" <?php if($chat_call_enabled == 0) echo 'selected'; ?>>Disabled</option>
+                                            </select>
+                                            <p class="help-block">Bufferless peer-to-peer WebRTC calls between customer and admin in live chat with zero telephony cost.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <div class="col-sm-offset-3 col-sm-9">
+                                            <a href="live-chat.php" class="btn btn-default btn-sm" target="_blank"><i class="fa fa-headphones text-success"></i> Open Admin Live Support Console <i class="fa fa-external-link"></i></a>
                                         </div>
                                     </div>
 
@@ -3150,51 +3414,86 @@ $lang_sections = [
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <div class="row" style="margin-top:16px; padding-top:16px; border-top:1px dashed #cbd5e1;">
+                                            <div class="col-md-6">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label style="font-weight:700; color:#1e293b;">
+                                                        <i class="fa fa-paint-brush text-purple"></i> Popup Display Style
+                                                    </label>
+                                                    <select name="popup_style" id="popupStyleSelector" class="form-control" onchange="window.updatePopupPreviewStyle(this.value)" style="border-radius:6px; font-weight:600;">
+                                                        <option value="sticker" <?php if($popup_style === 'sticker') echo 'selected'; ?>>🎭 Festive Die-Cut Sticker (Daraz Style - Floating bubbles, ribbons & bottom close)</option>
+                                                        <option value="card" <?php if($popup_style === 'card') echo 'selected'; ?>>📦 Classic Card Modal (White box with banner, text & action button)</option>
+                                                    </select>
+                                                    <small class="text-muted">Choose between modern die-cut floating sticker or traditional rectangular modal card.</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label style="font-weight:700; color:#1e293b;">
+                                                        <i class="fa fa-magic text-warning"></i> Floating Visual Effects (Sticker Style)
+                                                    </label>
+                                                    <select name="popup_floating_effects" id="popupEffectsSelector" class="form-control" onchange="window.updatePopupEffects(this.value)" style="border-radius:6px; font-weight:600;">
+                                                        <option value="1" <?php if($popup_floating_effects == 1) echo 'selected'; ?>>🎈 Enabled (Floating Product Orbs, Ribbons & Sparkle Stars)</option>
+                                                        <option value="0" <?php if($popup_floating_effects == 0) echo 'selected'; ?>>🚫 Disabled (Clean Floating Sticker Only)</option>
+                                                    </select>
+                                                    <small class="text-muted">Shows floating cosmetic, perfume, phone, and sneaker bubbles around the sticker.</small>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <!-- Section 2: Banner Image & Link -->
                                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
                                         <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
-                                            <i class="fa fa-picture-o text-success"></i> 2. Clickable Image Banner
+                                            <i class="fa fa-picture-o text-success"></i> 2. Clickable Sticker Graphic & Banner
                                         </h4>
                                         
                                         <div class="form-group">
-                                            <label class="col-sm-3 control-label">Current Banner Preview</label>
+                                            <label class="col-sm-3 control-label">Current Graphic Preview</label>
                                             <div class="col-sm-9">
                                                 <?php 
                                                 $popup_preview_src = '';
                                                 if (!empty($popup_photo)) {
                                                     if (strpos($popup_photo, 'http://') === 0 || strpos($popup_photo, 'https://') === 0) {
                                                         $popup_preview_src = $popup_photo;
+                                                    } elseif (strpos($popup_photo, 'assets/uploads/') === 0) {
+                                                        $popup_preview_src = BASE_URL . htmlspecialchars($popup_photo);
                                                     } elseif (file_exists('../assets/uploads/' . $popup_photo)) {
                                                         $popup_preview_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($popup_photo);
                                                     } else {
                                                         $popup_preview_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($popup_photo);
                                                     }
+                                                } else {
+                                                    $popup_preview_src = BASE_URL . 'assets/uploads/welcome_voucher_sticker.svg';
                                                 }
                                                 ?>
-                                                <?php if(!empty($popup_preview_src)): ?>
-                                                    <div style="margin-bottom:12px; display:inline-block; background:#fff; padding:6px; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-                                                        <img src="<?php echo htmlspecialchars($popup_preview_src); ?>" alt="Popup Banner" style="max-height:160px; max-width:100%; border-radius:6px; object-fit:contain;">
-                                                    </div>
-                                                <?php else: ?>
-                                                    <p class="text-muted" style="margin-top:6px;"><i class="fa fa-info-circle"></i> No popup banner image uploaded yet.</p>
-                                                <?php endif; ?>
+                                                <div style="background:#0f172a; border-radius:12px; padding:16px; display:inline-block; max-width:340px; box-shadow:0 10px 25px rgba(0,0,0,0.25); text-align:center;">
+                                                    <img id="adminCurrentStickerImg" src="<?php echo htmlspecialchars($popup_preview_src); ?>" alt="Popup Banner / Sticker" style="max-height:180px; max-width:100%; object-fit:contain; filter:drop-shadow(0 8px 16px rgba(0,0,0,0.4));">
+                                                    <div style="margin-top:8px; font-size:11px; color:#94a3b8;"><i class="fa fa-eye"></i> Transparent Die-Cut Alpha Preview</div>
+                                                </div>
+
+                                                <div style="margin-top:10px;">
+                                                    <button type="button" class="btn btn-warning btn-sm" onclick="window.useDefaultVoucherSticker()" style="font-weight:700; border-radius:20px; padding:6px 16px; box-shadow:0 2px 8px rgba(234,179,8,0.3);">
+                                                        <i class="fa fa-magic"></i> ⚡ Use Festive Welcome Voucher Sticker (Daraz Style)
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
 
                                         <div class="form-group">
-                                            <label class="col-sm-3 control-label">Upload New Banner</label>
+                                            <label class="col-sm-3 control-label">Upload Custom Sticker Graphic</label>
                                             <div class="col-sm-9">
-                                                <input type="file" name="popup_photo" class="form-control-file" accept="image/*">
-                                                <small class="text-muted">Recommended resolution: 600×400 or 700×500px (JPG, PNG, WEBP, GIF).</small>
+                                                <input type="file" name="popup_photo" class="form-control-file" accept="image/*,.svg" onchange="window.previewUploadedSticker(this)">
+                                                <small class="text-muted">Recommended: Transparent PNG or SVG vector sticker for clean die-cut edge without white square box.</small>
                                             </div>
                                         </div>
 
                                         <div class="form-group">
                                             <label class="col-sm-3 control-label">Or Direct Image CDN URL</label>
                                             <div class="col-sm-9">
-                                                <input type="text" name="popup_photo_url" class="form-control" value="<?php echo htmlspecialchars($popup_photo); ?>" placeholder="https://...supabase.co/storage/v1/object/public/storefront/assets/banner.jpg">
+                                                <input type="text" name="popup_photo_url" id="popupPhotoUrlInput" class="form-control" value="<?php echo htmlspecialchars($popup_photo); ?>" placeholder="assets/uploads/welcome_voucher_sticker.svg or https://...">
+                                                <small class="text-muted">You can enter a relative path (e.g. <code>assets/uploads/welcome_voucher_sticker.svg</code>) or full external CDN URL.</small>
                                             </div>
                                         </div>
 
@@ -3202,16 +3501,17 @@ $lang_sections = [
                                             <label class="col-sm-3 control-label">Clickable Target URL <span class="text-danger">*</span></label>
                                             <div class="col-sm-9">
                                                 <input type="text" name="popup_link" class="form-control" value="<?php echo htmlspecialchars($popup_link); ?>" placeholder="e.g. deals.php or product-category.php?id=1 or https://...">
-                                                <small class="text-muted">Visitors clicking the banner image or action button will be redirected here.</small>
+                                                <small class="text-muted">Visitors clicking anywhere on the sticker graphic or action button will be redirected here.</small>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Section 3: Headlines & Content -->
+                                    <!-- Section 3: Headlines & Content (Classic Card Style / Fallback) -->
                                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
-                                        <h4 style="margin:0 0 16px 0; font-weight:700; color:#1e293b; font-size:16px;">
+                                        <h4 style="margin:0 0 8px 0; font-weight:700; color:#1e293b; font-size:16px;">
                                             <i class="fa fa-font text-info"></i> 3. Text Headlines & Call to Action
                                         </h4>
+                                        <p style="font-size:12px; color:#64748b; margin-bottom:16px;">These fields are actively displayed when <strong>Classic Card Modal</strong> style is selected, and serve as accessibility labels for screen readers.</p>
 
                                         <div class="form-group">
                                             <label class="col-sm-3 control-label">Popup Title / Headline</label>
@@ -3265,12 +3565,27 @@ $lang_sections = [
                                         <!-- Inline Live Animation Demo Box -->
                                         <div class="row">
                                             <div class="col-sm-offset-3 col-sm-9">
-                                                <div id="animInlineStage" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:12px; padding:20px; text-align:center; overflow:hidden;">
-                                                    <div id="animInlineCard" style="display:inline-block; background:#ffffff; border-radius:12px; padding:18px 24px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.12); border:1px solid #e2e8f0; max-width:380px; width:100%; transform-origin:center center;">
-                                                        <div style="font-size:26px; margin-bottom:6px;" id="inlineAnimEmoji">🌪️</div>
-                                                        <h5 style="margin:0 0 4px 0; font-weight:700; color:#1e293b;" id="inlineAnimName">3D Spin & Zoom In</h5>
-                                                        <p style="margin:0 0 14px 0; font-size:12px; color:#64748b;">Live entrance animation preview</p>
-                                                        <button type="button" class="btn btn-xs btn-default" id="btnReplayInline" onclick="window.triggerPopupAnimPreview()" style="border-radius:15px; font-weight:600; padding:5px 14px;">
+                                                <div id="animInlineStage" style="background:linear-gradient(135deg, #0f172a, #1e293b); border:1px solid #334155; border-radius:14px; padding:24px 20px; text-align:center; overflow:hidden; position:relative; min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                                                    
+                                                    <!-- Sticker Demo Stage -->
+                                                    <div id="inlineDemoStickerWrap" style="display:<?php echo ($popup_style === 'sticker') ? 'block' : 'none'; ?>; width:100%; max-width:320px; transform-origin:center center;">
+                                                        <div class="sn-preview-sticker-wrap" style="max-width:240px; margin:0 auto;">
+                                                            <img id="inlineStickerImg" src="<?php echo htmlspecialchars($popup_preview_src); ?>" alt="Sticker" style="width:100%; height:auto; display:block; filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5));">
+                                                        </div>
+                                                        <div style="margin-top:12px; display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); backdrop-filter:blur(6px); color:#fbbf24; font-size:11px; font-weight:700; padding:4px 14px; border-radius:20px;">
+                                                            <span id="inlineAnimEmoji">🌪️</span> <span id="inlineAnimName">3D Spin & Zoom In</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Card Demo Stage -->
+                                                    <div id="inlineDemoCardWrap" style="display:<?php echo ($popup_style === 'card') ? 'inline-block' : 'none'; ?>; background:#ffffff; border-radius:12px; padding:18px 24px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.25); max-width:340px; width:100%; transform-origin:center center;">
+                                                        <div style="font-size:26px; margin-bottom:6px;" id="inlineCardAnimEmoji">🌪️</div>
+                                                        <h5 style="margin:0 0 4px 0; font-weight:700; color:#1e293b;" id="inlineCardAnimName">3D Spin & Zoom In</h5>
+                                                        <p style="margin:0 0 10px 0; font-size:12px; color:#64748b;">Classic Card Entrance Preview</p>
+                                                    </div>
+
+                                                    <div style="margin-top:16px;">
+                                                        <button type="button" class="btn btn-xs btn-default" id="btnReplayInline" onclick="window.triggerPopupAnimPreview()" style="border-radius:15px; font-weight:600; padding:5px 14px; background:#ffffff; border-color:#cbd5e1; color:#0f172a;">
                                                             <i class="fa fa-refresh text-primary"></i> Replay Animation
                                                         </button>
                                                         <button type="button" class="btn btn-xs btn-primary" id="btnLaunchFullModal" onclick="window.openFullModalPreview()" style="border-radius:15px; font-weight:600; padding:5px 14px; margin-left:6px; background:#4f46e5; border-color:#4338ca;">
@@ -3295,7 +3610,7 @@ $lang_sections = [
                                                     <option value="1" <?php if($popup_countdown_on_off == 1) echo 'selected'; ?>>⏰ Enabled (Show Live Ticking Timer)</option>
                                                     <option value="0" <?php if($popup_countdown_on_off == 0) echo 'selected'; ?>>Disabled (No Timer)</option>
                                                 </select>
-                                                <small class="text-muted">Shows an urgent live countdown clock (Days, Hours, Minutes, Seconds) directly on the popup.</small>
+                                                <small class="text-muted">Shows an urgent live countdown clock directly on the popup.</small>
                                             </div>
                                         </div>
 
@@ -3336,8 +3651,41 @@ $lang_sections = [
 
 <!-- Live Animated Preview Modal Overlay -->
 <div id="adminPopupPreviewOverlay">
-    <div id="adminPopupPreviewCard">
-        <button type="button" id="adminClosePreviewBtn" style="position:absolute; top:12px; right:12px; width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.95); border:none; box-shadow:0 4px 10px rgba(0,0,0,0.15); color:#1e293b; font-size:22px; line-height:1; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;">&times;</button>
+
+    <!-- 1. Festive Die-Cut Sticker Style Preview -->
+    <div id="adminPopupPreviewSticker" style="display:<?php echo ($popup_style === 'sticker') ? 'flex' : 'none'; ?>;">
+        <!-- Floating Product Bubble Orbs -->
+        <div class="sn-preview-orb sn-p-orb-1" title="Cosmetics"><span class="orb-icon">💄</span></div>
+        <div class="sn-preview-orb sn-p-orb-2" title="Perfume"><span class="orb-icon">🌸</span></div>
+        <div class="sn-preview-orb sn-p-orb-3" title="Smart Phone"><span class="orb-icon">📱</span></div>
+        <div class="sn-preview-orb sn-p-orb-4" title="Sneakers"><span class="orb-icon">👟</span></div>
+        <div class="sn-preview-orb sn-p-orb-5" title="Gadgets"><span class="orb-icon">💻</span></div>
+
+        <!-- Confetti Streamer Ribbons & Sparkles -->
+        <div class="sn-preview-streamer sn-p-streamer-1"></div>
+        <div class="sn-preview-streamer sn-p-streamer-2"></div>
+        <div class="sn-preview-sparkle sn-p-sparkle-1">✦</div>
+        <div class="sn-preview-sparkle sn-p-sparkle-2">★</div>
+        <div class="sn-preview-sparkle sn-p-sparkle-3">✦</div>
+
+        <!-- Levitating Floating Sticker Card -->
+        <div class="sn-preview-sticker-wrap">
+            <img id="previewStickerImg" src="<?php echo htmlspecialchars($popup_preview_src); ?>" alt="Festive Sticker" class="sn-preview-sticker-img">
+        </div>
+
+        <!-- Urgency Timer Pill -->
+        <div id="previewStickerTimerPill" style="margin-top:14px; background:rgba(15,23,42,0.85); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(8px); border-radius:30px; padding:6px 16px; color:#ffffff; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:8px; z-index:15;">
+            <span style="color:#fecdd3; font-size:12px; font-weight:600;">⏰ Offer expires in:</span>
+            <span style="color:#fbbf24; font-family:monospace; font-size:14px; font-weight:800;"><span id="prevStickerTimerH">01</span>h : <span id="prevStickerTimerM">59</span>m : <span id="prevStickerTimerS">59</span>s</span>
+        </div>
+
+        <!-- Centered Circular Close Button Floating Beneath (Daraz App Style) -->
+        <button type="button" class="sn-preview-sticker-close-btn" onclick="window.closeFullModalPreview()" aria-label="Close Preview">&times;</button>
+    </div>
+
+    <!-- 2. Classic Card Modal Style Preview -->
+    <div id="adminPopupPreviewCard" style="display:<?php echo ($popup_style === 'card') ? 'block' : 'none'; ?>;">
+        <button type="button" id="adminClosePreviewBtn" onclick="window.closeFullModalPreview()" style="position:absolute; top:12px; right:12px; width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.95); border:none; box-shadow:0 4px 10px rgba(0,0,0,0.15); color:#1e293b; font-size:22px; line-height:1; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;">&times;</button>
         
         <div id="previewCardBannerWrap" style="width:100%; max-height:220px; overflow:hidden; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
             <img id="previewCardBannerImg" src="<?php echo !empty($popup_preview_src) ? htmlspecialchars($popup_preview_src) : ''; ?>" alt="Popup Banner" style="width:100%; max-height:220px; object-fit:cover; display:<?php echo !empty($popup_preview_src) ? 'block' : 'none'; ?>;">
@@ -3396,6 +3744,82 @@ $lang_sections = [
 
     var animClasses = ['anim-spin-zoom', 'anim-flip-3d', 'anim-bounce-pop', 'anim-slide-up', 'anim-slide-down', 'anim-glow-pulse', 'anim-wiggle-swing'];
 
+    // 1-Click Set Default Festive Voucher Sticker
+    window.useDefaultVoucherSticker = function() {
+        var defaultPath = 'assets/uploads/welcome_voucher_sticker.svg';
+        var urlInput = document.getElementById('popupPhotoUrlInput');
+        if (urlInput) urlInput.value = defaultPath;
+
+        var fullUrl = '<?php echo BASE_URL; ?>' + defaultPath;
+        var currentImg = document.getElementById('adminCurrentStickerImg');
+        if (currentImg) currentImg.src = fullUrl;
+
+        var inlineImg = document.getElementById('inlineStickerImg');
+        if (inlineImg) inlineImg.src = fullUrl;
+
+        var prevSticker = document.getElementById('previewStickerImg');
+        if (prevSticker) prevSticker.src = fullUrl;
+
+        var prevCard = document.getElementById('previewCardBannerImg');
+        if (prevCard) {
+            prevCard.src = fullUrl;
+            prevCard.style.display = 'block';
+        }
+    };
+
+    // Client-side Preview of Uploaded Sticker File
+    window.previewUploadedSticker = function(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var src = e.target.result;
+                var currentImg = document.getElementById('adminCurrentStickerImg');
+                if (currentImg) currentImg.src = src;
+
+                var inlineImg = document.getElementById('inlineStickerImg');
+                if (inlineImg) inlineImg.src = src;
+
+                var prevSticker = document.getElementById('previewStickerImg');
+                if (prevSticker) prevSticker.src = src;
+
+                var prevCard = document.getElementById('previewCardBannerImg');
+                if (prevCard) {
+                    prevCard.src = src;
+                    prevCard.style.display = 'block';
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    };
+
+    // Update Preview Style (Sticker vs Card)
+    window.updatePopupPreviewStyle = function(style) {
+        var stickerWrap = document.getElementById('inlineDemoStickerWrap');
+        var cardWrap = document.getElementById('inlineDemoCardWrap');
+        var modalSticker = document.getElementById('adminPopupPreviewSticker');
+        var modalCard = document.getElementById('adminPopupPreviewCard');
+
+        if (style === 'sticker') {
+            if (stickerWrap) stickerWrap.style.display = 'block';
+            if (cardWrap) cardWrap.style.display = 'none';
+            if (modalSticker) modalSticker.style.display = 'flex';
+            if (modalCard) modalCard.style.display = 'none';
+        } else {
+            if (stickerWrap) stickerWrap.style.display = 'none';
+            if (cardWrap) cardWrap.style.display = 'inline-block';
+            if (modalSticker) modalSticker.style.display = 'none';
+            if (modalCard) modalCard.style.display = 'block';
+        }
+    };
+
+    // Update Floating Effects Toggle
+    window.updatePopupEffects = function(val) {
+        var orbs = document.querySelectorAll('#adminPopupPreviewSticker .sn-preview-orb, #adminPopupPreviewSticker .sn-preview-streamer, #adminPopupPreviewSticker .sn-preview-sparkle');
+        orbs.forEach(function(el) {
+            el.style.display = (val == '1') ? '' : 'none';
+        });
+    };
+
     // Play Inline Preview Animation
     window.triggerPopupAnimPreview = function(anim) {
         var sel = document.getElementById('popupAnimSelector');
@@ -3403,17 +3827,29 @@ $lang_sections = [
         if (!anim) anim = 'spin-zoom';
 
         var meta = animMeta[anim] || { emoji: '✨', name: anim };
+        
         var emojiEl = document.getElementById('inlineAnimEmoji');
         var nameEl = document.getElementById('inlineAnimName');
         if (emojiEl) emojiEl.textContent = meta.emoji;
         if (nameEl) nameEl.textContent = meta.name;
+
+        var cardEmoji = document.getElementById('inlineCardAnimEmoji');
+        var cardName = document.getElementById('inlineCardAnimName');
+        if (cardEmoji) cardEmoji.textContent = meta.emoji;
+        if (cardName) cardName.textContent = meta.name;
         
-        var card = document.getElementById('animInlineCard');
-        if (card) {
-            animClasses.forEach(function(c) { card.classList.remove(c); });
-            void card.offsetWidth; // trigger DOM reflow
+        var styleSel = document.getElementById('popupStyleSelector');
+        var currentStyle = styleSel ? styleSel.value : 'sticker';
+
+        var targetEl = (currentStyle === 'sticker') 
+            ? document.getElementById('inlineDemoStickerWrap')
+            : document.getElementById('inlineDemoCardWrap');
+
+        if (targetEl) {
+            animClasses.forEach(function(c) { targetEl.classList.remove(c); });
+            void targetEl.offsetWidth; // trigger DOM reflow
             setTimeout(function() {
-                card.classList.add('anim-' + anim);
+                targetEl.classList.add('anim-' + anim);
             }, 20);
         }
 
@@ -3431,47 +3867,50 @@ $lang_sections = [
         var badgeEl = document.getElementById('previewAnimBadge');
         if (badgeEl) badgeEl.textContent = meta.emoji + ' ' + meta.name;
 
-        // Sync values from live form inputs
+        var styleSel = document.getElementById('popupStyleSelector');
+        var currentStyle = styleSel ? styleSel.value : 'sticker';
+
+        // Sync values from live form inputs for card
         var titleInput = document.querySelector('input[name="popup_title"]');
         var descInput = document.querySelector('textarea[name="popup_text"]');
         var btnInput = document.querySelector('input[name="popup_btn_text"]');
-        var photoUrlInput = document.querySelector('input[name="popup_photo_url"]');
 
         var titleEl = document.getElementById('previewCardTitle');
         var descEl = document.getElementById('previewCardDesc');
         var ctaTextEl = document.getElementById('previewCardCtaText');
-        var bannerImg = document.getElementById('previewCardBannerImg');
 
         if (titleEl && titleInput && titleInput.value.trim()) titleEl.textContent = titleInput.value.trim();
         if (descEl && descInput && descInput.value.trim()) descEl.textContent = descInput.value.trim();
         if (ctaTextEl && btnInput && btnInput.value.trim()) ctaTextEl.textContent = btnInput.value.trim();
-        if (bannerImg && photoUrlInput && photoUrlInput.value.trim()) {
-            bannerImg.src = photoUrlInput.value.trim();
-            bannerImg.style.display = 'block';
-        }
 
         var overlay = document.getElementById('adminPopupPreviewOverlay');
-        var card = document.getElementById('adminPopupPreviewCard');
-        
-        if (card) {
-            animClasses.forEach(function(c) { card.classList.remove(c); });
+        var modalSticker = document.getElementById('adminPopupPreviewSticker');
+        var modalCard = document.getElementById('adminPopupPreviewCard');
+
+        if (currentStyle === 'sticker') {
+            if (modalSticker) modalSticker.style.display = 'flex';
+            if (modalCard) modalCard.style.display = 'none';
+            if (modalSticker) {
+                animClasses.forEach(function(c) { modalSticker.classList.remove(c); });
+                void modalSticker.offsetWidth;
+                setTimeout(function() { modalSticker.classList.add('anim-' + anim); }, 20);
+            }
+        } else {
+            if (modalSticker) modalSticker.style.display = 'none';
+            if (modalCard) modalCard.style.display = 'block';
+            if (modalCard) {
+                animClasses.forEach(function(c) { modalCard.classList.remove(c); });
+                void modalCard.offsetWidth;
+                setTimeout(function() { modalCard.classList.add('anim-' + anim); }, 20);
+            }
         }
-        if (overlay) {
-            overlay.style.display = 'flex';
-        }
-        if (card) {
-            void card.offsetWidth; // trigger DOM reflow
-            setTimeout(function() {
-                card.classList.add('anim-' + anim);
-            }, 20);
-        }
+
+        if (overlay) overlay.style.display = 'flex';
     };
 
     window.closeFullModalPreview = function() {
         var overlay = document.getElementById('adminPopupPreviewOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-        }
+        if (overlay) overlay.style.display = 'none';
     };
 
     function initPopupPreviewEvents() {
@@ -3506,22 +3945,6 @@ $lang_sections = [
             });
         }
 
-        var closeBtn = document.getElementById('adminClosePreviewBtn');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                window.closeFullModalPreview();
-            });
-        }
-
-        var closeLink = document.getElementById('adminClosePreviewLink');
-        if (closeLink) {
-            closeLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                window.closeFullModalPreview();
-            });
-        }
-
         var overlay = document.getElementById('adminPopupPreviewOverlay');
         if (overlay) {
             overlay.addEventListener('click', function(e) {
@@ -3537,7 +3960,7 @@ $lang_sections = [
             }
         });
 
-        // Initialize inline animation preview on load
+        // Initialize inline preview on load
         if (sel) {
             var initialAnim = sel.value || 'spin-zoom';
             var meta = animMeta[initialAnim] || { emoji: '✨', name: initialAnim };
@@ -3545,10 +3968,13 @@ $lang_sections = [
             var nameEl = document.getElementById('inlineAnimName');
             if (emojiEl) emojiEl.textContent = meta.emoji;
             if (nameEl) nameEl.textContent = meta.name;
-            var card = document.getElementById('animInlineCard');
-            if (card) {
-                card.classList.add('anim-' + initialAnim);
-            }
+
+            var styleSel = document.getElementById('popupStyleSelector');
+            var currentStyle = styleSel ? styleSel.value : 'sticker';
+            var targetEl = (currentStyle === 'sticker') 
+                ? document.getElementById('inlineDemoStickerWrap')
+                : document.getElementById('inlineDemoCardWrap');
+            if (targetEl) targetEl.classList.add('anim-' + initialAnim);
         }
     }
 
@@ -3569,8 +3995,12 @@ $lang_sections = [
         }
         var mEl = document.getElementById('prevTimerM');
         var sEl = document.getElementById('prevTimerS');
+        var smEl = document.getElementById('prevStickerTimerM');
+        var ssEl = document.getElementById('prevStickerTimerS');
         if (mEl) mEl.textContent = String(pMins).padStart(2, '0');
         if (sEl) sEl.textContent = String(pSecs).padStart(2, '0');
+        if (smEl) smEl.textContent = String(pMins).padStart(2, '0');
+        if (ssEl) ssEl.textContent = String(pSecs).padStart(2, '0');
     }, 1000);
 })();
 
