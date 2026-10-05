@@ -137,7 +137,7 @@ body.sn-header-scrolled-away .srp-chips { top:48px; }
 .srp-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding-top:12px; }
 .srp-card { position:relative; display:flex; flex-direction:column; background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; transition:box-shadow .2s, transform .2s; }
 .srp-card:hover { box-shadow:0 8px 22px rgba(17,24,39,.08); transform:translateY(-2px); }
-.srp-thumb { position:relative; display:block; aspect-ratio:1/1; background:#f8fafc; overflow:hidden; }
+.srp-thumb { position:relative; display:block; aspect-ratio:1/1; background:#ffffff; overflow:hidden; }
 .srp-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
 .srp-badge { position:absolute; top:8px; left:8px; background:var(--y); color:var(--ink); font-size:11px; font-weight:800; padding:3px 8px; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,.12); }
 .srp-badge.oos { background:#111827; color:#fff; }

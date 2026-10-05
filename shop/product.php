@@ -472,8 +472,64 @@ require_once('header.php');
 <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
 
 <style>
+/* Product Image Occupies Full Product Area & White Neutral Background */
+.sn-gallery-main-card {
+    background: #ffffff !important;
+    border: 1px solid #f1f5f9 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-radius: 20px !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+}
+.sn-gallery-viewport {
+    width: 100% !important;
+    height: 100% !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+.sn-gallery-main-img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+    margin: 0 !important;
+}
+
 /* Robust Mobile Layout & Price Section Ordering (Ensures pricing appears after gallery) */
 @media (max-width: 768px) {
+    .sn-gallery-main-card {
+        width: 100% !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+        min-height: 300px !important;
+        max-height: none !important;
+        background: #ffffff !important;
+        border: 1px solid #f1f5f9 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        border-radius: 20px !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+    }
+    .sn-gallery-viewport {
+        width: 100% !important;
+        height: 100% !important;
+        background: #ffffff !important;
+        overflow: hidden !important;
+        position: relative !important;
+    }
+    .sn-gallery-main-img {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: cover !important;
+        display: block !important;
+        margin: 0 !important;
+    }
+
     .sn-product-main-grid {
         display: flex !important;
         flex-direction: column !important;

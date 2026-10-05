@@ -163,16 +163,19 @@ a, button {
 .sn-gallery-main-card {
     position: relative;
     flex: 1;
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    background: #ffffff;
     border-radius: 20px;
     border: 1px solid #f1f5f9;
-    padding: 30px 24px;
-    min-height: 420px;
+    padding: 0;
+    min-height: 440px;
+    height: 440px;
+    aspect-ratio: 1 / 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
 }
 
 .sn-bestseller-badge {
@@ -217,17 +220,23 @@ a, button {
 
 .sn-gallery-viewport {
     width: 100%;
-    height: 320px;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    position: relative;
+    background: #ffffff;
 }
 
 .sn-gallery-main-img {
-    max-width: 90%;
-    max-height: 300px;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: cover;
+    display: block;
+    margin: 0;
     transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease;
 }
 
@@ -1982,26 +1991,28 @@ a, button {
     /* 3. Product Hero Showcase Card */
     .sn-gallery-main-card {
         width: 100% !important;
-        min-height: 290px !important;
-        height: 290px !important;
-        border-radius: 24px !important;
-        background: radial-gradient(circle at 82% 28%, #fef3c7 0%, #fef9c3 42%, #fffbeb 75%, #ffffff 100%) !important;
-        border: 1px solid rgba(254, 240, 138, 0.45) !important;
-        box-shadow: 0 4px 20px rgba(251, 191, 36, 0.08) !important;
-        padding: 14px !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+        min-height: 300px !important;
+        max-height: none !important;
+        border-radius: 20px !important;
+        background: #ffffff !important;
+        border: 1px solid #f1f5f9 !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+        padding: 0 !important;
         position: relative !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         overflow: hidden !important;
-        box-sizing: border-box;
+        box-sizing: border-box !important;
     }
 
     .sn-mob-discount-badge {
         display: block !important;
         position: absolute !important;
-        top: 14px !important;
-        left: 14px !important;
+        top: 12px !important;
+        left: 12px !important;
         background: #fab802 !important;
         color: #0f172a !important;
         font-weight: 800 !important;
@@ -2010,15 +2021,17 @@ a, button {
         border-radius: 9999px !important;
         z-index: 5 !important;
         letter-spacing: -0.2px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
     }
 
     .sn-mob-counter-badge {
         display: block !important;
         position: absolute !important;
-        top: 14px !important;
-        right: 14px !important;
-        background: rgba(51, 65, 85, 0.75) !important;
+        top: 12px !important;
+        right: 12px !important;
+        background: rgba(15, 23, 42, 0.72) !important;
         backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
         color: #ffffff !important;
         font-size: 11px !important;
         font-weight: 700 !important;
@@ -2035,9 +2048,11 @@ a, button {
         width: 34px !important;
         height: 34px !important;
         border-radius: 50% !important;
-        background: #ffffff !important;
-        border: none !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        background: rgba(255, 255, 255, 0.92) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
+        border: 1px solid rgba(241, 245, 249, 0.8) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
         align-items: center !important;
         justify-content: center !important;
         color: #0f172a !important;
@@ -2065,13 +2080,20 @@ a, button {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
     }
 
     .sn-gallery-main-img {
-        max-width: 82% !important;
-        max-height: 240px !important;
-        object-fit: contain !important;
-        margin: auto !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: cover !important;
+        margin: 0 !important;
+        display: block !important;
+        border-radius: inherit !important;
     }
 
     /* 4. Horizontal Thumbnail Strip */
@@ -2988,16 +3010,18 @@ a, button {
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
-    background: #f8fafc;
+    background: #ffffff;
     border-radius: 12px;
     overflow: hidden;
     text-decoration: none;
 }
 
 .sn-rel-img-box img {
-    max-height: 135px;
-    max-width: 85%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: cover;
     transition: transform 0.3s ease;
 }
 

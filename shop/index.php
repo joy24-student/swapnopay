@@ -815,15 +815,17 @@ body {
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
-    background: #f8fafc;
+    background: #ffffff;
     border-radius: 12px;
     overflow: hidden;
 }
 
 .sn-flash-img-box img {
-    max-height: 135px;
-    max-width: 85%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: cover;
     transition: transform 0.3s ease;
 }
 
@@ -990,15 +992,17 @@ body {
     align-items: center;
     justify-content: center;
     margin-bottom: 10px;
-    background: #f8fafc;
+    background: #ffffff;
     border-radius: 12px;
     overflow: hidden;
 }
 
 .sn-product-img-box img {
-    max-height: 130px;
-    max-width: 85%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: cover;
     transition: transform 0.25s ease;
 }
 
