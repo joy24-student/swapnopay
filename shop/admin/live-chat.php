@@ -25,21 +25,42 @@ html, body {
     padding: 0 !important;
     background: #f0f2f5 !important;
 }
+
+body.live-chat-page-body {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
 .wrapper {
     height: 100vh !important;
     max-height: 100vh !important;
+    min-height: 100vh !important;
     overflow: hidden !important;
     background: #f0f2f5 !important;
+    position: relative !important;
 }
+
 .main-sidebar {
     height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
 }
+
 .main-footer {
     display: none !important; /* Hide footer on live chat */
 }
-.content-wrapper {
+
+.content-wrapper,
+.right-side {
     height: calc(100vh - 50px) !important;
     max-height: calc(100vh - 50px) !important;
+    min-height: calc(100vh - 50px) !important;
     overflow: hidden !important;
     background: #f0f2f5 !important;
     padding: 0 !important;
@@ -51,9 +72,9 @@ html, body {
 
 /* 2. Top App Bar (Voice & Video Call, Collapse, Refresh) */
 .content-header {
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
     padding: 6px 14px !important;
     background: #ffffff !important;
     border-bottom: 1px solid #d1d7db !important;
@@ -63,12 +84,14 @@ html, body {
     flex-shrink: 0 !important;
     margin: 0 !important;
     z-index: 20;
+    overflow: hidden !important;
 }
 
 .content {
-    flex: 1 !important;
-    height: calc(100% - 48px) !important;
-    max-height: calc(100% - 48px) !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: calc(100% - 46px) !important;
+    max-height: calc(100% - 46px) !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -233,22 +256,33 @@ html, body {
     flex: 1;
     overflow-y: auto;
     background: #ffffff;
+    padding: 6px 0 16px 0;
 }
 .wa-chat-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 11px 14px;
     cursor: pointer;
-    border-bottom: 1px solid #f0f2f5;
+    border-bottom: 1px solid #f1f5f9;
     transition: background 0.15s ease;
     position: relative;
+    box-sizing: border-box;
+    background: #ffffff;
 }
 .wa-chat-item:hover {
-    background: #f5f6f6;
+    background: #f8fafc;
 }
-.wa-chat-item.active {
-    background: #f0f2f5;
+.wa-chat-item.active,
+.wa-chat-item.selected {
+    background: #eff6ff !important;
+    border-left: 3px solid #2563eb !important;
+}
+.sup-avatar-col {
+    position: relative !important;
+    width: 44px !important;
+    height: 44px !important;
+    flex-shrink: 0 !important;
 }
 .wa-avatar {
     width: 44px;
@@ -257,65 +291,146 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 16px;
     flex-shrink: 0;
     position: relative;
     user-select: none;
 }
+.sup-online-dot,
 .wa-online-dot {
-    position: absolute;
-    bottom: 1px;
-    right: 1px;
-    width: 11px;
-    height: 11px;
-    background: #25d366;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
+    position: absolute !important;
+    bottom: 0px !important;
+    right: 0px !important;
+    width: 12px !important;
+    height: 12px !important;
+    background: #10b981 !important;
+    border: 2px solid #ffffff !important;
+    border-radius: 50% !important;
+    z-index: 5 !important;
+    box-sizing: border-box !important;
 }
+.sup-online-dot.offline,
+.wa-online-dot.offline {
+    background: #cbd5e1 !important;
+}
+.sup-info-col,
 .wa-chat-content {
-    flex: 1;
-    min-width: 0;
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
 }
-.wa-chat-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 3px;
-}
+.sup-cust-name,
 .wa-chat-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #111b21;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.3 !important;
 }
+.sup-phone-tag {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    font-size: 11.5px !important;
+    color: #059669 !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+.sup-snippet,
+.wa-chat-snippet {
+    font-size: 12px !important;
+    color: #64748b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
+}
+.sup-meta-col {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: space-between !important;
+    gap: 5px !important;
+    flex-shrink: 0 !important;
+    min-width: 58px !important;
+}
+.sup-meta-top {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+.sup-time,
 .wa-chat-time {
-    font-size: 11px;
-    color: #667781;
-    flex-shrink: 0;
+    font-size: 11px !important;
+    color: #94a3b8 !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
 }
 .wa-chat-item.has-unread .wa-chat-time {
-    color: #25d366;
-    font-weight: 600;
+    color: #2563eb !important;
 }
-.wa-chat-msg-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 6px;
+.sup-meta-bot {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
 }
-.wa-chat-snippet {
-    font-size: 13px;
-    color: #667781;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 1;
+.sup-status-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 2px 7px !important;
+    border-radius: 10px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: capitalize !important;
+    cursor: pointer !important;
+    transition: opacity 0.15s ease !important;
+    white-space: nowrap !important;
+}
+.sup-status-pill.status-active {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+    border: 1px solid #bbf7d0 !important;
+}
+.sup-status-pill.status-pending {
+    background: #fef3c7 !important;
+    color: #b45309 !important;
+    border: 1px solid #fde68a !important;
+}
+.sup-status-pill.status-closed,
+.sup-status-pill.status-resolved {
+    background: #f1f5f9 !important;
+    color: #64748b !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.sup-card-dots-btn {
+    background: transparent !important;
+    border: none !important;
+    width: 22px !important;
+    height: 22px !important;
+    border-radius: 4px !important;
+    color: #94a3b8 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    padding: 0 !important;
+    transition: all 0.15s ease !important;
+}
+.sup-card-dots-btn:hover {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
 }
 .wa-unread-count {
-    background: #25d366;
+    background: #2563eb;
     color: #ffffff;
     font-size: 11px;
     font-weight: 700;
@@ -582,15 +697,22 @@ html, body {
 
 /* Canned Quick Replies Bar */
 .wa-quick-bar {
-    padding: 5px 16px;
-    background: #f0f2f5;
-    border-top: 1px solid #e9edef;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-x: auto;
-    white-space: nowrap;
-    flex-shrink: 0;
+    padding: 6px 16px !important;
+    background: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.wa-quick-bar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 .wa-canned-chip {
     background: #ffffff;
@@ -598,10 +720,11 @@ html, body {
     color: #54656f;
     font-size: 11px;
     font-weight: 600;
-    padding: 3px 10px;
+    padding: 4px 10px;
     border-radius: 14px;
     cursor: pointer;
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 .wa-canned-chip:hover {
     background: #d9fdd3;
@@ -611,7 +734,7 @@ html, body {
 
 /* WhatsApp Message Input Bar */
 .wa-input-bar {
-    min-height: 58px;
+    min-height: 56px;
     background: #f0f2f5;
     padding: 8px 16px;
     display: flex;
@@ -624,7 +747,7 @@ html, body {
     height: 40px;
     border-radius: 8px;
     background: #ffffff;
-    border: none;
+    border: 1px solid #e2e8f0;
     padding: 10px 14px;
     font-size: 14px;
     color: #111b21;
@@ -653,26 +776,48 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   COLUMN 3: CONTACT INFO & CRM DRAWER (Width: 320px, Collapsible)
+   COLUMN 3: CONTACT INFO & CRM DRAWER (Width: 300px, Responsive & Collapsible)
    -------------------------------------------------------------------------- */
 .wa-col-drawer {
-    width: 320px;
+    width: 300px;
     border-left: 1px solid #d1d7db;
-    background: #f0f2f5;
+    background: #f8fafc;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    overflow-x: hidden;
     flex-shrink: 0;
     height: 100%;
-    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, transform 0.25s ease;
+    box-sizing: border-box;
 }
 .wa-col-drawer.collapsed {
     width: 0 !important;
     min-width: 0 !important;
     border-left: none !important;
-    opacity: 0;
-    pointer-events: none;
+    opacity: 0 !important;
+    pointer-events: none !important;
     overflow: hidden !important;
+}
+
+@media (max-width: 1240px) and (min-width: 768px) {
+    .wa-col-drawer {
+        position: absolute !important;
+        right: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        z-index: 50 !important;
+        width: 300px !important;
+        box-shadow: -6px 0 25px rgba(0, 0, 0, 0.15) !important;
+        border-left: 1px solid #cbd5e1 !important;
+        background: #ffffff !important;
+    }
+    .wa-col-drawer.collapsed {
+        transform: translateX(100%) !important;
+        width: 300px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
 }
 
 .wa-drawer-header {
@@ -1009,21 +1154,21 @@ html, body {
         <!-- ============================================== -->
         <!-- COLUMN 3: WHATSAPP CONTACT INFO & CRM DRAWER -->
         <!-- ============================================== -->
-        <div class="wa-col-drawer wa-scroll" id="contextCol">
+        <div class="wa-col-drawer wa-scroll collapsed" id="contextCol">
             <!-- Drawer Header -->
-            <div class="wa-drawer-header">
-                <button type="button" onclick="toggleContextCol()" class="wa-icon-btn" style="width: 30px; height: 30px;" title="Close Details">
-                    <i class="fa fa-times"></i>
+            <div class="wa-drawer-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Contact Info</span>
+                <button type="button" onclick="toggleContextCol()" class="btn btn-default btn-xs" style="border-radius: 4px; padding: 3px 8px; font-weight: 600;" title="Close Details">
+                    <i class="fa fa-times"></i> Close
                 </button>
-                <span>Contact Info</span>
             </div>
 
             <!-- Profile Section -->
-            <div class="wa-drawer-section" style="text-align: center;">
-                <div class="wa-avatar" id="ctxAvatar" style="width: 72px; height: 72px; font-size: 26px; margin: 0 auto 12px; background: #e0f2fe; color: #0369a1;">C</div>
-                <h4 style="font-size: 17px; font-weight: 600; color: #111b21; margin: 0 0 4px;" id="ctxName">Customer</h4>
-                <p style="font-size: 13px; color: #667781; margin: 0 0 10px; word-break: break-all;" id="ctxEmail">No email registered</p>
-                <p style="font-size: 13px; color: #667781; margin: 0 0 14px;" id="ctxPhone">No phone registered</p>
+            <div class="wa-drawer-section" style="text-align: center; word-break: break-word; overflow: hidden;">
+                <div class="wa-avatar" id="ctxAvatar" style="width: 64px; height: 64px; font-size: 24px; margin: 0 auto 10px; background: #e0f2fe; color: #0369a1;">C</div>
+                <h4 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="ctxName">Customer</h4>
+                <p style="font-size: 12px; color: #64748b; margin: 0 0 6px; word-break: break-all;" id="ctxEmail">No email registered</p>
+                <p style="font-size: 12px; color: #64748b; margin: 0 0 12px; word-break: break-all;" id="ctxPhone">No phone registered</p>
 
                 <div id="ctxWhatsAppBtnWrap" style="display: none;">
                     <button type="button" onclick="openCustomerWhatsApp()" class="btn btn-success btn-sm btn-block" style="border-radius: 6px; font-weight: 600; background: #25d366; border: none;">
@@ -1033,13 +1178,13 @@ html, body {
             </div>
 
             <!-- Recent Orders from tbl_payment -->
-            <div class="wa-drawer-section" style="flex: 1;">
+            <div class="wa-drawer-section" style="flex: 1; word-break: break-word;">
                 <div class="wa-drawer-sec-title">
                     <span>Store Orders</span>
-                    <span class="badge" id="ctxOrdersCount" style="background: #111b21; font-size: 11px;">0</span>
+                    <span class="badge" id="ctxOrdersCount" style="background: #0f172a; font-size: 11px;">0</span>
                 </div>
                 <div id="ctxOrdersList" style="display: flex; flex-direction: column; gap: 8px;">
-                    <div style="color: #667781; font-size: 13px; text-align: center; padding: 15px 0;">
+                    <div style="color: #64748b; font-size: 12.5px; text-align: center; padding: 15px 0;">
                         No store orders found.
                     </div>
                 </div>
@@ -1048,8 +1193,8 @@ html, body {
             <!-- Internal Staff Notes -->
             <div class="wa-drawer-section">
                 <div class="wa-drawer-sec-title">Internal Staff Notes</div>
-                <textarea id="staffNoteInput" onkeyup="saveStaffNote()" class="form-control" rows="3" placeholder="Private notes about this customer..." style="font-size: 13px; border-radius: 6px; resize: vertical; border: 1px solid #d1d7db;"></textarea>
-                <div style="font-size: 11px; color: #667781; margin-top: 4px;">Saved locally for your staff account</div>
+                <textarea id="staffNoteInput" onkeyup="saveStaffNote()" class="form-control" rows="3" placeholder="Private notes about this customer..." style="font-size: 12.5px; border-radius: 6px; resize: vertical; border: 1px solid #d1d7db; width: 100%; box-sizing: border-box;"></textarea>
+                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Saved locally for your staff account</div>
             </div>
         </div>
 
@@ -1427,6 +1572,21 @@ function stopRingtone() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Enforce viewport lock so layout never scrolls headers off screen
+    function enforceLiveChatLayout() {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+        const cw = document.querySelector('.content-wrapper');
+        if (cw) {
+            cw.scrollTop = 0;
+            cw.style.minHeight = '0px';
+        }
+    }
+    enforceLiveChatLayout();
+    window.addEventListener('resize', enforceLiveChatLayout);
+    window.addEventListener('load', enforceLiveChatLayout);
+
     // Check URL parameters for thread_id
     const params = new URLSearchParams(window.location.search);
     const initialThreadId = params.get('thread_id');
@@ -1437,6 +1597,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const col = document.getElementById('threadsCol');
         if (col) col.classList.add('collapsed');
         updateToggleButtonsState(true);
+    }
+
+    // Context details drawer: Collapse on screens < 1360px to prevent overflow
+    const ctxCol = document.getElementById('contextCol');
+    if (ctxCol) {
+        if (window.innerWidth >= 1360 && localStorage.getItem('wa_context_collapsed') !== '1') {
+            ctxCol.classList.remove('collapsed');
+        } else {
+            ctxCol.classList.add('collapsed');
+        }
     }
 
     loadThreads().then(() => {
@@ -1511,7 +1681,10 @@ function updateToggleButtonsState(isCollapsed) {
 // Toggle Context Column (details panel)
 function toggleContextCol() {
     const col = document.getElementById('contextCol');
+    if (!col) return;
     col.classList.toggle('collapsed');
+    const isCollapsed = col.classList.contains('collapsed');
+    localStorage.setItem('wa_context_collapsed', isCollapsed ? '1' : '0');
 }
 
 // Toggle Main Admin Navigation Sidebar (Full Screen Focus)
@@ -1658,7 +1831,7 @@ function renderThreadList() {
 
         html += `
             <div onclick="selectThread(${t.id})" class="sup-chat-card wa-chat-item ${isSelected ? 'active selected' : ''} ${hasUnread ? 'has-unread' : ''}">
-                <div class="sup-avatar-col">
+                <div class="sup-avatar-col wa-avatar-wrap">
                     <div class="sup-avatar wa-avatar" style="${avatarStyle}">
                         ${initial}
                     </div>
@@ -1675,16 +1848,13 @@ function renderThreadList() {
                 <div class="sup-meta-col">
                     <div class="sup-meta-top">
                         <span class="sup-time wa-chat-time">${timeStr}</span>
-                        <button type="button" class="sup-card-dots-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Status & Options">
-                            <i class="fa fa-ellipsis-v"></i>
-                        </button>
                     </div>
                     <div class="sup-meta-bot">
-                        <span class="sup-status-pill status-${rawStatus}">
-                            <i class="fa fa-user" style="font-size: 8.5px; opacity: 0.85;"></i> ${statusLabel}
+                        <span class="sup-status-pill status-${rawStatus}" onclick="openThreadStatusModal(event, ${t.id})" title="Status: ${statusLabel}">
+                            <i class="fa fa-circle" style="font-size: 6px;"></i> ${statusLabel}
                         </span>
-                        <button type="button" class="sup-card-edit-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Edit status">
-                            <i class="fa fa-pencil"></i>
+                        <button type="button" class="sup-card-dots-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Thread options">
+                            <i class="fa fa-ellipsis-v"></i>
                         </button>
                     </div>
                 </div>
@@ -1702,8 +1872,12 @@ async function selectThread(id) {
     currentThreadId = id;
     lastMessageCount = 0;
 
-    // Activate mobile conversation view
-    document.body.classList.add('mobile-chat-active');
+    // Activate mobile conversation view only on mobile screens (< 768px)
+    if (window.innerWidth < 768) {
+        document.body.classList.add('mobile-chat-active');
+    } else {
+        document.body.classList.remove('mobile-chat-active');
+    }
 
     const empty = document.getElementById('emptyThreadState');
     if (empty) empty.style.display = 'none';
@@ -1920,6 +2094,20 @@ function renderMessages(messages) {
             <span class="wa-date-pill">Apr 12, 2025</span>
         </div>
     `;
+
+    const nonAiMessages = (messages || []).filter(m => m.sender_type !== 'ai');
+    if (nonAiMessages.length === 0) {
+        container.innerHTML += `
+            <div style="text-align: center; margin: 36px auto; max-width: 360px; background: rgba(255,255,255,0.92); border-radius: 14px; padding: 22px 24px; box-shadow: 0 1px 4px rgba(15,23,42,0.06); border: 1px solid #e2e8f0;">
+                <div style="width: 46px; height: 46px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 22px; margin: 0 auto 12px;">
+                    <i class="fa fa-comments"></i>
+                </div>
+                <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">Live Support Connected</div>
+                <div style="font-size: 12.5px; color: #64748b; line-height: 1.5;">Customer is online in your web storefront. Type a message below or click a quick reply chip to begin assistance.</div>
+            </div>
+        `;
+        return;
+    }
 
     messages.forEach(m => {
         const isMe = (m.sender_type === 'admin');
