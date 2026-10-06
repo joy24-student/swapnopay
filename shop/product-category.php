@@ -1424,6 +1424,7 @@ function renderStarIcons($rating) {
 
     // 8. Add to Cart AJAX
     window.addToCart = function(productId, btn) {
+        if (!btn || btn.disabled) return;
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';

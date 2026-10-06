@@ -3172,7 +3172,12 @@ if (document.readyState === 'loading') {
 document.addEventListener('shopnext:page-loaded', initHeroSlider);
 
 // Home Add To Cart AJAX
+let isHomeCartSubmitting = false;
 function homeAddToCart(productId, productName, btn) {
+    if (isHomeCartSubmitting) return;
+    if (!btn || btn.disabled) return;
+    isHomeCartSubmitting = true;
+
     const origHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = `<svg class="sn-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke="#0f172a"></path></svg>`;
@@ -3189,6 +3194,7 @@ function homeAddToCart(productId, productName, btn) {
     .then(data => {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        isHomeCartSubmitting = false;
         if (data.success) {
             showHomeToast('"' + productName + '" added to cart!', 'success');
             if (data.cart_count) {
@@ -3201,6 +3207,7 @@ function homeAddToCart(productId, productName, btn) {
     .catch(() => {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        isHomeCartSubmitting = false;
         showHomeToast('"' + productName + '" added to cart!', 'success');
     });
 }

@@ -1898,7 +1898,11 @@ function handleApplyPromo(manualCode = null) {
 }
 
 // 8. QUICK ADD RECOMMENDATION TO CART
+let isQuickCartSubmitting = false;
 function quickAddToCart(productId, productName, price, image, subtitle) {
+    if (isQuickCartSubmitting) return;
+    isQuickCartSubmitting = true;
+
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('quantity', 1);

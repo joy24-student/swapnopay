@@ -1929,6 +1929,7 @@ window.handleProductBuyNow = function(triggerBtn) {
 };
 
 function relAddToCart(productId, productName, btn) {
+    if (!btn || btn.disabled) return;
     const origHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:12px;"></i>';
