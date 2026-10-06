@@ -47,8 +47,9 @@ body.live-chat-page-body {
 }
 
 .main-sidebar {
-    height: 100vh !important;
-    max-height: 100vh !important;
+    height: calc(100vh - 64px) !important;
+    max-height: calc(100vh - 64px) !important;
+    top: 64px !important;
     overflow-y: auto !important;
 }
 
@@ -56,11 +57,14 @@ body.live-chat-page-body {
     display: none !important; /* Hide footer on live chat */
 }
 
+/* 2. Content Wrapper sits cleanly below the 64px fixed Admin Panel header */
 .content-wrapper,
 .right-side {
-    height: calc(100vh - 50px) !important;
-    max-height: calc(100vh - 50px) !important;
-    min-height: calc(100vh - 50px) !important;
+    position: relative !important;
+    margin-top: 64px !important;
+    height: calc(100vh - 64px) !important;
+    max-height: calc(100vh - 64px) !important;
+    min-height: calc(100vh - 64px) !important;
     overflow: hidden !important;
     background: #f0f2f5 !important;
     padding: 0 !important;
@@ -68,30 +72,19 @@ body.live-chat-page-body {
     border: none !important;
     display: flex !important;
     flex-direction: column !important;
+    box-sizing: border-box !important;
 }
 
-/* 2. Top App Bar (Voice & Video Call, Collapse, Refresh) */
+/* Hide duplicate top app bar; all actions live inside wa-main-header and wa-sidebar-header */
 .content-header {
-    height: 46px !important;
-    min-height: 46px !important;
-    max-height: 46px !important;
-    padding: 6px 14px !important;
-    background: #ffffff !important;
-    border-bottom: 1px solid #d1d7db !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    flex-shrink: 0 !important;
-    margin: 0 !important;
-    z-index: 20;
-    overflow: hidden !important;
+    display: none !important;
 }
 
 .content {
-    flex: 1 1 0% !important;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: calc(100% - 46px) !important;
-    max-height: calc(100% - 46px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -145,14 +138,17 @@ body.live-chat-page-body {
 
 /* Sidebar Header */
 .wa-sidebar-header {
-    height: 52px;
-    background: #f0f2f5;
-    padding: 8px 14px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    background: #ffffff;
+    padding: 0 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    border-bottom: 1px solid #d1d7db;
+    border-bottom: 1px solid #e2e8f0;
+    box-sizing: border-box;
 }
 .wa-brand-title {
     font-size: 17px;
@@ -467,19 +463,22 @@ body.live-chat-page-body {
     position: relative;
 }
 
-/* Chat Header (54px) */
+/* Chat Header (56px) */
 .wa-main-header {
-    height: 52px;
-    background: #f0f2f5;
-    padding: 8px 16px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    background: #ffffff;
+    padding: 0 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #d1d7db;
-    border-left: 1px solid #d1d7db;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 1px solid #e2e8f0;
     flex-shrink: 0;
-    gap: 8px;
+    gap: 10px;
     z-index: 10;
+    box-sizing: border-box;
 }
 .wa-contact-info-wrap {
     display: flex;
@@ -1156,7 +1155,7 @@ body.live-chat-page-body {
         <!-- ============================================== -->
         <div class="wa-col-drawer wa-scroll collapsed" id="contextCol">
             <!-- Drawer Header -->
-            <div class="wa-drawer-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+            <div class="wa-drawer-header" style="height: 56px; min-height: 56px; max-height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #ffffff; border-bottom: 1px solid #e2e8f0; box-sizing: border-box;">
                 <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Contact Info</span>
                 <button type="button" onclick="toggleContextCol()" class="btn btn-default btn-xs" style="border-radius: 4px; padding: 3px 8px; font-weight: 600;" title="Close Details">
                     <i class="fa fa-times"></i> Close

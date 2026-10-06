@@ -30,13 +30,18 @@
     }
 
     .live-chat-page-body .content-wrapper {
+        margin-top: 60px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
         height: calc(100vh - 60px) !important;
         max-height: calc(100vh - 60px) !important;
+        min-height: calc(100vh - 60px) !important;
         overflow: hidden !important;
         padding: 0 !important;
-        margin: 0 !important;
         background: #F8FAFC !important;
         border: none !important;
+        box-sizing: border-box !important;
     }
 
     .live-chat-page-body .content {
@@ -91,8 +96,10 @@
 
     body.mobile-chat-active .content-wrapper,
     body.mobile-chat-active .content {
+        margin-top: 0 !important;
         height: 100vh !important;
         max-height: 100vh !important;
+        min-height: 100vh !important;
     }
 
     /* Mobile Admin Header in View 1 (Warm Yellow #FEDB65) */
@@ -964,6 +971,15 @@
 
 /* Hide mobile-specific blocks on desktop displays (>= 768px) */
 @media (min-width: 768px) {
+    .live-chat-page-body .content-wrapper,
+    .live-chat-page-body .right-side {
+        margin-top: 64px !important;
+        height: calc(100vh - 64px) !important;
+        max-height: calc(100vh - 64px) !important;
+        min-height: calc(100vh - 64px) !important;
+        box-sizing: border-box !important;
+    }
+
     .sup-mob-title-block,
     .sup-mob-search-wrap,
     .sup-mob-filter-strip,
