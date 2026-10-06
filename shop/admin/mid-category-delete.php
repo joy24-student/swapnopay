@@ -3,6 +3,7 @@ require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/inc/catalog-delete.php';
 try {
     deleteStoreCatalogEntry($pdo, 'mid-category', (int)($_GET['id'] ?? $_POST['id'] ?? 0));
+    if (function_exists('clearShopCache')) { clearShopCache('menu'); }
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
         || isset($_POST['ajax']) || isset($_GET['ajax']);
     if ($isAjax) {

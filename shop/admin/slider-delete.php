@@ -33,6 +33,7 @@ if(!isset($_REQUEST['id'])) {
 	// Delete from tbl_slider
 	$statement = $pdo->prepare("DELETE FROM tbl_slider WHERE id=?");
 	$statement->execute(array($_REQUEST['id']));
+	@unlink(__DIR__ . '/inc/cache_slides.json');
 
 	$isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
 	    || isset($_POST['ajax']) || isset($_GET['ajax']);

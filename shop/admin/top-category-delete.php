@@ -8,6 +8,7 @@ try {
     $catPhoto = $photoStmt->fetchColumn();
 
     deleteStoreCatalogEntry($pdo, 'top-category', $catId);
+    if (function_exists('clearShopCache')) { clearShopCache('menu'); }
 
     if(!empty($catPhoto) && file_exists('../assets/uploads/'.$catPhoto)) {
         @unlink('../assets/uploads/'.$catPhoto);

@@ -34,6 +34,7 @@ if(isset($_POST['form1'])) {
 		$statement->execute(array($final_name,$_POST['heading'],$_POST['content'],$_POST['button_text'],$_POST['button_url'],$_POST['position']));
 			
 		$success_message = 'Slider is added successfully!';
+		if (function_exists('clearShopCache')) { clearShopCache('slides'); }
 
 		unset($_POST['heading']);
 		unset($_POST['content']);

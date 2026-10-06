@@ -8,6 +8,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
     $deleteId = (int)$_GET['slide_id'];
     $stmt = $pdo->prepare("DELETE FROM tbl_slider WHERE id = ?");
     $stmt->execute([$deleteId]);
+    @unlink(__DIR__ . '/inc/cache_slides.json');
     header("Location: settings.php#tab_home_features");
     exit;
 }
@@ -588,6 +589,7 @@ if(isset($_POST['form_general_settings'])) {
             isset($_POST['hide_free_delivery_mobile']) ? 1 : 0
         ));
         $success_message = 'General Settings are updated successfully.';
+        @unlink(__DIR__ . '/inc/cache_settings.json');
     }
 }
 

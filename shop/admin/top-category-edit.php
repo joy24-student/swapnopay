@@ -57,6 +57,7 @@ if(isset($_POST['form1'])) {
         }
 
     	$success_message = 'Top Category is updated successfully.';
+    	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
     }
 }
 ?>

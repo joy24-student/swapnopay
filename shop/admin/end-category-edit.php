@@ -26,6 +26,7 @@ if(isset($_POST['form1'])) {
 		$statement->execute(array($_POST['ecat_name'],$_POST['mcat_id'],$_REQUEST['id']));
 
     	$success_message = 'End Level Category is updated successfully.';
+    	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
     }
 }
 ?>

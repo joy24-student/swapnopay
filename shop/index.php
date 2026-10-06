@@ -51,14 +51,16 @@ if (!function_exists('renderAliProductCard')) {
 // -------------------------------------------------------------------------
 // 1. FETCH GLOBAL SETTINGS & SLIDERS FROM SUPABASE (MICROCACHED)
 // -------------------------------------------------------------------------
-$settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
-$s = null;
-if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 30)) {
-    $s = json_decode(file_get_contents($settingsCacheFile), true);
-}
+$s = $GLOBALS['STORE_SETTINGS'] ?? null;
 if (!$s) {
-    $s = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC) ?: [];
-    @file_put_contents($settingsCacheFile, json_encode($s));
+    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 300)) {
+        $s = json_decode(file_get_contents($settingsCacheFile), true);
+    }
+    if (!$s) {
+        $s = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC) ?: [];
+        @file_put_contents($settingsCacheFile, json_encode($s));
+    }
 }
 
 // Section Toggles
@@ -79,14 +81,24 @@ $hero_btn_url       = !empty($s['hero_btn_url']) ? $s['hero_btn_url'] : 'product
 $hero_slider_autoplay = isset($s['hero_slider_autoplay']) ? (int)$s['hero_slider_autoplay'] : 1;
 $hero_slider_interval = !empty($s['hero_slider_interval']) ? (int)$s['hero_slider_interval'] : 4500;
 
-// Query Hero Slides from Supabase
-try {
-    $heroSlides = $pdo->query("SELECT * FROM tbl_slider WHERE is_active = 1 ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-} catch (Throwable $_) {
+// Query Hero Slides from Supabase (Microcached 120s)
+$slidesCacheFile = __DIR__ . '/admin/inc/cache_slides.json';
+$heroSlides = null;
+if (file_exists($slidesCacheFile) && (time() - filemtime($slidesCacheFile) < 120)) {
+    $heroSlides = json_decode(file_get_contents($slidesCacheFile), true);
+}
+if (!$heroSlides) {
     try {
-        $heroSlides = $pdo->query("SELECT * FROM tbl_slider ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } catch (Throwable $__) {
-        $heroSlides = [];
+        $heroSlides = $pdo->query("SELECT * FROM tbl_slider WHERE is_active = 1 ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $_) {
+        try {
+            $heroSlides = $pdo->query("SELECT * FROM tbl_slider ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $__) {
+            $heroSlides = [];
+        }
+    }
+    if (!empty($heroSlides)) {
+        @file_put_contents($slidesCacheFile, json_encode($heroSlides));
     }
 }
 if (empty($heroSlides)) {
@@ -94,17 +106,27 @@ if (empty($heroSlides)) {
     $heroSlides = [['id' => 1, 'photo' => $fallbackImg]];
 }
 
-// Categories Section Defaults & Data
+// Categories Section Defaults & Data (Reusing preloaded categories)
 $categories_title = !empty($s['categories_title']) ? $s['categories_title'] : 'Shop by Category';
 $categories = [];
-try {
-    $catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 AND LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
-    $categories = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-    if (empty($categories)) {
-        $catStmt2 = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_id ASC LIMIT 10");
-        $categories = $catStmt2 ? ($catStmt2->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+if (!empty($GLOBALS['all_tcat']) && is_array($GLOBALS['all_tcat'])) {
+    foreach ($GLOBALS['all_tcat'] as $tc) {
+        if (strtolower($tc['tcat_name'] ?? '') !== 'shop') {
+            $categories[] = $tc;
+            if (count($categories) >= 10) break;
+        }
     }
-} catch (Throwable $_) {}
+}
+if (empty($categories)) {
+    try {
+        $catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 AND LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
+        $categories = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        if (empty($categories)) {
+            $catStmt2 = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_id ASC LIMIT 10");
+            $categories = $catStmt2 ? ($catStmt2->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        }
+    } catch (Throwable $_) {}
+}
 
 // Dual Promo Banners Defaults
 $promo1_tag   = !empty($s['promo_banner1_tag']) ? $s['promo_banner1_tag'] : 'Up to 50% Off';
@@ -200,11 +222,16 @@ $initialOrder = "({$scoreSql}) DESC, p.p_id DESC";
 try {
     $prodStmt = $pdo->query("
         SELECT p.*, e.mcat_id, m.tcat_id,
-               COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating,
-               COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count
+               COALESCE(r.avg_rating, 0) as avg_rating,
+               COALESCE(r.rev_count, 0) as rev_count
         FROM tbl_product p
         LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
         LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+        LEFT JOIN (
+            SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count 
+            FROM tbl_rating 
+            GROUP BY p_id
+        ) r ON p.p_id = r.p_id
         WHERE p.p_is_active = 1
         ORDER BY {$initialOrder}
         LIMIT {$featured_limit}

@@ -34,15 +34,20 @@ foreach ($langValues as $lv) {
     $i++;
 }
 
-// Fetch general website settings (cached for 60 seconds)
-$settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
-$settings = null;
-if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 60)) {
-    $settings = json_decode(file_get_contents($settingsCacheFile), true);
-}
+// Fetch general website settings (cached for 300 seconds)
+$settings = $GLOBALS['STORE_SETTINGS'] ?? null;
 if (!$settings) {
-    $settings = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC) ?: [];
-    @file_put_contents($settingsCacheFile, json_encode($settings));
+    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 300)) {
+        $settings = json_decode(file_get_contents($settingsCacheFile), true);
+    }
+    if (!$settings) {
+        $settings = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC) ?: [];
+        @file_put_contents($settingsCacheFile, json_encode($settings));
+    }
+    if ($settings) {
+        $GLOBALS['STORE_SETTINGS'] = $settings;
+    }
 } 
 
 // Assign settings variables
@@ -1966,16 +1971,37 @@ body.sn-popup-open {
         <nav class="sn-nav-bar sn-desktop-only">
             <a href="<?php echo BASE_URL; ?>" class="sn-nav-link <?php echo ($cur_page == 'index.php' || $cur_page == '') ? 'active' : ''; ?>">Home</a>
 
+            <?php
+            $menuCacheFile = __DIR__ . '/admin/inc/cache_menu.json';
+            $menuData = null;
+            if (file_exists($menuCacheFile) && (time() - filemtime($menuCacheFile) < 300)) {
+                $menuData = json_decode(file_get_contents($menuCacheFile), true);
+            }
+            if (!$menuData) {
+                try {
+                    $all_tcat = $pdo->query("SELECT * FROM tbl_top_category WHERE show_on_menu=1 ORDER BY tcat_order ASC, tcat_id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    $all_mcat_raw = $pdo->query("SELECT * FROM tbl_mid_category ORDER BY mcat_id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    $all_ecat_raw = $pdo->query("SELECT * FROM tbl_end_category ORDER BY ecat_id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    $mcat_by_tcat = [];
+                    foreach ($all_mcat_raw as $m) { $mcat_by_tcat[$m['tcat_id']][] = $m; }
+                    $ecat_by_mcat = [];
+                    foreach ($all_ecat_raw as $e) { $ecat_by_mcat[$e['mcat_id']][] = $e; }
+                    $menuData = ['tcat' => $all_tcat, 'mcat' => $mcat_by_tcat, 'ecat' => $ecat_by_mcat];
+                    @file_put_contents($menuCacheFile, json_encode($menuData));
+                } catch (Throwable $e) {
+                    $menuData = ['tcat' => [], 'mcat' => [], 'ecat' => []];
+                }
+            }
+            $navCategories = array_slice($menuData['tcat'] ?? [], 0, 12);
+            ?>
+
             <div class="sn-dropdown-parent">
                 <a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category" class="sn-nav-link">
                     <span>All Categories</span>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </a>
                 <div class="sn-category-dropdown">
-                    <?php
-                    $navCategories = $pdo->query("SELECT tcat_id, tcat_name FROM tbl_top_category WHERE show_on_menu = 1 ORDER BY tcat_order ASC, tcat_id ASC LIMIT 12")->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($navCategories as $nc):
-                    ?>
+                    <?php foreach ($navCategories as $nc): ?>
                         <a href="<?php echo BASE_URL; ?>product-category.php?id=<?php echo $nc['tcat_id']; ?>&type=top-category"><?php echo htmlspecialchars($nc['tcat_name']); ?></a>
                     <?php endforeach; ?>
                 </div>
@@ -2082,30 +2108,10 @@ window.snOpenMobileSearch = function(e) {
             <a href="#"><i class="fas fa-th-list"></i> Categories <i class="fas fa-chevron-down submenu-arrow"></i></a>
             <ul class="submenu">
                 <?php
-                $menuCacheFile = __DIR__ . '/admin/inc/cache_menu.json';
-                $menuData = null;
-                if (file_exists($menuCacheFile) && (time() - filemtime($menuCacheFile) < 60)) {
-                    $menuData = json_decode(file_get_contents($menuCacheFile), true);
-                }
-                if (!$menuData) {
-                    $all_tcat = $pdo->query("SELECT * FROM tbl_top_category WHERE show_on_menu=1 ORDER BY tcat_id ASC")->fetchAll(PDO::FETCH_ASSOC);
-                    $all_tcat = $pdo->query("SELECT * FROM tbl_top_category WHERE show_on_menu=1 ORDER BY tcat_order ASC, tcat_id ASC")->fetchAll(PDO::FETCH_ASSOC);
-                    $all_mcat_raw = $pdo->query("SELECT * FROM tbl_mid_category ORDER BY mcat_id ASC")->fetchAll(PDO::FETCH_ASSOC);
-                    $all_ecat_raw = $pdo->query("SELECT * FROM tbl_end_category ORDER BY ecat_id ASC")->fetchAll(PDO::FETCH_ASSOC);
-                    $mcat_by_tcat = [];
-                    foreach ($all_mcat_raw as $m) { $mcat_by_tcat[$m['tcat_id']][] = $m; }
-                    $ecat_by_mcat = [];
-                    foreach ($all_ecat_raw as $e) { $ecat_by_mcat[$e['mcat_id']][] = $e; }
-                    $menuData = ['tcat' => $all_tcat, 'mcat' => $mcat_by_tcat, 'ecat' => $ecat_by_mcat];
-                    @file_put_contents($menuCacheFile, json_encode($menuData));
-                }
-                $all_tcat = $menuData['tcat'];
-                $mcat_by_tcat = $menuData['mcat'];
-                $ecat_by_mcat = $menuData['ecat'];
-                $GLOBALS['all_tcat'] = $all_tcat;
                 $all_tcat = $menuData['tcat'] ?? [];
                 $mcat_by_tcat = $menuData['mcat'] ?? [];
                 $ecat_by_mcat = $menuData['ecat'] ?? [];
+                $GLOBALS['all_tcat'] = $all_tcat;
 
                 foreach ($all_tcat as $row_tcat) {
                     $mid_cats = $mcat_by_tcat[$row_tcat['tcat_id']] ?? [];

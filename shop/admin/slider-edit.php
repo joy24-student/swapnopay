@@ -35,6 +35,7 @@ if(isset($_POST['form1'])) {
 		}	   
 
 	    $success_message = 'Slider is updated successfully!';
+	    if (function_exists('clearShopCache')) { clearShopCache('slides'); }
 	}
 }
 ?>

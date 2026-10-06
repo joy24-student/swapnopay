@@ -35,6 +35,7 @@ if(isset($_POST['form1'])) {
 		$statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$final_name));
             
     	$success_message = 'Top Category is added successfully.';
+    	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
     }
 }
 ?>

@@ -162,21 +162,33 @@ if (!filter_var($BASE_URL,FILTER_VALIDATE_URL) || !in_array(parse_url($BASE_URL,
 }
 define('BASE_URL',rtrim($BASE_URL,'/') . '/');
 
-// Dynamically resolve Store / Shop Name from Database (tbl_settings)
-$dynamicStoreName = '';
-try {
-    $settingsRow = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    if (!empty($settingsRow['store_name'])) {
-        $dynamicStoreName = trim($settingsRow['store_name']);
-    } elseif (!empty($settingsRow['meta_title_home'])) {
-        $dynamicStoreName = trim($settingsRow['meta_title_home']);
-    }
-} catch (Throwable $e) {}
-
-if (empty($dynamicStoreName) && !empty($runtime['store_name'])) {
-    $dynamicStoreName = trim($runtime['store_name']);
+// Dynamically resolve Store / Shop Name from Cached Settings or Database
+$settingsCacheFile = __DIR__ . '/cache_settings.json';
+$settingsRow = null;
+if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 300)) {
+    $settingsRow = json_decode(file_get_contents($settingsCacheFile), true);
 }
-if (empty($dynamicStoreName)) {
+if (!$settingsRow) {
+    try {
+        $settingsRow = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if ($settingsRow) {
+            @file_put_contents($settingsCacheFile, json_encode($settingsRow));
+        }
+    } catch (Throwable $e) {}
+}
+
+if (!empty($settingsRow)) {
+    $GLOBALS['STORE_SETTINGS'] = $settingsRow;
+}
+
+$dynamicStoreName = '';
+if (!empty($settingsRow['store_name'])) {
+    $dynamicStoreName = trim($settingsRow['store_name']);
+} elseif (!empty($settingsRow['meta_title_home'])) {
+    $dynamicStoreName = trim($settingsRow['meta_title_home']);
+} elseif (!empty($runtime['store_name'])) {
+    $dynamicStoreName = trim($runtime['store_name']);
+} else {
     $dynamicStoreName = 'Online Store';
 }
 
@@ -188,3 +200,19 @@ if (!function_exists('getStoreName')) {
         return defined('STORE_NAME') ? STORE_NAME : 'Online Store';
     }
 }
+
+if (!function_exists('clearShopCache')) {
+    function clearShopCache($type = 'all') {
+        $dir = __DIR__;
+        if ($type === 'settings' || $type === 'all') {
+            @unlink($dir . '/cache_settings.json');
+        }
+        if ($type === 'menu' || $type === 'all') {
+            @unlink($dir . '/cache_menu.json');
+        }
+        if ($type === 'slides' || $type === 'all') {
+            @unlink($dir . '/cache_slides.json');
+        }
+    }
+}
+
