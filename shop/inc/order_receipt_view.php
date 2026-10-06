@@ -709,9 +709,9 @@ $qrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&
 }
 
 /* =========================================================
-   RESPONSIVE & PRINT SPECIFICATION
+   RESPONSIVE (SCREEN ONLY) & PRINT SPECIFICATION
    ========================================================= */
-@media (max-width: 820px) {
+@media screen and (max-width: 820px) {
     .sn-rcpt-container {
         padding: 24px 20px;
         margin: 12px auto;
@@ -742,14 +742,51 @@ $qrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&
     }
 }
 
+@page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+}
+
 @media print {
-    body, html {
-        background: #ffffff !important;
-        margin: 0 !important;
-        padding: 0 !important;
+    *, *:before, *:after {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        color-adjust: exact !important;
     }
+
+    body, html {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        font-size: 11pt !important;
+    }
+
+    /* Reset all AdminLTE wrappers & sidebars */
+    .wrapper,
+    .content-wrapper,
+    .right-side,
+    .content,
+    .page {
+        margin: 0 !important;
+        margin-left: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: auto !important;
+        position: static !important;
+        overflow: visible !important;
+        float: none !important;
+    }
+
+    /* Hide chrome, navigation & buttons */
     .no-print,
     .main-header,
     .main-sidebar,
@@ -757,24 +794,136 @@ $qrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&
     .content-header,
     .breadcrumb,
     .btn,
-    .receipt-action-bar {
+    .receipt-action-bar,
+    .sn-nav-action-bar,
+    .sn-mobile-bottom-dock,
+    .modal,
+    .modal-backdrop {
         display: none !important;
-    }
-    .content-wrapper,
-    .content,
-    .page {
+        visibility: hidden !important;
+        height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
-        background: #ffffff !important;
-        border: none !important;
     }
+
+    /* Receipt container: Clean borderless full-width presentation */
     .sn-rcpt-container {
+        width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
-        padding: 20px !important;
-        border: 1px solid #cbd5e1 !important;
+        padding: 4mm 0 !important;
+        border: none !important;
         box-shadow: none !important;
         border-radius: 0 !important;
+        background: #ffffff !important;
+    }
+
+    /* Preserve 2-column header */
+    .sn-rcpt-header-bar {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding-bottom: 12px !important;
+        border-bottom: 2px solid #0f2942 !important;
+    }
+
+    .sn-rcpt-trust-badges {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 16px !important;
+    }
+
+    /* Preserve Title and Order Status Card side-by-side */
+    .sn-rcpt-title-section {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        margin: 14px 0 16px 0 !important;
+    }
+
+    .sn-rcpt-title-card {
+        min-width: 280px !important;
+        padding: 10px 14px !important;
+        background: #f0f7ff !important;
+        border: 1px solid #bfdbfe !important;
+    }
+
+    /* Preserve 3-Column Address & Payment Cards */
+    .sn-rcpt-cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 12px !important;
+        margin-bottom: 16px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .sn-rcpt-info-card {
+        padding: 10px 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #f8fafc !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* Preserve 2-Column Product Table & Calculations */
+    .sn-rcpt-main-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 270px !important;
+        gap: 16px !important;
+        margin-bottom: 16px !important;
+        align-items: flex-start !important;
+    }
+
+    .sn-rcpt-table-wrap {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+    }
+
+    .sn-rcpt-table thead tr {
+        background: #0f2942 !important;
+        color: #ffffff !important;
+    }
+
+    .sn-rcpt-table th,
+    .sn-rcpt-table td {
+        padding: 8px 10px !important;
+        font-size: 11px !important;
+    }
+
+    .sn-rcpt-table tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .sn-rcpt-prod-thumb {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .sn-rcpt-summary-box,
+    .sn-rcpt-shipinfo-box {
+        padding: 10px 14px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        background: #f8fafc !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* Preserve Horizontal Footer Banner */
+    .sn-rcpt-footer-banner {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-top: 1px solid #cbd5e1 !important;
+        padding-top: 12px !important;
+        margin-top: 14px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
     }
 }
 </style>

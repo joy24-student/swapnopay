@@ -90,13 +90,74 @@ if (isset($_GET['print']) && $_GET['print'] == '1') {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Order Receipt - <?= receiptText($reference) ?></title>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <style>
-            body { margin: 0; padding: 15px; background: #ffffff; }
+            body { margin: 0; padding: 24px 12px; background: #f8fafc; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #0f172a; }
+            .print-floating-bar {
+                position: fixed;
+                top: 16px;
+                right: 20px;
+                display: flex;
+                gap: 8px;
+                z-index: 99999;
+                background: #ffffff;
+                padding: 6px 12px;
+                border-radius: 8px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+                border: 1px solid #cbd5e1;
+            }
+            .print-btn-main {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 7px 16px;
+                background: #2563eb;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                font-weight: 700;
+                font-size: 13px;
+                cursor: pointer;
+            }
+            .print-btn-main:hover { background: #1d4ed8; }
+            .print-btn-close {
+                display: inline-flex;
+                align-items: center;
+                padding: 7px 14px;
+                background: #f1f5f9;
+                color: #334155;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                cursor: pointer;
+            }
+            @media print {
+                .print-floating-bar { display: none !important; }
+                body { padding: 0 !important; background: #ffffff !important; }
+            }
         </style>
     </head>
-    <body onload="window.print();">
+    <body>
+        <div class="print-floating-bar no-print">
+            <button type="button" class="print-btn-main" onclick="window.print()">
+                <i class="fa fa-print"></i> Print Document
+            </button>
+            <button type="button" class="print-btn-close" onclick="window.close()">
+                Close
+            </button>
+        </div>
         <?php require_once __DIR__ . '/../inc/order_receipt_view.php'; ?>
+        <script>
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    window.print();
+                }, 400);
+            });
+        </script>
     </body>
     </html>
     <?php
@@ -128,311 +189,81 @@ require_once __DIR__ . '/header.php';
     flex-wrap: wrap;
     gap: 12px;
 }
-.receipt-sheet {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 36px 40px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    color: #1e293b;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    position: relative;
-}
-.receipt-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 2px solid #f1f5f9;
-    padding-bottom: 24px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-.receipt-brand-logo {
-    max-height: 56px;
-    max-width: 220px;
-    object-fit: contain;
-    margin-bottom: 10px;
-}
-.receipt-company-info {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.6;
-}
-.receipt-title-box {
-    text-align: right;
-}
-.receipt-main-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.5px;
-    margin: 0 0 6px;
-    text-transform: uppercase;
-}
-.receipt-ref-code {
-    font-size: 14px;
-    font-family: "Courier New", Courier, monospace;
-    font-weight: 700;
-    color: #2563eb;
-    background: #eff6ff;
-    padding: 3px 8px;
-    border-radius: 6px;
-    border: 1px solid #dbeafe;
-    display: inline-block;
-    margin-bottom: 8px;
-}
-.receipt-meta-pills {
-    display: flex;
-    gap: 6px;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    margin-top: 6px;
-}
-.status-pill {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-    text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.status-paid { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-.status-pending { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-.status-cancelled { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-.status-delivered { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-.status-shipped { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
-.status-processing { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
-
-/* 3-Column Info Cards */
-.receipt-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
-    margin-bottom: 28px;
-}
-@media (max-width: 768px) {
-    .receipt-grid-3 { grid-template-columns: 1fr; }
-    .receipt-title-box { text-align: left; }
-    .receipt-meta-pills { justify-content: flex-start; }
-}
-.receipt-info-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 16px 18px;
-    font-size: 13px;
-    line-height: 1.6;
-}
-.receipt-info-card h4 {
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #64748b;
-    margin: 0 0 10px;
-    letter-spacing: 0.5px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.receipt-info-card strong {
-    color: #0f172a;
-    font-size: 14px;
-}
-
-/* Itemized Products Table */
-.receipt-table-box {
-    margin-bottom: 28px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    overflow: hidden;
-}
-.receipt-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-.receipt-table thead th {
-    background: #f8fafc;
-    color: #475569;
-    font-weight: 700;
-    font-size: 12px;
-    text-transform: uppercase;
-    padding: 12px 16px;
-    border-bottom: 2px solid #e2e8f0;
-    letter-spacing: 0.5px;
-}
-.receipt-table tbody td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
-}
-.receipt-table tbody tr:last-child td {
-    border-bottom: none;
-}
-.receipt-table tbody tr:hover {
-    background: #fafafa;
-}
-.receipt-prod-img {
-    width: 58px;
-    height: 58px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    background: #ffffff;
-    flex-shrink: 0;
-}
-.receipt-prod-meta {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-.receipt-badge-option {
-    display: inline-block;
-    background: #f1f5f9;
-    color: #475569;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 4px;
-    margin-right: 4px;
-    margin-top: 4px;
-}
-
-/* Financial Summary & Calculations */
-.receipt-bottom-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 24px;
-    margin-bottom: 30px;
-}
-@media (max-width: 768px) {
-    .receipt-bottom-grid { grid-template-columns: 1fr; }
-}
-.receipt-notes-panel {
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 10px;
-    padding: 18px;
-    font-size: 12px;
-    color: #475569;
-}
-.receipt-calc-table {
-    width: 100%;
-    font-size: 13px;
-}
-.receipt-calc-table td {
-    padding: 7px 0;
-    vertical-align: middle;
-}
-.receipt-calc-table td:last-child {
-    text-align: right;
-    font-weight: 600;
-}
-.receipt-calc-total {
-    border-top: 2px solid #0f172a;
-    border-bottom: 2px solid #0f172a;
-    padding: 12px 0 !important;
-}
-.receipt-calc-total td {
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    color: #0f172a !important;
-}
-
-/* Barcode simulation */
-.barcode-box {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px dashed #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-.barcode-lines {
-    font-family: 'Libre Barcode 39', 'Code 128', monospace;
-    font-size: 32px;
-    letter-spacing: 4px;
-    color: #0f172a;
-    line-height: 1;
-}
-
-/* Footer & Signatures */
-.receipt-sign-row {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 36px;
-    padding-top: 24px;
-    border-top: 1px solid #f1f5f9;
-    font-size: 12px;
-    color: #64748b;
-}
-.receipt-sign-box {
-    text-align: center;
-    width: 180px;
-}
-.receipt-sign-line {
-    border-top: 1px solid #cbd5e1;
-    margin-top: 36px;
-    padding-top: 4px;
-}
 
 /* =========================================================
-   PRINT SPECIFIC HIGH-FIDELITY STYLESHEET
+   PRINT SPECIFIC HIGH-FIDELITY STYLESHEET (ADMIN PANEL VIEW)
    ========================================================= */
+@page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+}
+
 @media print {
-    body, html {
-        background: #ffffff !important;
-        color: #000000 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 12px !important;
+    *, *:before, *:after {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        color-adjust: exact !important;
     }
+
+    body, html {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        font-size: 11pt !important;
+    }
+
+    /* Total AdminLTE reset: eliminate 230px sidebar offset and padding */
+    .wrapper,
+    .content-wrapper,
+    .right-side,
+    .main-content,
+    .content,
+    .page {
+        margin: 0 !important;
+        margin-left: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: auto !important;
+        position: static !important;
+        overflow: visible !important;
+        float: none !important;
+        transform: none !important;
+    }
+
+    /* Hide all admin controls, chrome, menus and modal overlays */
     .main-header,
     .main-sidebar,
+    .left-side,
     .main-footer,
     .content-header,
     .receipt-action-bar,
     .btn,
     .alert,
-    .breadcrumb {
-        display: none !important;
-    }
-    .content-wrapper,
-    .content {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #ffffff !important;
-        border: none !important;
-        min-height: auto !important;
-    }
-    .receipt-wrapper {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    .receipt-sheet {
-        box-shadow: none !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 0 !important;
-        padding: 24px !important;
-    }
-    .receipt-info-card,
-    .receipt-table-box,
-    .receipt-notes-panel {
-        background: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    .receipt-table thead th {
-        background: #f1f5f9 !important;
-        color: #000000 !important;
-    }
+    .breadcrumb,
+    .modal,
+    .modal-backdrop,
     .no-print {
         display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .receipt-wrapper {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 }
 </style>
