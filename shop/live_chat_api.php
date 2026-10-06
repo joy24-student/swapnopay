@@ -254,7 +254,7 @@ switch ($action) {
         $recentOrders = [];
         if (!empty($curr['customer_email']) || !empty($curr['customer_phone'])) {
             try {
-                $oQuery = "SELECT id, payment_id, customer_name, customer_email, paid_amount, payment_status, shipping_status, payment_date FROM tbl_payment WHERE 1=0";
+                $oQuery = "SELECT id, payment_id, customer_name, customer_email, paid_amount, payment_method, payment_status, shipping_status, payment_date, shipping_address, shipping_city, shipping_state, billing_address, billing_city, billing_state FROM tbl_payment WHERE 1=0";
                 $oParams = [];
                 if (!empty($curr['customer_email'])) {
                     $oQuery .= " OR customer_email = ?";
@@ -273,6 +273,14 @@ switch ($action) {
                 $oStmt = $pdo->prepare($oQuery);
                 $oStmt->execute($oParams);
                 $recentOrders = $oStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($recentOrders as &$ord) {
+                    $pId = $ord['payment_id'];
+                    $iStmt = $pdo->prepare("SELECT o.product_name, o.size, o.color, o.quantity, o.unit_price, p.p_featured_photo FROM tbl_order o LEFT JOIN tbl_product p ON p.p_id = o.product_id WHERE o.payment_id = ? LIMIT 1");
+                    $iStmt->execute([$pId]);
+                    $ord['item'] = $iStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+                unset($ord);
             } catch (Throwable $e) {}
         }
 
@@ -449,13 +457,11 @@ switch ($action) {
 
         $stmt = $pdo->query("
             SELECT t.*, 
-                   (SELECT message FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'ai' ORDER BY id DESC LIMIT 1) as last_message,
-                   (SELECT created_at FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'ai' ORDER BY id DESC LIMIT 1) as last_message_at
+                   COALESCE((SELECT message FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'system' ORDER BY id DESC LIMIT 1), 'Customer opened chat session') as last_message,
+                   COALESCE((SELECT created_at FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'system' ORDER BY id DESC LIMIT 1), t.updated_at) as last_message_at
             FROM tbl_shop_chat_threads t
-            WHERE t.mode = 'live' 
-               OR EXISTS (SELECT 1 FROM tbl_shop_chat_messages m WHERE m.thread_id = t.id AND m.sender_type IN ('customer', 'admin'))
             ORDER BY t.updated_at DESC
-            LIMIT 50
+            LIMIT 60
         ");
         $threads = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['status' => 'success', 'threads' => $threads]);
@@ -513,6 +519,21 @@ switch ($action) {
             ->execute([$threadId, $notice]);
 
         echo json_encode(['status' => 'success', 'mode' => $mode]);
+        exit;
+    }
+
+    case 'admin_update_status': {
+        $threadId = (int)($_POST['thread_id'] ?? 0);
+        $status = strtolower(trim($_POST['status'] ?? 'active'));
+        $allowed = ['active', 'pending', 'processing', 'blocked', 'resolved', 'closed'];
+
+        if ($threadId && in_array($status, $allowed, true)) {
+            $pdo->prepare("UPDATE tbl_shop_chat_threads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                ->execute([$status, $threadId]);
+            echo json_encode(['status' => 'success', 'new_status' => $status]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid parameters']);
+        }
         exit;
     }
 

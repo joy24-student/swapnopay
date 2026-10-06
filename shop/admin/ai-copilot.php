@@ -157,8 +157,12 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
 
                 <!-- Secondary Quick Action Chips -->
                 <div class="gemini-quick-chips">
+                    <span class="gemini-chip" onclick="sendAiPrompt('Analyze customer retention, VIP champions, and churn risk')"><i class="fa fa-users text-purple" style="color:#7C3AED;"></i> VIP Retention & Churn</span>
+                    <span class="gemini-chip" onclick="sendAiPrompt('Run dynamic pricing and profit margin optimization')"><i class="fa fa-balance-scale text-success"></i> Dynamic Pricing</span>
+                    <span class="gemini-chip" onclick="sendAiPrompt('Forecast 30-day inventory demand and stockout risks')"><i class="fa fa-clock-o text-warning"></i> Demand Forecast</span>
+                    <span class="gemini-chip" onclick="sendAiPrompt('Audit store conversion rate and catalog CRO health')"><i class="fa fa-check-circle text-primary"></i> CRO Conversion Audit</span>
+                    <span class="gemini-chip" onclick="sendAiPrompt('Recover abandoned carts and pending unpaid orders')"><i class="fa fa-shopping-cart text-danger"></i> Cart Recovery</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Run autonomous fraud and risk detection scan on recent orders')"><i class="fa fa-shield text-danger"></i> Fraud Risk Scan</span>
-                    <span class="gemini-chip" onclick="sendAiPrompt('Show all low stock and out of stock products in inventory')"><i class="fa fa-cubes text-warning"></i> Restock Low Inventory</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Generate executive business revenue and sales analytics report')"><i class="fa fa-line-chart text-success"></i> Revenue KPI Report</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Generate studio photo enhancement with verified badges')"><i class="fa fa-magic text-info"></i> Studio Photo Enhancer</span>
                 </div>
