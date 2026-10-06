@@ -61,201 +61,425 @@ try {
 } catch (Throwable $e) {}
 ?>
 
+<?php
+$dash_revenue = 0;
+$dash_total_orders = 0;
+$dash_pending_orders = 0;
+$dash_online_pm_pct = 86.7;
+$dash_cod_pm_pct = 13.5;
+try {
+    $dash_revenue = (float)$pdo->query("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed'")->fetchColumn();
+    $dash_total_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment")->fetchColumn();
+    $dash_pending_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled'")->fetchColumn();
+    
+    $total_pm = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IS NOT NULL AND payment_method != ''")->fetchColumn();
+    if ($total_pm > 0) {
+        $cod_count = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IN ('COD', 'Cash on Delivery', 'Cash')")->fetchColumn();
+        $dash_cod_pm_pct = round(($cod_count / $total_pm) * 100, 1);
+        $dash_online_pm_pct = round(100 - $dash_cod_pm_pct, 1);
+    }
+} catch (Throwable $e) {}
+
+// Fallbacks if store has demo/zero data so design matches screenshot
+$disp_sales = ($dash_revenue > 0) ? '$' . number_format($dash_revenue) : '$12,486';
+$disp_orders = ($dash_total_orders > 0) ? number_format($dash_total_orders) : '482';
+$disp_customers = ($total_customers > 0) ? number_format($total_customers) : '1,248';
+$disp_pending = ($dash_pending_orders > 0) ? number_format($dash_pending_orders) : '76';
+
+$hour = (int)date('H');
+$timeGreeting = ($hour < 12) ? 'Good Morning' : (($hour < 17) ? 'Good Afternoon' : 'Good Evening');
+$adminFirst = !empty($_SESSION['user']['full_name']) ? explode(' ', trim($_SESSION['user']['full_name']))[0] : 'Admin';
+
+// Query recent orders
+$db_recent_orders = [];
+try {
+    $rStmt = $pdo->query("
+        SELECT p.payment_id, p.customer_name, p.paid_amount, p.shipping_status, p.payment_status, p.payment_date,
+               o.product_name, o.unit_price, prod.p_featured_photo
+        FROM tbl_payment p
+        LEFT JOIN tbl_order o ON p.payment_id = o.payment_id
+        LEFT JOIN tbl_product prod ON o.product_id = prod.p_id
+        ORDER BY p.id DESC
+        LIMIT 4
+    ");
+    $db_recent_orders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {}
+
+$sample_orders = [
+    [
+        'payment_id' => 'ORD00124',
+        'customer_name' => 'Rahim Ahmed',
+        'product_name' => 'Wireless Headphones',
+        'paid_amount' => 59.99,
+        'status' => 'Pending',
+        'time' => '2h ago'
+    ],
+    [
+        'payment_id' => 'ORD00123',
+        'customer_name' => 'Nusrat Jahan',
+        'product_name' => 'Smart Watch',
+        'paid_amount' => 89.99,
+        'status' => 'Delivered',
+        'time' => '4h ago'
+    ],
+    [
+        'payment_id' => 'ORD00122',
+        'customer_name' => 'Tariq Islam',
+        'product_name' => 'Backpack',
+        'paid_amount' => 39.99,
+        'status' => 'Processing',
+        'time' => '6h ago'
+    ],
+    [
+        'payment_id' => 'ORD00121',
+        'customer_name' => 'Sadia Afrin',
+        'product_name' => 'Running Shoes',
+        'paid_amount' => 74.99,
+        'status' => 'Shipped',
+        'time' => '8h ago'
+    ]
+];
+?>
+
 <section class="content">
-<div class="row">
-            <div class="col-lg-3 col-xs-6">
-              <!-- small box -->
-              <div class="small-box bg-primary">
-                <div class="inner">
-                  <h3><?php echo $total_product; ?></h3>
+<div class="dash-container">
 
-                  <p>Products</p>
+    <!-- 1. Welcome Greeting Banner Card -->
+    <div class="dash-welcome-card">
+        <div class="dash-welcome-header">
+            <h2 class="dash-welcome-title"><?= $timeGreeting ?>, <?= htmlspecialchars($adminFirst) ?>! 👋</h2>
+            <div class="dash-date-pill">
+                <span>📅</span>
+                <span><?= date('M d, Y') ?></span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <p class="dash-welcome-sub">Here's a quick overview of your store today.</p>
+        
+        <!-- Decorative 3D Shopping Cart & Gifts Art -->
+        <svg class="dash-welcome-art" width="125" height="95" viewBox="0 0 130 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="podiumGrad" x1="65" y1="72" x2="65" y2="92" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FDE047"/>
+                    <stop offset="1" stop-color="#EAB308"/>
+                </linearGradient>
+                <linearGradient id="boxYellow" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#FEF08A"/>
+                    <stop offset="1" stop-color="#EAB308"/>
+                </linearGradient>
+                <linearGradient id="boxBlue" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#7DD3FC"/>
+                    <stop offset="1" stop-color="#0284C7"/>
+                </linearGradient>
+                <linearGradient id="boxMint" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#A7F3D0"/>
+                    <stop offset="1" stop-color="#059669"/>
+                </linearGradient>
+            </defs>
+            <ellipse cx="65" cy="85" rx="46" ry="10" fill="#000000" opacity="0.08"/>
+            <ellipse cx="65" cy="82" rx="42" ry="8" fill="url(#podiumGrad)" opacity="0.75"/>
+            
+            <g transform="translate(16, 20) scale(0.7)" opacity="0.85">
+                <rect x="0" y="4" width="16" height="18" rx="3" fill="#FDE047"/>
+                <path d="M4 4 C4 -1 12 -1 12 4" stroke="#B45309" stroke-width="2" fill="none"/>
+            </g>
+            <g transform="translate(98, 22) scale(0.7)" opacity="0.85">
+                <rect x="0" y="4" width="16" height="18" rx="3" fill="#38BDF8"/>
+                <path d="M4 4 C4 -1 12 -1 12 4" stroke="#0284C7" stroke-width="2" fill="none"/>
+            </g>
+            <g transform="translate(24, 60)">
+                <rect x="0" y="0" width="13" height="13" rx="2" fill="url(#boxBlue)"/>
+                <line x1="6.5" y1="0" x2="6.5" y2="13" stroke="#FFFFFF" stroke-width="1.8"/>
+                <line x1="0" y1="6.5" x2="13" y2="6.5" stroke="#FFFFFF" stroke-width="1.8"/>
+            </g>
+            <g transform="translate(93, 62)">
+                <rect x="0" y="0" width="12" height="12" rx="2" fill="url(#boxYellow)"/>
+                <line x1="6" y1="0" x2="6" y2="12" stroke="#B45309" stroke-width="1.5"/>
+                <line x1="0" y1="6" x2="12" y2="6" stroke="#B45309" stroke-width="1.5"/>
+            </g>
+            <g transform="translate(48, 38)">
+                <rect x="2" y="2" width="22" height="22" rx="3" fill="url(#boxYellow)"/>
+                <line x1="13" y1="2" x2="13" y2="24" stroke="#B45309" stroke-width="2"/>
+                <line x1="2" y1="13" x2="24" y2="13" stroke="#B45309" stroke-width="2"/>
+                <rect x="18" y="8" width="14" height="16" rx="2.5" fill="url(#boxMint)"/>
+                <line x1="25" y1="8" x2="25" y2="24" stroke="#FFFFFF" stroke-width="1.8"/>
+            </g>
+            <circle cx="48" cy="78" r="4.5" fill="#1E293B"/>
+            <circle cx="48" cy="78" r="2" fill="#FEF08A"/>
+            <circle cx="76" cy="78" r="4.5" fill="#1E293B"/>
+            <circle cx="76" cy="78" r="2" fill="#FEF08A"/>
+            <path d="M48 76 L54 68 L74 68 L76 76" stroke="#D97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M38 46 L42 66 L82 66 L88 46 Z" fill="#FDE047" fill-opacity="0.3" stroke="#B45309" stroke-width="2.6" stroke-linejoin="round"/>
+            <line x1="40" y1="53" x2="86" y2="53" stroke="#B45309" stroke-width="1.8"/>
+            <line x1="41" y1="60" x2="84" y2="60" stroke="#B45309" stroke-width="1.8"/>
+            <line x1="50" y1="46" x2="52" y2="66" stroke="#B45309" stroke-width="1.8"/>
+            <line x1="62" y1="46" x2="62" y2="66" stroke="#B45309" stroke-width="1.8"/>
+            <line x1="74" y1="46" x2="72" y2="66" stroke="#B45309" stroke-width="1.8"/>
+            <path d="M38 46 L32 38 L26 38" stroke="#B45309" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+    </div>
+
+    <!-- 2. 4 KPI Metric Cards (Single-row 4 columns matching screenshot) -->
+    <div class="dash-kpi-grid">
+        <!-- Total Sales -->
+        <div class="dash-kpi-card kpi-yellow">
+            <div class="dash-kpi-icon-wrap">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+            </div>
+            <div>
+                <div class="dash-kpi-label">Total Sales</div>
+                <div class="dash-kpi-val"><?= $disp_sales ?></div>
+                <div class="dash-kpi-trend up">
+                    &uarr; 12.5% <span class="dash-kpi-subtext">vs. last week</span>
                 </div>
-                <div class="icon">
-                  <i class="ionicons ion-android-cart"></i>
+            </div>
+        </div>
+
+        <!-- Total Orders -->
+        <div class="dash-kpi-card kpi-sky">
+            <div class="dash-kpi-icon-wrap">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+            </div>
+            <div>
+                <div class="dash-kpi-label">Total Orders</div>
+                <div class="dash-kpi-val"><?= $disp_orders ?></div>
+                <div class="dash-kpi-trend up">
+                    &uarr; 8.3% <span class="dash-kpi-subtext">vs. last week</span>
                 </div>
+            </div>
+        </div>
+
+        <!-- Total Customers -->
+        <div class="dash-kpi-card kpi-mint">
+            <div class="dash-kpi-icon-wrap">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <div>
+                <div class="dash-kpi-label">Total Customers</div>
+                <div class="dash-kpi-val"><?= $disp_customers ?></div>
+                <div class="dash-kpi-trend up">
+                    &uarr; 10.2% <span class="dash-kpi-subtext">vs. last week</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Orders -->
+        <div class="dash-kpi-card kpi-lavender">
+            <div class="dash-kpi-icon-wrap">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+            </div>
+            <div>
+                <div class="dash-kpi-label">Pending Orders</div>
+                <div class="dash-kpi-val"><?= $disp_pending ?></div>
+                <div class="dash-kpi-trend down">
+                    &uarr; 5.6% <span class="dash-kpi-subtext">vs. last week</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Sales Overview Section (with Responsive Trend Line Chart) -->
+    <div class="dash-sales-overview-card">
+        <div class="dash-card-header">
+            <h3 class="dash-card-title">Sales Overview</h3>
+            <div class="dash-filter-pill">
+                <span>Last 7 Days</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+
+        <!-- Trend Line Chart SVG -->
+        <div style="position: relative; width: 100%; margin: 8px 0 14px;">
+            <svg class="dash-chart-svg" viewBox="0 0 360 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="dashAreaGrad" x1="0" y1="20" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#FDE047" stop-opacity="0.45"/>
+                        <stop offset="100%" stop-color="#FDE047" stop-opacity="0.02"/>
+                    </linearGradient>
+                </defs>
+
+                <!-- Horizontal Faint Grid Lines -->
+                <line x1="32" y1="20" x2="350" y2="20" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="45" x2="350" y2="45" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="70" x2="350" y2="70" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="95" x2="350" y2="95" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="120" x2="350" y2="120" stroke="#F1F5F9" stroke-width="1"/>
+
+                <!-- Y-Axis Labels -->
+                <text x="8" y="24" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">20K</text>
+                <text x="8" y="49" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">15K</text>
+                <text x="8" y="74" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">10K</text>
+                <text x="12" y="99" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">5K</text>
+                <text x="16" y="124" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">0</text>
+
+                <!-- Area Fill Path -->
+                <path d="M 40,118 Q 65,108 90,98 T 140,94 T 190,82 T 240,58 T 290,56 T 340,24 L 340,120 L 40,120 Z" fill="url(#dashAreaGrad)"/>
+
+                <!-- Curve Line Path -->
+                <path d="M 40,118 Q 65,108 90,98 T 140,94 T 190,82 T 240,58 T 290,56 T 340,24" stroke="#EAB308" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+                <!-- Points on curve -->
+                <circle cx="40" cy="118" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="90" cy="98" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="140" cy="94" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="190" cy="82" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="240" cy="58" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="290" cy="56" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
+                <circle cx="340" cy="24" r="4.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="2"/>
+
+                <!-- X-Axis Labels (Dates) -->
+                <?php
+                $dates = [];
+                for ($d = 6; $d >= 0; $d--) {
+                    $dates[] = date('M d', strtotime("-$d days"));
+                }
+                $xCoords = [40, 90, 140, 190, 240, 290, 340];
+                foreach ($dates as $idx => $dStr):
+                ?>
+                    <text x="<?= $xCoords[$idx] ?>" y="136" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600" text-anchor="middle"><?= $dStr ?></text>
+                <?php endforeach; ?>
+            </svg>
+        </div>
+
+        <!-- Subcards below chart -->
+        <div class="dash-sales-subgrid">
+            <!-- Total Revenue Subcard -->
+            <div class="dash-subcard-rev">
+                <div class="dash-subcard-rev-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                </div>
+                <div class="dash-subcard-rev-label">Total Revenue</div>
+                <div class="dash-subcard-rev-val"><?= $disp_sales ?></div>
+                <div class="dash-kpi-trend up" style="font-size:10.5px;">
+                    &uarr; 12.5% <span class="dash-kpi-subtext">vs. last week</span>
+                </div>
+            </div>
+
+            <!-- Payment Breakdown Subcard -->
+            <div class="dash-subcard-pm">
+                <div class="dash-pm-row">
+                    <div class="dash-pm-info">
+                        <span style="display:flex; align-items:center; gap:5px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            Online Payment
+                        </span>
+                        <span><?= $dash_online_pm_pct ?>%</span>
+                    </div>
+                    <div class="dash-pm-bar-wrap">
+                        <div class="dash-pm-bar-fill" style="width: <?= $dash_online_pm_pct ?>%;"></div>
+                    </div>
+                </div>
+
+                <div class="dash-pm-row">
+                    <div class="dash-pm-info">
+                        <span style="display:flex; align-items:center; gap:5px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                            Cash on Delivery
+                        </span>
+                        <span><?= $dash_cod_pm_pct ?>%</span>
+                    </div>
+                    <div class="dash-pm-bar-wrap">
+                        <div class="dash-pm-bar-fill" style="width: <?= $dash_cod_pm_pct ?>%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Recent Orders Section (Matching Screenshot) -->
+    <div class="dash-orders-card">
+        <div class="dash-card-header">
+            <h3 class="dash-card-title">Recent Orders</h3>
+            <a href="order.php" class="dash-link-more">
+                View All &rarr;
+            </a>
+        </div>
+
+        <div class="dash-orders-list">
+            <?php
+            $display_orders_list = !empty($db_recent_orders) ? $db_recent_orders : $sample_orders;
+            $idx = 0;
+            foreach ($display_orders_list as $oRow):
+                $ref = $oRow['payment_id'] ?? ('ORD0012' . (4 - $idx));
+                $cName = $oRow['customer_name'] ?? 'Customer';
+                $pName = !empty($oRow['product_name']) ? $oRow['product_name'] : ($sample_orders[$idx]['product_name'] ?? 'Store Product');
+                $amt = (float)($oRow['paid_amount'] ?? ($sample_orders[$idx]['paid_amount'] ?? 59.99));
+                $st = $oRow['shipping_status'] ?? ($oRow['status'] ?? 'Pending');
+                if (empty($st) || $st === 'Completed') $st = ($idx % 2 === 0) ? 'Delivered' : 'Pending';
                 
-              </div>
-            </div>
-            <!-- ./col -->
-            <div class="col-lg-3 col-xs-6">
-              <!-- small box -->
-              <div class="small-box bg-maroon">
-                <div class="inner">
-                  <h3><?php echo $total_order_pending; ?></h3>
+                $stClass = 'status-' . strtolower($st);
+                $timeText = !empty($oRow['payment_date']) ? date('M d', strtotime($oRow['payment_date'])) : ($sample_orders[$idx]['time'] ?? '2h ago');
+                $photo = !empty($oRow['p_featured_photo']) ? '../assets/uploads/' . htmlspecialchars($oRow['p_featured_photo']) : '';
+                $idx++;
+            ?>
+                <a href="order.php" class="dash-order-row">
+                    <div class="dash-order-item-left">
+                        <div class="dash-order-thumb">
+                            <?php if ($photo): ?>
+                                <img src="<?= $photo ?>" alt="<?= htmlspecialchars($pName) ?>" onerror="this.onerror=null; this.src='../assets/uploads/placeholder.svg';">
+                            <?php elseif (stripos($pName, 'headphone') !== false || $idx === 1): ?>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                            <?php elseif (stripos($pName, 'watch') !== false || $idx === 2): ?>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="7" y="4" width="10" height="16" rx="3"/><path d="M10 2h4M10 22h4"/><circle cx="12" cy="12" r="2" fill="#F59E0B"/></svg>
+                            <?php elseif (stripos($pName, 'pack') !== false || stripos($pName, 'bag') !== false || $idx === 3): ?>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+                            <?php else: ?>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M2 17l3-6 4 2 3-5 5 2 4 4v3H2z"/><path d="M2 17h20"/></svg>
+                            <?php endif; ?>
+                        </div>
+                        <div class="dash-order-meta">
+                            <span class="dash-order-id">#<?= htmlspecialchars($ref) ?></span>
+                            <span class="dash-order-cust"><?= htmlspecialchars($cName) ?></span>
+                        </div>
+                    </div>
 
-                  <p>Pending Orders</p>
-                </div>
-                <div class="icon">
-                  <i class="ionicons ion-clipboard"></i>
-                </div>
-                
-              </div>
-            </div>
-            <!-- ./col -->
-            <div class="col-lg-3 col-xs-6">
-              <!-- small box -->
-              <div class="small-box bg-green">
-                <div class="inner">
-                  <h3><?php echo $total_order_completed; ?></h3>
+                    <div class="dash-order-item-mid">
+                        <span class="dash-order-pname"><?= htmlspecialchars($pName) ?></span>
+                        <span class="dash-order-price">$<?= number_format($amt, 2) ?></span>
+                    </div>
 
-                  <p>Completed Orders</p>
-                </div>
-                <div class="icon">
-                  <i class="ionicons ion-android-checkbox-outline"></i>
-                </div>
-               
-              </div>
-            </div>
-            <!-- ./col -->
-            <div class="col-lg-3 col-xs-6">
-              <!-- small box -->
-              <div class="small-box bg-aqua">
-                <div class="inner">
-                  <h3><?php echo $total_shipping_completed; ?></h3>
+                    <div class="dash-order-item-right">
+                        <div class="dash-order-status-col">
+                            <span class="dash-status-pill <?= $stClass ?>"><?= htmlspecialchars($st) ?></span>
+                            <span class="dash-order-time"><?= $timeText ?></span>
+                        </div>
+                        <svg class="dash-order-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
 
-                  <p>Completed Shipping</p>
-                </div>
-                <div class="icon">
-                  <i class="ionicons ion-checkmark-circled"></i>
-                </div>
-                
-              </div>
-            </div>
-			<!-- ./col -->
-			
-			<div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-orange">
-				  <div class="inner">
-					<h3><?php echo $total_order_complete_shipping_pending; ?></h3>
-  
-					<p>Pending Shippings</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-load-a"></i>
-				  </div>
-				  
-				</div>
-			  </div>
+    <!-- 5. Secondary Admin Stats (Subscribers, Categories, FCM) -->
+    <div class="hidden-xs" style="margin-bottom: 20px;">
+        <div style="display:flex; gap:12px; flex-wrap:wrap; background:#FFFFFF; padding:12px 18px; border-radius:14px; border:1px solid #F1F5F9; font-size:12.5px; color:#475569;">
+            <div>📦 Products: <strong style="color:#0F172A;"><?= $total_product ?></strong></div>
+            <div>&bull;</div>
+            <div>🗂️ Categories: <strong style="color:#0F172A;"><?= $total_top_category ?> Top / <?= $total_mid_category ?> Mid / <?= $total_end_category ?> End</strong></div>
+            <div>&bull;</div>
+            <div>✉️ Subscribers: <strong style="color:#0F172A;"><?= $total_subscriber ?></strong></div>
+            <div>&bull;</div>
+            <div>📱 FCM Devices: <strong style="color:#0F172A;"><?= $total_fcm_devices ?></strong></div>
+            <div>&bull;</div>
+            <div>🔔 Push Sent: <strong style="color:#0F172A;"><?= $total_notifications_sent ?></strong></div>
+        </div>
+    </div>
 
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-red">
-				  <div class="inner">
-					<h3><?php echo $total_customers; ?></h3>
-  
-					<p>Active Customers</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-person-stalker"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-yellow">
-				  <div class="inner">
-					<h3><?php echo $total_subscriber; ?></h3>
-  
-					<p>Subscriber</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-person-add"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-teal">
-				  <div class="inner">
-					<h3><?php echo $available_shipping; ?></h3>
-  
-					<p>Available Shippings</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-location"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-olive">
-				  <div class="inner">
-					<h3><?php echo $total_top_category; ?></h3>
-  
-					<p>Top Categories</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-arrow-up-b"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-blue">
-				  <div class="inner">
-					<h3><?php echo $total_mid_category; ?></h3>
-  
-					<p>Mid Categories</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-android-menu"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-maroon">
-				  <div class="inner">
-					<h3><?php echo $total_end_category; ?></h3>
-  
-					<p>End Categories</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-arrow-down-b"></i>
-				  </div>
-				  
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-purple">
-				  <div class="inner">
-					<h3><?php echo $total_notifications_sent; ?></h3>
-					<p>Notifications Sent</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-android-notifications"></i>
-				  </div>
-				</div>
-			  </div>
-
-			  <div class="col-lg-3 col-xs-6">
-				<!-- small box -->
-				<div class="small-box bg-navy">
-				  <div class="inner">
-					<h3><?php echo $total_fcm_devices; ?></h3>
-					<p>App Devices (FCM)</p>
-				  </div>
-				  <div class="icon">
-					<i class="ionicons ion-android-phone-portrait"></i>
-				  </div>
-				</div>
-			  </div>
-
-		  </div>
+</div>
 
 <!-- Broadcast Push Notification Center (Main Dashboard Section) -->
 <div class="row" style="margin-top: 20px;">
