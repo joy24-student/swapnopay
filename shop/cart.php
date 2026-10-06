@@ -1755,10 +1755,16 @@ body.shopnext-theme {
         box-sizing: border-box !important;
     }
     .sn-recom-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-trust-assurance-bar {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 }
 
@@ -2117,73 +2123,95 @@ body.shopnext-theme {
         white-space: nowrap !important;
     }
 
-    /* "You Might Also Like" section: 2 columns on mobile */
+    /* "You Might Also Like" section: Concise & Fully Responsive on Mobile */
     .sn-recommendations-section {
-        margin-top: 18px !important;
-        margin-bottom: 18px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin-top: 14px !important;
+        margin-bottom: 14px !important;
     }
     .sn-recom-head {
-        margin-bottom: 10px !important;
+        margin-bottom: 8px !important;
         display: flex !important;
         justify-content: space-between !important;
         align-items: center !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-recom-title {
-        font-size: 16px !important;
+        font-size: 15px !important;
         font-weight: 800 !important;
         color: #0f172a !important;
     }
+    .sn-recom-link {
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+    }
     .sn-recom-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 10px !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-recom-card {
         flex-direction: column !important;
         align-items: stretch !important;
-        padding: 10px 10px 12px 10px !important;
-        border-radius: 12px !important;
+        padding: 8px 8px 10px 8px !important;
+        border-radius: 10px !important;
         position: relative !important;
         gap: 0 !important;
         background: #ffffff !important;
         border: 1px solid #f1f5f9 !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
     .sn-recom-img-box {
         width: 100% !important;
-        height: 120px !important;
+        height: 96px !important;
         background: #f8fafc !important;
-        border-radius: 8px !important;
+        border-radius: 6px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 6px !important;
         overflow: hidden !important;
         text-decoration: none !important;
+        box-sizing: border-box !important;
     }
     .sn-recom-img-box img {
-        max-width: 90% !important;
-        max-height: 90% !important;
+        max-width: 85% !important;
+        max-height: 85px !important;
         object-fit: contain !important;
     }
     .sn-recom-content {
         width: 100% !important;
+        min-width: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         position: relative !important;
-        padding-right: 30px !important;
+        padding-right: 28px !important;
+        box-sizing: border-box !important;
     }
     .sn-recom-item-name {
-        font-size: 12px !important;
+        font-size: 11.5px !important;
         font-weight: 700 !important;
-        line-height: 1.3 !important;
-        margin: 0 0 3px 0 !important;
-        height: 31px !important;
+        line-height: 1.25 !important;
+        margin: 0 0 2px 0 !important;
+        height: 29px !important;
         white-space: normal !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         display: -webkit-box !important;
         -webkit-line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
+        word-break: break-word !important;
         color: #0f172a !important;
     }
     .sn-recom-item-name a {
@@ -2191,72 +2219,78 @@ body.shopnext-theme {
         text-decoration: none !important;
     }
     .sn-recom-item-sub {
-        font-size: 10px !important;
-        color: #64748b !important;
-        margin-bottom: 4px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
+        display: none !important;
     }
     .sn-recom-price-row {
         display: flex !important;
         align-items: baseline !important;
-        gap: 5px !important;
-        margin-bottom: 2px !important;
+        gap: 4px !important;
+        margin-top: 1px !important;
+        margin-bottom: 0 !important;
         flex-wrap: wrap !important;
+        min-width: 0 !important;
     }
     .sn-recom-price {
-        font-size: 13.5px !important;
+        font-size: 13px !important;
         font-weight: 800 !important;
         color: #0f172a !important;
+        line-height: 1 !important;
     }
     .sn-recom-old-price {
-        font-size: 10.5px !important;
+        font-size: 10px !important;
         color: #94a3b8 !important;
         text-decoration: line-through !important;
+        line-height: 1 !important;
     }
     .sn-recom-discount {
-        font-size: 9.5px !important;
+        font-size: 8.5px !important;
         font-weight: 700 !important;
         color: #ef4444 !important;
-        min-height: 14px !important;
+        min-height: 12px !important;
+        line-height: 1 !important;
+        margin-top: 2px !important;
     }
     .sn-recom-add-btn {
         position: absolute !important;
         right: 0 !important;
-        bottom: 2px !important;
-        width: 28px !important;
-        height: 28px !important;
+        bottom: 0 !important;
+        width: 25px !important;
+        height: 25px !important;
         border-radius: 50% !important;
         background: #fab802 !important;
         border: none !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 2px 6px rgba(250, 184, 2, 0.3) !important;
+        box-shadow: 0 2px 5px rgba(250, 184, 2, 0.3) !important;
         cursor: pointer !important;
         z-index: 2 !important;
     }
     .sn-recom-add-btn svg {
-        width: 14px !important;
-        height: 14px !important;
+        width: 13px !important;
+        height: 13px !important;
     }
 
     /* Bottom Trust Assurance Bar - Clean 2x2 Grid */
     .sn-trust-assurance-bar {
         display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 10px !important;
-        padding: 14px 12px !important;
-        border-radius: 14px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        padding: 12px 10px !important;
+        border-radius: 12px !important;
         background: #ffffff !important;
         border: 1px solid #f1f5f9 !important;
-        margin-top: 16px !important;
+        margin-top: 14px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-trust-cell {
         display: flex !important;
         align-items: center !important;
         gap: 8px !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
     }
     .sn-trust-icon {
         width: 32px !important;
@@ -2272,16 +2306,26 @@ body.shopnext-theme {
         width: 16px !important;
         height: 16px !important;
     }
+    .sn-trust-info {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
     .sn-trust-info h4 {
         font-size: 11.5px !important;
         font-weight: 700 !important;
         margin: 0 !important;
         color: #0f172a !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     .sn-trust-info p {
         font-size: 10px !important;
         color: #64748b !important;
         margin: 1px 0 0 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     /* Mobile Sticky Bottom Checkout & Voucher Dock */
