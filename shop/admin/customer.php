@@ -478,6 +478,26 @@ function getInitials($name) {
 </style>
 
 <?php
+if (!function_exists('renderCustAvatarHtml')) {
+    function renderCustAvatarHtml($name, $size = 52) {
+        $initials = getInitials($name);
+        $palettes = [
+            ['bg' => '#E0F2FE', 'color' => '#0369A1'], // Sky Blue
+            ['bg' => '#FEF3C7', 'color' => '#B45309'], // Warm Amber
+            ['bg' => '#EDE9FE', 'color' => '#6D28D9'], // Soft Purple
+            ['bg' => '#DCFCE7', 'color' => '#15803D'], // Emerald Green
+            ['bg' => '#FFE4E6', 'color' => '#BE123C'], // Rose
+            ['bg' => '#F1F5F9', 'color' => '#475569'], // Slate
+            ['bg' => '#FFEDD5', 'color' => '#C2410C'], // Orange
+            ['bg' => '#E0E7FF', 'color' => '#4338CA']  // Indigo
+        ];
+        $idx = abs(crc32((string)$name)) % count($palettes);
+        $p = $palettes[$idx];
+        $fontSize = (int)round($size * 0.35);
+        return '<div class="sn-mcust-avatar" style="width:'.$size.'px; height:'.$size.'px; border-radius:50%; background-color:'.$p['bg'].'; color:'.$p['color'].'; font-size:'.$fontSize.'px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; text-transform:uppercase; letter-spacing:-0.5px; user-select:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.05);">' . custEsc($initials) . '</div>';
+    }
+}
+
 $sample_mobile_customers = [
     [
         'cust_id' => 1,
@@ -492,8 +512,7 @@ $sample_mobile_customers = [
         'status_label' => 'Active',
         'status_slug' => 'active',
         'order_count' => 12,
-        'total_spent' => 24560,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_1.png'
+        'total_spent' => 24560
     ],
     [
         'cust_id' => 2,
@@ -508,8 +527,7 @@ $sample_mobile_customers = [
         'status_label' => 'Active',
         'status_slug' => 'active',
         'order_count' => 5,
-        'total_spent' => 12340,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_2.png'
+        'total_spent' => 12340
     ],
     [
         'cust_id' => 3,
@@ -524,8 +542,7 @@ $sample_mobile_customers = [
         'status_label' => 'Active',
         'status_slug' => 'active',
         'order_count' => 8,
-        'total_spent' => 18750,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_3.png'
+        'total_spent' => 18750
     ],
     [
         'cust_id' => 4,
@@ -540,8 +557,7 @@ $sample_mobile_customers = [
         'status_label' => 'Inactive',
         'status_slug' => 'inactive',
         'order_count' => 0,
-        'total_spent' => 0,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_4.png'
+        'total_spent' => 0
     ],
     [
         'cust_id' => 5,
@@ -556,8 +572,7 @@ $sample_mobile_customers = [
         'status_label' => 'Active',
         'status_slug' => 'active',
         'order_count' => 6,
-        'total_spent' => 15980,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_5.png'
+        'total_spent' => 15980
     ],
     [
         'cust_id' => 6,
@@ -572,8 +587,7 @@ $sample_mobile_customers = [
         'status_label' => 'Pending',
         'status_slug' => 'pending',
         'order_count' => 2,
-        'total_spent' => 5120,
-        'avatar' => '../assets/uploads/avatars/cust_avatar_6.png'
+        'total_spent' => 5120
     ]
 ];
 
@@ -591,8 +605,6 @@ if (!empty($customers)) {
         $locStr = !empty($locParts) ? implode(', ', $locParts) : 'Bangladesh';
         
         $cId = (int)$c['cust_id'];
-        $avIdx = (($cId - 1) % 6) + 1;
-        $avatarPath = '../assets/uploads/avatars/cust_avatar_' . $avIdx . '.png';
 
         $mob_customers[] = [
             'cust_id' => $cId,
@@ -607,8 +619,7 @@ if (!empty($customers)) {
             'status_label' => $sLabel,
             'status_slug' => $sSlug,
             'order_count' => $stats['order_count'],
-            'total_spent' => $stats['total_spent'],
-            'avatar' => $avatarPath
+            'total_spent' => $stats['total_spent']
         ];
     }
 }
@@ -698,11 +709,7 @@ if (count($mob_customers) < 6) {
                 <!-- Left: Avatar + Info -->
                 <div class="sn-mcust-left">
                     <div class="sn-mcust-avatar-wrap">
-                        <?php if (!empty($mc['avatar'])): ?>
-                            <img src="<?= htmlspecialchars($mc['avatar']) ?>" class="sn-mcust-avatar" alt="<?= htmlspecialchars($mc['cust_name']) ?>" onerror="this.onerror=null; this.src='../assets/uploads/avatars/cust_avatar_4.png';">
-                        <?php else: ?>
-                            <div class="sn-mcust-avatar-placeholder"><?= custEsc(getInitials($mc['cust_name'])) ?></div>
-                        <?php endif; ?>
+                        <?= renderCustAvatarHtml($mc['cust_name'], 52) ?>
                     </div>
                     <div class="sn-mcust-info">
                         <h3 class="sn-mcust-name" id="sn-mcust-name-<?= $mc['cust_id'] ?>"><?= htmlspecialchars($mc['cust_name']) ?></h3>
@@ -1143,7 +1150,7 @@ if (count($mob_customers) < 6) {
             <div class="sn-mcust-sheet-handle"></div>
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #F1F5F9;">
                 <div class="sn-mcust-avatar-wrap" style="width: 44px; height: 44px;">
-                    <img src="" id="sheetCustAvatar" class="sn-mcust-avatar" alt="">
+                    <div id="sheetCustAvatar" class="sn-mcust-avatar" style="width: 44px; height: 44px; font-size: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">CU</div>
                 </div>
                 <div>
                     <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;" id="sheetCustName">Customer Name</h4>
@@ -1252,17 +1259,42 @@ function showAdminToast(msg, type) {
     }, 3000);
 }
 
+function getAvatarPalette(name) {
+    var palettes = [
+        { bg: '#E0F2FE', color: '#0369A1' },
+        { bg: '#FEF3C7', color: '#B45309' },
+        { bg: '#EDE9FE', color: '#6D28D9' },
+        { bg: '#DCFCE7', color: '#15803D' },
+        { bg: '#FFE4E6', color: '#BE123C' },
+        { bg: '#F1F5F9', color: '#475569' },
+        { bg: '#FFEDD5', color: '#C2410C' },
+        { bg: '#E0E7FF', color: '#4338CA' }
+    ];
+    var hash = 0;
+    var str = String(name || '');
+    for (var i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    var idx = Math.abs(hash) % palettes.length;
+    return palettes[idx];
+}
+
 var activeCustData = null;
 
 function openCustActionSheet(cust) {
     activeCustData = cust;
     $('#sheetCustName').text(cust.cust_name);
     $('#sheetCustCode').text(cust.cust_code);
-    if (cust.avatar) {
-        $('#sheetCustAvatar').attr('src', cust.avatar).show();
-    } else {
-        $('#sheetCustAvatar').hide();
+    var name = (cust.cust_name || 'Customer').trim();
+    var parts = name.split(/\s+/);
+    var initials = 'CU';
+    if (parts.length >= 2) {
+        initials = (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+    } else if (name.length > 0) {
+        initials = name.substring(0, 2).toUpperCase();
     }
+    var pal = getAvatarPalette(name);
+    $('#sheetCustAvatar').text(initials).css({ 'background-color': pal.bg, 'color': pal.color, 'display': 'flex' });
 
     if (cust.cust_phone) {
         $('#sheetCallBtn').attr('href', 'tel:' + cust.cust_phone).show();

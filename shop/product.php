@@ -58,10 +58,37 @@ if (isset($_REQUEST['slug'])) {
     exit;
 }
 
-// Fetch product details
-$statement = $pdo->prepare("SELECT * FROM tbl_product WHERE p_id=? AND p_is_active=1");
-$statement->execute(array($p_id));
-$product_data = $statement->fetch(PDO::FETCH_ASSOC);
+// Session & Microcache Product Bundle
+$prodCacheKey = 'sn_pc_' . $p_id;
+$prodCacheFile = __DIR__ . '/admin/inc/cache_prod_' . $p_id . '.json';
+$prodBundle = null;
+
+if (!empty($_SESSION[$prodCacheKey]) && is_array($_SESSION[$prodCacheKey]) && (!empty($_SESSION[$prodCacheKey]['_time'])) && (time() - $_SESSION[$prodCacheKey]['_time'] < 180)) {
+    $prodBundle = $_SESSION[$prodCacheKey];
+}
+if (!$prodBundle && file_exists($prodCacheFile) && (time() - filemtime($prodCacheFile) < 120)) {
+    $prodBundle = json_decode(file_get_contents($prodCacheFile), true);
+    if (!empty($prodBundle) && is_array($prodBundle)) {
+        $_SESSION[$prodCacheKey] = $prodBundle;
+    }
+}
+
+if ($prodBundle && !empty($prodBundle['product_data'])) {
+    $product_data        = $prodBundle['product_data'];
+    $photo_rows          = $prodBundle['photo_rows'] ?? [];
+    $product_sizes       = $prodBundle['product_sizes'] ?? [];
+    $product_colors      = $prodBundle['product_colors'] ?? [];
+    $avg_rating          = $prodBundle['avg_rating'] ?? 0;
+    $total_reviews_count = $prodBundle['total_reviews_count'] ?? 0;
+    $reviews_list        = $prodBundle['reviews_list'] ?? [];
+    $cat_row             = $prodBundle['cat_row'] ?? [];
+    $related_products    = $prodBundle['related_products'] ?? [];
+} else {
+    // Fetch product details from DB
+    $statement = $pdo->prepare("SELECT * FROM tbl_product WHERE p_id=? AND p_is_active=1");
+    $statement->execute(array($p_id));
+    $product_data = $statement->fetch(PDO::FETCH_ASSOC);
+}
 
 if (!$product_data) {
     header("HTTP/1.1 404 Not Found");
@@ -86,9 +113,16 @@ $p_video_link = $product_data['p_video_link'] ?? '';
 $is_top_sale = (int)($product_data['is_top_sale'] ?? 0);
 $is_official = (int)($product_data['is_official'] ?? 0);
 
-// Update view count
-$statement = $pdo->prepare("UPDATE tbl_product SET p_total_view = p_total_view + 1 WHERE p_id = ?");
-$statement->execute([$p_id]);
+// Update view count: Throttled by Session & Cookie (only 1 DB update per product per visitor per 24 hours)
+$viewKey = 'sn_pv_' . $p_id;
+if (empty($_SESSION[$viewKey]) && empty($_COOKIE[$viewKey])) {
+    $_SESSION[$viewKey] = time();
+    @setcookie($viewKey, '1', time() + 86400, '/');
+    try {
+        $statement = $pdo->prepare("UPDATE tbl_product SET p_total_view = p_total_view + 1 WHERE p_id = ?");
+        $statement->execute([$p_id]);
+    } catch (Throwable $_) {}
+}
 
 // Track recently viewed products in session and persistent cookie
 if (!isset($_SESSION['recently_viewed']) || !is_array($_SESSION['recently_viewed'])) {
@@ -243,9 +277,11 @@ if (!function_exists('parse_product_media')) {
 }
 
 // Fetch Gallery Media (Photos & Videos)
-$stmt_photos = $pdo->prepare("SELECT photo FROM tbl_product_photo WHERE p_id = ? ORDER BY pp_id ASC");
-$stmt_photos->execute([$p_id]);
-$photo_rows = $stmt_photos->fetchAll(PDO::FETCH_ASSOC);
+if (!isset($photo_rows)) {
+    $stmt_photos = $pdo->prepare("SELECT photo FROM tbl_product_photo WHERE p_id = ? ORDER BY pp_id ASC");
+    $stmt_photos->execute([$p_id]);
+    $photo_rows = $stmt_photos->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $raw_media_list = [];
 
@@ -293,19 +329,34 @@ foreach ($gallery_items as $gi) {
     $gallery_photos[] = $gi['thumb'];
 }
 
-// Fetch Product Sizes & Colors
-$stmt_size = $pdo->prepare("SELECT s.size_id, s.size_name FROM tbl_product_size ps JOIN tbl_size s ON ps.size_id = s.size_id WHERE ps.p_id = ?");
-$stmt_size->execute([$p_id]);
-$product_sizes = $stmt_size->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Product Sizes & Colors (Cached in bundle)
+if (!isset($product_sizes)) {
+    $stmt_size = $pdo->prepare("SELECT s.size_id, s.size_name FROM tbl_product_size ps JOIN tbl_size s ON ps.size_id = s.size_id WHERE ps.p_id = ?");
+    $stmt_size->execute([$p_id]);
+    $product_sizes = $stmt_size->fetchAll(PDO::FETCH_ASSOC);
+}
 
-$stmt_color = $pdo->prepare("SELECT c.color_id, c.color_name FROM tbl_product_color pc JOIN tbl_color c ON pc.color_id = c.color_id WHERE pc.p_id = ?");
-$stmt_color->execute([$p_id]);
-$product_colors = $stmt_color->fetchAll(PDO::FETCH_ASSOC);
+if (!isset($product_colors)) {
+    $stmt_color = $pdo->prepare("SELECT c.color_id, c.color_name FROM tbl_product_color pc JOIN tbl_color c ON pc.color_id = c.color_id WHERE pc.p_id = ?");
+    $stmt_color->execute([$p_id]);
+    $product_colors = $stmt_color->fetchAll(PDO::FETCH_ASSOC);
+}
 
-// Fetch Settings
-$stmt_settings = $pdo->prepare("SELECT * FROM tbl_settings WHERE id = 1");
-$stmt_settings->execute();
-$settings_data = $stmt_settings->fetch(PDO::FETCH_ASSOC);
+// Fetch Settings from Global Microcache (0 SQL queries)
+$settings_data = $GLOBALS['STORE_SETTINGS'] ?? null;
+if (!$settings_data) {
+    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    if (file_exists($settingsCacheFile)) {
+        $settings_data = json_decode(file_get_contents($settingsCacheFile), true);
+    }
+}
+if (!$settings_data) {
+    try {
+        $stmt_settings = $pdo->prepare("SELECT * FROM tbl_settings WHERE id = 1");
+        $stmt_settings->execute();
+        $settings_data = $stmt_settings->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
 
 $review_feature_on_off = $settings_data['review_feature_on_off'] ?? 1;
 $estimated_delivery_time_local = $settings_data['estimated_delivery_time_local'] ?? '2-3 business days';
@@ -316,39 +367,41 @@ $product_voucher_discount = !empty($settings_data['product_voucher_discount']) ?
 $related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
 $mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
 
-// Fetch Ratings & Reviews
-$avg_rating = 0;
-$total_reviews_count = 0;
-$reviews_list = [];
+// Fetch Ratings & Reviews (Cached in bundle)
+if (!isset($reviews_list)) {
+    $avg_rating = 0;
+    $total_reviews_count = 0;
+    $reviews_list = [];
 
-if ($review_feature_on_off == 1) {
-    try {
-        $stmt_rating = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_rating WHERE p_id = ?");
-        $stmt_rating->execute([$p_id]);
-        $rating_res = $stmt_rating->fetch(PDO::FETCH_ASSOC);
-        if ($rating_res && $rating_res['total_count'] > 0) {
-            $avg_rating = round((float)$rating_res['avg_rating'], 1);
-            $total_reviews_count = (int)$rating_res['total_count'];
-        }
-    } catch (Throwable $e) {}
-
-    if ($total_reviews_count == 0) {
+    if ($review_feature_on_off == 1) {
         try {
-            $stmt_rev2 = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_review WHERE product_id = ? AND status = 'Approved'");
-            $stmt_rev2->execute([$p_id]);
-            $res2 = $stmt_rev2->fetch(PDO::FETCH_ASSOC);
-            if ($res2 && $res2['total_count'] > 0) {
-                $avg_rating = round((float)$res2['avg_rating'], 1);
-                $total_reviews_count = (int)$res2['total_count'];
+            $stmt_rating = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_rating WHERE p_id = ?");
+            $stmt_rating->execute([$p_id]);
+            $rating_res = $stmt_rating->fetch(PDO::FETCH_ASSOC);
+            if ($rating_res && $rating_res['total_count'] > 0) {
+                $avg_rating = round((float)$rating_res['avg_rating'], 1);
+                $total_reviews_count = (int)$rating_res['total_count'];
             }
         } catch (Throwable $e) {}
-    }
 
-    try {
-        $stmt_reviews = $pdo->prepare("SELECT r.*, c.cust_name FROM tbl_review r LEFT JOIN tbl_customer c ON r.cust_id = c.cust_id WHERE r.product_id = ? AND r.status = 'Approved' ORDER BY r.created_at DESC LIMIT 10");
-        $stmt_reviews->execute([$p_id]);
-        $reviews_list = $stmt_reviews->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {}
+        if ($total_reviews_count == 0) {
+            try {
+                $stmt_rev2 = $pdo->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total_count FROM tbl_review WHERE product_id = ? AND status = 'Approved'");
+                $stmt_rev2->execute([$p_id]);
+                $res2 = $stmt_rev2->fetch(PDO::FETCH_ASSOC);
+                if ($res2 && $res2['total_count'] > 0) {
+                    $avg_rating = round((float)$res2['avg_rating'], 1);
+                    $total_reviews_count = (int)$res2['total_count'];
+                }
+            } catch (Throwable $e) {}
+        }
+
+        try {
+            $stmt_reviews = $pdo->prepare("SELECT r.*, c.cust_name FROM tbl_review r LEFT JOIN tbl_customer c ON r.cust_id = c.cust_id WHERE r.product_id = ? AND r.status = 'Approved' ORDER BY r.created_at DESC LIMIT 10");
+            $stmt_reviews->execute([$p_id]);
+            $reviews_list = $stmt_reviews->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {}
+    }
 }
 
 // Fetch Category Breadcrumbs
@@ -358,21 +411,25 @@ $tcat_name = '';
 $mcat_name = '';
 $ecat_name = '';
 
-if ($ecat_id > 0) {
-    $stmt_cat = $pdo->prepare("SELECT e.ecat_id, e.ecat_name, m.mcat_id, m.mcat_name, t.tcat_id, t.tcat_name 
-                               FROM tbl_end_category e 
-                               LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id 
-                               LEFT JOIN tbl_top_category t ON m.tcat_id = t.tcat_id 
-                               WHERE e.ecat_id = ?");
-    $stmt_cat->execute([$ecat_id]);
-    $cat_row = $stmt_cat->fetch(PDO::FETCH_ASSOC);
-    if ($cat_row) {
-        if (!empty($cat_row['tcat_id']))   $tcat_id   = (int)$cat_row['tcat_id'];
-        if (!empty($cat_row['tcat_name'])) $tcat_name = $cat_row['tcat_name'];
-        if (!empty($cat_row['mcat_id']))   $mcat_id   = (int)$cat_row['mcat_id'];
-        if (!empty($cat_row['mcat_name'])) $mcat_name = $cat_row['mcat_name'];
-        if (!empty($cat_row['ecat_name'])) $ecat_name = $cat_row['ecat_name'];
+if (!isset($cat_row) && $ecat_id > 0) {
+    try {
+        $stmt_cat = $pdo->prepare("SELECT e.ecat_id, e.ecat_name, m.mcat_id, m.mcat_name, t.tcat_id, t.tcat_name 
+                                   FROM tbl_end_category e 
+                                   LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id 
+                                   LEFT JOIN tbl_top_category t ON m.tcat_id = t.tcat_id 
+                                   WHERE e.ecat_id = ?");
+        $stmt_cat->execute([$ecat_id]);
+        $cat_row = $stmt_cat->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $_) {
+        $cat_row = [];
     }
+}
+if (!empty($cat_row)) {
+    if (!empty($cat_row['tcat_id']))   $tcat_id   = (int)$cat_row['tcat_id'];
+    if (!empty($cat_row['tcat_name'])) $tcat_name = $cat_row['tcat_name'];
+    if (!empty($cat_row['mcat_id']))   $mcat_id   = (int)$cat_row['mcat_id'];
+    if (!empty($cat_row['mcat_name'])) $mcat_name = $cat_row['mcat_name'];
+    if (!empty($cat_row['ecat_name'])) $ecat_name = $cat_row['ecat_name'];
 }
 
 // Parse Specification Highlights for Cards
@@ -439,34 +496,54 @@ $hp_logo_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/publi
 $lifestyle_img_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_lifestyle.jpg';
 
 // Fetch Related Products (same end category first, or active products in store)
-$related_products = [];
-try {
-    if ($ecat_id > 0) {
-        $stmt_rel = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
-                                   FROM tbl_product 
-                                   WHERE ecat_id = ? AND p_id != ? AND p_is_active = 1 
-                                   ORDER BY p_id DESC LIMIT 8");
-        $stmt_rel->execute([$ecat_id, $p_id]);
-        $related_products = $stmt_rel->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    if (count($related_products) < 4) {
-        $needed = 8 - count($related_products);
-        $exclude_ids = array_merge([$p_id], !empty($related_products) ? array_column($related_products, 'p_id') : []);
-        $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
-        
-        $stmt_more = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
-                                    FROM tbl_product 
-                                    WHERE p_id NOT IN ($placeholders) AND p_is_active = 1 
-                                    ORDER BY p_id DESC LIMIT " . (int)$needed);
-        $stmt_more->execute($exclude_ids);
-        $more_prods = $stmt_more->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if (!empty($more_prods)) {
-            $related_products = array_merge($related_products, $more_prods);
+if (!isset($related_products) || empty($related_products)) {
+    $related_products = [];
+    try {
+        if ($ecat_id > 0) {
+            $stmt_rel = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                                       FROM tbl_product 
+                                       WHERE ecat_id = ? AND p_id != ? AND p_is_active = 1 
+                                       ORDER BY p_id DESC LIMIT 8");
+            $stmt_rel->execute([$ecat_id, $p_id]);
+            $related_products = $stmt_rel->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
+
+        if (count($related_products) < 4) {
+            $needed = 8 - count($related_products);
+            $exclude_ids = array_merge([$p_id], !empty($related_products) ? array_column($related_products, 'p_id') : []);
+            $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+            
+            $stmt_more = $pdo->prepare("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, is_top_sale 
+                                        FROM tbl_product 
+                                        WHERE p_id NOT IN ($placeholders) AND p_is_active = 1 
+                                        ORDER BY p_id DESC LIMIT " . (int)$needed);
+            $stmt_more->execute($exclude_ids);
+            $more_prods = $stmt_more->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (!empty($more_prods)) {
+                $related_products = array_merge($related_products, $more_prods);
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Related products error: ' . $e->getMessage());
     }
-} catch (Throwable $e) {
-    error_log('Related products error: ' . $e->getMessage());
+}
+
+// Persist resolved bundle to Session and Microcache file
+if (!$prodBundle && !empty($product_data)) {
+    $prodBundle = [
+        '_time'               => time(),
+        'product_data'        => $product_data,
+        'photo_rows'          => $photo_rows ?? [],
+        'product_sizes'       => $product_sizes ?? [],
+        'product_colors'      => $product_colors ?? [],
+        'avg_rating'          => $avg_rating ?? 0,
+        'total_reviews_count' => $total_reviews_count ?? 0,
+        'reviews_list'        => $reviews_list ?? [],
+        'cat_row'             => $cat_row ?? [],
+        'related_products'    => $related_products ?? []
+    ];
+    $_SESSION[$prodCacheKey] = $prodBundle;
+    @file_put_contents($prodCacheFile, json_encode($prodBundle));
 }
 
 // Require site header

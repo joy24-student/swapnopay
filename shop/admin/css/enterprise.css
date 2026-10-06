@@ -3198,7 +3198,6 @@ textarea.form-control {
     border-radius: 50%;
     overflow: hidden;
     flex-shrink: 0;
-    background: #E2E8F0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3207,18 +3206,15 @@ textarea.form-control {
 .sn-mcust-avatar {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.sn-mcust-avatar-placeholder {
-    width: 100%;
-    height: 100%;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #F1F5F9;
-    color: #94A3B8;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-transform: uppercase;
+    user-select: none;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
 .sn-mcust-info {

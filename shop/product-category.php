@@ -142,9 +142,14 @@ $offsetInt = max(0, ($currentPage - 1) * $limitInt);
 try {
     $stmtProd = $pdo->prepare(
         "SELECT p.*,
-                COALESCE((SELECT AVG(r.rating) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as avg_r,
-                COALESCE((SELECT COUNT(*) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as review_count
+                COALESCE(r_sub.avg_r, 0) as avg_r,
+                COALESCE(r_sub.review_count, 0) as review_count
          FROM tbl_product p
+         LEFT JOIN (
+             SELECT p_id, AVG(rating) as avg_r, COUNT(*) as review_count
+             FROM tbl_rating
+             GROUP BY p_id
+         ) r_sub ON p.p_id = r_sub.p_id
          $whereSQL
          $orderSQL
          LIMIT $limitInt OFFSET $offsetInt"
@@ -170,17 +175,26 @@ try {
     }
 } catch (Throwable $e) {}
 
-$sidebarCategories = [];
-try {
-    $sbCatStmt = $pdo->query("SELECT t.tcat_id, t.tcat_name, COUNT(p.p_id) as cat_count 
-                             FROM tbl_top_category t 
-                             LEFT JOIN tbl_mid_category m ON m.tcat_id = t.tcat_id 
-                             LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
-                             LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
-                             GROUP BY t.tcat_id, t.tcat_name 
-                             ORDER BY t.tcat_order ASC, t.tcat_id ASC");
-    $sidebarCategories = $sbCatStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-} catch (Throwable $e) {}
+$sidebarCategories = $_SESSION['sn_sidebar_cats'] ?? null;
+$sbCacheFile = __DIR__ . '/admin/inc/cache_sidebar_cats.json';
+if (!$sidebarCategories && file_exists($sbCacheFile) && (time() - filemtime($sbCacheFile) < 300)) {
+    $sidebarCategories = json_decode(file_get_contents($sbCacheFile), true);
+    $_SESSION['sn_sidebar_cats'] = $sidebarCategories;
+}
+if (!$sidebarCategories) {
+    try {
+        $sbCatStmt = $pdo->query("SELECT t.tcat_id, t.tcat_name, COUNT(p.p_id) as cat_count 
+                                 FROM tbl_top_category t 
+                                 LEFT JOIN tbl_mid_category m ON m.tcat_id = t.tcat_id 
+                                 LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
+                                 LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                                 GROUP BY t.tcat_id, t.tcat_name 
+                                 ORDER BY t.tcat_order ASC, t.tcat_id ASC");
+        $sidebarCategories = $sbCatStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $_SESSION['sn_sidebar_cats'] = $sidebarCategories;
+        @file_put_contents($sbCacheFile, json_encode($sidebarCategories));
+    } catch (Throwable $e) {}
+}
 
 // ── 6. Wishlist check ─────────────────────────────────────────────────────
 $wishlistIds = [];

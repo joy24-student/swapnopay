@@ -305,15 +305,6 @@ $sample_products = [
 				</ul>
 			</div>
 		</div>
-
-		<div class="sn-mobile-view-toggles">
-			<button type="button" class="sn-mvt-btn active" title="Grid View">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>
-			</button>
-			<button type="button" class="sn-mvt-btn" title="List View">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-			</button>
-		</div>
 	</div>
 
 	<!-- Mobile Product Card List (visible-xs - Exactly Matching media_1791278546819_1d7a0830.png) -->

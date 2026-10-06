@@ -202,7 +202,7 @@ if (!function_exists('getStoreName')) {
 }
 
 if (!function_exists('clearShopCache')) {
-    function clearShopCache($type = 'all') {
+    function clearShopCache($type = 'all', $id = null) {
         $dir = __DIR__;
         if ($type === 'settings' || $type === 'all') {
             @unlink($dir . '/cache_settings.json');
@@ -213,6 +213,20 @@ if (!function_exists('clearShopCache')) {
         if ($type === 'slides' || $type === 'all') {
             @unlink($dir . '/cache_slides.json');
         }
+        if ($type === 'product' && $id) {
+            @unlink($dir . '/cache_prod_' . (int)$id . '.json');
+        }
+        if ($type === 'products' || $type === 'all') {
+            $files = glob($dir . '/cache_prod_*.json');
+            if ($files) {
+                foreach ($files as $f) {
+                    @unlink($f);
+                }
+            }
+            @unlink($dir . '/cache_sidebar_cats.json');
+            @unlink($dir . '/cache_home_feed.json');
+        }
     }
 }
+
 

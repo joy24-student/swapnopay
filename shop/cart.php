@@ -23,38 +23,41 @@ if (!isset($_SESSION['cart_p_id']) || !is_array($_SESSION['cart_p_id'])) {
 // -------------------------------------------------------------------------
 // 2. DATABASE SCHEMA SAFEGUARDS & PERSISTENT CART SYNC
 // -------------------------------------------------------------------------
-try {
-    // Ensure customer cart table exists
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `tbl_customer_carts` (
-      `cart_id` int(11) NOT NULL AUTO_INCREMENT,
-      `customer_id` int(11) NOT NULL,
-      `product_id` int(11) NOT NULL,
-      `size_id` int(11) DEFAULT 0,
-      `size_name` varchar(255) DEFAULT '',
-      `color_id` int(11) DEFAULT 0,
-      `color_name` varchar(255) DEFAULT '',
-      `quantity` int(11) NOT NULL DEFAULT 1,
-      `price_at_add` decimal(10,2) NOT NULL DEFAULT 0.00,
-      `product_name` varchar(255) DEFAULT '',
-      `product_photo` varchar(255) DEFAULT NULL,
-      `added_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (`cart_id`),
-      KEY `customer_id` (`customer_id`),
-      KEY `product_id` (`product_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+if (empty($_SESSION['cart_tables_verified'])) {
+    try {
+        // Ensure customer cart table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `tbl_customer_carts` (
+          `cart_id` int(11) NOT NULL AUTO_INCREMENT,
+          `customer_id` int(11) NOT NULL,
+          `product_id` int(11) NOT NULL,
+          `size_id` int(11) DEFAULT 0,
+          `size_name` varchar(255) DEFAULT '',
+          `color_id` int(11) DEFAULT 0,
+          `color_name` varchar(255) DEFAULT '',
+          `quantity` int(11) NOT NULL DEFAULT 1,
+          `price_at_add` decimal(10,2) NOT NULL DEFAULT 0.00,
+          `product_name` varchar(255) DEFAULT '',
+          `product_photo` varchar(255) DEFAULT NULL,
+          `added_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (`cart_id`),
+          KEY `customer_id` (`customer_id`),
+          KEY `product_id` (`product_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-    // Ensure wishlist table exists
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `tbl_wishlist` (
-      `id` int(11) NOT NULL AUTO_INCREMENT,
-      `cust_id` int(11) NOT NULL,
-      `product_id` int(11) NOT NULL,
-      `added_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (`id`),
-      KEY `cust_id` (`cust_id`),
-      KEY `product_id` (`product_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-} catch (Exception $e) {}
+        // Ensure wishlist table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `tbl_wishlist` (
+          `id` int(11) NOT NULL AUTO_INCREMENT,
+          `cust_id` int(11) NOT NULL,
+          `product_id` int(11) NOT NULL,
+          `added_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `cust_id` (`cust_id`),
+          KEY `product_id` (`product_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        $_SESSION['cart_tables_verified'] = true;
+    } catch (Exception $e) {}
+}
 
 // If customer is logged in, load persisted cart from database if session is empty
 if (empty($_SESSION['cart_p_id']) && isset($_SESSION['customer']['cust_id'])) {
