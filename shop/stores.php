@@ -1,7 +1,7 @@
 <?php
 require_once('header.php');
 
-$store_name = $settings['site_name'] ?? $settings['meta_title_home'] ?? 'ShopNext';
+$store_name = !empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Our Store'));
 $store_address = !empty($settings['contact_address']) ? $settings['contact_address'] : 'Dhaka, Bangladesh';
 $store_phone = !empty($settings['contact_phone']) ? $settings['contact_phone'] : '+880 1700-000000';
 $store_email = !empty($settings['contact_email']) ? $settings['contact_email'] : 'support@swapnopay.top';

@@ -437,3 +437,4 @@ if ($action === 'create_announcement') {
 // Default fallback
 echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
 exit;
+

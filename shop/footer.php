@@ -66,7 +66,7 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
                         <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                         <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <span>Shop<span class="sn-logo-text-next">Next</span></span>
+                    <span><?php echo htmlspecialchars($store_name ?? (defined('STORE_NAME') ? STORE_NAME : 'Store')); ?></span>
                 </a>
                 <h4>Your One-Stop Shop</h4>
                 <p>We bring you the best products from trusted brands, with a focus on quality, affordability and customer satisfaction.</p>
@@ -127,7 +127,7 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
 
         <!-- Footer Bottom -->
         <div class="sn-footer-bottom">
-            <p class="sn-footer-copyright">© <?php echo date('Y'); ?> ShopNext. All rights reserved.</p>
+            <p class="sn-footer-copyright">© <?php echo date('Y'); ?> <?php echo htmlspecialchars($store_name ?? (defined('STORE_NAME') ? STORE_NAME : 'Store')); ?>. All rights reserved.</p>
             <div class="sn-payment-icons">
                 <span style="font-weight:700; font-size:12px; color:#111827; margin-right:8px;">VISA</span>
                 <span style="font-weight:700; font-size:12px; color:#EA580C; margin-right:8px;">Mastercard</span>

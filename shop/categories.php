@@ -166,7 +166,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
     <base href="<?php echo htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8'); ?>">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Categories - <?php echo htmlspecialchars($settings['meta_title_home'] ?? 'ShopNext'); ?></title>
+    <title>Categories - <?php echo htmlspecialchars(!empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Store'))); ?></title>
     <link rel="icon" type="image/png" href="assets/uploads/<?php echo htmlspecialchars($favicon); ?>">
 
     <!-- Google Fonts & FontAwesome -->

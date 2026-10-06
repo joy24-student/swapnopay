@@ -240,7 +240,8 @@ function render_smart_fallback($prompt, $product_details) {
                            "- **7 Days Return:** Hassle-free easy return policy if you're not completely satisfied!\n\n" .
                            "Need help finding products or tracking orders?";
         } else {
-            $ai_markdown = "### 🛍️ Welcome to ShopNext AI Assistant!\n\n" .
+            $currStore = defined('STORE_NAME') ? STORE_NAME : 'Our Store';
+            $ai_markdown = "### 🛍️ Welcome to {$currStore} AI Assistant!\n\n" .
                            "I'm here to help you discover the best prices, compare gadgets, find deals, and answer questions!\n\n" .
                            "- Tap or ask: *\"What are today's top deals?\"*\n" .
                            "- Tap or ask: *\"Recommend the best laptop under ৳ 70k\"*\n" .
@@ -456,7 +457,7 @@ function call_openrouter_key_pool($openrouter_keys, $prompt_text, $preferred_mod
                     'Authorization: Bearer ' . $api_key,
                     'Content-Type: application/json',
                     'HTTP-Referer: ' . $referer,
-                    'X-Title: ShopNext AI Assistant'
+                    'X-Title: ' . (defined('STORE_NAME') ? STORE_NAME : 'Store') . ' AI Assistant'
                 ],
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 22,

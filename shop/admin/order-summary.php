@@ -31,9 +31,9 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $pdo->query("SELECT * FROM tbl_settings WHERE id=1");
 $settings = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 $shopLogo = $settings['logo'] ?? '';
-$shopName = $settings['meta_title_home'] ?? 'ShopNext Online Store';
-$contactEmail = $settings['contact_email'] ?? 'support@shopnext.style';
-$contactPhone = $settings['contact_phone'] ?? '+880 1700-123456';
+$shopName = $settings['store_name'] ?? ($settings['meta_title_home'] ?? (defined('STORE_NAME') ? STORE_NAME : 'Online Store'));
+$contactEmail = $settings['contact_email'] ?? ('support@' . ($_SERVER['HTTP_HOST'] ?? 'store.com'));
+$contactPhone = $settings['contact_phone'] ?? '+880 1700-000000';
 $contactAddress = $settings['contact_address'] ?? 'Dhaka, Bangladesh';
 
 // Fetch customer account details if customer_id exists

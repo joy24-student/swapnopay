@@ -62,7 +62,7 @@ $isPrint = isset($_GET['print']) && $_GET['print'] == '1';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Receipt <?= htmlspecialchars($paymentId) ?> - <?= htmlspecialchars($settings['meta_title_home'] ?? 'ShopMart') ?></title>
+    <title>Order Receipt <?= htmlspecialchars($paymentId) ?> - <?= htmlspecialchars($settings['store_name'] ?? ($settings['meta_title_home'] ?? (defined('STORE_NAME') ? STORE_NAME : 'Store'))) ?></title>
     <link rel="icon" type="image/png" href="<?= BASE_URL ?>assets/uploads/<?= htmlspecialchars($settings['favicon'] ?? 'favicon.png') ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>

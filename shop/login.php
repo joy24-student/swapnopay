@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - ShopNext</title>
+    <title>Sign In - <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -784,19 +784,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
     <div class="form-panel">
         <div>
             <!-- LOGO -->
-            <a href="index.php" class="brand-logo" title="Back to ShopNext Store">
+            <a href="index.php" class="brand-logo" title="Back to <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?>">
                 <div class="logo-bag">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>
                     </svg>
                 </div>
-                Shop<span>Next</span>
+                <span><?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?></span>
             </a>
 
             <!-- HEADING -->
             <div class="header-section">
                 <h1>Welcome Back</h1>
-                <p>Enter your credentials to access your ShopNext account.</p>
+                <p>Enter your credentials to access your <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?> account.</p>
             </div>
 
             <!-- NOTIFICATIONS -->
@@ -896,7 +896,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
 
         <!-- 3D GRAPHIC -->
         <div class="banner-stage">
-            <img src="<?php echo htmlspecialchars($banner_login); ?>" alt="ShopNext Best Products">
+            <img src="<?php echo htmlspecialchars($banner_login); ?>" alt="<?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?> Best Products">
         </div>
 
         <!-- 3 TRUST BADGES -->
@@ -940,14 +940,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
 <div class="mobile-auth-container">
     <div class="content-wrap">
         <!-- LOGO -->
-        <a href="index.php" class="m-brand-logo" title="Back to ShopNext Store">
+        <a href="index.php" class="m-brand-logo" title="Back to <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?>">
             <svg width="42" height="46" viewBox="0 0 48 50" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M9 16.5 C9 15.5 9.8 14.5 11 14.5 L37 14.5 C38.2 14.5 39 15.5 39 16.5 L36 43 C36 45 34 46.5 32 46.5 L16 46.5 C14 46.5 12 45 12 43 Z" fill="#FBBF24" stroke="#0F172A" stroke-width="2.8" stroke-linejoin="round"/>
                 <path d="M19 14.5 V10 C19 7 21 5 24 5 C27 5 29 7 29 10 V14.5" stroke="#0F172A" stroke-width="2.8" stroke-linecap="round"/>
                 <path d="M20 28 C21.5 31 26.5 31 28 28" stroke="#0F172A" stroke-width="2.8" stroke-linecap="round"/>
             </svg>
             <div class="m-brand-title">
-                <span class="m-brand-shop">Shop</span><span class="m-brand-next">Next</span>
+                <span class="m-brand-shop"><?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?></span>
             </div>
         </a>
 

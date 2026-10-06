@@ -458,7 +458,7 @@
     }
 
     // =========================================================================
-    // 5. MULTI-IMAGE DRAG & DROP & ATTACHMENT HANDLING
+    // 5. CLIENT-SIDE IMAGE COMPRESSION & MULTI-IMAGE ATTACHMENT ENGINE
     // =========================================================================
     window.triggerImagePicker = function() {
         if (fileInput) fileInput.click();
@@ -470,23 +470,119 @@
         input.value = '';
     };
 
-    function addFiles(files) {
+    function formatBytes(bytes, decimals = 1) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    /**
+     * High-Performance Client-Side Image Compression via HTML5 Canvas
+     * Auto-resizes to e-commerce resolution (max 1600px), converts to WebP, and strips EXIF
+     */
+    function compressImageFile(file, maxDimension = 1600, quality = 0.82) {
+        return new Promise((resolve) => {
+            const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowed.includes(file.type)) {
+                resolve({ file: file, originalSize: file.size, compressedSize: file.size, savedPct: 0 });
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob(function(blob) {
+                        if (!blob || blob.size >= file.size) {
+                            // If compression didn't reduce size (already tiny), keep original
+                            resolve({
+                                file: file,
+                                originalSize: file.size,
+                                compressedSize: file.size,
+                                savedPct: 0,
+                                dimensions: `${img.width}×${img.height}`,
+                                dataUrl: e.target.result
+                            });
+                            return;
+                        }
+
+                        const compName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+                        const compressedFile = new File([blob], compName, {
+                            type: 'image/webp',
+                            lastModified: Date.now()
+                        });
+
+                        const origSize = file.size;
+                        const compSize = compressedFile.size;
+                        const savedPct = Math.max(0, Math.round(((origSize - compSize) / origSize) * 100));
+
+                        resolve({
+                            file: compressedFile,
+                            originalSize: origSize,
+                            compressedSize: compSize,
+                            savedPct: savedPct,
+                            dimensions: `${width}×${height}`,
+                            dataUrl: canvas.toDataURL('image/webp', quality)
+                        });
+                    }, 'image/webp', quality);
+                };
+                img.onerror = () => resolve({ file: file, originalSize: file.size, compressedSize: file.size, savedPct: 0, dataUrl: e.target.result });
+                img.src = e.target.result;
+            };
+            reader.onerror = () => resolve({ file: file, originalSize: file.size, compressedSize: file.size, savedPct: 0 });
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function addFiles(files) {
         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        // Show non-blocking indicator in tray
+        if (dropzoneTray) {
+            dropzoneTray.style.display = 'block';
+            if (previewStrip) previewStrip.innerHTML = '<div style="padding:10px; font-size:12px; color:#1A73E8;"><i class="fa fa-spinner fa-spin"></i> Compressing & optimizing photos for instant upload...</div>';
+        }
+
         for (const file of files) {
             if (selectedFiles.length >= 5) {
                 alert('You can attach a maximum of 5 product images at a time.');
                 break;
             }
             if (!allowedTypes.includes(file.type)) {
-                alert(`File "${file.name}" is not a valid image. Only JPG, PNG, and WebP are supported.`);
+                alert(`File "${file.name}" is not a supported image format.`);
                 continue;
             }
-            if (file.size > 8 * 1024 * 1024) {
-                alert(`File "${file.name}" exceeds 8MB.`);
-                continue;
-            }
-            selectedFiles.push(file);
+
+            // Run client-side compression
+            const result = await compressImageFile(file, 1600, 0.82);
+            result.file._compressionMeta = result; // attach meta
+            selectedFiles.push(result.file);
         }
+
         renderImagePreviews();
         updateSendButtonState();
     }
@@ -512,10 +608,38 @@
         }
         if (trayFileCount) trayFileCount.textContent = selectedFiles.length;
 
+        // Calculate total compression stats
+        let totalOrig = 0;
+        let totalComp = 0;
+        selectedFiles.forEach(f => {
+            const m = f._compressionMeta;
+            if (m) {
+                totalOrig += m.originalSize || f.size;
+                totalComp += m.compressedSize || f.size;
+            } else {
+                totalOrig += f.size;
+                totalComp += f.size;
+            }
+        });
+
+        const totalSavedPct = totalOrig > 0 ? Math.max(0, Math.round(((totalOrig - totalComp) / totalOrig) * 100)) : 0;
+        const statsHtml = totalSavedPct > 0 ? `<span style="color:#059669; font-weight:700; margin-left:8px;"><i class="fa fa-bolt"></i> Auto-Compressed: ${formatBytes(totalOrig)} → ${formatBytes(totalComp)} (-${totalSavedPct}%)</span>` : '';
+
+        const attachHeader = dropzoneTray.querySelector('.gemini-attach-header');
+        if (attachHeader) {
+            attachHeader.innerHTML = `
+                <span><i class="fa fa-images"></i> <strong>Selected Photos for Vision Analysis</strong> (${selectedFiles.length}/5) ${statsHtml}</span>
+                <button type="button" class="gemini-attach-clear" onclick="clearSelectedImages()">&times; Clear</button>
+            `;
+        }
+
         previewStrip.innerHTML = '';
         selectedFiles.forEach((file, index) => {
             const card = document.createElement('div');
             card.className = 'sn-ai-thumb-card';
+
+            const m = file._compressionMeta;
+            const badgeText = (m && m.savedPct > 0) ? `-${m.savedPct}%` : 'OPTIMIZED';
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -524,6 +648,7 @@
                         <img src="${e.target.result}" alt="${file.name}" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">
                         <button type="button" class="sn-ai-thumb-del" onclick="removeSelectedFile(${index})" style="position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,0.7); color:#fff; border:none; cursor:pointer; line-height:1; font-size:12px;">&times;</button>
                         ${index === 0 ? '<span class="sn-ai-primary-tag" style="position:absolute; bottom:2px; left:2px; background:#1A73E8; color:#fff; font-size:8px; font-weight:800; padding:1px 4px; border-radius:3px;">PRIMARY</span>' : `<span class="sn-ai-gallery-tag" style="position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.6); color:#fff; font-size:8px; padding:1px 4px; border-radius:3px;">#${index + 1}</span>`}
+                        <span class="sn-ai-compress-tag" title="Original: ${formatBytes(m ? m.originalSize : file.size)} → Compressed: ${formatBytes(file.size)}" style="position:absolute; top:2px; left:2px; background:#10B981; color:#fff; font-size:8px; font-weight:800; padding:1px 4px; border-radius:3px;">${badgeText}</span>
                     </div>
                 `;
             };

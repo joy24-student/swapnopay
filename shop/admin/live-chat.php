@@ -775,10 +775,15 @@ html, body {
         <!-- COLUMN 1: LIVE CONVERSATIONS LIST (330px) -->
         <!-- ============================================== -->
         <div class="wa-col-chats" id="threadsCol">
-            <!-- Mobile Title Block (Matches media_1791287559643_49f007d0.png View 1) -->
+            <!-- Mobile Title Block (Matches media_1791288649666_d25b5b6c.png View 1) -->
             <div class="sup-mob-title-block">
                 <div class="sup-mob-icon-wrap">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#EAB308"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#FEDB65">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                        <circle cx="8" cy="9.5" r="1.5" fill="#FFFFFF"/>
+                        <circle cx="12" cy="9.5" r="1.5" fill="#FFFFFF"/>
+                        <circle cx="16" cy="9.5" r="1.5" fill="#FFFFFF"/>
+                    </svg>
                 </div>
                 <div class="sup-mob-title-text">
                     <h2 class="sup-mob-heading">Live Support Chat</h2>
@@ -797,16 +802,16 @@ html, body {
             <!-- Mobile Horizontal Filter Strip (Matches View 1) -->
             <div class="sup-mob-filter-strip">
                 <button type="button" class="sup-filter-pill active" onclick="setThreadFilter('all', this)">
-                    All Chats <span class="sup-count-tag" id="supCntAll">(0)</span>
+                    <span>All Chats</span> <span class="sup-count-badge" id="supCntAll">24</span>
                 </button>
                 <button type="button" class="sup-filter-pill" onclick="setThreadFilter('active', this)">
-                    Active <span class="sup-count-tag" id="supCntActive">(0)</span>
+                    <span>Active</span> <span class="sup-count-badge" id="supCntActive">12</span>
                 </button>
                 <button type="button" class="sup-filter-pill" onclick="setThreadFilter('pending', this)">
-                    Pending <span class="sup-count-tag" id="supCntPending">(0)</span>
+                    <span>Pending</span> <span class="sup-count-badge" id="supCntPending">6</span>
                 </button>
                 <button type="button" class="sup-filter-pill" onclick="setThreadFilter('closed', this)">
-                    Closed <span class="sup-count-tag" id="supCntClosed"></span>
+                    <span>Closed</span>
                 </button>
             </div>
 

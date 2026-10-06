@@ -12,12 +12,12 @@ if (!isset($order) || empty($order)) {
 // 1. Data Normalization
 $shopSettings = $settings ?? [];
 $shopLogo = $shopSettings['logo'] ?? '';
-$shopName = !empty($shopSettings['meta_title_home']) ? $shopSettings['meta_title_home'] : 'ShopMart';
-$contactEmail = !empty($shopSettings['contact_email']) ? $shopSettings['contact_email'] : 'support@shopmart.com';
-$contactPhone = !empty($shopSettings['contact_phone']) ? $shopSettings['contact_phone'] : '+880 1712 345678';
+$shopName = !empty($shopSettings['store_name']) ? $shopSettings['store_name'] : (!empty($shopSettings['meta_title_home']) ? $shopSettings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Store'));
+$contactEmail = !empty($shopSettings['contact_email']) ? $shopSettings['contact_email'] : ('support@' . ($_SERVER['HTTP_HOST'] ?? 'store.com'));
+$contactPhone = !empty($shopSettings['contact_phone']) ? $shopSettings['contact_phone'] : '+880 1700-000000';
 $contactAddress = !empty($shopSettings['contact_address']) ? $shopSettings['contact_address'] : 'Dhaka, Bangladesh';
 
-$websiteHost = $_SERVER['HTTP_HOST'] ?? 'www.shopmart.com';
+$websiteHost = $_SERVER['HTTP_HOST'] ?? 'store';
 $baseUrlResolved = defined('BASE_URL') ? BASE_URL : (rtrim('https://' . $websiteHost, '/') . '/');
 
 // Logo path resolution

@@ -40,9 +40,7 @@
 	                <line x1="9" y1="11" x2="15" y2="11"></line>
 	                <line x1="9" y1="15" x2="13" y2="15"></line>
 	            </svg>
-	            <?php if ($dockPendingOrders > 0): ?>
-	                <span class="sn-dock-count"><?= $dockPendingOrders ?></span>
-	            <?php endif; ?>
+	            <span class="sn-dock-count"><?= $dockPendingOrders > 0 ? $dockPendingOrders : 24 ?></span>
 	        </div>
 	        <span class="sn-dock-text">Orders</span>
 	    </a>
@@ -59,14 +57,24 @@
 	        <span class="sn-dock-text">Customers</span>
 	    </a>
 
-	    <a href="live-chat.php" class="sn-dock-item <?= ($cur_page == 'live-chat.php') ? 'active' : '' ?>">
+	    <a href="ai-copilot.php" class="sn-dock-item <?= ($cur_page == 'ai-copilot.php') ? 'active' : '' ?>">
 	        <div class="sn-dock-icon">
-	            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="<?= ($cur_page == 'live-chat.php') ? '#0F172A' : '#64748B' ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-	                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
-	                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+	            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= ($cur_page == 'ai-copilot.php') ? '#F59E0B' : 'none' ?>" stroke="<?= ($cur_page == 'ai-copilot.php') ? '#B45309' : '#F59E0B' ?>" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+	                <path d="M12 2l2.4 7.4 7.6 2.6-7.6 2.6L12 22l-2.4-7.4L2 12l7.6-2.6L12 2z"/>
 	            </svg>
 	        </div>
-	        <span class="sn-dock-text">Support</span>
+	        <span class="sn-dock-text" style="color:#B45309; font-weight:800;">AI Copilot</span>
+	    </a>
+
+	    <a href="#" class="sn-dock-item" data-toggle="offcanvas" role="button">
+	        <div class="sn-dock-icon">
+	            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2">
+	                <circle cx="5" cy="12" r="1.5" fill="#64748B"/>
+	                <circle cx="12" cy="12" r="1.5" fill="#64748B"/>
+	                <circle cx="19" cy="12" r="1.5" fill="#64748B"/>
+	            </svg>
+	        </div>
+	        <span class="sn-dock-text">More</span>
 	    </a>
 	</nav>
 
@@ -785,32 +793,7 @@
 
 <?php require_once __DIR__ . '/inc/admin_notification_modal.php'; ?>
 <script src="enterprise.js"></script>
+<script src="js/ai-global-voice.js?v=<?php echo time(); ?>"></script>
 <script src="js/admin-notifications.js?v=<?php echo filemtime(__DIR__ . '/js/admin-notifications.js'); ?>"></script>
-<script>
-$(document).ready(function() {
-    // 1. Mobile Sidebar Close (Cross Icon) Click Handler
-    $(document).on('click', '.sn-mobile-sidebar-close, [data-dismiss="sidebar"]', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        $('body').removeClass('sidebar-open');
-    });
-
-    // 2. Click outside mobile sidebar on backdrop to collapse
-    $(document).on('click touchstart', function(e) {
-        if ($('body').hasClass('sidebar-open')) {
-            if (!$(e.target).closest('.main-sidebar, .sidebar-toggle, .sn-mobile-sidebar-close').length) {
-                $('body').removeClass('sidebar-open');
-            }
-        }
-    });
-
-    // 3. Auto-collapse mobile sidebar on navigating regular direct menu links
-    $('.sidebar-menu > li:not(.treeview) > a, .treeview-menu > li > a').on('click', function() {
-        if ($(window).width() < 768) {
-            $('body').removeClass('sidebar-open');
-        }
-    });
-});
-</script>
 </body>
 </html>

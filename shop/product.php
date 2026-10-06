@@ -1407,7 +1407,7 @@ require_once('header.php');
                                     <span style="color: #fab802; margin-right: 6px;">Q:</span> Is this product 100% original & authentic?
                                 </div>
                                 <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
-                                    <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Yes, all items sold on ShopNext are 100% brand new, authentic, and backed by official manufacturer warranty.
+                                    <span style="font-weight: 700; color: #10b981; margin-right: 6px;">A:</span> Yes, all items sold on <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'this store'); ?> are 100% brand new, authentic, and backed by official manufacturer warranty.
                                 </div>
                             </div>
                             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
@@ -2200,7 +2200,7 @@ function initProductPage() {
         if (navigator.share) {
             navigator.share({
                 title: '<?php echo addslashes($p_name); ?>',
-                text: 'Check out <?php echo addslashes($p_name); ?> on ShopNext!',
+                text: 'Check out <?php echo addslashes($p_name); ?> on ' + <?php echo json_encode(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?> + '!',
                 url: window.location.href
             }).catch(() => {});
         } else if (navigator.clipboard) {

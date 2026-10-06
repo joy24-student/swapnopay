@@ -4,15 +4,16 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-$cur_page = 'deals.php';
-$page_meta_title = 'Top Deals & Limited-Time Offers - ShopNext';
-$page_meta_keyword = 'deals, discounts, coupons, flash sale, shopnext';
-$page_meta_description = 'Shop exclusive limited-time deals and save up to 70% off on top electronics, smartphones, laptops, watches and more at ShopNext.';
-
 require_once("admin/inc/config.php");
 require_once("admin/inc/functions.php");
 require_once("admin/inc/CSRF_Protect.php");
 require_once("admin/inc/seo_helpers.php");
+
+$cur_page = 'deals.php';
+$storeName = defined('STORE_NAME') ? STORE_NAME : 'Store';
+$page_meta_title = 'Top Deals & Limited-Time Offers - ' . $storeName;
+$page_meta_keyword = 'deals, discounts, coupons, flash sale, ' . strtolower($storeName);
+$page_meta_description = 'Shop exclusive limited-time deals and save up to 70% off on top electronics, smartphones, laptops, watches and more at ' . $storeName . '.';
 
 $csrf = new CSRF_Protect();
 

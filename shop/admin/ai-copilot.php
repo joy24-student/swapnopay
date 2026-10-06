@@ -104,7 +104,7 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
                 <h1 class="gemini-hero-title">
                     Hello, <span class="gemini-gradient-text"><?php echo htmlspecialchars($admin_first_name); ?></span>
                 </h1>
-                <h2 class="gemini-hero-subtitle">How can I help you manage ShopMart today?</h2>
+                <h2 class="gemini-hero-subtitle">How can I help you manage <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'your store'); ?> today?</h2>
 
                 <!-- Gemini Prompt Suggestion Cards Grid -->
                 <div class="gemini-cards-grid">
@@ -157,6 +157,7 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
 
                 <!-- Secondary Quick Action Chips -->
                 <div class="gemini-quick-chips">
+                    <span class="gemini-chip" onclick="triggerImagePicker()"><i class="fa fa-compress text-success"></i> Auto-Compress Photos</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Analyze customer retention, VIP champions, and churn risk')"><i class="fa fa-users text-purple" style="color:#7C3AED;"></i> VIP Retention & Churn</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Run dynamic pricing and profit margin optimization')"><i class="fa fa-balance-scale text-success"></i> Dynamic Pricing</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Forecast 30-day inventory demand and stockout risks')"><i class="fa fa-clock-o text-warning"></i> Demand Forecast</span>

@@ -14,6 +14,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
 
 // Ensure required columns exist across all tenant schemas safely
 $settings_migrations = [
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS store_name varchar(255) DEFAULT ''",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''",
@@ -233,6 +234,7 @@ try {
 // General Settings
 $logo = $settings_data['logo'] ?? '';
 $favicon = $settings_data['favicon'] ?? '';
+$store_name = $settings_data['store_name'] ?? ($settings_data['meta_title_home'] ?? '');
 $contact_email = $settings_data['contact_email'] ?? '';
 $contact_phone = $settings_data['contact_phone'] ?? '';
 $meta_title_home = $settings_data['meta_title_home'] ?? '';
@@ -563,12 +565,13 @@ if(isset($_POST['form_general_settings'])) {
 
     if($valid == 1) {
         $statement = $pdo->prepare("UPDATE tbl_settings SET
-                                    logo=?, favicon=?, contact_email=?, contact_phone=?,
+                                    store_name=?, logo=?, favicon=?, contact_email=?, contact_phone=?,
                                     meta_title_home=?, meta_keyword_home=?, meta_description_home=?,
                                     before_head=?, after_body=?, before_body=?,
                                     hide_banner_desktop=?, hide_banner_mobile=?, hide_free_delivery_desktop=?, hide_free_delivery_mobile=?
                                     WHERE id=1");
         $statement->execute(array(
+            $_POST['store_name'] ?? '',
             $logo,
             $favicon,
             $_POST['contact_email'] ?? '',
@@ -2137,7 +2140,14 @@ $lang_sections = [
                                             <input type="text" name="contact_phone" id="contact_phone" class="form-control" value="<?php echo htmlspecialchars($contact_phone); ?>">
                                         </div>
                                     </div>
-                                    <h3 class="seo-info mt-8">SEO & Script Settings</h3>
+                                    <h3 class="seo-info mt-8">Store Identity &amp; SEO</h3>
+                                    <div class="form-group">
+                                        <label for="store_name" class="col-sm-3 control-label">Store / Brand Name</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="store_name" id="store_name" class="form-control" value="<?php echo htmlspecialchars($store_name); ?>" placeholder="e.g. My Online Store">
+                                            <p class="help-block" style="font-size:11.5px; color:#64748b; margin-top:4px;">Official store name dynamically displayed in header, footer, invoices, and system notifications.</p>
+                                        </div>
+                                    </div>
                                     <div class="form-group">
                                         <label for="meta_title_home" class="col-sm-3 control-label">Meta Title (Home)</label>
                                         <div class="col-sm-9">

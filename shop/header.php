@@ -46,6 +46,7 @@ if (!$settings) {
 } 
 
 // Assign settings variables
+$store_name = !empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Online Store'));
 $logo = $settings['logo'] ?? 'default_logo.png';
 $logo_file_path = 'assets/uploads/' . $logo;
 if (!file_exists(__DIR__ . '/' . $logo_file_path)) {
@@ -1816,13 +1817,17 @@ body.sn-popup-open {
         <!-- Top Row -->
         <div class="sn-header-top">
             <!-- Brand Logo -->
-            <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>Shop<span class="sn-logo-text-next">Next</span></span>
+            <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo" title="<?php echo htmlspecialchars($store_name); ?>">
+                <?php if (!empty($logo) && file_exists(__DIR__ . '/' . $logo_file_path) && !str_ends_with($logo_file_path, 'default_logo.png')): ?>
+                    <img src="<?php echo BASE_URL . $logo_file_path; ?>" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height: 38px; width: auto; object-fit: contain;">
+                <?php else: ?>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span><?php echo htmlspecialchars($store_name); ?></span>
+                <?php endif; ?>
             </a>
 
             <!-- Search Bar -->
@@ -2213,7 +2218,7 @@ window.snOpenMobileSearch = function(e) {
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
                     </div>
                     <div>
-                        <div class="sn-global-ai-title">ShopNext AI Shopping Assistant</div>
+                        <div class="sn-global-ai-title"><?php echo htmlspecialchars($store_name); ?> AI Shopping Assistant</div>
                         <div class="sn-global-ai-sub">Smart deal finder & product recommendations</div>
                     </div>
                 </div>
@@ -2231,7 +2236,7 @@ window.snOpenMobileSearch = function(e) {
             <!-- Messages Stream -->
             <div class="sn-global-ai-chat" id="snGlobalAiMessages">
                 <div class="sn-ai-bubble ai">
-                    Welcome! I'm your <strong>ShopNext AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
+                    Welcome! I'm your <strong><?php echo htmlspecialchars($store_name); ?> AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
                 </div>
             </div>
 

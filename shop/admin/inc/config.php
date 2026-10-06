@@ -161,3 +161,30 @@ if (!filter_var($BASE_URL,FILTER_VALIDATE_URL) || !in_array(parse_url($BASE_URL,
     http_response_code(503); exit('The store address has not been configured.');
 }
 define('BASE_URL',rtrim($BASE_URL,'/') . '/');
+
+// Dynamically resolve Store / Shop Name from Database (tbl_settings)
+$dynamicStoreName = '';
+try {
+    $settingsRow = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!empty($settingsRow['store_name'])) {
+        $dynamicStoreName = trim($settingsRow['store_name']);
+    } elseif (!empty($settingsRow['meta_title_home'])) {
+        $dynamicStoreName = trim($settingsRow['meta_title_home']);
+    }
+} catch (Throwable $e) {}
+
+if (empty($dynamicStoreName) && !empty($runtime['store_name'])) {
+    $dynamicStoreName = trim($runtime['store_name']);
+}
+if (empty($dynamicStoreName)) {
+    $dynamicStoreName = 'Online Store';
+}
+
+define('STORE_NAME', $dynamicStoreName);
+define('SHOP_NAME', $dynamicStoreName);
+
+if (!function_exists('getStoreName')) {
+    function getStoreName() {
+        return defined('STORE_NAME') ? STORE_NAME : 'Online Store';
+    }
+}

@@ -534,3 +534,4 @@
     window.snAdminNotifications = new AdminNotificationManager();
 
 })();
+

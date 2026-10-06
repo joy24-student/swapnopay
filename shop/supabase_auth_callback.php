@@ -9,7 +9,7 @@ require_once __DIR__ . '/admin/inc/config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Authenticating... - ShopNext</title>
+    <title>Authenticating... - <?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -136,7 +136,7 @@ require_once __DIR__ . '/admin/inc/config.php';
 
     async function syncAndRedirect(user) {
         document.getElementById('statusTitle').innerText = 'Setting up Account';
-        document.getElementById('statusMsg').innerText = 'Synchronizing profile details with ShopNext...';
+        document.getElementById('statusMsg').innerText = 'Synchronizing profile details with <?php echo addslashes(defined('STORE_NAME') ? STORE_NAME : 'Store'); ?>...';
 
         const meta = user.user_metadata || {};
         const payload = {

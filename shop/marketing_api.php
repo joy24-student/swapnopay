@@ -1215,7 +1215,8 @@ switch ($action) {
 
     case 'send_test_whatsapp_message': {
         $to = trim($_POST['to'] ?? '');
-        $messageText = trim($_POST['message'] ?? 'Hello from ShopNext WhatsApp Cloud API! This test message confirms your Meta Business automation is active.');
+        $storeBrand = defined('STORE_NAME') ? STORE_NAME : 'Store';
+        $messageText = trim($_POST['message'] ?? ("Hello from {$storeBrand} WhatsApp Cloud API! This test message confirms your Meta Business automation is active."));
 
         if (empty($to)) {
             echo json_encode(['status' => 'error', 'message' => 'Destination phone number required']);
@@ -1303,23 +1304,25 @@ switch ($action) {
         $phoneId = $conf['phone_number_id'] ?? '';
         $token = $conf['access_token'] ?? '';
 
+        $storeName = defined('STORE_NAME') ? STORE_NAME : 'Store';
+        $baseUrl = defined('BASE_URL') ? BASE_URL : '/';
         $messageBody = '';
         $templateName = 'abandoned_cart_reminder';
         if ($triggerKey === 'abandoned_cart') {
             $templateName = 'abandoned_cart_reminder';
-            $messageBody = "Hi {$customerName}, you left items in your cart! Complete your order today and take 5% OFF with code RECOVER5: https://shopnext.style/cart.php";
+            $messageBody = "Hi {$customerName}, you left items in your cart at {$storeName}! Complete your order today and take 5% OFF with code RECOVER5: {$baseUrl}cart.php";
         } elseif ($triggerKey === 'order_placed') {
             $templateName = 'order_shipped_tracking';
-            $messageBody = "🎉 Order Confirmed! Hi {$customerName}, your order {$orderId} for ৳{$orderTotal} has been received. Download receipt invoice: https://shopnext.style/dashboard.php";
+            $messageBody = "🎉 Order Confirmed! Hi {$customerName}, your {$storeName} order {$orderId} for ৳{$orderTotal} has been received. Download receipt invoice: {$baseUrl}dashboard.php";
         } elseif ($triggerKey === 'order_shipped') {
             $templateName = 'order_shipped_tracking';
-            $messageBody = "🚚 Out for Delivery! Hi {$customerName}, your order {$orderId} is out with our courier. Track parcel live: https://shopnext.style/tracking.php?id={$orderId}";
+            $messageBody = "🚚 Out for Delivery! Hi {$customerName}, your {$storeName} order {$orderId} is out with our courier. Track parcel live: {$baseUrl}tracking.php?id={$orderId}";
         } elseif ($triggerKey === 'cod_verification') {
             $templateName = 'cod_order_confirm';
-            $messageBody = "📦 COD Verification for Order {$orderId} (৳{$orderTotal}). Please reply with YES to confirm shipment or NO to cancel.";
+            $messageBody = "📦 COD Verification for {$storeName} Order {$orderId} (৳{$orderTotal}). Please reply with YES to confirm shipment or NO to cancel.";
         } elseif ($triggerKey === 'post_purchase_review') {
             $templateName = 'flash_sale_promo';
-            $messageBody = "⭐ How did we do, {$customerName}? Review your order {$orderId} and claim 10% OFF on your next styling purchase with coupon VIP10.";
+            $messageBody = "⭐ How did we do, {$customerName}? Review your {$storeName} order {$orderId} and claim 10% OFF on your next purchase with coupon VIP10.";
         }
 
         $wamid = 'wamid.HBg_' . bin2hex(random_bytes(6));

@@ -20,7 +20,7 @@ try {
     $settings = [];
 }
 
-$site_name = $settings['meta_title_home'] ?? 'ShopNext';
+$site_name = !empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Store'));
 $contact_phone = $settings['contact_phone'] ?? '';
 $chat_whatsapp_url = trim($settings['chat_whatsapp_url'] ?? '');
 if (empty($chat_whatsapp_url)) {
@@ -32,7 +32,7 @@ if (empty($chat_whatsapp_url)) {
 
 $chat_messenger_url = trim($settings['chat_messenger_url'] ?? '');
 if (empty($chat_messenger_url)) {
-    $chat_messenger_url = "https://m.me/shopnext";
+    $chat_messenger_url = !empty($settings['facebook_url']) ? $settings['facebook_url'] : '#';
 } elseif (!preg_match('/^https?:\/\//i', $chat_messenger_url)) {
     $chat_messenger_url = "https://m.me/" . ltrim($chat_messenger_url, '@');
 }
