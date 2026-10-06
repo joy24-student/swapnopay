@@ -52,7 +52,7 @@ foreach ($result as $row) {
 	<link rel="stylesheet" href="css/summernote.css">
 	<link rel="stylesheet" href="style.css">
 
-<link rel="stylesheet" href="css/enterprise.css">
+<link rel="stylesheet" href="css/enterprise.css?v=<?php echo filemtime(__DIR__ . '/css/enterprise.css'); ?>">
 <meta name="csrf-token" content="<?php echo $csrf->getToken(); ?>">
 <script src="js/jquery-2.2.4.min.js"></script>
 </head>
