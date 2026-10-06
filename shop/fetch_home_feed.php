@@ -8,9 +8,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once('admin/inc/config.php');
-require_once('admin/inc/seo_helpers.php');
-require_once('inc_feed_card.php');
+require_once(__DIR__ . '/admin/inc/config.php');
+require_once(__DIR__ . '/admin/inc/seo_helpers.php');
+require_once(__DIR__ . '/inc_feed_card.php');
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-cache, must-revalidate');
@@ -119,8 +119,8 @@ try {
     }
 
     // Numeric price expressions compatible with PostgreSQL varchar price columns
-    $numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price, '0'), ',', ''), '') AS numeric)";
-    $numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price, '0'), ',', ''), '') AS numeric)";
+    $numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price::text, '0'), ',', ''), '') AS numeric)";
+    $numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price::text, '0'), ',', ''), '') AS numeric)";
 
     $order = "p.p_id DESC";
 
@@ -158,21 +158,42 @@ try {
     $offset = ($page - 1) * $limit;
     $whereSql = implode(' AND ', $where);
 
-    // Fetch products batch
-    $sql = "
-        SELECT p.*, e.mcat_id, m.tcat_id,
-               COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating,
-               COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count
-        FROM tbl_product p
-        LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
-        LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
-        WHERE {$whereSql}
-        ORDER BY {$order}
-        LIMIT {$limit} OFFSET {$offset}
-    ";
+    // Fetch products batch safely
+    $products = [];
+    try {
+        $sql = "
+            SELECT p.*, e.mcat_id, m.tcat_id,
+                   COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating,
+                   COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count
+            FROM tbl_product p
+            LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
+            LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+            WHERE {$whereSql}
+            ORDER BY {$order}
+            LIMIT {$limit} OFFSET {$offset}
+        ";
 
-    $stmt = $pdo->query($sql);
-    $products = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        $stmt = $pdo->query($sql);
+        $products = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    } catch (Throwable $qErr) {
+        // Fallback to simple robust query if complex ordering or joins had an issue
+        try {
+            $fallbackSql = "
+                SELECT p.*, e.mcat_id, m.tcat_id,
+                       0 as avg_rating, 0 as rev_count
+                FROM tbl_product p
+                LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
+                LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+                WHERE p.p_is_active = 1 " . (!empty($excludeIds) ? "AND p.p_id NOT IN (" . implode(',', $excludeIds) . ")" : "") . "
+                ORDER BY p.p_id DESC
+                LIMIT {$limit} OFFSET {$offset}
+            ";
+            $stmt = $pdo->query($fallbackSql);
+            $products = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (Throwable $_) {
+            $products = [];
+        }
+    }
 
     // Fallback: If 'deals' or 'choice' has few items and offset reached, don't break
     if (empty($products) && $page === 1 && ($tab === 'deals' || $tab === 'choice')) {
@@ -187,7 +208,9 @@ try {
             ORDER BY p.p_total_view DESC, p.p_id DESC
             LIMIT {$limit}
         ";
-        $products = $pdo->query($fallbackSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        try {
+            $products = $pdo->query($fallbackSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $_) {}
     }
 
     // Render HTML cards

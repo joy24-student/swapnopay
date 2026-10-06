@@ -2130,7 +2130,9 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
         <div class="sn-global-ai-card">
             <div class="sn-global-ai-header">
                 <div class="sn-global-ai-title-wrap">
-                    <div class="sn-global-ai-icon">✨</div>
+                    <div class="sn-global-ai-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+                    </div>
                     <div>
                         <div class="sn-global-ai-title">ShopNext AI Shopping Assistant</div>
                         <div class="sn-global-ai-sub">Smart deal finder & product recommendations</div>
@@ -2141,16 +2143,16 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
             <!-- Suggestion Chips Bar -->
             <div class="sn-global-ai-chips">
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are today\'s best flash sale deals and payday discounts?')">⚡ Top Deals Today</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Recommend the best laptop under ৳ 70,000 for work and study')">💻 Best Laptops</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are the latest smartphones available with discount?')">📱 Smartphones</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Tell me about free shipping threshold and delivery times')">🚚 Shipping Policy</button>
+                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are today\'s best flash sale deals and payday discounts?')"><svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Top Deals Today</button>
+                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Recommend the best laptop under ৳ 70,000 for work and study')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="20" x2="22" y2="20"></line></svg>Best Laptops</button>
+                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are the latest smartphones available with discount?')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>Smartphones</button>
+                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Tell me about free shipping threshold and delivery times')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>Shipping Policy</button>
             </div>
 
             <!-- Messages Stream -->
             <div class="sn-global-ai-chat" id="snGlobalAiMessages">
                 <div class="sn-ai-bubble ai">
-                    👋 Hi there! I'm your <strong>ShopNext AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
+                    Welcome! I'm your <strong>ShopNext AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
                 </div>
             </div>
 
@@ -2346,7 +2348,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let html = `
                 <div class="sn-suggestion-header">
                     <span>Products &amp; Suggestions</span>
-                    <span class="sn-suggestion-hint">Tab ⇥ or ➔ to complete</span>
+                    <span class="sn-suggestion-hint">Press Tab or &rarr; to complete</span>
                 </div>
             `;
 
@@ -2975,7 +2977,7 @@ window.sendShopAiMessage = function() {
 
         <?php if(($settings['popup_countdown_on_off']??1) == 1): ?>
         <div class="sn-popup-countdown" id="snPopupCountdown">
-            <span class="sn-timer-label">⏰ Limited Time Offer Ends In:</span>
+            <span class="sn-timer-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px; margin-right:4px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Limited Time Offer Ends In:</span>
             <div class="sn-timer-boxes">
                 <div class="sn-timer-box"><span id="snTimerDays">00</span><small>Days</small></div>
                 <div class="sn-timer-sep">:</div>

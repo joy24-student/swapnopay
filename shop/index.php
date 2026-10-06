@@ -172,8 +172,8 @@ if (!empty($ssrSignalIds)) {
     } catch (Throwable $_) {}
 }
 
-$numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price, '0'), ',', ''), '') AS numeric)";
-$numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price, '0'), ',', ''), '') AS numeric)";
+$numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price::text, '0'), ',', ''), '') AS numeric)";
+$numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price::text, '0'), ',', ''), '') AS numeric)";
 
 $scoreParts = [];
 if (!empty($preferredEcats)) {
@@ -729,17 +729,17 @@ body {
 }
 
 /* ==========================================================================
-   LIVE DEAL MARQUEE RIBBON (DARAZ / ALIEXPRESS TICKER)
+   LIVE DEAL MARQUEE RIBBON (DARAZ / ALIEXPRESS TICKER - LIGHT GRADIENT)
    ========================================================================== */
 .sn-live-marquee-wrap {
-    background: linear-gradient(105deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #fff7ed 50%, #fef3c7 100%);
     border-radius: 14px;
-    padding: 10px 16px;
+    padding: 10px 18px;
     margin-bottom: 24px;
     overflow: hidden;
     position: relative;
-    border: 1px solid rgba(250, 184, 2, 0.25);
-    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
+    border: 1.5px solid #fed7aa;
+    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03);
     display: flex;
     align-items: center;
 }
@@ -750,17 +750,17 @@ body {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 30px;
+    width: 34px;
     z-index: 2;
     pointer-events: none;
 }
 .sn-live-marquee-wrap::before {
     left: 0;
-    background: linear-gradient(90deg, #0f172a 20%, transparent);
+    background: linear-gradient(90deg, #ffffff 30%, transparent);
 }
 .sn-live-marquee-wrap::after {
     right: 0;
-    background: linear-gradient(270deg, #0f172a 20%, transparent);
+    background: linear-gradient(270deg, #fef3c7 30%, transparent);
 }
 
 .sn-live-marquee-track {
@@ -785,42 +785,48 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: #f8fafc;
+    color: #1e293b;
     font-size: 13px;
     font-weight: 700;
     text-decoration: none !important;
 }
 
 .sn-marquee-tag {
-    background: #fab802;
-    color: #0f172a;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
     font-size: 10px;
-    font-weight: 900;
-    padding: 2px 7px;
-    border-radius: 5px;
-    letter-spacing: 0.3px;
+    font-weight: 800;
+    padding: 2.5px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.4px;
     text-transform: uppercase;
+    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.25);
 }
 
 .sn-marquee-tag.red {
-    background: #ef4444;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
     color: #ffffff;
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.25);
 }
 
 .sn-marquee-tag.purple {
-    background: #8b5cf6;
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
     color: #ffffff;
+    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.25);
 }
 
 .sn-marquee-tag.green {
-    background: #10b981;
+    background: linear-gradient(135deg, #10b981, #059669);
     color: #ffffff;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.25);
 }
 
 .sn-marquee-sep {
-    color: #fab802;
-    font-size: 14px;
-    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #f59e0b;
+    opacity: 0.8;
 }
 
 /* ==========================================================================
@@ -831,8 +837,8 @@ body {
 }
 
 .sn-payday-banner {
-    background: linear-gradient(100deg, #0a0e17 0%, #151d2a 50%, #1e293b 100%);
-    border: 1px solid rgba(250, 184, 2, 0.22);
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 40%, #fef3c7 100%);
+    border: 1.5px solid #fde68a;
     border-radius: 20px;
     padding: 24px 36px;
     display: flex;
@@ -840,7 +846,7 @@ body {
     justify-content: space-between;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16), 0 0 20px rgba(250, 184, 2, 0.05);
+    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.08), 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 /* Diagonal Shimmer Sweep Light Animation */
@@ -851,7 +857,7 @@ body {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: linear-gradient(60deg, transparent 40%, rgba(255, 255, 255, 0.08) 50%, transparent 60%);
+    background: linear-gradient(60deg, transparent 40%, rgba(255, 255, 255, 0.6) 50%, transparent 60%);
     transform: translateX(-100%) rotate(25deg);
     animation: snPaydayShimmer 6s infinite ease-in-out;
     pointer-events: none;
@@ -862,15 +868,15 @@ body {
     35%, 100% { transform: translateX(100%) rotate(25deg); }
 }
 
-/* Left Angled Badge with Neon Outline */
+/* Left Angled Badge with Warm Amber/Gold Outline */
 .sn-payday-left {
-    background: #0f172a;
-    border: 2px solid #fab802;
+    background: #ffffff;
+    border: 2px solid #f59e0b;
     border-radius: 14px;
     padding: 12px 20px;
     text-align: center;
     transform: rotate(-3deg);
-    box-shadow: 0 4px 18px rgba(250, 184, 2, 0.25), inset 0 0 12px rgba(250, 184, 2, 0.1);
+    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.2), inset 0 0 12px rgba(254, 243, 199, 0.5);
     flex-shrink: 0;
     animation: snBadgeNeon 3s infinite ease-in-out alternate;
     position: relative;
@@ -879,93 +885,94 @@ body {
 
 @keyframes snBadgeNeon {
     0% {
-        border-color: #fab802;
-        box-shadow: 0 4px 16px rgba(250, 184, 2, 0.25), inset 0 0 8px rgba(250, 184, 2, 0.1);
+        border-color: #f59e0b;
+        box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2), inset 0 0 8px rgba(254, 243, 199, 0.4);
     }
     100% {
-        border-color: #fde047;
-        box-shadow: 0 6px 24px rgba(250, 184, 2, 0.45), inset 0 0 16px rgba(250, 184, 2, 0.2);
+        border-color: #d97706;
+        box-shadow: 0 6px 22px rgba(245, 158, 11, 0.35), inset 0 0 16px rgba(254, 243, 199, 0.7);
     }
 }
 
 .sn-payday-badge-title {
     font-size: 18px;
     font-weight: 900;
-    color: #ffffff;
+    color: #0f172a;
     line-height: 1.05;
     letter-spacing: 0.5px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Solid Yellow Bar under SALE (exact match to screenshot) */
+/* Solid Amber Bar under SALE */
 .sn-payday-badge-bar {
     width: 100%;
     height: 3px;
-    background: #fab802;
+    background: #f59e0b;
     border-radius: 2px;
     margin: 4px auto 3px auto;
-    box-shadow: 0 0 8px rgba(250, 184, 2, 0.6);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
 }
 
 .sn-payday-badge-sub {
     font-size: 11px;
     font-weight: 800;
-    color: #fab802;
+    color: #d97706;
     letter-spacing: 0.8px;
 }
 
 .sn-payday-center {
     flex: 1;
     padding: 0 32px;
-    color: #ffffff;
+    color: #0f172a;
     position: relative;
     z-index: 1;
 }
 
 .sn-payday-center-title {
     font-size: 26px;
-    font-weight: 800;
+    font-weight: 900;
     line-height: 1.15;
     margin-bottom: 4px;
     letter-spacing: -0.5px;
-    color: #ffffff;
+    color: #0f172a;
 }
 
 .sn-payday-center-sub {
-    font-size: 13.5px;
-    color: #94a3b8;
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
     margin-bottom: 14px;
 }
 
-/* Claim Now Button with Radiating Ambient Glow Pulse */
+/* Claim Now Button with Radiating Glow Pulse */
 .sn-payday-btn {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    background: #fab802;
-    color: #0f172a !important;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff !important;
     font-size: 13px;
     font-weight: 700;
-    padding: 9px 22px;
+    padding: 10px 24px;
     border-radius: 50px;
     text-decoration: none !important;
-    box-shadow: 0 4px 15px rgba(250, 184, 2, 0.35);
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
     transition: all 0.25s ease;
     animation: snGlowPulse 2.4s infinite ease-in-out;
 }
 
 @keyframes snGlowPulse {
     0%, 100% {
-        box-shadow: 0 4px 15px rgba(250, 184, 2, 0.4), 0 0 15px rgba(250, 184, 2, 0.15);
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35), 0 0 12px rgba(245, 158, 11, 0.15);
     }
     50% {
-        box-shadow: 0 4px 24px rgba(250, 184, 2, 0.75), 0 0 28px rgba(250, 184, 2, 0.35);
+        box-shadow: 0 4px 22px rgba(245, 158, 11, 0.6), 0 0 24px rgba(245, 158, 11, 0.3);
     }
 }
 
 .sn-payday-btn:hover {
-    background: #f59e0b;
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
     transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(217, 119, 6, 0.45);
 }
 
 .sn-payday-btn svg {
@@ -991,7 +998,7 @@ body {
     max-height: 115px;
     max-width: 180px;
     object-fit: contain;
-    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.1));
     animation: snCartFloat 3.8s ease-in-out infinite alternate;
     will-change: transform;
 }
@@ -1429,11 +1436,21 @@ body {
 }
 
 .sn-feed-tabs-wrap {
+    position: -webkit-sticky;
+    position: sticky;
+    top: var(--sn-feed-sticky-top, 0px);
+    z-index: 95;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     display: flex;
     align-items: center;
     gap: 8px;
     overflow-x: auto;
-    padding: 6px 2px 14px 2px;
+    padding: 10px 4px;
+    margin: 0 0 16px 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.02);
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
 }
@@ -1445,7 +1462,7 @@ body {
 .sn-feed-tab {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     padding: 8px 18px;
     border-radius: 999px;
     background: #ffffff;
@@ -1457,6 +1474,11 @@ body {
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.sn-feed-tab svg {
+    flex-shrink: 0;
 }
 
 .sn-feed-tab:hover {
@@ -1467,10 +1489,11 @@ body {
 }
 
 .sn-feed-tab.active {
-    background: #0f172a;
-    color: #ffffff;
-    border-color: #0f172a;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 40%, #fef3c7 100%);
+    color: #92400e;
+    border-color: #f59e0b;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2);
+    font-weight: 800;
 }
 
 .sn-products-grid {
@@ -2326,13 +2349,15 @@ body {
         padding: 2px 6px !important;
     }
     .sn-feed-tabs-wrap {
-        padding: 4px 2px 10px 2px !important;
+        --sn-feed-sticky-top: var(--sn-mobile-header-height, 50px);
+        padding: 8px 4px !important;
+        margin: 0 0 12px 0 !important;
         gap: 6px !important;
     }
     .sn-feed-tab {
-        padding: 6px 12px !important;
+        padding: 6px 13px !important;
         font-size: 11.5px !important;
-        gap: 4px !important;
+        gap: 5px !important;
     }
     .sn-card-wishlist {
         width: 26px !important;
@@ -2577,54 +2602,54 @@ body {
                     <span class="sn-marquee-tag red">HOT</span>
                     <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
                     <span class="sn-marquee-tag">VOUCHER</span>
                     <span>Extra 15% OFF On Your First Order</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <span class="sn-marquee-item">
                     <span class="sn-marquee-tag green">FREE DELIVERY</span>
                     <span>Free Shipping Across Bangladesh on ৳2,000+</span>
                 </span>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
                     <span class="sn-marquee-tag purple">FLASH DEAL</span>
                     <span>Limited Time Deals Refreshing Every 6 Hours</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <span class="sn-marquee-item">
                     <span class="sn-marquee-tag">100% AUTHENTIC</span>
                     <span>Verified Brands & 7 Days Hassle-Free Returns</span>
                 </span>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
 
                 <!-- Group 2 (Duplicate for Seamless Infinite Marquee Loop) -->
                 <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
                     <span class="sn-marquee-tag red">HOT</span>
                     <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
                     <span class="sn-marquee-tag">VOUCHER</span>
                     <span>Extra 15% OFF On Your First Order</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <span class="sn-marquee-item">
                     <span class="sn-marquee-tag green">FREE DELIVERY</span>
                     <span>Free Shipping Across Bangladesh on ৳2,000+</span>
                 </span>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
                     <span class="sn-marquee-tag purple">FLASH DEAL</span>
                     <span>Limited Time Deals Refreshing Every 6 Hours</span>
                 </a>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
                 <span class="sn-marquee-item">
                     <span class="sn-marquee-tag">100% AUTHENTIC</span>
                     <span>Verified Brands & 7 Days Hassle-Free Returns</span>
                 </span>
-                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
             </div>
         </div>
 
@@ -2633,7 +2658,7 @@ body {
              ============================================================ -->
         <section class="sn-payday-section">
             <div class="sn-payday-banner">
-                <!-- Left: Angled Badge with Solid Yellow Bar -->
+                <!-- Left: Angled Badge with Warm Amber Bar -->
                 <div class="sn-payday-left">
                     <div class="sn-payday-badge-title">PAYDAY<br>SALE</div>
                     <div class="sn-payday-badge-bar"></div>
@@ -2652,7 +2677,7 @@ body {
 
                 <!-- Right: Shopping Cart with Packages Image (Floating Levitation) -->
                 <div class="sn-payday-right">
-                    <img src="assets/uploads/payday_cart.jpg" alt="Payday Shopping Cart" loading="lazy">
+                    <img src="assets/uploads/payday_cart_transparent.png" alt="Payday Shopping Cart" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/payday_cart.jpg';">
                 </div>
             </div>
         </section>
@@ -2664,7 +2689,9 @@ body {
             <div class="sn-section-header">
                 <div class="sn-flash-header-left">
                     <h2 class="sn-section-title">
-                        <span class="sn-flash-icon">⚡</span>
+                        <span class="sn-flash-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        </span>
                         <span>Flash Sale</span>
                     </h2>
                     <!-- Live Countdown Clock -->
@@ -2738,7 +2765,10 @@ body {
                     ?>
                         <a href="<?php echo htmlspecialchars($prodUrl); ?>" class="sn-flash-card" data-href="<?php echo htmlspecialchars($prodUrl); ?>">
                             <div class="sn-flash-card-top">
-                                <span class="sn-flash-discount">🔥 <?php echo $fi['discount']; ?></span>
+                                <span class="sn-flash-discount">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2c-.6 2.3-2.1 4.2-4.1 5.4C6 8.5 5 10.6 5 13c0 3.9 3.1 7 7 7s7-3.1 7-7c0-2.8-1.5-5.3-3.7-6.5-.4 1.3-1.3 2.4-2.5 3-1-3-1.8-6.1-.8-7.5z"/></svg>
+                                    <span><?php echo $fi['discount']; ?></span>
+                                </span>
                                 <button type="button" class="sn-flash-wishlist" title="Save to Wishlist" onclick="homeToggleWishlist(<?php echo $fi['id']; ?>, this, event)">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                                 </button>
@@ -2758,7 +2788,10 @@ body {
                                 <div class="sn-flash-stock-bar">
                                     <div class="sn-flash-stock-fill" style="width: <?php echo $fi['sold']; ?>%;"></div>
                                 </div>
-                                <span class="sn-flash-stock-text">🔥 <?php echo $fi['sold']; ?>% Claimed</span>
+                                <span class="sn-flash-stock-text">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><path d="M12 2c-.6 2.3-2.1 4.2-4.1 5.4C6 8.5 5 10.6 5 13c0 3.9 3.1 7 7 7s7-3.1 7-7c0-2.8-1.5-5.3-3.7-6.5-.4 1.3-1.3 2.4-2.5 3-1-3-1.8-6.1-.8-7.5z"/></svg>
+                                    <span><?php echo $fi['sold']; ?>% Claimed</span>
+                                </span>
                             </div>
                         </a>
                     <?php endforeach; ?>
@@ -2772,7 +2805,9 @@ body {
         <section class="sn-shira-section">
             <div class="sn-section-header">
                 <h2 class="sn-section-title">
-                    <span class="sn-flash-icon">🕒</span>
+                    <span class="sn-flash-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </span>
                     <span>Daily Shira Deals</span>
                 </h2>
                 <div class="sn-header-right-actions">
@@ -2854,7 +2889,9 @@ body {
             <div class="sn-feed-header-wrap">
                 <div class="sn-section-header" style="margin-bottom: 8px;">
                     <h2 class="sn-section-title" style="display: flex; align-items: center; gap: 8px;">
-                        <span class="sn-feed-title-icon">✨</span>
+                        <span class="sn-feed-title-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#f59e0b" stroke="#d97706" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </span>
                         <span><?php echo htmlspecialchars($featured_products_title ?: 'Featured Products'); ?></span>
                         <span class="sn-feed-header-badge">Personalized For You</span>
                     </h2>
@@ -2863,25 +2900,30 @@ body {
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </a>
                 </div>
-                
-                <!-- AliExpress Style Category & Feed Tabs -->
-                <div class="sn-feed-tabs-wrap" id="snFeedTabs">
-                    <button type="button" class="sn-feed-tab active" data-tab="for_you">
-                        <span>✨ For You</span>
-                    </button>
-                    <button type="button" class="sn-feed-tab" data-tab="trending">
-                        <span>🔥 Best Sellers</span>
-                    </button>
-                    <button type="button" class="sn-feed-tab" data-tab="deals">
-                        <span>🏷️ Super Deals</span>
-                    </button>
-                    <button type="button" class="sn-feed-tab" data-tab="top_rated">
-                        <span>⭐ Top Rated</span>
-                    </button>
-                    <button type="button" class="sn-feed-tab" data-tab="choice">
-                        <span>🚀 Choice</span>
-                    </button>
-                </div>
+            </div>
+            
+            <!-- AliExpress Style Category & Feed Tabs (Sticky Filter Bar) -->
+            <div class="sn-feed-tabs-wrap" id="snFeedTabs">
+                <button type="button" class="sn-feed-tab active" data-tab="for_you">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>For You</span>
+                </button>
+                <button type="button" class="sn-feed-tab" data-tab="trending">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-.6 2.3-2.1 4.2-4.1 5.4C6 8.5 5 10.6 5 13c0 3.9 3.1 7 7 7s7-3.1 7-7c0-2.8-1.5-5.3-3.7-6.5-.4 1.3-1.3 2.4-2.5 3-1-3-1.8-6.1-.8-7.5z"/></svg>
+                    <span>Best Sellers</span>
+                </button>
+                <button type="button" class="sn-feed-tab" data-tab="deals">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                    <span>Super Deals</span>
+                </button>
+                <button type="button" class="sn-feed-tab" data-tab="top_rated">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="#d97706" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>Top Rated</span>
+                </button>
+                <button type="button" class="sn-feed-tab" data-tab="choice">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
+                    <span>Choice</span>
+                </button>
             </div>
 
             <!-- Product Feed Grid -->
@@ -2926,10 +2968,12 @@ body {
             <!-- End of Feed Banner -->
             <div id="snFeedEnd" class="sn-feed-end" style="display: none;">
                 <div class="sn-feed-end-badge">
-                    <span>🎉 You've seen all top personalized recommendations!</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    <span>You've seen all top personalized recommendations!</span>
                 </div>
                 <button type="button" class="sn-feed-btn-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-                    Back to Top ↑
+                    <span>Back to Top</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:middle; margin-left:4px;"><polyline points="18 15 12 9 6 15"></polyline></svg>
                 </button>
             </div>
         </section>
@@ -3204,7 +3248,7 @@ function initHomeCarousels() {
 }
 
 // Toast Feedback System
-let homeToastTimer = null;
+var homeToastTimer = null;
 function showHomeToast(msg, type) {
     let toast = document.getElementById('sn-home-toast');
     if (!toast) {
@@ -3249,11 +3293,11 @@ function updateCartBadges(count) {
 // ============================================================
 // ALIEXPRESS STYLE PERSONALIZED FEED & CONTINUOUS SCROLL CONTROLLER
 // ============================================================
-let snFeedTab = 'for_you';
-let snFeedPage = 1;
-let snFeedLoading = false;
-let snFeedHasMore = true;
-let snLoadedIds = new Set(<?php echo json_encode($initialIds ?? []); ?>);
+var snFeedTab = 'for_you';
+var snFeedPage = 1;
+var snFeedLoading = false;
+var snFeedHasMore = true;
+var snLoadedIds = new Set(<?php echo json_encode($initialIds ?? []); ?>);
 
 function getClientRecentViewedIds() {
     try {
@@ -3345,7 +3389,8 @@ function bindFeedCardNavigation() {
     document.querySelectorAll('.sn-feed-card:not([data-bound])').forEach(card => {
         card.setAttribute('data-bound', '1');
         card.addEventListener('click', function(e) {
-            if (e.target.closest('.sn-btn-cart') || e.target.closest('.sn-card-wishlist') || e.target.closest('a')) {
+            var targetEl = e.target instanceof Element ? e.target : (e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
+            if (!targetEl || targetEl.closest('.sn-btn-cart') || targetEl.closest('.sn-card-wishlist') || targetEl.closest('a')) {
                 return;
             }
             const href = this.getAttribute('data-href');

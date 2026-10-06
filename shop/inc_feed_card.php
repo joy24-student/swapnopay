@@ -79,13 +79,13 @@ if (!function_exists('renderAliProductCard')) {
                         <span class="sn-pill-free">Free Delivery</span>
                     <?php endif; ?>
                     <?php if ($score >= 4.5): ?>
-                        <span class="sn-pill-top">★ <?php echo $score; ?></span>
+                        <span class="sn-pill-top"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px; margin-right:2px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><?php echo $score; ?></span>
                     <?php endif; ?>
                 </div>
 
                 <!-- Social Proof: Rating & Sold Count -->
                 <div class="sn-product-rating">
-                    <span class="sn-rating-star">★</span>
+                    <span class="sn-rating-star"><svg width="11" height="11" viewBox="0 0 24 24" fill="#f59e0b" stroke="none" style="display:inline-block; vertical-align:-1px; margin-right:1px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
                     <span><?php echo ($score > 0 ? $score : '4.8'); ?></span>
                     <?php if ($reviewsCount > 0): ?>
                         <span class="sn-rating-count">(<?php echo $reviewsCount; ?>)</span>

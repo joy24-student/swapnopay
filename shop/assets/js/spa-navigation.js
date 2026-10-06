@@ -291,15 +291,18 @@
     }
 
     function handleLinkHover(e) {
+        const targetEl = e.target instanceof Element ? e.target : (e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
+        if (!targetEl || typeof targetEl.closest !== 'function') return;
+
         // Ignore hover over action buttons or inputs
-        if (e.target.closest('button, input, select, textarea, .sn-btn-cart, .sn-btn-mob-cart, .sn-flash-wishlist, .sn-rel-wishlist, .sn-add-cart-btn, .sn-rel-add-btn')) {
+        if (targetEl.closest('button, input, select, textarea, .sn-btn-cart, .sn-btn-mob-cart, .sn-flash-wishlist, .sn-rel-wishlist, .sn-add-cart-btn, .sn-rel-add-btn')) {
             return;
         }
 
-        let anchor = e.target.closest('a');
+        let anchor = targetEl.closest('a');
         if (!anchor) {
             // Check if hovering over a product card or item card
-            const card = e.target.closest(
+            const card = targetEl.closest(
                 '.sn-product-card, .sn-flash-card, .sn-shira-card, .sn-rel-card, ' +
                 '.sn-card, .sn-deal-card, .srp-card, .sn-recom-card, .sn-cat-prod-card, ' +
                 '.sn-subcat-card, [data-href]'
@@ -623,17 +626,20 @@
         // Allow middle clicks / new-tab clicks (Ctrl, Cmd, Shift, Alt)
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
+        const targetEl = e.target instanceof Element ? e.target : (e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
+        if (!targetEl || typeof targetEl.closest !== 'function') return;
+
         // Do NOT intercept clicks on explicit interactive buttons or form controls
-        if (e.target.closest('button, input, select, textarea, label, .sn-btn-cart, .sn-btn-mob-cart, .sn-flash-wishlist, .sn-rel-wishlist, .sn-rel-add-btn, .sn-add-cart-btn, .sn-deal-wishlist-btn, .sn-deal-coupon-pill, .sn-recom-add-btn')) {
+        if (targetEl.closest('button, input, select, textarea, label, .sn-btn-cart, .sn-btn-mob-cart, .sn-flash-wishlist, .sn-rel-wishlist, .sn-rel-add-btn, .sn-add-cart-btn, .sn-deal-wishlist-btn, .sn-deal-coupon-pill, .sn-recom-add-btn')) {
             return;
         }
 
         // 1. Check if user clicked directly on an anchor
-        let anchor = e.target.closest('a');
+        let anchor = targetEl.closest('a');
 
         // 2. If not directly on an anchor, check if clicked anywhere on a product card or item card
         if (!anchor) {
-            const card = e.target.closest(
+            const card = targetEl.closest(
                 '.sn-product-card, .sn-flash-card, .sn-shira-card, .sn-rel-card, ' +
                 '.sn-card, .sn-deal-card, .srp-card, .sn-recom-card, .sn-cat-prod-card, ' +
                 '.sn-subcat-card, [data-href]'
