@@ -175,74 +175,97 @@ if (!empty($_SESSION['customer']['cust_id'])) {
 }
 $ssrSignalIds = array_values(array_unique(array_filter($ssrSignalIds)));
 
-$preferredEcats = [];
-$preferredMcats = [];
-$preferredTcats = [];
+$homeFeedKey = 'sn_feed_' . (!empty($ssrSignalIds) ? md5(implode(',', array_slice($ssrSignalIds, 0, 10))) : 'def');
+$feedCacheFile = __DIR__ . '/admin/inc/cache_home_feed.json';
+$featuredProducts = null;
 
-if (!empty($ssrSignalIds)) {
-    $inSignals = implode(',', array_slice($ssrSignalIds, 0, 20));
+if (!empty($_SESSION[$homeFeedKey]) && is_array($_SESSION[$homeFeedKey]) && !empty($_SESSION[$homeFeedKey]['_t']) && (time() - $_SESSION[$homeFeedKey]['_t'] < 120)) {
+    $featuredProducts = $_SESSION[$homeFeedKey]['data'];
+}
+if (!$featuredProducts && empty($ssrSignalIds) && file_exists($feedCacheFile) && (time() - filemtime($feedCacheFile) < 120)) {
+    $featuredProducts = json_decode(file_get_contents($feedCacheFile), true);
+    if (!empty($featuredProducts) && is_array($featuredProducts)) {
+        $_SESSION[$homeFeedKey] = ['_t' => time(), 'data' => $featuredProducts];
+    }
+}
+
+if (!$featuredProducts) {
+    $preferredEcats = [];
+    $preferredMcats = [];
+    $preferredTcats = [];
+
+    if (!empty($ssrSignalIds)) {
+        $inSignals = implode(',', array_slice($ssrSignalIds, 0, 20));
+        try {
+            $catStmt = $pdo->query("
+                SELECT p.p_id, p.ecat_id, e.mcat_id, m.tcat_id
+                FROM tbl_product p
+                LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
+                LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+                WHERE p.p_id IN ($inSignals)
+            ");
+            while ($row = $catStmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['ecat_id'])) $preferredEcats[$row['ecat_id']] = ($preferredEcats[$row['ecat_id']] ?? 0) + 1;
+                if (!empty($row['mcat_id'])) $preferredMcats[$row['mcat_id']] = ($preferredMcats[$row['mcat_id']] ?? 0) + 1;
+                if (!empty($row['tcat_id'])) $preferredTcats[$row['tcat_id']] = ($preferredTcats[$row['tcat_id']] ?? 0) + 1;
+            }
+        } catch (Throwable $_) {}
+    }
+
+    $numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price::text, '0'), ',', ''), '') AS numeric)";
+    $numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price::text, '0'), ',', ''), '') AS numeric)";
+
+    $scoreParts = [];
+    if (!empty($preferredEcats)) {
+        $scoreParts[] = "(CASE WHEN p.ecat_id IN (" . implode(',', array_keys($preferredEcats)) . ") THEN 60 ELSE 0 END)";
+    }
+    if (!empty($preferredMcats)) {
+        $scoreParts[] = "(CASE WHEN e.mcat_id IN (" . implode(',', array_keys($preferredMcats)) . ") THEN 30 ELSE 0 END)";
+    }
+    if (!empty($preferredTcats)) {
+        $scoreParts[] = "(CASE WHEN m.tcat_id IN (" . implode(',', array_keys($preferredTcats)) . ") THEN 15 ELSE 0 END)";
+    }
+    $scoreParts[] = "(CASE WHEN {$numOld} > {$numCurr} AND {$numOld} > 0 THEN (({$numOld} - {$numCurr}) / {$numOld}) * 25 ELSE 0 END)";
+    $scoreParts[] = "(CASE WHEN p.p_is_featured = 1 THEN 20 ELSE 0 END)";
+    $scoreParts[] = "(CASE WHEN p.is_top_sale = 1 THEN 15 ELSE 0 END)";
+    $scoreParts[] = "(CASE WHEN p.is_official = 1 OR p.is_premium = 1 THEN 10 ELSE 0 END)";
+    $scoreParts[] = "LEAST(p.p_total_view * 0.02, 30)";
+
+    $scoreSql = implode(' + ', $scoreParts);
+    $initialOrder = "({$scoreSql}) DESC, p.p_id DESC";
+
     try {
-        $catStmt = $pdo->query("
-            SELECT p.p_id, p.ecat_id, e.mcat_id, m.tcat_id
+        $prodStmt = $pdo->query("
+            SELECT p.*, e.mcat_id, m.tcat_id,
+                   COALESCE(r.avg_rating, 0) as avg_rating,
+                   COALESCE(r.rev_count, 0) as rev_count
             FROM tbl_product p
             LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
             LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
-            WHERE p.p_id IN ($inSignals)
+            LEFT JOIN (
+                SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count 
+                FROM tbl_rating 
+                GROUP BY p_id
+            ) r ON p.p_id = r.p_id
+            WHERE p.p_is_active = 1
+            ORDER BY {$initialOrder}
+            LIMIT {$featured_limit}
         ");
-        while ($row = $catStmt->fetch(PDO::FETCH_ASSOC)) {
-            if (!empty($row['ecat_id'])) $preferredEcats[$row['ecat_id']] = ($preferredEcats[$row['ecat_id']] ?? 0) + 1;
-            if (!empty($row['mcat_id'])) $preferredMcats[$row['mcat_id']] = ($preferredMcats[$row['mcat_id']] ?? 0) + 1;
-            if (!empty($row['tcat_id'])) $preferredTcats[$row['tcat_id']] = ($preferredTcats[$row['tcat_id']] ?? 0) + 1;
-        }
-    } catch (Throwable $_) {}
-}
-
-$numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price::text, '0'), ',', ''), '') AS numeric)";
-$numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price::text, '0'), ',', ''), '') AS numeric)";
-
-$scoreParts = [];
-if (!empty($preferredEcats)) {
-    $scoreParts[] = "(CASE WHEN p.ecat_id IN (" . implode(',', array_keys($preferredEcats)) . ") THEN 60 ELSE 0 END)";
-}
-if (!empty($preferredMcats)) {
-    $scoreParts[] = "(CASE WHEN e.mcat_id IN (" . implode(',', array_keys($preferredMcats)) . ") THEN 30 ELSE 0 END)";
-}
-if (!empty($preferredTcats)) {
-    $scoreParts[] = "(CASE WHEN m.tcat_id IN (" . implode(',', array_keys($preferredTcats)) . ") THEN 15 ELSE 0 END)";
-}
-$scoreParts[] = "(CASE WHEN {$numOld} > {$numCurr} AND {$numOld} > 0 THEN (({$numOld} - {$numCurr}) / {$numOld}) * 25 ELSE 0 END)";
-$scoreParts[] = "(CASE WHEN p.p_is_featured = 1 THEN 20 ELSE 0 END)";
-$scoreParts[] = "(CASE WHEN p.is_top_sale = 1 THEN 15 ELSE 0 END)";
-$scoreParts[] = "(CASE WHEN p.is_official = 1 OR p.is_premium = 1 THEN 10 ELSE 0 END)";
-$scoreParts[] = "LEAST(p.p_total_view * 0.02, 30)";
-
-$scoreSql = implode(' + ', $scoreParts);
-$initialOrder = "({$scoreSql}) DESC, p.p_id DESC";
-
-try {
-    $prodStmt = $pdo->query("
-        SELECT p.*, e.mcat_id, m.tcat_id,
-               COALESCE(r.avg_rating, 0) as avg_rating,
-               COALESCE(r.rev_count, 0) as rev_count
-        FROM tbl_product p
-        LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
-        LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
-        LEFT JOIN (
-            SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count 
-            FROM tbl_rating 
-            GROUP BY p_id
-        ) r ON p.p_id = r.p_id
-        WHERE p.p_is_active = 1
-        ORDER BY {$initialOrder}
-        LIMIT {$featured_limit}
-    ");
-    $featuredProducts = $prodStmt ? ($prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-} catch (Throwable $_) {
-    try {
-        $prodStmt = $pdo->query("SELECT p.*, COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating, COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count FROM tbl_product p WHERE p.p_is_active = 1 ORDER BY p.p_total_view DESC, p.p_id DESC LIMIT {$featured_limit}");
         $featuredProducts = $prodStmt ? ($prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-    } catch (Throwable $__) {
-        $featuredProducts = [];
+    } catch (Throwable $_) {
+        try {
+            $prodStmt = $pdo->query("SELECT p.*, COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating, COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count FROM tbl_product p WHERE p.p_is_active = 1 ORDER BY p.p_total_view DESC, p.p_id DESC LIMIT {$featured_limit}");
+            $featuredProducts = $prodStmt ? ($prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (Throwable $__) {
+            $featuredProducts = [];
+        }
+    }
+
+    if (!empty($featuredProducts)) {
+        $_SESSION[$homeFeedKey] = ['_t' => time(), 'data' => $featuredProducts];
+        if (empty($ssrSignalIds)) {
+            @file_put_contents($feedCacheFile, json_encode($featuredProducts));
+        }
     }
 }
 

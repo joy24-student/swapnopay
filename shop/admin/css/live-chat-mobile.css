@@ -954,6 +954,12 @@
     .sup-send-btn:active {
         transform: scale(0.92) !important;
     }
+
+    /* Hide desktop WhatsApp message input bar and desktop canned response chips on mobile (< 768px) */
+    .wa-input-bar,
+    .wa-quick-bar {
+        display: none !important;
+    }
 }
 
 /* Hide mobile-specific blocks on desktop displays (>= 768px) */

@@ -62,7 +62,12 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
             $saved=$saveImage(['tmp_name'=>$tmp,'error'=>$photos['error'][$key],'size'=>$photos['size'][$key]],'product_photos/');
             if($saved) $pdo->prepare('INSERT INTO tbl_product_photo(photo,p_id) VALUES(?,?)')->execute([$saved,$id]);
         }
-        $pdo->commit();return $id;
+        $pdo->commit();
+        if (function_exists('clearShopCache')) {
+            clearShopCache('products');
+            clearShopCache('product', $id);
+        }
+        return $id;
     } catch(Throwable $error) {
         if($pdo->inTransaction()) $pdo->rollBack();
         foreach($uploaded as $file) if(is_file($file)) unlink($file);

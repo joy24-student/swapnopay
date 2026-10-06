@@ -968,8 +968,8 @@ html, body {
                     <!-- Rendered dynamically -->
                 </div>
 
-                <!-- Desktop Canned Responses / Quick Reply Toolbar -->
-                <div class="wa-quick-bar wa-scroll">
+                <!-- Desktop Canned Responses / Quick Reply Toolbar (Desktop Only) -->
+                <div class="wa-quick-bar wa-scroll hidden-xs">
                     <span style="font-size: 11px; font-weight: 700; color: #667781; margin-right: 4px;">QUICK:</span>
                     <button type="button" onclick="insertQuickReply('Hello! How can I assist you with your order today?')" class="wa-canned-chip">👋 Greeting</button>
                     <button type="button" onclick="insertQuickReply('Let me check your order and shipping status right away.')" class="wa-canned-chip">📦 Check Order</button>
@@ -979,8 +979,8 @@ html, body {
                     <button type="button" onclick="insertQuickReply('Thank you for shopping with us! Have a wonderful day.')" class="wa-canned-chip">🙏 Thank You</button>
                 </div>
 
-                <!-- Desktop WhatsApp Message Input Bar -->
-                <div class="wa-input-bar">
+                <!-- Desktop WhatsApp Message Input Bar (Desktop Only) -->
+                <div class="wa-input-bar hidden-xs">
                     <input type="file" id="adminFileInput" accept="image/*,application/pdf" style="display: none;" onchange="handleAdminFileUpload(this)">
                     <button type="button" onclick="document.getElementById('adminFileInput').click()" class="wa-icon-btn" title="Attach file or photo">
                         <i class="fa fa-paperclip"></i>
@@ -1443,8 +1443,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (initialThreadId) {
             selectThread(parseInt(initialThreadId, 10));
         } else if (allThreads.length > 0) {
-            // Auto select the first real live customer chat
-            selectThread(allThreads[0].id);
+            // Auto select only on desktop screens (>= 768px).
+            // On mobile devices (< 768px), keep the customer thread list open so the admin can pick a conversation!
+            if (window.innerWidth >= 768) {
+                selectThread(allThreads[0].id);
+            }
         }
     });
 
@@ -2235,8 +2238,14 @@ function handleKeyPress(e) {
 
 function insertQuickReply(text) {
     const input = document.getElementById('adminReplyInput');
-    input.value = text;
-    input.focus();
+    const mobInput = document.getElementById('supMobReplyInput');
+    if (input) input.value = text;
+    if (mobInput) mobInput.value = text;
+    if (mobInput && window.innerWidth < 768) {
+        mobInput.focus();
+    } else if (input) {
+        input.focus();
+    }
 }
 
 async function toggleAdminTakeover() {
