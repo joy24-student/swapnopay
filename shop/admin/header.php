@@ -105,8 +105,9 @@ foreach ($result as $row) {
 				</div>
 
 				<div class="navbar-custom-menu">
+					<ul class="nav navbar-nav sn-nav-items" style="list-style: none !important; margin: 0; padding: 0;">
 						<!-- Dedicated AI Voice Copilot Button (Beside Notification Bell) -->
-						<li class="sn-ai-li">
+						<li class="sn-ai-li" style="list-style: none !important;">
 							<a href="ai-copilot.php" class="sn-ai-header-btn" title="AI Voice Copilot & Autonomous Operations">
 								<span class="sn-ai-btn-sparkle">
 									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
@@ -119,7 +120,7 @@ foreach ($result as $row) {
 						</li>
 
 						<!-- Notification Bell -->
-						<li class="sn-bell-li">
+						<li class="sn-bell-li" style="list-style: none !important;">
 							<a href="javascript:void(0)" class="sn-bell-link" id="snAdminNotificationTrigger" onclick="window.snAdminNotifications && window.snAdminNotifications.toggleModal(event)" title="Store Notifications" role="button" aria-haspopup="dialog">
 								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 									<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -143,7 +144,7 @@ foreach ($result as $row) {
 						}
 						$display_role = !empty($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'Administrator';
 						?>
-						<li class="dropdown user user-menu sn-user-li">
+						<li class="dropdown user user-menu sn-user-li" style="list-style: none !important;">
 							<a href="#" class="dropdown-toggle sn-user-link" data-toggle="dropdown" title="<?php echo htmlspecialchars($raw_name); ?>">
 								<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="user-image sn-user-avatar" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
 								<div class="sn-user-meta hidden-xs">
@@ -181,6 +182,21 @@ foreach ($result as $row) {
   		<?php $cur_page = substr($_SERVER["SCRIPT_NAME"],strrpos($_SERVER["SCRIPT_NAME"],"/")+1); ?>
 <!-- Side Bar to Manage Shop Activities -->
   		<aside class="main-sidebar">
+			<!-- Mobile Sidebar Header with Close/Collapse Cross Icon -->
+			<div class="sn-mobile-sidebar-header visible-xs" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#FEDB65; border-bottom:1px solid rgba(0,0,0,0.06);">
+				<div class="sn-mobile-sidebar-brand" style="display:flex; align-items:center; gap:8px;">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+						<line x1="3" y1="6" x2="21" y2="6"/>
+						<path d="M16 10a4 4 0 0 1-8 0"/>
+					</svg>
+					<span style="font-weight:700; color:#0F172A; font-size:14px;">Admin Menu</span>
+				</div>
+				<button type="button" class="sn-mobile-sidebar-close" data-toggle="offcanvas" aria-label="Close sidebar" title="Close Sidebar" style="background:none; border:none; color:#0F172A; font-size:22px; cursor:pointer; padding:0 4px; line-height:1;">
+					&times;
+				</button>
+			</div>
+
     		<section class="sidebar">
       
       			<ul class="sidebar-menu">
@@ -191,26 +207,9 @@ foreach ($result as $row) {
 			          </a>
 			        </li>
 
-			        <!-- Autonomous AI Voice Copilot -->
-			        <li class="treeview <?php if($cur_page == 'ai-copilot.php') {echo 'active';} ?>">
-			          <a href="ai-copilot.php" style="background: linear-gradient(135deg, rgba(250, 184, 2, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);">
-			            <i class="fa fa-magic" style="color: #f59e0b;"></i> <span>AI Voice Copilot</span>
-			            <span class="pull-right-container">
-			              <small class="label pull-right bg-yellow" style="color:#0f172a; font-weight:800; border-radius:4px; font-size:10px;">PRO AI</small>
-			            </span>
-			          </a>
-			        </li>
-
-					
 			        <li class="treeview <?php if( ($cur_page == 'settings.php') ) {echo 'active';} ?>">
 			          <a href="settings.php">
 			            <i class="fa fa-sliders"></i> <span>Website Settings</span>
-			          </a>
-			        </li>
-
-			        <li class="treeview <?php if( ($cur_page == 'homepage-banners.php') ) {echo 'active';} ?>">
-			          <a href="homepage-banners.php">
-			            <i class="fa fa-desktop"></i> <span>Homepage Customizer</span>
 			          </a>
 			        </li>
 
@@ -230,12 +229,6 @@ foreach ($result as $row) {
 			        <li class="treeview <?php if( ($cur_page == 'live-chat.php') ) {echo 'active';} ?>">
 			          <a href="live-chat.php">
 			            <i class="fa fa-commenting-o"></i> <span>Live Support Chat</span>
-			          </a>
-			        </li>
-
-			        <li class="treeview <?php if( ($cur_page == 'broadcast-notification.php') ) {echo 'active';} ?>">
-			          <a href="broadcast-notification.php">
-			            <i class="fa fa-bullhorn"></i> <span>Push Notifications</span>
 			          </a>
 			        </li>
 

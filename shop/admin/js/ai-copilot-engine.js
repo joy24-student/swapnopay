@@ -962,8 +962,238 @@
                 startGeminiLive();
             }
         } else if (e.key === 'Escape' && isLiveActive) {
-            stopGeminiLive();
+            if (compressModal && compressModal.style.display !== 'none') {
+                closeImageCompressorModal();
+            } else {
+                stopGeminiLive();
+            }
         }
     });
+
+    // =========================================================================
+    // 8. DEDICATED IMAGE UPLOAD & COMPRESS ENGINE STUDIO
+    // =========================================================================
+    let compressEngineQueue = [];
+    const compressModal = document.getElementById('geminiCompressModal');
+    const compDropzone = document.getElementById('compressEngineDropzone');
+    const compFileInput = document.getElementById('compressEngineFileInput');
+    const compResultsGrid = document.getElementById('compressResultsGrid');
+    const compSummaryBar = document.getElementById('compressEngineSummary');
+    const btnDownloadAll = document.getElementById('btnDownloadAllComp');
+    const btnFeedAi = document.getElementById('btnFeedToAiCatalog');
+
+    window.openImageCompressorModal = function() {
+        if (compressModal) {
+            compressModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    };
+
+    window.closeImageCompressorModal = function() {
+        if (compressModal) {
+            compressModal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    };
+
+    // Drag and Drop listeners
+    if (compDropzone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            compDropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                compDropzone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            compDropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                compDropzone.classList.remove('dragover');
+            }, false);
+        });
+
+        compDropzone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length) {
+                handleCompressEngineFiles(dt.files);
+            }
+        });
+    }
+
+    function getPresetConfig() {
+        const preset = document.getElementById('compEnginePreset') ? document.getElementById('compEnginePreset').value : 'store';
+        if (preset === 'ultra') {
+            return { maxDimension: 1200, quality: 0.65, label: 'Ultra Shrink (65%)' };
+        } else if (preset === 'hd') {
+            return { maxDimension: 2048, quality: 0.90, label: 'High Detail (90%)' };
+        }
+        return { maxDimension: 1600, quality: 0.82, label: 'Storefront Optimal (82%)' };
+    }
+
+    window.recalculateCompressionPreset = async function() {
+        if (!compressEngineQueue.length) return;
+        const config = getPresetConfig();
+        const rawFiles = compressEngineQueue.map(item => item.originalFile);
+        compressEngineQueue = [];
+        await processCompressFiles(rawFiles, config);
+    };
+
+    window.handleCompressEngineFiles = async function(files) {
+        if (!files || !files.length) return;
+        const config = getPresetConfig();
+        await processCompressFiles(Array.from(files), config);
+    };
+
+    async function processCompressFiles(files, config) {
+        if (compDropzone) {
+            compDropzone.innerHTML = `
+                <div class="gemini-compress-drop-icon"><i class="fa fa-spinner fa-spin"></i></div>
+                <h3>Optimizing & Compressing ${files.length} Photo(s)...</h3>
+                <p>Generating high-efficiency WebP files in browser</p>
+            `;
+        }
+
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            try {
+                const compResult = await compressImageFile(file, config.maxDimension, config.quality);
+                compResult.file._compressionMeta = compResult;
+                compressEngineQueue.push({
+                    originalFile: file,
+                    compressedFile: compResult.file,
+                    originalSize: compResult.originalSize,
+                    compressedSize: compResult.compressedSize,
+                    savedPct: compResult.savedPct,
+                    dimensions: compResult.dimensions,
+                    dataUrl: compResult.dataUrl,
+                    name: file.name
+                });
+            } catch (err) {
+                console.error('Compression error on file:', file.name, err);
+            }
+        }
+
+        if (compDropzone) {
+            compDropzone.innerHTML = `
+                <input type="file" id="compressEngineFileInput" multiple accept="image/*" style="display:none;" onchange="handleCompressEngineFiles(this.files)">
+                <div class="gemini-compress-drop-icon"><i class="fa fa-cloud-upload"></i></div>
+                <h3>Drag & Drop More Photos, or <span style="color:#2563EB; text-decoration:underline;">Browse Files</span></h3>
+                <p>Supports JPG, PNG, WEBP &bull; Auto-rotates phone photos</p>
+            `;
+        }
+
+        renderCompressEngineResults();
+    }
+
+    function renderCompressEngineResults() {
+        if (!compResultsGrid || !compSummaryBar) return;
+
+        if (compressEngineQueue.length === 0) {
+            compResultsGrid.innerHTML = '';
+            compSummaryBar.style.display = 'none';
+            if (btnDownloadAll) btnDownloadAll.style.display = 'none';
+            if (btnFeedAi) btnFeedAi.style.display = 'none';
+            return;
+        }
+
+        compSummaryBar.style.display = 'grid';
+        if (btnDownloadAll) btnDownloadAll.style.display = 'inline-flex';
+        if (btnFeedAi) btnFeedAi.style.display = 'inline-flex';
+
+        let totalOrig = 0;
+        let totalComp = 0;
+        compressEngineQueue.forEach(item => {
+            totalOrig += item.originalSize;
+            totalComp += item.compressedSize;
+        });
+
+        const totalSaved = totalOrig > 0 ? Math.max(0, Math.round(((totalOrig - totalComp) / totalOrig) * 100)) : 0;
+
+        const countEl = document.getElementById('compStatCount');
+        const origEl = document.getElementById('compStatOrig');
+        const compEl = document.getElementById('compStatComp');
+        const savedEl = document.getElementById('compStatSaved');
+
+        if (countEl) countEl.textContent = compressEngineQueue.length;
+        if (origEl) origEl.textContent = formatBytes(totalOrig);
+        if (compEl) compEl.textContent = formatBytes(totalComp);
+        if (savedEl) savedEl.textContent = `-${totalSaved}% (${formatBytes(totalOrig - totalComp)})`;
+
+        compResultsGrid.innerHTML = '';
+        compressEngineQueue.forEach((item, idx) => {
+            const card = document.createElement('div');
+            card.className = 'gemini-comp-result-card';
+            card.innerHTML = `
+                <div class="gemini-comp-thumb-wrap">
+                    <img src="${item.dataUrl}" alt="${item.name}">
+                    <span class="gemini-comp-badge">-${item.savedPct}%</span>
+                </div>
+                <div class="gemini-comp-meta">
+                    <span class="gemini-comp-filename" title="${item.name}">${item.name}</span>
+                    <div class="gemini-comp-sizes">
+                        <span>${formatBytes(item.originalSize)} &rarr; <strong style="color:#059669;">${formatBytes(item.compressedSize)}</strong></span>
+                        <span style="font-size:10px; color:#94A3B8;">${item.dimensions}</span>
+                    </div>
+                </div>
+                <div class="gemini-comp-actions">
+                    <button type="button" class="gemini-comp-btn primary" onclick="downloadSingleCompressed(${idx})" title="Download optimized WebP">
+                        <i class="fa fa-download"></i> Save WebP
+                    </button>
+                    <button type="button" class="gemini-comp-btn" onclick="removeCompressEngineItem(${idx})" title="Remove item" style="flex:0 0 28px; padding:0; color:#EF4444;">
+                        &times;
+                    </button>
+                </div>
+            `;
+            compResultsGrid.appendChild(card);
+        });
+    }
+
+    window.downloadSingleCompressed = function(index) {
+        const item = compressEngineQueue[index];
+        if (!item) return;
+        const link = document.createElement('a');
+        link.href = item.dataUrl;
+        const baseName = item.name.replace(/\.[^/.]+$/, "");
+        link.download = `${baseName}-optimized.webp`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    window.downloadAllCompressedFiles = function() {
+        if (!compressEngineQueue.length) return;
+        compressEngineQueue.forEach((item, index) => {
+            setTimeout(() => {
+                downloadSingleCompressed(index);
+            }, index * 250);
+        });
+    };
+
+    window.removeCompressEngineItem = function(index) {
+        compressEngineQueue.splice(index, 1);
+        renderCompressEngineResults();
+    };
+
+    window.clearCompressEngineList = function() {
+        compressEngineQueue = [];
+        renderCompressEngineResults();
+    };
+
+    window.sendCompressedToAiCatalog = function() {
+        if (!compressEngineQueue.length) return;
+        const top5 = compressEngineQueue.slice(0, 5);
+        selectedFiles = top5.map(item => item.compressedFile);
+        renderImagePreviews();
+        updateSendButtonState();
+        closeImageCompressorModal();
+
+        if (promptInput) {
+            promptInput.value = "Analyze these compressed product photos, write SEO titles, specs, price and add to inventory catalog";
+            updateSendButtonState();
+            promptInput.focus();
+        }
+    };
 
 })();

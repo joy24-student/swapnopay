@@ -11,16 +11,24 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
     $stmt->execute([$category]);
     if(!$stmt->fetchColumn()) throw new RuntimeException('Choose a valid product category.');
     $uploaded=[];
+    require_once __DIR__ . '/image_compressor.php';
     $saveImage=static function(array $file,string $folder='') use (&$uploaded): ?string {
         if(($file['error'] ?? UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_NO_FILE) return null;
         $info=is_uploaded_file($file['tmp_name'] ?? '') ? @getimagesize($file['tmp_name']) : false;
         $extensions=['image/jpeg'=>'jpg','image/png'=>'png','image/gif'=>'gif','image/webp'=>'webp'];
-        if(!$info || !isset($extensions[$info['mime']]) || ($file['error'] ?? 1)!==UPLOAD_ERR_OK || ($file['size'] ?? 0)>8388608) throw new RuntimeException('Choose a valid product image up to 8 MB.');
+        if(!$info || !isset($extensions[$info['mime']]) || ($file['error'] ?? 1)!==UPLOAD_ERR_OK || ($file['size'] ?? 0)>20971520) throw new RuntimeException('Choose a valid product image up to 20 MB.');
         $directory=dirname(__DIR__,2) . '/assets/uploads/' . $folder;
         if(!is_dir($directory) && !mkdir($directory,0775,true)) throw new RuntimeException('The image folder could not be created.');
-        $filename='product-' . bin2hex(random_bytes(16)) . '.' . $extensions[$info['mime']];
-        if(!move_uploaded_file($file['tmp_name'],$directory . $filename)) throw new RuntimeException('The image could not be saved.');
-        $uploaded[]=$directory . $filename;
+        $targetExt = function_exists('imagewebp') ? 'webp' : $extensions[$info['mime']];
+        $filename='product-' . bin2hex(random_bytes(16)) . '.' . $targetExt;
+        $destPath = $directory . $filename;
+
+        // Run high-efficiency compression & optimization
+        $compResult = ImageCompressorEngine::compress($file['tmp_name'], $destPath, 1600, 82, true);
+        if (!$compResult['success'] || !file_exists($destPath)) {
+            if(!move_uploaded_file($file['tmp_name'],$destPath)) throw new RuntimeException('The image could not be saved.');
+        }
+        $uploaded[]=$destPath;
         return $filename;
     };
     try {

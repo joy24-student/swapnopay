@@ -109,6 +109,17 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
                 <!-- Gemini Prompt Suggestion Cards Grid -->
                 <div class="gemini-cards-grid">
                     
+                    <div class="gemini-card-item" onclick="openImageCompressorModal()">
+                        <div class="gemini-card-icon" style="background:#ECFDF5; color:#059669;">
+                            <i class="fa fa-compress"></i>
+                        </div>
+                        <div class="gemini-card-body">
+                            <h3>Image Compress Engine</h3>
+                            <p>Batch compress RAW smartphone photos by 80-95% into ultra-fast WebP format.</p>
+                        </div>
+                        <span class="gemini-card-arrow">&rarr;</span>
+                    </div>
+
                     <div class="gemini-card-item" onclick="triggerImagePicker()">
                         <div class="gemini-card-icon" style="background:#EEF2FF; color:#4F46E5;">
                             <i class="fa fa-camera"></i>
@@ -157,7 +168,8 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
 
                 <!-- Secondary Quick Action Chips -->
                 <div class="gemini-quick-chips">
-                    <span class="gemini-chip" onclick="triggerImagePicker()"><i class="fa fa-compress text-success"></i> Auto-Compress Photos</span>
+                    <span class="gemini-chip" onclick="openImageCompressorModal()"><i class="fa fa-compress text-success"></i> Image Compress Engine</span>
+                    <span class="gemini-chip" onclick="triggerImagePicker()"><i class="fa fa-camera text-primary"></i> Ingest 5 Photos</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Analyze customer retention, VIP champions, and churn risk')"><i class="fa fa-users text-purple" style="color:#7C3AED;"></i> VIP Retention & Churn</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Run dynamic pricing and profit margin optimization')"><i class="fa fa-balance-scale text-success"></i> Dynamic Pricing</span>
                     <span class="gemini-chip" onclick="sendAiPrompt('Forecast 30-day inventory demand and stockout risks')"><i class="fa fa-clock-o text-warning"></i> Demand Forecast</span>
@@ -359,6 +371,88 @@ $admin_first_name = explode(' ', trim($admin_name))[0] ?? 'Admin';
 
     </div>
 
+</div>
+
+<!-- Dedicated Image Upload & Compress Engine Modal -->
+<div class="gemini-compress-modal" id="geminiCompressModal" style="display:none;">
+    <div class="gemini-compress-backdrop" onclick="closeImageCompressorModal()"></div>
+    <div class="gemini-compress-dialog">
+        <div class="gemini-compress-header">
+            <div class="gemini-compress-title-wrap">
+                <div class="gemini-compress-icon-badge">
+                    <i class="fa fa-bolt"></i>
+                </div>
+                <div>
+                    <h2 class="gemini-compress-title">Image Upload & Compress Engine</h2>
+                    <p class="gemini-compress-subtitle">Client & Server hybrid optimization &bull; Convert RAW camera photos to lightning-fast WebP</p>
+                </div>
+            </div>
+            <button type="button" class="gemini-compress-close-btn" onclick="closeImageCompressorModal()">&times;</button>
+        </div>
+        
+        <div class="gemini-compress-body">
+            <!-- Controls & Settings Bar -->
+            <div class="gemini-compress-settings-bar">
+                <div class="gemini-compress-setting">
+                    <label><i class="fa fa-sliders"></i> Compression Preset:</label>
+                    <select id="compEnginePreset" onchange="recalculateCompressionPreset()">
+                        <option value="store" selected>Storefront Optimal (82% Quality, Max 1600px - Recommended)</option>
+                        <option value="ultra">Ultra Shrink (65% Quality, Max 1200px - Smallest Size)</option>
+                        <option value="hd">High Detail (90% Quality, Max 2048px - Premium Showcase)</option>
+                    </select>
+                </div>
+                <div class="gemini-compress-setting">
+                    <label><i class="fa fa-file-image-o"></i> Output Format:</label>
+                    <span class="badge" style="background:#10B981; color:#fff; padding:6px 12px; font-size:12px; font-weight:700; border-radius:6px;">Next-Gen WebP + JPEG Fallback</span>
+                </div>
+            </div>
+
+            <!-- Drag and Drop Dropzone -->
+            <div class="gemini-compress-dropzone" id="compressEngineDropzone" onclick="document.getElementById('compressEngineFileInput').click()">
+                <input type="file" id="compressEngineFileInput" multiple accept="image/*" style="display:none;" onchange="handleCompressEngineFiles(this.files)">
+                <div class="gemini-compress-drop-icon">
+                    <i class="fa fa-cloud-upload"></i>
+                </div>
+                <h3>Drag & Drop Photos Here, or <span style="color:#2563EB; text-decoration:underline;">Browse Files</span></h3>
+                <p>Supports JPG, PNG, WEBP &bull; Multi-file batch upload &bull; Auto-rotates phone photos</p>
+            </div>
+
+            <!-- Live Stats Banner (Hidden until files added) -->
+            <div class="gemini-compress-summary-bar" id="compressEngineSummary" style="display:none;">
+                <div class="gemini-stat-pill">
+                    <span class="stat-label">Files Processed:</span>
+                    <span class="stat-value" id="compStatCount">0</span>
+                </div>
+                <div class="gemini-stat-pill">
+                    <span class="stat-label">Original Total:</span>
+                    <span class="stat-value" id="compStatOrig">0 MB</span>
+                </div>
+                <div class="gemini-stat-pill">
+                    <span class="stat-label">Optimized Total:</span>
+                    <span class="stat-value" id="compStatComp">0 KB</span>
+                </div>
+                <div class="gemini-stat-pill highlight">
+                    <span class="stat-label">Bandwidth Saved:</span>
+                    <span class="stat-value" id="compStatSaved">0%</span>
+                </div>
+            </div>
+
+            <!-- Compressed Items List Grid -->
+            <div class="gemini-compress-results-grid" id="compressResultsGrid"></div>
+        </div>
+
+        <div class="gemini-compress-footer">
+            <button type="button" class="btn btn-default" onclick="clearCompressEngineList()">Clear All</button>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn btn-success" id="btnDownloadAllComp" onclick="downloadAllCompressedFiles()" style="display:none;">
+                    <i class="fa fa-download"></i> Download All
+                </button>
+                <button type="button" class="btn btn-primary" id="btnFeedToAiCatalog" onclick="sendCompressedToAiCatalog()" style="display:none;">
+                    <i class="fa fa-magic"></i> Send to Store Catalog with AI
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="js/ai-copilot-engine.js?v=<?php echo time(); ?>"></script>
