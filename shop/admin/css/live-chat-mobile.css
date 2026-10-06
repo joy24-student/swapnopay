@@ -83,9 +83,25 @@
         pointer-events: none !important;
     }
 
-    /* Hide standard bottom navigation bar when inside active conversation */
-    body.mobile-chat-active .sn-mobile-bottom-dock {
+    /* Hide standard bottom navigation bar and admin header when inside active conversation */
+    body.mobile-chat-active .sn-mobile-bottom-dock,
+    body.mobile-chat-active .main-header {
         display: none !important;
+    }
+
+    body.mobile-chat-active .content-wrapper,
+    body.mobile-chat-active .content {
+        height: 100vh !important;
+        max-height: 100vh !important;
+    }
+
+    /* Mobile Admin Header in View 1 (Warm Yellow #FEDB65) */
+    .live-chat-page-body .main-header,
+    .live-chat-page-body .main-header .navbar,
+    .live-chat-page-body .main-header .logo {
+        background: #FEDB65 !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+        box-shadow: none !important;
     }
 
     /* Hide original desktop headers in mobile chats column */
@@ -345,19 +361,26 @@
     }
 
     .sup-card-dots-btn {
-        background: transparent !important;
-        border: none !important;
+        background: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 6px !important;
+        width: 22px !important;
+        height: 22px !important;
         color: #94A3B8 !important;
         cursor: pointer !important;
-        padding: 0 2px !important;
-        font-size: 14px !important;
+        font-size: 11px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        padding: 0 !important;
+        transition: all 0.15s ease !important;
     }
 
-    .sup-card-dots-btn:hover {
+    .sup-card-dots-btn:hover,
+    .sup-card-dots-btn:active {
         color: #0F172A !important;
+        border-color: #CBD5E1 !important;
+        background: #F1F5F9 !important;
     }
 
     .sup-meta-bot {
@@ -367,19 +390,26 @@
     }
 
     .sup-card-edit-btn {
-        background: transparent !important;
-        border: none !important;
+        background: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 6px !important;
+        width: 22px !important;
+        height: 22px !important;
         color: #94A3B8 !important;
         cursor: pointer !important;
-        padding: 0 2px !important;
-        font-size: 13px !important;
+        font-size: 10px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        padding: 0 !important;
+        transition: all 0.15s ease !important;
     }
 
-    .sup-card-edit-btn:hover {
+    .sup-card-edit-btn:hover,
+    .sup-card-edit-btn:active {
         color: #0F172A !important;
+        border-color: #CBD5E1 !important;
+        background: #F1F5F9 !important;
     }
 
     /* Status Pill */
@@ -588,11 +618,11 @@
     /* Pinned Top Context Order Card */
     .sup-order-card {
         background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 14px !important;
-        margin: 10px 12px 6px 12px !important;
+        border: 1px solid #EEF2F6 !important;
+        border-radius: 16px !important;
+        margin: 10px 14px 6px 14px !important;
         padding: 10px 12px !important;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03) !important;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
         flex-shrink: 0 !important;
     }
 
@@ -604,10 +634,11 @@
     }
 
     .sup-order-thumb {
-        width: 50px !important;
-        height: 50px !important;
-        border-radius: 10px !important;
-        background: #0F172A !important;
+        width: 54px !important;
+        height: 54px !important;
+        border-radius: 12px !important;
+        background: #F8FAFC !important;
+        border: 1px solid #F1F5F9 !important;
         overflow: hidden !important;
         flex-shrink: 0 !important;
         display: flex !important;
@@ -640,9 +671,9 @@
     }
 
     .sup-order-status-badge {
-        font-size: 10px !important;
+        font-size: 10.5px !important;
         font-weight: 700 !important;
-        padding: 2px 7px !important;
+        padding: 2px 8px !important;
         border-radius: 999px !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -663,7 +694,7 @@
     }
 
     .sup-order-pname {
-        font-size: 12px !important;
+        font-size: 11.5px !important;
         color: #475569 !important;
         font-weight: 500 !important;
         white-space: nowrap !important;
@@ -673,7 +704,7 @@
     }
 
     .sup-order-price {
-        font-size: 13.5px !important;
+        font-size: 14.5px !important;
         font-weight: 800 !important;
         color: #0F172A !important;
         margin-top: 2px !important;
@@ -681,10 +712,10 @@
 
     .sup-order-card-grid {
         display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr !important;
-        gap: 8px !important;
+        grid-template-columns: 1.25fr 0.85fr 0.9fr !important;
+        gap: 4px !important;
         background: #F8FAFC !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         padding: 8px 10px !important;
         border: 1px solid #F1F5F9 !important;
     }
@@ -693,27 +724,47 @@
         display: flex !important;
         flex-direction: column !important;
         min-width: 0 !important;
+        padding-right: 4px !important;
+    }
+
+    .sup-order-subcol:not(:last-child) {
+        border-right: 1px solid #E2E8F0 !important;
     }
 
     .sup-subcol-label {
         font-size: 9.5px !important;
         font-weight: 700 !important;
         color: #64748B !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.2px !important;
+        display: flex !important;
+        align-items: center !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
     }
 
+    .sup-sub-icon {
+        width: 15px !important;
+        height: 15px !important;
+        border-radius: 50% !important;
+        background: #FEF3C7 !important;
+        color: #D97706 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 8px !important;
+        margin-right: 3px !important;
+        flex-shrink: 0 !important;
+    }
+
     .sup-subcol-val {
-        font-size: 11px !important;
+        font-size: 10px !important;
         font-weight: 700 !important;
         color: #0F172A !important;
-        margin-top: 2px !important;
+        margin-top: 3px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+        line-height: 1.2 !important;
     }
 
     .sup-pay-pill {

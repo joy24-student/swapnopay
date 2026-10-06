@@ -57,13 +57,13 @@
 	        <span class="sn-dock-text">Customers</span>
 	    </a>
 
-	    <a href="ai-copilot.php" class="sn-dock-item <?= ($cur_page == 'ai-copilot.php') ? 'active' : '' ?>">
+	    <a href="live-chat.php" class="sn-dock-item <?= ($cur_page == 'live-chat.php') ? 'active' : '' ?>">
 	        <div class="sn-dock-icon">
-	            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= ($cur_page == 'ai-copilot.php') ? '#F59E0B' : 'none' ?>" stroke="<?= ($cur_page == 'ai-copilot.php') ? '#B45309' : '#F59E0B' ?>" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-	                <path d="M12 2l2.4 7.4 7.6 2.6-7.6 2.6L12 22l-2.4-7.4L2 12l7.6-2.6L12 2z"/>
+	            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= ($cur_page == 'live-chat.php') ? '#FEDB65' : 'none' ?>" stroke="<?= ($cur_page == 'live-chat.php') ? '#0F172A' : '#64748B' ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
 	            </svg>
 	        </div>
-	        <span class="sn-dock-text" style="color:#B45309; font-weight:800;">AI Copilot</span>
+	        <span class="sn-dock-text" <?= ($cur_page == 'live-chat.php') ? 'style="color:#0F172A; font-weight:800;"' : '' ?>>Support</span>
 	    </a>
 
 	    <a href="#" class="sn-dock-item" data-toggle="offcanvas" role="button">
