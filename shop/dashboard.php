@@ -54,11 +54,12 @@ try {
     $stmt_orders_count->execute([$cust_id]);
     $total_orders = (int)$stmt_orders_count->fetchColumn();
 
+    $start_of_month = date('Y-m-01 00:00:00');
     $stmt_this_month = $pdo->prepare("
         SELECT COUNT(*) FROM tbl_payment 
-        WHERE customer_id = ? AND payment_date::timestamp >= date_trunc('month', CURRENT_DATE)
+        WHERE customer_id = ? AND payment_date >= ?
     ");
-    $stmt_this_month->execute([$cust_id]);
+    $stmt_this_month->execute([$cust_id, $start_of_month]);
     $this_month_orders = (int)$stmt_this_month->fetchColumn();
 } catch (Throwable $e) {}
 
@@ -104,9 +105,9 @@ try {
 
     $stmt_m_spent = $pdo->prepare("
         SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment 
-        WHERE customer_id = ? AND payment_status != 'Cancelled' AND payment_date::timestamp >= date_trunc('month', CURRENT_DATE)
+        WHERE customer_id = ? AND payment_status != 'Cancelled' AND payment_date >= ?
     ");
-    $stmt_m_spent->execute([$cust_id]);
+    $stmt_m_spent->execute([$cust_id, $start_of_month]);
     $this_month_spent = (float)$stmt_m_spent->fetchColumn();
 } catch (Throwable $e) {}
 

@@ -17,10 +17,10 @@ if(isset($_POST['form1'])) {
 
     if($path != '') {
         $ext = pathinfo( $path, PATHINFO_EXTENSION );
-        $file_name = basename( $path, '.' . $ext );
-        if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' ) {
+        $ext = strtolower($ext);
+        if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' && $ext!='webp' ) {
             $valid = 0;
-            $error_message .= 'You must have to upload jpg, jpeg, gif or png file<br>';
+            $error_message .= 'You must have to upload jpg, jpeg, gif, webp or png file<br>';
         } else {
             $final_name = 'tcat-'.time().'.'.$ext;
         }
@@ -51,19 +51,33 @@ if(isset($_POST['form1'])) {
 <section class="content">
 	<div class="row">
 		<div class="col-md-12">
+
+			<?php if($error_message): ?>
+			<div class="callout callout-danger">
+				<p><?php echo $error_message; ?></p>
+			</div>
+			<?php endif; ?>
+
+			<?php if($success_message): ?>
+			<div class="callout callout-success">
+				<p><?php echo $success_message; ?></p>
+			</div>
+			<?php endif; ?>
+
 			<form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
 				<div class="box box-info">
 					<div class="box-body">
 						<div class="form-group">
 							<label for="" class="col-sm-2 control-label">Top Category Name <span>*</span></label>
 							<div class="col-sm-4">
-								<input type="text" class="form-control" name="tcat_name">
+								<input type="text" class="form-control" name="tcat_name" value="<?php if(isset($_POST['tcat_name'])){echo htmlspecialchars($_POST['tcat_name'], ENT_QUOTES, 'UTF-8');} ?>">
 							</div>
 						</div>
 						<div class="form-group">
 							<label for="" class="col-sm-2 control-label">Photo</label>
 							<div class="col-sm-4" style="padding-top:6px;">
 								<input type="file" name="photo">
+								<p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp</p>
 							</div>
 						</div>
 						<div class="form-group">

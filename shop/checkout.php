@@ -402,8 +402,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
         }
     } else {
         // SwapnoPay Unified Gateway (bKash, Nagad, Rocket, Upay, Cards, Net Banking)
-        $_SESSION['mfs_provider'] = 'SwapnoPay';
-        header("Location: payment/swapnopay/process.php?provider=SwapnoPay");
+        $mfs_provider = strip_tags($_POST['mfs_provider'] ?? 'bKash');
+        if (!in_array($mfs_provider, ['bKash', 'Nagad', 'Rocket', 'Upay'])) {
+            $mfs_provider = 'bKash';
+        }
+        $_SESSION['mfs_provider'] = $mfs_provider;
+        header("Location: payment/swapnopay/process.php?provider=" . urlencode($mfs_provider));
         exit;
     }
 }
@@ -425,21 +429,16 @@ require_once('header.php');
                 </svg>
             </a>
             <div class="sn-mob-brand">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#FBBF24" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span class="sn-mob-brand-text">Shop<strong>Next</strong></span>
+                <img src="assets/uploads/swapnopay-logo.png" alt="SwapnoPay" class="sn-mob-brand-logo" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
             </div>
             <div class="sn-mob-badge-safe">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                     <polyline points="9 12 11 14 15 10"></polyline>
                 </svg>
                 <div class="sn-mob-badge-text">
                     <span class="t1">Secure Checkout</span>
-                    <span class="t2">Your information is safe</span>
+                    <span class="t2">SwapnoPay Encrypted</span>
                 </div>
             </div>
         </div>
@@ -940,24 +939,52 @@ require_once('header.php');
                                 <div class="sn-radio-indicator">
                                     <div class="sn-radio-dot"></div>
                                 </div>
-                                <div class="sn-pay-icon-box swapnopay-icon-bg" style="background:#4F46E5; color:#FFF;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                                        <line x1="2" y1="10" x2="22" y2="10"></line>
-                                    </svg>
+                                <div class="sn-pay-icon-box swapnopay-icon-bg">
+                                    <img src="assets/uploads/swapnopay-logo.png" alt="SwapnoPay Official" class="sn-pay-logo-img" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
                                 </div>
                                 <div class="sn-pay-title-col">
-                                    <div class="sn-pay-name" style="font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
-                                        <span>Swapnopay Payment Gateway</span>
-                                        <span class="badge" style="background:#EEF2FF; color:#4F46E5; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Official</span>
+                                    <div class="sn-pay-name">
+                                        <span>SwapnoPay Gateway</span>
+                                        <span class="sn-official-badge">Official</span>
                                     </div>
                                     <div class="sn-pay-desc sn-pay-desc-desktop">bKash, Nagad, Rocket, Upay, Cards &amp; Net Banking</div>
                                     <div class="sn-pay-desc sn-pay-desc-mobile">bKash, Nagad, Rocket, Upay &amp; Cards</div>
                                 </div>
-                                <div class="sn-mfs-badges" style="display:flex; align-items:center; gap:4px;">
-                                    <span style="font-size:10px; font-weight:700; color:#E11D48; background:#FFE4E6; padding:2px 6px; border-radius:4px;">bKash</span>
-                                    <span style="font-size:10px; font-weight:700; color:#EA580C; background:#FFEDD5; padding:2px 6px; border-radius:4px;">Nagad</span>
-                                    <span style="font-size:10px; font-weight:700; color:#9333EA; background:#F3E8FF; padding:2px 6px; border-radius:4px;">Rocket</span>
+                                <div class="sn-mfs-badges">
+                                    <span class="sn-mfs-tag bkash">bKash</span>
+                                    <span class="sn-mfs-tag nagad">Nagad</span>
+                                    <span class="sn-mfs-tag rocket">Rocket</span>
+                                </div>
+                            </div>
+
+                            <!-- MFS Provider Sub-Selection (appears when SwapnoPay is selected) -->
+                            <div class="sn-mfs-provider-selector" id="mfsProviderSelector" style="display: block;">
+                                <input type="hidden" name="mfs_provider" id="inputMfsProvider" value="bKash">
+                                <div class="sn-mfs-selector-label">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                    <span>Choose your payment provider:</span>
+                                </div>
+                                <div class="sn-mfs-grid">
+                                    <div class="sn-mfs-option active" id="mfsBkash" onclick="selectMfsProvider('bKash')" data-method="bKash">
+                                        <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
+                                        <div class="sn-mfs-color-bar" style="background: #e2136e;"></div>
+                                        <span class="sn-mfs-label">bKash</span>
+                                    </div>
+                                    <div class="sn-mfs-option" id="mfsNagad" onclick="selectMfsProvider('Nagad')" data-method="Nagad">
+                                        <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
+                                        <div class="sn-mfs-color-bar" style="background: #f7941d;"></div>
+                                        <span class="sn-mfs-label">Nagad</span>
+                                    </div>
+                                    <div class="sn-mfs-option" id="mfsRocket" onclick="selectMfsProvider('Rocket')" data-method="Rocket">
+                                        <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
+                                        <div class="sn-mfs-color-bar" style="background: #8c3494;"></div>
+                                        <span class="sn-mfs-label">Rocket</span>
+                                    </div>
+                                    <div class="sn-mfs-option" id="mfsUpay" onclick="selectMfsProvider('Upay')" data-method="Upay">
+                                        <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
+                                        <div class="sn-mfs-color-bar" style="background: #ffcb05;"></div>
+                                        <span class="sn-mfs-label">Upay</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1144,8 +1171,14 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
 .sn-mob-brand {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     text-decoration: none;
+}
+
+.sn-mob-brand-logo {
+    height: 32px;
+    max-width: 135px;
+    object-fit: contain;
 }
 
 .sn-mob-brand-text {
@@ -1914,14 +1947,59 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
 }
 
 .sn-pay-icon-box {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
+
+.sn-pay-icon-box.swapnopay-icon-bg {
+    background: #0F172A;
+    width: auto;
+    min-width: 44px;
+    height: 36px;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.sn-pay-logo-img {
+    height: 24px;
+    max-width: 95px;
+    object-fit: contain;
+}
+
+.sn-official-badge {
+    background: #EEF2FF;
+    color: #4F46E5;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    display: inline-block;
+}
+
+.sn-mfs-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.sn-mfs-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.sn-mfs-tag.bkash { color: #E11D48; background: #FFE4E6; }
+.sn-mfs-tag.nagad { color: #EA580C; background: #FFEDD5; }
+.sn-mfs-tag.rocket { color: #9333EA; background: #F3E8FF; }
 
 .sn-pay-title-col {
     flex: 1;
@@ -1933,6 +2011,9 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     font-weight: 700;
     color: var(--sn-dark);
     line-height: 1.2;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .sn-pay-desc {
@@ -2248,10 +2329,100 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
 }
 
+/* Base SwapnoPay MFS Provider Selector (Desktop) */
+.sn-mfs-provider-selector {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: -4px 0 12px 0;
+    animation: fadeInMfs 0.25s ease;
+}
+@keyframes fadeInMfs {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.sn-mfs-selector-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+.sn-mfs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.sn-mfs-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+}
+.sn-mfs-option:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.sn-mfs-option.active {
+    border-color: #0f172a;
+    background: #f0f9ff;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.1);
+}
+.sn-mfs-radio {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #cbd5e1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.sn-mfs-option.active .sn-mfs-radio {
+    border-color: #0f172a;
+}
+.sn-mfs-radio-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: transparent;
+}
+.sn-mfs-option.active .sn-mfs-radio-dot {
+    background: #0f172a;
+}
+.sn-mfs-color-bar {
+    width: 4px;
+    height: 22px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.sn-mfs-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
 /* ============================================================
-   RESPONSIVE MEDIA QUERIES (DESKTOP VS MOBILE PIXEL MATCH)
+   RESPONSIVE MEDIA QUERIES (COMPACT & SHORT-SCROLL MOBILE LAYOUT)
    ============================================================ */
 @media (max-width: 1024px) {
+    body {
+        padding-bottom: 80px !important;
+        overflow-x: hidden !important;
+    }
+
     /* Hide desktop global site header & footer on mobile checkout */
     .sn-header-wrap,
     .sn-footer-wrap {
@@ -2259,13 +2430,65 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     }
 
     .sn-checkout-page-wrapper {
-        padding: 8px 0 95px 0;
+        padding: 4px 0 80px 0;
     }
 
+    .sn-checkout-container {
+        padding: 0 10px;
+        max-width: 100%;
+    }
+
+    /* Mobile Header Bar */
     .sn-mobile-header-bar {
         display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 0 8px 0;
+        margin-bottom: 4px;
+        gap: 6px;
     }
 
+    .sn-mob-back-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .sn-mob-brand-logo {
+        height: 26px;
+    }
+
+    .sn-mob-badge-safe {
+        padding: 2px 7px;
+        max-width: 135px;
+    }
+
+    .sn-mob-badge-text .t1 {
+        font-size: 9.5px;
+    }
+
+    .sn-mob-badge-text .t2 {
+        font-size: 8px;
+    }
+
+    /* Checkout Header */
+    .sn-checkout-header {
+        margin-bottom: 8px;
+    }
+
+    .sn-checkout-title {
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.4px;
+        margin-bottom: 2px;
+    }
+
+    .sn-checkout-subtitle {
+        font-size: 11.5px;
+        line-height: 1.3;
+        margin-bottom: 6px;
+    }
+
+    /* Hide desktop-only elements */
     .sn-checkout-top-nav,
     .sn-stepper-wrap,
     .sn-trust-badges-bar,
@@ -2276,7 +2499,9 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     .sn-title-desktop,
     .sn-pay-sub-desktop,
     .sn-pay-desc-desktop,
-    .sn-sum-price {
+    .sn-sum-price,
+    .sn-card-brand-pills,
+    .sn-mfs-badges {
         display: none !important;
     }
 
@@ -2304,90 +2529,609 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
         display: inline;
     }
 
-    .sn-summary-chevron {
-        display: block;
-    }
-
-    /* Enforce exact mobile vertical card ordering matching Image 2 */
+    /* Flatten columns so direct children can be cleanly reordered */
     .sn-checkout-grid {
         display: flex;
         flex-direction: column;
         gap: 0;
     }
 
-    .sn-checkout-left-col {
-        display: flex;
-        flex-direction: column;
-    }
-
+    .sn-checkout-left-col,
     .sn-checkout-right-col {
-        display: flex;
-        flex-direction: column;
+        display: contents;
     }
 
-    /* 1. Shipping Address */
+    /* Ultra-Compact Card Shell */
+    .sn-checkout-card {
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+    }
+
+    .sn-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .sn-card-icon-wrap svg {
+        width: 17px;
+        height: 17px;
+    }
+
+    .sn-card-title-col h2 {
+        font-size: 13.5px;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .sn-card-title-col p {
+        font-size: 11px;
+        margin: 0;
+    }
+
+    /* 1. Shipping Address Preview */
     .sn-mobile-address-card {
         display: block !important;
         order: 1;
+        background: #FFFFFF;
+        border: 1px solid var(--sn-border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
     }
 
-    #shippingInfoCard {
-        display: none; /* Collapsed on mobile, expanded if user clicks Change */
-        order: 2;
+    .sn-card-head-compact {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
     }
 
-    /* 2. Delivery Method */
-    #deliveryMethodCard {
-        order: 3;
+    .sn-head-title-row {
+        gap: 6px;
     }
 
-    /* 3. Payment Method */
-    #paymentMethodCard {
-        order: 4;
+    .sn-head-title-row svg {
+        width: 16px;
+        height: 16px;
     }
 
-    /* 4. Have a coupon code? */
-    .sn-mobile-promo-card {
-        display: block !important;
-        order: 5;
+    .sn-head-title-row h3 {
+        font-size: 13.5px;
+        font-weight: 700;
     }
 
-    /* 5. Order Summary */
-    #orderSummaryCard {
-        order: 6;
+    .sn-change-addr-btn {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #2563EB;
+        gap: 2px;
     }
 
-    /* 6. Free Shipping Progress */
-    #freeShippingBannerCard {
-        order: 7;
+    .sn-saved-addr-box {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 6px 10px;
     }
 
-    /* 7. 100% Secure Payment */
-    #securePaymentBadgeCard {
-        order: 8;
-    }
-
-    /* 8. Sticky Bottom Action */
-    .sn-mobile-bottom-dock {
-        display: block !important;
-    }
-
-    .sn-shipping-options-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .sn-checkout-title {
-        font-size: 24px;
+    .sn-saved-user-row {
+        gap: 6px;
         margin-bottom: 2px;
     }
 
-    .sn-checkout-subtitle {
-        font-size: 13px;
-        margin-bottom: 12px;
+    .sn-saved-user-row svg {
+        width: 14px;
+        height: 14px;
     }
 
-    .sn-card-brand-pills {
+    .sn-saved-name {
+        font-size: 12.5px;
+        font-weight: 700;
+    }
+
+    .sn-tag-home {
+        font-size: 9.5px;
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
+
+    .sn-saved-details {
+        font-size: 11.5px;
+        line-height: 1.3;
+        color: var(--sn-muted);
+    }
+
+    /* 2. Full Shipping Address Form (Collapsed by default, opens if Change is clicked) */
+    #shippingInfoCard {
         display: none;
+        order: 2;
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+    }
+
+    .sn-input-grid-2,
+    .sn-input-grid-3 {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .sn-form-group {
+        margin-bottom: 8px;
+    }
+
+    .sn-form-label {
+        font-size: 11.5px;
+        margin-bottom: 3px;
+    }
+
+    .sn-form-input,
+    .sn-form-select {
+        font-size: 14px !important;
+        height: 40px;
+        border-radius: 8px;
+    }
+
+    .sn-phone-prefix {
+        height: 40px;
+    }
+
+    /* 3. Delivery Method (Ultra-compact horizontal slim rows) */
+    #deliveryMethodCard {
+        order: 3;
+        margin-bottom: 8px;
+    }
+
+    .sn-shipping-options-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sn-ship-card {
+        position: relative;
+        min-height: unset;
+        padding: 8px 12px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .sn-ship-card-top {
+        margin-bottom: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .sn-radio-indicator {
+        width: 16px;
+        height: 16px;
+    }
+
+    .sn-radio-dot {
+        width: 8px;
+        height: 8px;
+    }
+
+    .sn-ship-method-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .sn-ship-card-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sn-ship-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--sn-dark);
+        margin-bottom: 1px;
+        line-height: 1.2;
+    }
+
+    .sn-ship-time {
+        font-size: 11px;
+        color: var(--sn-muted);
+        line-height: 1.2;
+    }
+
+    .sn-ship-price {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--sn-dark);
+        margin-top: 0;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    .sn-badge-popular {
+        position: absolute;
+        top: -6px;
+        right: 10px;
+        margin-left: 0;
+        font-size: 9px;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        background: #FEF3C7;
+        color: #B45309;
+        font-weight: 700;
+        border: 1px solid #FDE68A;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    /* 4. Have a coupon code? (Compact single row) */
+    .sn-mobile-promo-card {
+        display: block !important;
+        order: 4;
+        background: #FFFFFF;
+        border: 1px solid var(--sn-border);
+        border-radius: 12px;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+    }
+
+    .sn-promo-head {
+        margin-bottom: 6px;
+        gap: 6px;
+    }
+
+    .sn-promo-head svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .sn-promo-head h3 {
+        font-size: 12.5px;
+        font-weight: 700;
+    }
+
+    .sn-promo-input-row {
+        gap: 6px;
+    }
+
+    .sn-promo-input-row .sn-form-input {
+        height: 36px !important;
+        font-size: 12.5px !important;
+        padding: 0 10px;
+        border-radius: 8px;
+    }
+
+    .sn-btn-apply {
+        height: 36px;
+        padding: 0 14px;
+        font-size: 12px;
+        font-weight: 700;
+        border-radius: 8px;
+    }
+
+    .sn-coupon-msg {
+        font-size: 11px;
+        margin-top: 4px;
+    }
+
+    /* 5. Payment Method (Compact Cards + 1-Row MFS Selector) */
+    #paymentMethodCard {
+        order: 5;
+        margin-bottom: 8px;
+    }
+
+    .sn-payment-options-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sn-pay-card {
+        padding: 8px 10px;
+        border-radius: 10px;
+        gap: 8px;
+    }
+
+    .sn-pay-icon-box {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+    }
+
+    .sn-pay-icon-box.swapnopay-icon-bg {
+        min-width: 36px;
+        height: 28px;
+        padding: 2px 5px;
+    }
+
+    .sn-pay-logo-img {
+        height: 18px;
+        max-width: 75px;
+    }
+
+    .sn-pay-name {
+        font-size: 12.5px;
+        line-height: 1.2;
+    }
+
+    .sn-official-badge {
+        font-size: 8.5px;
+        padding: 1px 4px;
+        margin-left: 4px;
+    }
+
+    .sn-pay-desc-mobile {
+        font-size: 10.5px;
+        line-height: 1.2;
+        display: block;
+    }
+
+    .sn-mfs-provider-selector {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 6px 8px;
+        margin: 2px 0 4px 0;
+    }
+
+    .sn-mfs-selector-label {
+        font-size: 10px;
+        margin-bottom: 4px;
+        gap: 4px;
+    }
+
+    .sn-mfs-selector-label svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .sn-mfs-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 4px !important;
+    }
+
+    .sn-mfs-option {
+        padding: 5px 2px !important;
+        border-radius: 6px !important;
+        gap: 3px !important;
+        justify-content: center !important;
+        border-width: 1px !important;
+    }
+
+    .sn-mfs-radio {
+        display: none !important;
+    }
+
+    .sn-mfs-color-bar {
+        width: 3px !important;
+        height: 14px !important;
+        border-radius: 2px !important;
+    }
+
+    .sn-mfs-label {
+        font-size: 10.5px !important;
+        font-weight: 700 !important;
+    }
+
+    /* 6. Order Summary (Compact + Scrollable Items Preview) */
+    #orderSummaryCard {
+        order: 6;
+        background: #FFFFFF;
+        border: 1px solid var(--sn-border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+    }
+
+    #orderSummaryCard .sn-card-header {
+        margin-bottom: 6px;
+        cursor: pointer;
+    }
+
+    #orderSummaryCard .sn-card-header h2 {
+        font-size: 13.5px;
+        font-weight: 700;
+    }
+
+    .sn-summary-item-count {
+        font-size: 11.5px;
+    }
+
+    .sn-summary-chevron {
+        display: block;
+        transition: transform 0.2s ease;
+        transform: rotate(90deg);
+    }
+
+    .sn-summary-products-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 6px;
+        max-height: 160px;
+        overflow-y: auto;
+    }
+
+    .sn-summary-item-row {
+        gap: 8px;
+        padding-bottom: 4px;
+        border-bottom: 1px dashed var(--sn-border-light);
+    }
+
+    .sn-summary-item-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .sn-sum-thumb-wrap {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+    }
+
+    .sn-sum-item-name {
+        font-size: 11.5px;
+        margin-bottom: 1px;
+    }
+
+    .sn-sum-item-specs {
+        font-size: 9.5px;
+        margin-bottom: 1px;
+    }
+
+    .sn-sum-item-qty {
+        font-size: 9.5px;
+    }
+
+    .sn-sum-price-mobile {
+        font-size: 12px;
+        font-weight: 700;
+        display: block;
+    }
+
+    .sn-summary-divider {
+        margin: 6px 0;
+    }
+
+    .sn-pricing-breakdown {
+        gap: 5px;
+    }
+
+    .sn-calc-row {
+        font-size: 12px;
+    }
+
+    .sn-total-row {
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid var(--sn-border);
+    }
+
+    .sn-total-label {
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    .sn-total-amount {
+        font-size: 16.5px;
+        font-weight: 800;
+        color: var(--sn-dark);
+    }
+
+    /* 7. Free Shipping Progress */
+    #freeShippingBannerCard {
+        order: 7;
+        background: #FFFFFF;
+        border: 1px solid var(--sn-border);
+        border-radius: 10px;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        gap: 4px;
+    }
+
+    .sn-free-shipping-head {
+        gap: 6px;
+    }
+
+    .sn-free-shipping-head svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .sn-free-shipping-texts strong {
+        font-size: 11px;
+    }
+
+    .sn-free-shipping-texts span {
+        font-size: 10px;
+    }
+
+    .sn-free-shipping-bar-track {
+        height: 4px;
+    }
+
+    /* 8. 100% Secure Payment Trust */
+    #securePaymentBadgeCard {
+        order: 8;
+        background: #FFFDF5;
+        border: 1px solid #FEF3C7;
+        border-radius: 10px;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+    }
+
+    .sn-secure-box-inner {
+        gap: 8px;
+    }
+
+    .sn-secure-icon-wrap {
+        width: 24px;
+        height: 24px;
+    }
+
+    .sn-secure-icon-wrap svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .sn-secure-meta h4 {
+        font-size: 11px;
+        margin-bottom: 1px;
+    }
+
+    .sn-secure-meta p {
+        font-size: 9.5px;
+    }
+
+    /* 9. Sticky Bottom Action Dock */
+    .sn-mobile-bottom-dock {
+        display: block !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #FFFFFF;
+        padding: 8px 14px max(8px, env(safe-area-inset-bottom)) 14px;
+        box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.08);
+        border-top: 1px solid var(--sn-border);
+        z-index: 9999 !important;
+    }
+
+    .sn-btn-mobile-place-order {
+        width: 100%;
+        height: 44px;
+        background: var(--sn-primary);
+        border: none;
+        border-radius: 10px;
+        color: var(--sn-dark);
+        font-size: 15px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(251, 191, 36, 0.35);
+        transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .sn-btn-mobile-place-order:active {
+        transform: scale(0.98);
+        background: var(--sn-primary-hover);
+    }
+}
+
+@media (max-width: 480px) {
+    .sn-mob-badge-safe {
+        display: none; /* Keep top bar clean on narrow 320px screens */
     }
 }
 </style>
@@ -2434,13 +3178,20 @@ function selectPayment(method) {
     if (method === 'swapnopay') document.getElementById('payCardSwapnopay')?.classList.add('active');
     if (method === 'cod') document.getElementById('payCardCod')?.classList.add('active');
 
+    // Show/hide MFS provider selector
+    const mfsSelector = document.getElementById('mfsProviderSelector');
+    if (mfsSelector) {
+        mfsSelector.style.display = (method === 'swapnopay') ? 'block' : 'none';
+    }
+
     // Update CTA button label
     const submitBtn = document.getElementById('btnSubmitText');
     if (submitBtn) {
         if (method === 'cod') {
             submitBtn.textContent = 'Place Order (COD)';
         } else {
-            submitBtn.textContent = 'Pay with SwapnoPay';
+            const provider = document.getElementById('inputMfsProvider')?.value || 'SwapnoPay';
+            submitBtn.textContent = 'Pay with ' + provider;
         }
     }
 
@@ -2449,9 +3200,25 @@ function selectPayment(method) {
         if (method === 'cod') {
             mobBtn.textContent = 'Place Order (COD)';
         } else {
-            mobBtn.textContent = 'Pay with SwapnoPay';
+            const provider = document.getElementById('inputMfsProvider')?.value || 'SwapnoPay';
+            mobBtn.textContent = 'Pay with ' + provider;
         }
     }
+}
+
+function selectMfsProvider(provider) {
+    document.getElementById('inputMfsProvider').value = provider;
+
+    // Update active class on MFS options
+    document.querySelectorAll('.sn-mfs-option').forEach(el => el.classList.remove('active'));
+    const targetEl = document.querySelector('.sn-mfs-option[data-method="' + provider + '"]');
+    if (targetEl) targetEl.classList.add('active');
+
+    // Update button text
+    const submitBtn = document.getElementById('btnSubmitText');
+    if (submitBtn) submitBtn.textContent = 'Pay with ' + provider;
+    const mobBtn = document.querySelector('.sn-btn-mobile-place-order span');
+    if (mobBtn) mobBtn.textContent = 'Pay with ' + provider;
 }
 
 // 3. RECALCULATE TOTAL
@@ -2546,8 +3313,13 @@ function toggleAddressEditor() {
 function toggleMobileSummaryList() {
     if (window.innerWidth <= 1024) {
         const list = document.getElementById('summaryProductsList');
+        const chevron = document.querySelector('.sn-summary-chevron');
         if (list) {
-            list.style.display = (list.style.display === 'none') ? 'flex' : 'none';
+            const isHidden = (window.getComputedStyle(list).display === 'none');
+            list.style.display = isHidden ? 'flex' : 'none';
+            if (chevron) {
+                chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+            }
         }
     }
 }

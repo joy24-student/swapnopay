@@ -174,6 +174,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo time(); ?>">
 
     <script>
     if (window.innerWidth > 768 && !window.location.search.includes('mobile_mode=1')) {
@@ -943,7 +944,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
     </style>
 </head>
 <body>
-
+<div id="sn-page-container" class="sn-page-container">
 <div class="sn-cat-app-viewport">
 
     <!-- ── 1. Header with Search Pill & Bell ─────────────────────────────── -->
@@ -962,6 +963,12 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
             <!-- Search Query Input -->
             <input type="text" name="search_text" class="sn-search-input" id="catSearchInput" placeholder="Sim800l" value="<?php echo htmlspecialchars($_GET['search_text'] ?? ''); ?>">
+            <button type="button" class="sn-search-clear-btn" id="catSearchClearBtn" title="Clear" aria-label="Clear search" style="display:none; background: #e2e8f0; border: none; border-radius: 50%; width: 20px; height: 20px; min-width: 20px; min-height: 20px; align-items: center; justify-content: center; cursor: pointer; color: #64748b; margin-right: 4px; padding: 0;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
 
             <!-- Search Submit Button -->
             <button type="submit" class="sn-search-submit-btn" aria-label="Search">
@@ -1200,6 +1207,23 @@ if (!empty($_SESSION['cart_p_qty'])) {
         });
     }
 
+    // Categories Search Clear Button
+    const catInp = document.getElementById('catSearchInput');
+    const catClr = document.getElementById('catSearchClearBtn');
+    if (catInp && catClr) {
+        const updateCatClr = () => {
+            catClr.style.display = (catInp.value && catInp.value.trim().length > 0) ? 'inline-flex' : 'none';
+        };
+        catInp.addEventListener('input', updateCatClr);
+        catInp.addEventListener('keyup', updateCatClr);
+        catClr.addEventListener('click', () => {
+            catInp.value = '';
+            updateCatClr();
+            catInp.focus();
+        });
+        updateCatClr();
+    }
+
     // 2. Feedback Modal
     const modal = document.getElementById('feedbackModal');
     const openBtn = document.getElementById('openFeedbackModalBtn');
@@ -1381,7 +1405,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 })();
-</script>
-
+</div><!-- /#sn-page-container -->
+<script src="assets/js/spa-navigation.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

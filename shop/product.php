@@ -48,8 +48,11 @@ if (isset($_REQUEST['slug'])) {
     
     $row = $statement->fetch(PDO::FETCH_ASSOC);
     $newUrl = getProductURL($p_id, $row['p_name'], BASE_URL);
-    redirect301($newUrl);
-    exit;
+    $isSpa = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'ShopNext-SPA');
+    if (!$isSpa) {
+        redirect301($newUrl);
+        exit;
+    }
 } else {
     header('location: ' . BASE_URL . 'index.php');
     exit;
@@ -349,12 +352,14 @@ if ($review_feature_on_off == 1) {
 }
 
 // Fetch Category Breadcrumbs
-$tcat_name = 'Home';
+$tcat_id = 0;
+$mcat_id = 0;
+$tcat_name = '';
 $mcat_name = '';
 $ecat_name = '';
 
 if ($ecat_id > 0) {
-    $stmt_cat = $pdo->prepare("SELECT e.ecat_name, m.mcat_name, t.tcat_name 
+    $stmt_cat = $pdo->prepare("SELECT e.ecat_id, e.ecat_name, m.mcat_id, m.mcat_name, t.tcat_id, t.tcat_name 
                                FROM tbl_end_category e 
                                LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id 
                                LEFT JOIN tbl_top_category t ON m.tcat_id = t.tcat_id 
@@ -362,7 +367,9 @@ if ($ecat_id > 0) {
     $stmt_cat->execute([$ecat_id]);
     $cat_row = $stmt_cat->fetch(PDO::FETCH_ASSOC);
     if ($cat_row) {
+        if (!empty($cat_row['tcat_id']))   $tcat_id   = (int)$cat_row['tcat_id'];
         if (!empty($cat_row['tcat_name'])) $tcat_name = $cat_row['tcat_name'];
+        if (!empty($cat_row['mcat_id']))   $mcat_id   = (int)$cat_row['mcat_id'];
         if (!empty($cat_row['mcat_name'])) $mcat_name = $cat_row['mcat_name'];
         if (!empty($cat_row['ecat_name'])) $ecat_name = $cat_row['ecat_name'];
     }
@@ -989,10 +996,18 @@ require_once('header.php');
     <!-- Breadcrumbs (Desktop Only) -->
     <nav class="sn-breadcrumbs sn-desktop-only" aria-label="Breadcrumb">
         <a href="<?php echo BASE_URL; ?>">Home</a>
-        <span class="sn-crumb-sep">›</span>
-        <a href="<?php echo BASE_URL; ?>category.php?cat=<?php echo urlencode($tcat_name); ?>"><?php echo htmlspecialchars($tcat_name); ?></a>
-        <span class="sn-crumb-sep">›</span>
-        <a href="<?php echo BASE_URL; ?>category.php?cat=<?php echo urlencode($mcat_name); ?>"><?php echo htmlspecialchars($mcat_name); ?></a>
+        <?php if (!empty($tcat_name) && $tcat_id > 0): ?>
+            <span class="sn-crumb-sep">›</span>
+            <a href="<?php echo BASE_URL; ?>product-category.php?id=<?php echo $tcat_id; ?>&type=top-category"><?php echo htmlspecialchars($tcat_name); ?></a>
+        <?php endif; ?>
+        <?php if (!empty($mcat_name) && $mcat_id > 0): ?>
+            <span class="sn-crumb-sep">›</span>
+            <a href="<?php echo BASE_URL; ?>product-category.php?id=<?php echo $mcat_id; ?>&type=mid-category"><?php echo htmlspecialchars($mcat_name); ?></a>
+        <?php endif; ?>
+        <?php if (!empty($ecat_name) && $ecat_id > 0): ?>
+            <span class="sn-crumb-sep">›</span>
+            <a href="<?php echo BASE_URL; ?>product-category.php?id=<?php echo $ecat_id; ?>&type=end-category"><?php echo htmlspecialchars($ecat_name); ?></a>
+        <?php endif; ?>
         <span class="sn-crumb-sep">›</span>
         <span class="sn-crumb-current"><?php echo htmlspecialchars($p_name); ?></span>
     </nav>
@@ -1473,7 +1488,7 @@ require_once('header.php');
             </div>
 
             <!-- Purchase Form (Preserves All Backend Inputs & Token) -->
-            <form action="" method="post" id="snAddToCartForm">
+            <form action="" method="post" id="snAddToCartForm" onsubmit="event.preventDefault(); handleProductAddToCart(); return false;">
                 <?php $csrf->echoInputField(); ?>
                 <input type="hidden" name="p_name" value="<?php echo htmlspecialchars($p_name); ?>">
                 <input type="hidden" name="p_current_price" value="<?php echo htmlspecialchars($p_current_price); ?>">
@@ -1508,7 +1523,7 @@ require_once('header.php');
 
                 <!-- Dual Action Buttons: Add to Cart (Yellow) + Buy Now (Cream) -->
                 <div class="sn-mob-dual-actions">
-                    <button type="submit" name="form_add_to_cart" class="sn-btn-mob-cart" id="btnAddToCart">
+                    <button type="button" class="sn-btn-mob-cart" id="btnAddToCart" onclick="handleProductAddToCart(this)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="9" cy="21" r="1"></circle>
                             <circle cx="20" cy="21" r="1"></circle>
@@ -1516,7 +1531,7 @@ require_once('header.php');
                         </svg>
                         <span>Add to Cart</span>
                     </button>
-                    <button type="submit" name="form_buy_now" class="sn-btn-mob-buy" id="btnBuyNow">
+                    <button type="button" class="sn-btn-mob-buy" id="btnBuyNow" onclick="handleProductBuyNow(this)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                         </svg>
@@ -1603,7 +1618,7 @@ require_once('header.php');
                 $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
                 $rUrl = function_exists('getProductURL') ? getProductURL($rel['p_id'], $rel['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $rel['p_id'];
             ?>
-                <div class="sn-rel-card">
+                <div class="sn-rel-card" data-href="<?php echo htmlspecialchars($rUrl); ?>" style="cursor:pointer;">
                     <div class="sn-rel-card-top">
                         <?php if ($rHasDiscount): ?>
                             <span class="sn-rel-badge">-<?php echo $rDiscountPct; ?>%</span>
@@ -1666,7 +1681,7 @@ require_once('header.php');
     </button>
 
     <!-- Add to Cart Button (Solid Yellow) -->
-    <button type="button" class="sn-sticky-btn-cart" id="snStickyCartBtn">
+    <button type="button" class="sn-sticky-btn-cart" id="snStickyCartBtn" onclick="handleProductAddToCart(this)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="21" r="1"></circle>
             <circle cx="20" cy="21" r="1"></circle>
@@ -1676,7 +1691,7 @@ require_once('header.php');
     </button>
 
     <!-- Buy Now Button (Warm Cream) -->
-    <button type="button" class="sn-sticky-btn-buy" id="snStickyBuyBtn">
+    <button type="button" class="sn-sticky-btn-buy" id="snStickyBuyBtn" onclick="handleProductBuyNow(this)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
@@ -1687,54 +1702,10 @@ require_once('header.php');
 <!-- ================= GESTURE-CONTROLLED DIRECT CHAT BOTTOM SHEET ================= -->
 <div class="sn-chat-sheet-backdrop" id="snChatSheetBackdrop"></div>
 
-<div class="sn-chat-sheet-container" id="snChatSheetContainer" role="dialog" aria-modal="true" aria-labelledby="snChatSheetTitle">
+<div class="sn-chat-sheet-container" id="snChatSheetContainer" role="dialog" aria-modal="true" aria-label="Direct Chat">
     <!-- Top Drag Handle & Gesture Area -->
     <div class="sn-chat-drag-area" id="snChatDragArea">
         <div class="sn-chat-drag-pill"></div>
-    </div>
-
-    <!-- Sheet Header -->
-    <div class="sn-chat-sheet-header" id="snChatSheetHeader">
-        <div class="sn-chat-sheet-brand">
-            <div class="sn-chat-avatar-pulse">
-                <i class="fas fa-wand-magic-sparkles"></i>
-                <span class="sn-chat-online-dot"></span>
-            </div>
-            <div>
-                <div class="sn-chat-sheet-title" id="snChatSheetTitle">ShopNext AI & Live Support</div>
-                <div class="sn-chat-sheet-sub">
-                    <span class="sn-chat-pulse-indicator"></span> Direct Chat • Live Specialist & AI
-                </div>
-            </div>
-        </div>
-
-        <div class="sn-chat-sheet-actions">
-            <!-- Open In Full Tab button -->
-            <a href="<?php echo BASE_URL; ?>messages.php?product_id=<?php echo $p_id; ?>" target="_blank" class="sn-chat-sheet-action-btn" title="Open full chat in new window" aria-label="Open full chat">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                    <polyline points="15 3 21 3 21 9"></polyline>
-                    <line x1="10" y1="14" x2="21" y2="3"></line>
-                </svg>
-            </a>
-            <!-- Close Button -->
-            <button type="button" class="sn-chat-sheet-close-btn" id="snChatSheetCloseBtn" aria-label="Close Chat">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Pinned Product Quick Bar in Header (Mobile/Desktop Preview) -->
-    <div class="sn-chat-sheet-product-bar">
-        <img src="<?php echo !empty($p_featured_photo) ? BASE_URL . 'assets/uploads/' . htmlspecialchars($p_featured_photo) : BASE_URL . 'assets/uploads/product_featured_default.jpg'; ?>" alt="<?php echo htmlspecialchars($p_name); ?>" class="sn-chat-sheet-p-thumb">
-        <div class="sn-chat-sheet-p-info">
-            <span class="sn-chat-sheet-p-name"><?php echo htmlspecialchars($p_name); ?></span>
-            <span class="sn-chat-sheet-p-price"><?php echo $cur . number_format((float)$p_current_price); ?></span>
-        </div>
-        <span class="sn-chat-sheet-p-badge"><i class="fas fa-paper-plane" style="font-size:9px;"></i> Forwarded</span>
     </div>
 
     <!-- Direct Chat Screen Iframe -->
@@ -1749,7 +1720,183 @@ require_once('header.php');
 </div>
 
 <script>
-// Related Products Global Helpers
+// ============================================================
+// GLOBAL HELPERS: TOAST, CART BADGE SYNC, AND ZERO-RELOAD ACTIONS
+// ============================================================
+function showToast(message, type = 'success') {
+    let container = document.getElementById('snToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'snToastContainer';
+        container.style.cssText = 'position:fixed; bottom:76px; left:50%; transform:translateX(-50%); z-index:999999; display:flex; flex-direction:column; gap:8px; pointer-events:none;';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.style.cssText = 'background:#0f172a; color:#ffffff; padding:10px 18px; border-radius:30px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; box-shadow:0 10px 30px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); pointer-events:auto;';
+    toast.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>${message}</span>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(12px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 2800);
+}
+
+function updateAllCartBadges(count) {
+    const badgeSelectors = [
+        '#sn-cart-badge-count',
+        '#sn-dock-cart-count',
+        '#snSubCartCount',
+        '.sn-cart-count',
+        '.cart-count'
+    ];
+    badgeSelectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            el.textContent = count;
+            el.style.display = count > 0 ? '' : 'none';
+            el.style.transform = 'scale(1.4)';
+            el.style.transition = 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            setTimeout(() => { el.style.transform = 'scale(1)'; }, 250);
+        });
+    });
+}
+
+window.handleProductAddToCart = function(triggerBtn) {
+    const mainBtn = document.getElementById('btnAddToCart');
+    const stickyBtn = document.getElementById('snStickyCartBtn');
+    const qtyInput = document.getElementById('snQtyInput');
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+
+    const sizeInput = document.getElementById('hiddenSizeId');
+    const sizeNameInput = document.getElementById('hiddenSizeName');
+    const colorInput = document.getElementById('hiddenColorId');
+    const colorNameInput = document.getElementById('hiddenColorName');
+
+    const origMainHtml = mainBtn ? mainBtn.innerHTML : '';
+    const origStickyHtml = stickyBtn ? stickyBtn.innerHTML : '';
+
+    if (mainBtn) {
+        mainBtn.disabled = true;
+        mainBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Adding...';
+    }
+    if (stickyBtn) {
+        stickyBtn.disabled = true;
+        stickyBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Adding...';
+    }
+
+    const fd = new FormData();
+    fd.append('product_id', '<?php echo $p_id; ?>');
+    fd.append('quantity', qty);
+    fd.append('size_id', sizeInput ? sizeInput.value : '0');
+    fd.append('size_name', sizeNameInput ? sizeNameInput.value : '');
+    fd.append('color_id', colorInput ? colorInput.value : '0');
+    fd.append('color_name', colorNameInput ? colorNameInput.value : '');
+
+    fetch('<?php echo BASE_URL; ?>add-to-cart-ajax.php', {
+        method: 'POST',
+        body: fd
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (mainBtn) mainBtn.disabled = false;
+        if (stickyBtn) stickyBtn.disabled = false;
+
+        if (data.success) {
+            if (mainBtn) {
+                mainBtn.style.background = '#10b981';
+                mainBtn.style.color = '#ffffff';
+                mainBtn.innerHTML = '<i class="fas fa-check" style="margin-right:6px;"></i> Added!';
+            }
+            if (stickyBtn) {
+                stickyBtn.style.background = '#10b981';
+                stickyBtn.style.color = '#ffffff';
+                stickyBtn.innerHTML = '<i class="fas fa-check" style="margin-right:6px;"></i> Added!';
+            }
+
+            const newCount = data.cart_count || 0;
+            updateAllCartBadges(newCount);
+            window.dispatchEvent(new CustomEvent('shopnext:cart-updated', { detail: { count: newCount } }));
+            showToast(data.message || 'Added to cart!');
+
+            setTimeout(() => {
+                if (mainBtn) {
+                    mainBtn.innerHTML = origMainHtml;
+                    mainBtn.style.background = '';
+                    mainBtn.style.color = '';
+                }
+                if (stickyBtn) {
+                    stickyBtn.innerHTML = origStickyHtml;
+                    stickyBtn.style.background = '';
+                    stickyBtn.style.color = '';
+                }
+            }, 1800);
+
+        } else {
+            if (mainBtn) mainBtn.innerHTML = origMainHtml;
+            if (stickyBtn) stickyBtn.innerHTML = origStickyHtml;
+            alert(data.message || 'Unable to add item to cart.');
+        }
+    })
+    .catch(err => {
+        console.error('[Add to Cart Error]', err);
+        if (mainBtn) {
+            mainBtn.disabled = false;
+            mainBtn.innerHTML = origMainHtml;
+        }
+        if (stickyBtn) {
+            stickyBtn.disabled = false;
+            stickyBtn.innerHTML = origStickyHtml;
+        }
+        alert('Could not add item to cart. Please check your connection.');
+    });
+};
+
+window.handleProductBuyNow = function(triggerBtn) {
+    const qtyInput = document.getElementById('snQtyInput');
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+
+    const sizeInput = document.getElementById('hiddenSizeId');
+    const sizeNameInput = document.getElementById('hiddenSizeName');
+    const colorInput = document.getElementById('hiddenColorId');
+    const colorNameInput = document.getElementById('hiddenColorName');
+
+    const fd = new FormData();
+    fd.append('product_id', '<?php echo $p_id; ?>');
+    fd.append('quantity', qty);
+    fd.append('size_id', sizeInput ? sizeInput.value : '0');
+    fd.append('size_name', sizeNameInput ? sizeNameInput.value : '');
+    fd.append('color_id', colorInput ? colorInput.value : '0');
+    fd.append('color_name', colorNameInput ? colorNameInput.value : '');
+
+    fetch('<?php echo BASE_URL; ?>add-to-cart-ajax.php', {
+        method: 'POST',
+        body: fd
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const newCount = data.cart_count || 0;
+            updateAllCartBadges(newCount);
+            window.dispatchEvent(new CustomEvent('shopnext:cart-updated', { detail: { count: newCount } }));
+            if (window.ShopNextSPA && typeof window.ShopNextSPA.navigate === 'function') {
+                window.ShopNextSPA.navigate('<?php echo BASE_URL; ?>cart.php');
+            } else {
+                window.location.href = '<?php echo BASE_URL; ?>cart.php';
+            }
+        } else {
+            alert(data.message || 'Unable to proceed to cart.');
+        }
+    })
+    .catch(err => {
+        console.error('[Buy Now Error]', err);
+        window.location.href = '<?php echo BASE_URL; ?>cart.php';
+    });
+};
+
 function relAddToCart(productId, productName, btn) {
     const origHtml = btn.innerHTML;
     btn.disabled = true;
@@ -1777,22 +1924,10 @@ function relAddToCart(productId, productName, btn) {
                 btn.innerHTML = origHtml;
             }, 1800);
 
-            if (typeof showToast === 'function') {
-                showToast('"' + productName + '" added to cart!');
-            }
+            showToast('"' + productName + '" added to cart!');
             if (data.cart_count) {
-                const cartBadge = document.getElementById('sn-cart-badge-count');
-                if (cartBadge) {
-                    cartBadge.textContent = data.cart_count;
-                    cartBadge.style.transform = 'scale(1.3)';
-                    setTimeout(() => cartBadge.style.transform = 'scale(1)', 250);
-                }
-                const dockCartBadge = document.getElementById('sn-dock-cart-count');
-                if (dockCartBadge) {
-                    dockCartBadge.textContent = data.cart_count;
-                    dockCartBadge.style.transform = 'scale(1.3)';
-                    setTimeout(() => dockCartBadge.style.transform = 'scale(1)', 250);
-                }
+                updateAllCartBadges(data.cart_count);
+                window.dispatchEvent(new CustomEvent('shopnext:cart-updated', { detail: { count: data.cart_count } }));
             }
         } else {
             alert(data.message || 'Unable to add to cart.');
@@ -1835,7 +1970,11 @@ function relToggleWishlist(productId, btn, e) {
     }).catch(err => console.error(err));
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initProductPage() {
+    const mainWrap = document.querySelector('.sn-product-details-wrap, .product-page');
+    if (!mainWrap || mainWrap.dataset.snInit === '1') return;
+    mainWrap.dataset.snInit = '1';
+
     // Related products scroll buttons
     document.getElementById('snRelPrev')?.addEventListener('click', () => {
         document.getElementById('snRelatedTrack')?.scrollBy({ left: -260, behavior: 'smooth' });
@@ -2202,128 +2341,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 5.5 AJAX Add to Cart Handler
+    // 5.5 Action Buttons Handlers (Add to Cart, Buy Now, Sticky Bar)
     const addCartBtn = document.getElementById('btnAddToCart');
+    const stickyCartBtn = document.getElementById('snStickyCartBtn');
+    const buyNowBtn = document.getElementById('btnBuyNow');
+    const stickyBuyBtn = document.getElementById('snStickyBuyBtn');
     const addToCartForm = document.getElementById('snAddToCartForm');
+    const stickyMsgBtn = document.getElementById('snStickyMsgBtn');
+
+    addToCartForm?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleProductAddToCart(addCartBtn);
+    });
 
     addCartBtn?.addEventListener('click', function(e) {
         e.preventDefault();
-        
-        const origHtml = addCartBtn.innerHTML;
-        const stickyCartBtn = document.getElementById('snStickyCartBtn');
-        const origStickyHtml = stickyCartBtn ? stickyCartBtn.innerHTML : '';
-
-        addCartBtn.disabled = true;
-        addCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
-        if (stickyCartBtn) {
-            stickyCartBtn.disabled = true;
-            stickyCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
-        }
-
-        const formData = new FormData(addToCartForm);
-        formData.append('product_id', '<?php echo $p_id; ?>');
-        formData.append('quantity', document.getElementById('snQtyInput')?.value || '1');
-        formData.append('size_id', document.getElementById('hiddenSizeId')?.value || '0');
-        formData.append('size_name', document.getElementById('hiddenSizeName')?.value || '');
-        formData.append('color_id', document.getElementById('hiddenColorId')?.value || '0');
-        formData.append('color_name', document.getElementById('hiddenColorName')?.value || '');
-
-        fetch('<?php echo BASE_URL; ?>add-to-cart-ajax.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(r => r.json())
-        .then(data => {
-            addCartBtn.disabled = false;
-            if (stickyCartBtn) stickyCartBtn.disabled = false;
-
-            if (data.success) {
-                addCartBtn.innerHTML = '<i class="fas fa-check"></i> Added!';
-                addCartBtn.style.background = '#10b981';
-                addCartBtn.style.color = '#ffffff';
-
-                if (stickyCartBtn) {
-                    stickyCartBtn.innerHTML = '<i class="fas fa-check"></i> Added!';
-                    stickyCartBtn.style.background = '#10b981';
-                    stickyCartBtn.style.color = '#ffffff';
-                }
-
-                // Update header cart badge and dock cart badge
-                const cartBadge = document.getElementById('sn-cart-badge-count');
-                if (cartBadge) {
-                    cartBadge.textContent = data.cart_count;
-                    cartBadge.style.transform = 'scale(1.3)';
-                    setTimeout(() => cartBadge.style.transform = 'scale(1)', 250);
-                }
-                const dockCartBadge = document.getElementById('sn-dock-cart-count');
-                if (dockCartBadge) {
-                    dockCartBadge.textContent = data.cart_count;
-                    dockCartBadge.style.transform = 'scale(1.3)';
-                    setTimeout(() => dockCartBadge.style.transform = 'scale(1)', 250);
-                }
-
-                // Show toast alert
-                if (typeof showToast === 'function') {
-                    showToast(data.message || 'Added to cart!');
-                }
-
-                setTimeout(() => {
-                    addCartBtn.innerHTML = origHtml;
-                    addCartBtn.style.background = '';
-                    addCartBtn.style.color = '';
-                    if (stickyCartBtn) {
-                        stickyCartBtn.innerHTML = origStickyHtml;
-                        stickyCartBtn.style.background = '';
-                        stickyCartBtn.style.color = '';
-                    }
-                }, 2000);
-            } else {
-                addCartBtn.innerHTML = origHtml;
-                if (stickyCartBtn) stickyCartBtn.innerHTML = origStickyHtml;
-                alert(data.message || 'Unable to add to cart.');
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            addToCartForm.submit();
-        });
-    });
-
-    // 5.8 Sticky Bottom Action Bar Handlers (Message, Add to Cart, Buy Now)
-    const stickyMsgBtn = document.getElementById('snStickyMsgBtn');
-    const stickyCartBtn = document.getElementById('snStickyCartBtn');
-    const stickyBuyBtn = document.getElementById('snStickyBuyBtn');
-
-    stickyMsgBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        openProductChatSheet();
+        handleProductAddToCart(this);
     });
 
     stickyCartBtn?.addEventListener('click', function(e) {
         e.preventDefault();
-        if (addCartBtn) {
-            addCartBtn.click();
-        }
+        handleProductAddToCart(this);
+    });
+
+    buyNowBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        handleProductBuyNow(this);
     });
 
     stickyBuyBtn?.addEventListener('click', function(e) {
         e.preventDefault();
-        const mainBuy = document.getElementById('btnBuyNow');
-        if (mainBuy) {
-            mainBuy.click();
-        } else {
-            const form = document.getElementById('snAddToCartForm');
-            let buyInput = document.getElementById('hiddenBuyNow');
-            if (!buyInput) {
-                buyInput = document.createElement('input');
-                buyInput.type = 'hidden';
-                buyInput.name = 'form_buy_now';
-                buyInput.id = 'hiddenBuyNow';
-                buyInput.value = '1';
-                form.appendChild(buyInput);
-            }
-            form.submit();
-        }
+        handleProductBuyNow(this);
+    });
+
+    stickyMsgBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openProductChatSheet();
     });
 
     // 6. Wishlist Button Toggle
@@ -2497,7 +2550,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initProductPage);
+} else {
+    initProductPage();
+}
+document.addEventListener('shopnext:page-loaded', initProductPage);
 </script>
 
 <?php require_once('footer.php'); ?>

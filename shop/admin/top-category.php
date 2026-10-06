@@ -24,6 +24,7 @@
 			<thead>
 			    <tr>
 			        <th>#</th>
+			        <th>Photo</th>
 			        <th>Top Category Name</th>
                     <th>Show on Menu?</th>
 			        <th>Action</th>
@@ -40,7 +41,14 @@
             		?>
 					<tr>
 	                    <td><?php echo $i; ?></td>
-	                    <td><?php echo $row['tcat_name']; ?></td>
+	                    <td style="width:70px;text-align:center;">
+	                        <?php if(!empty($row['photo']) && file_exists('../assets/uploads/'.$row['photo'])): ?>
+	                            <img src="../assets/uploads/<?php echo htmlspecialchars($row['photo'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($row['tcat_name'], ENT_QUOTES, 'UTF-8'); ?>" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;">
+	                        <?php else: ?>
+	                            <span class="text-muted" style="font-size:11px;color:#999;">No photo</span>
+	                        <?php endif; ?>
+	                    </td>
+	                    <td><?php echo htmlspecialchars($row['tcat_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td>
                             <?php 
                                 if($row['show_on_menu'] == 1) {

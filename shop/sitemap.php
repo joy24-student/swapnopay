@@ -180,10 +180,12 @@ function generatePagesSitemap($baseUrl) {
     
     $pages = array(
         array('url' => '', 'priority' => '1.0', 'changefreq' => 'daily'),
+        array('url' => 'categories.php', 'priority' => '0.9', 'changefreq' => 'weekly'),
+        array('url' => 'deals.php', 'priority' => '0.8', 'changefreq' => 'daily'),
+        array('url' => 'stores.php', 'priority' => '0.7', 'changefreq' => 'monthly'),
         array('url' => 'about.php', 'priority' => '0.7', 'changefreq' => 'monthly'),
         array('url' => 'contact.php', 'priority' => '0.6', 'changefreq' => 'monthly'),
         array('url' => 'faq.php', 'priority' => '0.6', 'changefreq' => 'weekly'),
-        array('url' => 'features.php', 'priority' => '0.7', 'changefreq' => 'monthly'),
     );
     
     foreach ($pages as $page) {

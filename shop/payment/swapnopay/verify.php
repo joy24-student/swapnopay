@@ -34,6 +34,18 @@ $supabase_anon_key = defined('SUPABASE_ANON_KEY') ? SUPABASE_ANON_KEY : (getenv(
 $api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
 $merchant_id = defined('MERCHANT_ID') && !empty(MERCHANT_ID) ? MERCHANT_ID : ($runtime['merchant_id'] ?? null);
 
+try {
+    $stmt_sett = $pdo->query("SELECT swapnopay_merchant_id, swapnopay_api_key, swapnopay_api_url FROM tbl_settings WHERE id=1");
+    if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
+        if (empty($merchant_id) && !empty($sett_row['swapnopay_merchant_id'])) {
+            $merchant_id = trim($sett_row['swapnopay_merchant_id']);
+        }
+        if (!empty($sett_row['swapnopay_api_url'])) {
+            $api_url = rtrim(trim($sett_row['swapnopay_api_url']), '/');
+        }
+    }
+} catch (Throwable $e) {}
+
 if (!empty($supabase_url) && !empty($supabase_service_key)) {
     $clean_supabase_url = rtrim($supabase_url, '/');
     $numberQuery = 'type=eq.' . rawurlencode($method) . '&active=eq.true&select=number,is_default&limit=1';
@@ -382,7 +394,42 @@ if (supabaseUrl && supabaseAnonKey && typeof supabase !== 'undefined') {
     }
 }
 
-// 2. HTTP Polling Fallback (every 3 seconds)
+// 2. Socket.IO Real-time Connection to SwapnoPay Backend
+(function() {
+    const apiUrl = "<?php echo htmlspecialchars($api_url, ENT_QUOTES, 'UTF-8'); ?>";
+    const orderId = "<?php echo htmlspecialchars($gateway_order_id, ENT_QUOTES, 'UTF-8'); ?>";
+    if (apiUrl && orderId) {
+        try {
+            const ioScript = document.createElement('script');
+            ioScript.src = apiUrl + '/socket.io/socket.io.js';
+            ioScript.onload = function() {
+                if (typeof io === 'undefined') return;
+                const socket = io(apiUrl, { transports: ['websocket', 'polling'] });
+                socket.on('connect', function() {
+                    console.log('SwapnoPay Socket.IO connected');
+                    socket.emit('join_order', orderId);
+                });
+                socket.on('payment_status', function(data) {
+                    console.log('SwapnoPay payment_status event:', data);
+                    if (data && (data.status === 'PAID' || data.status === 'Completed')) {
+                        handlePaymentSuccess();
+                    }
+                });
+                socket.on('disconnect', function() {
+                    console.log('SwapnoPay Socket.IO disconnected');
+                });
+            };
+            ioScript.onerror = function() {
+                console.log('SwapnoPay Socket.IO script load failed, relying on polling');
+            };
+            document.head.appendChild(ioScript);
+        } catch(e) {
+            console.error('SwapnoPay Socket.IO init error:', e);
+        }
+    }
+})();
+
+// 3. HTTP Polling Fallback (every 3 seconds)
 setInterval(() => {
     fetch("check_status.php?tran_id=" + encodeURIComponent(tranId))
         .then(res => res.json())

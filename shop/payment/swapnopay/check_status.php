@@ -60,6 +60,8 @@ if (!empty($supabase_url) && !empty($supabase_key)) {
     if (!empty($merchant_id)) {
         $query .= "&merchant_id=" . urlencode($merchant_id);
     }
+    // Also try tran_id as fallback identifier
+    $query .= "&tran_id=" . urlencode($tran_id);
     $ch = curl_init("{$api_url}/v1/payment/check-status?{$query}");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
@@ -69,11 +71,17 @@ if (!empty($supabase_url) && !empty($supabase_key)) {
     $curl_error = curl_error($ch);
     curl_close($ch);
     $gateway_res = json_decode($res, true);
-    if ($res !== false && $http_code >= 200 && $http_code < 300 && !empty($gateway_res) && !empty($gateway_res['status'])) {
-        $status = $gateway_res['status'];
-        $paid_amount = $gateway_res['amount'] ?? 0;
-        $paid_at = $gateway_res['paid_at'] ?? null;
-        $trx_id = $gateway_res['trx_id'] ?? '';
+    if ($res !== false && $http_code >= 200 && $http_code < 300 && !empty($gateway_res)) {
+        // Normalize response: backend may return status in different formats
+        $raw_status = $gateway_res['status'] ?? ($gateway_res['order_status'] ?? '');
+        if (strtoupper($raw_status) === 'PAID' || strtoupper($raw_status) === 'COMPLETED') {
+            $status = 'PAID';
+        } elseif (!empty($raw_status)) {
+            $status = strtoupper($raw_status);
+        }
+        $paid_amount = $gateway_res['amount'] ?? ($gateway_res['paid_amount'] ?? 0);
+        $paid_at = $gateway_res['paid_at'] ?? ($gateway_res['payment_time'] ?? null);
+        $trx_id = $gateway_res['trx_id'] ?? ($gateway_res['matched_trx_id'] ?? '');
     } else {
         $status = $http_code === 404 ? 'NOT_FOUND' : 'ERROR';
         $status_message = $curl_error ?: ($gateway_res['error'] ?? 'Payment gateway status could not be checked');

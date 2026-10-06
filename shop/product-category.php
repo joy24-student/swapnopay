@@ -109,15 +109,15 @@ if ($filterBrand !== '') {
 }
 
 if ($filterPrice === '1') {
-    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) < 30000";
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) < 500";
 } elseif ($filterPrice === '2') {
-    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 30000 AND 50000";
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 500 AND 1000";
 } elseif ($filterPrice === '3') {
-    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 50000 AND 80000";
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 1000 AND 2500";
 } elseif ($filterPrice === '4') {
-    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 80000 AND 120000";
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) BETWEEN 2500 AND 5000";
 } elseif ($filterPrice === '5') {
-    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) > 120000";
+    $whereClauses[] = "CAST(p.p_current_price AS DECIMAL(12,2)) > 5000";
 }
 
 $whereSQL = 'WHERE ' . implode(' AND ', $whereClauses);
@@ -1096,19 +1096,19 @@ function renderStarIcons($rating) {
                             <label><input type="radio" name="price_range" value="" <?= ($filterPrice === '') ? 'checked' : '' ?> onchange="applyFilters()"> All Prices</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="1" <?= ($filterPrice === '1') ? 'checked' : '' ?> onchange="applyFilters()"> Under ৳ 30,000</label>
+                            <label><input type="radio" name="price_range" value="1" <?= ($filterPrice === '1') ? 'checked' : '' ?> onchange="applyFilters()"> Under ৳ 500</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="2" <?= ($filterPrice === '2') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 30,000 – ৳ 50,000</label>
+                            <label><input type="radio" name="price_range" value="2" <?= ($filterPrice === '2') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 500 – ৳ 1,000</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="3" <?= ($filterPrice === '3') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 50,000 – ৳ 80,000</label>
+                            <label><input type="radio" name="price_range" value="3" <?= ($filterPrice === '3') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 1,000 – ৳ 2,500</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="4" <?= ($filterPrice === '4') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 80,000 – ৳ 1,20,000</label>
+                            <label><input type="radio" name="price_range" value="4" <?= ($filterPrice === '4') ? 'checked' : '' ?> onchange="applyFilters()"> ৳ 2,500 – ৳ 5,000</label>
                         </div>
                         <div class="sn-radio-item">
-                            <label><input type="radio" name="price_range" value="5" <?= ($filterPrice === '5') ? 'checked' : '' ?> onchange="applyFilters()"> Above ৳ 1,20,000</label>
+                            <label><input type="radio" name="price_range" value="5" <?= ($filterPrice === '5') ? 'checked' : '' ?> onchange="applyFilters()"> Above ৳ 5,000</label>
                         </div>
                     </div>
                 </div>
@@ -1167,7 +1167,7 @@ function renderStarIcons($rating) {
                             $isWish = in_array($pid, $wishlistIds);
                             $detailLink = function_exists('getProductURL') ? getProductURL($pid, $pname, BASE_URL) : BASE_URL . "product.php?id=" . urlencode($pid);
                         ?>
-                        <div class="sn-card" data-pid="<?= htmlspecialchars($pid) ?>" data-price="<?= $currPrice ?>" data-rating="<?= $rating ?>">
+                        <div class="sn-card" data-href="<?= $detailLink ?>" data-pid="<?= htmlspecialchars($pid) ?>" data-price="<?= $currPrice ?>" data-rating="<?= $rating ?>" style="cursor:pointer;">
                             <div class="sn-card-top">
                                 <?php if ($discount > 0): ?>
                                     <span class="sn-badge b-red">-<?= $discount ?>%</span>
@@ -1336,11 +1336,11 @@ function renderStarIcons($rating) {
         cards.forEach(card => {
             const cardPrice = parseFloat(card.dataset.price || '0');
             let matchPrice = true;
-            if (selectedPrice === '1') matchPrice = cardPrice < 30000;
-            else if (selectedPrice === '2') matchPrice = (cardPrice >= 30000 && cardPrice <= 50000);
-            else if (selectedPrice === '3') matchPrice = (cardPrice >= 50000 && cardPrice <= 80000);
-            else if (selectedPrice === '4') matchPrice = (cardPrice >= 80000 && cardPrice <= 120000);
-            else if (selectedPrice === '5') matchPrice = cardPrice > 120000;
+            if (selectedPrice === '1') matchPrice = cardPrice < 500;
+            else if (selectedPrice === '2') matchPrice = (cardPrice >= 500 && cardPrice <= 1000);
+            else if (selectedPrice === '3') matchPrice = (cardPrice >= 1000 && cardPrice <= 2500);
+            else if (selectedPrice === '4') matchPrice = (cardPrice >= 2500 && cardPrice <= 5000);
+            else if (selectedPrice === '5') matchPrice = cardPrice > 5000;
 
             if (matchPrice) {
                 card.style.display = 'flex';

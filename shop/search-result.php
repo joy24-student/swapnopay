@@ -26,8 +26,9 @@ if (!isset($_REQUEST['search_text']) || trim($_REQUEST['search_text']) === '') {
 }
 
 $search_text = trim(strip_tags($_REQUEST['search_text']));
-$search_like = '%' . $search_text . '%';
-$search_prefix = $search_text . '%';
+$search_lower = strtolower($search_text);
+$search_like = '%' . $search_lower . '%';
+$search_prefix = $search_lower . '%';
 
 /* ---------- Filters & sorting (all server-side) ---------- */
 $allowedSorts = ['best', 'popular', 'newest', 'price_asc', 'price_desc'];
@@ -42,8 +43,8 @@ $priceMax  = (isset($_GET['max']) && $_GET['max'] !== '' && is_numeric($_GET['ma
 $priceExpr = "CAST(p.p_current_price AS DECIMAL(12,2))";
 $oldExpr   = "CAST(NULLIF(p.p_old_price,'') AS DECIMAL(12,2))";
 
-$where  = ["p.p_is_active = 1", "p.p_name LIKE ?"];
-$params = [$search_like];
+$where  = ["p.p_is_active = 1", "(LOWER(p.p_name) LIKE ? OR LOWER(COALESCE(p.p_short_description, '')) LIKE ? OR LOWER(COALESCE(p.p_description, '')) LIKE ?)"];
+$params = [$search_like, $search_like, $search_like];
 if ($onSale)  { $where[] = "$oldExpr > $priceExpr"; }
 if ($inStock) { $where[] = "p.p_qty > 0"; }
 if ($priceMin !== null) { $where[] = "$priceExpr >= ?"; $params[] = $priceMin; }
@@ -54,8 +55,8 @@ if ($minRating) {
 }
 $whereSql = implode(' AND ', $where);
 
-$orderSql = "CASE WHEN p.p_name LIKE ? THEN 0 ELSE 1 END, p.p_is_featured DESC, p.p_total_view DESC, p.p_id DESC";
-$orderParams = [$search_prefix];
+$orderSql = "CASE WHEN LOWER(p.p_name) LIKE ? THEN 0 WHEN LOWER(p.p_name) LIKE ? THEN 1 ELSE 2 END, p.p_is_featured DESC, p.p_total_view DESC, p.p_id DESC";
+$orderParams = [$search_prefix, $search_like];
 switch ($sort) {
     case 'popular':    $orderSql = "p.p_total_view DESC, p.p_id DESC"; $orderParams = []; break;
     case 'newest':     $orderSql = "p.p_id DESC"; $orderParams = []; break;
@@ -228,14 +229,21 @@ body.sn-header-scrolled-away .srp-chips { top:48px; }
         <a class="srp-chip<?php echo $sort === 'price_asc' ? ' active' : ''; ?>" href="<?php echo htmlspecialchars($buildUrl(['sort' => $sort === 'price_asc' ? 'best' : 'price_asc', 'page' => null])); ?>">Price <i class="fas fa-arrow-up" style="font-size:10px"></i></a>
     </div>
 
-    <?php if ($activeFilters): ?>
+    <?php if ($activeFilters || !empty($search_text)): ?>
     <div class="srp-applied">
+        <?php if (!empty($search_text)): ?>
+            <a class="srp-tag" href="<?php echo defined('BASE_URL') ? BASE_URL : 'index.php'; ?>" title="Clear search query">
+                "<?php echo htmlspecialchars($search_text); ?>" <i class="fas fa-times"></i>
+            </a>
+        <?php endif; ?>
         <?php if ($onSale): ?><a class="srp-tag" href="<?php echo htmlspecialchars($buildUrl(['sale' => 0, 'page' => null])); ?>">On sale <i class="fas fa-times"></i></a><?php endif; ?>
         <?php if ($inStock): ?><a class="srp-tag" href="<?php echo htmlspecialchars($buildUrl(['stock' => 0, 'page' => null])); ?>">In stock <i class="fas fa-times"></i></a><?php endif; ?>
         <?php if ($minRating): ?><a class="srp-tag" href="<?php echo htmlspecialchars($buildUrl(['rating' => 0, 'page' => null])); ?>"><?php echo $minRating; ?>★ &amp; up <i class="fas fa-times"></i></a><?php endif; ?>
         <?php if ($priceMin !== null): ?><a class="srp-tag" href="<?php echo htmlspecialchars($buildUrl(['min' => null, 'page' => null])); ?>">Min <?php echo $cur . rtrim(rtrim(number_format($priceMin, 2, '.', ''), '0'), '.'); ?> <i class="fas fa-times"></i></a><?php endif; ?>
         <?php if ($priceMax !== null): ?><a class="srp-tag" href="<?php echo htmlspecialchars($buildUrl(['max' => null, 'page' => null])); ?>">Max <?php echo $cur . rtrim(rtrim(number_format($priceMax, 2, '.', ''), '0'), '.'); ?> <i class="fas fa-times"></i></a><?php endif; ?>
-        <a class="srp-clear" href="<?php echo htmlspecialchars($base . '?search_text=' . urlencode($search_text)); ?>">Clear all</a>
+        <?php if ($activeFilters): ?>
+            <a class="srp-clear" href="<?php echo htmlspecialchars($base . '?search_text=' . urlencode($search_text)); ?>">Reset filters</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -527,9 +535,12 @@ if ($is_ajax) {
         loadFilteredResults(window.location.href, false);
     });
 
-    // Keep header search box showing the current query
+    // Keep header search box showing the current query & display cross clear button
     var inp = document.getElementById('sn-search-input');
-    if (inp && !inp.value) inp.value = <?php echo json_encode($search_text); ?>;
+    if (inp) {
+        if (!inp.value) inp.value = <?php echo json_encode($search_text); ?>;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 })();
 </script>
 

@@ -3,213 +3,1320 @@ require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/header.php';
 ?>
 
-<div class="content-wrapper" style="min-height: calc(100vh - 100px); background: #f4f6f9;">
-    <!-- Content Header -->
-    <section class="content-header" style="padding: 15px 20px;">
-        <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0; display: flex; items-center; gap: 10px;">
-            <i class="fa fa-comments text-primary"></i> Live Customer Support & AI Pilot Console
-            <small style="font-size: 13px; color: #64748b; font-weight: 500;">Realtime messaging, AI handover, and bufferless WebRTC calling</small>
-        </h1>
-        <ol class="breadcrumb" style="background: transparent; padding: 0; margin-top: 5px;">
-            <li><a href="index.php"><i class="fa fa-dashboard"></i> Dashboard</a></li>
-            <li class="active">Live Chat Console</li>
-        </ol>
-    </section>
+<style>
+/* ==========================================================================
+   WHATSAPP WEB LIVE CHAT INTERFACE (Zero Bottom Gap, Live-Only, Call Buttons Top)
+   ========================================================================== */
 
-    <!-- Main Live Chat Application -->
-    <section class="content" style="padding: 0 20px 20px 20px;">
-        <div class="box box-solid" style="border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden;">
-            <div class="box-body" style="padding: 0;">
-                <div class="row" style="margin: 0; min-height: 720px; display: flex;">
-                    
-                    <!-- LEFT COLUMN: THREAD LIST (320px) -->
-                    <div class="col-md-4" style="padding: 0; border-right: 1px solid #e2e8f0; background: #ffffff; display: flex; flex-direction: column;">
-                        <!-- Search & Filter -->
-                        <div style="padding: 15px; border-bottom: 1px solid #f1f5f9; background: #fafafa;">
-                            <div class="input-group">
-                                <input type="text" id="threadSearch" class="form-control" placeholder="Search conversations..." style="border-radius: 20px 0 0 20px; border-color: #cbd5e1; font-size: 13px;">
-                                <span class="input-group-btn">
-                                    <button class="btn btn-default" type="button" style="border-radius: 0 20px 20px 0; border-color: #cbd5e1; background: #ffffff;">
-                                        <i class="fa fa-search text-muted"></i>
-                                    </button>
-                                </span>
-                            </div>
-                        </div>
+/* 1. Viewport Lock: Page never scrolls; layout fills 100% of visible viewport */
+html, body {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #f0f2f5 !important;
+}
+.wrapper {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    background: #f0f2f5 !important;
+}
+.main-sidebar {
+    height: 100vh !important;
+}
+.main-footer {
+    display: none !important; /* Hide footer on live chat */
+}
+.content-wrapper {
+    height: calc(100vh - 50px) !important;
+    max-height: calc(100vh - 50px) !important;
+    overflow: hidden !important;
+    background: #f0f2f5 !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
 
-                        <!-- Active Customer Threads -->
-                        <div id="threadListContainer" style="flex: 1; overflow-y: auto; max-height: 650px;">
-                            <div style="padding: 30px; text-align: center; color: #94a3b8;">
-                                <i class="fa fa-spinner fa-spin fa-2x"></i>
-                                <p style="margin-top: 10px; font-size: 13px;">Loading conversations...</p>
-                            </div>
-                        </div>
-                    </div>
+/* 2. Top App Bar (Voice & Video Call, Collapse, Refresh) */
+.content-header {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 6px 14px !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #d1d7db !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    z-index: 20;
+}
 
-                    <!-- RIGHT COLUMN: ACTIVE CONVERSATION (Flex-1) -->
-                    <div class="col-md-8" style="padding: 0; background: #f8fafc; display: flex; flex-direction: column; flex: 1;">
-                        
-                        <!-- Empty Placeholder when no thread selected -->
-                        <div id="emptyThreadState" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
-                            <div style="width: 70px; height: 70px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 15px;">
-                                <i class="fa fa-comments-o"></i>
-                            </div>
-                            <h3 style="font-weight: 700; color: #334155; margin-bottom: 8px;">Select a Conversation</h3>
-                            <p style="color: #64748b; font-size: 13px; max-width: 360px;">Choose a customer thread from the left list to answer inquiries, take over from AI, or launch audio/video calls.</p>
-                        </div>
+.content {
+    flex: 1 !important;
+    height: calc(100% - 48px) !important;
+    max-height: calc(100% - 48px) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    background: #f0f2f5 !important;
+}
 
-                        <!-- Active Chat Panel (Hidden until thread selected) -->
-                        <div id="activeThreadPanel" style="display: none; flex-direction: column; flex: 1; height: 100%;">
-                            
-                            <!-- Chat Top Bar -->
-                            <div style="padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
-                                <div style="display: flex; items-center; gap: 12px;">
-                                    <div style="width: 42px; height: 42px; border-radius: 50%; background: #0284c7; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">
-                                        <span id="activeCustomerAvatar">C</span>
-                                    </div>
-                                    <div>
-                                        <div style="display: flex; align-items: center; gap: 8px;">
-                                            <h4 id="activeCustomerName" style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b;">Customer Name</h4>
-                                            <span id="activeModeBadge" class="label label-primary" style="font-size: 10px; border-radius: 10px; padding: 3px 8px;">AI Copilot</span>
-                                        </div>
-                                        <p id="activeCustomerDetails" style="margin: 2px 0 0; font-size: 12px; color: #64748b;">Guest User • Online</p>
-                                    </div>
-                                </div>
+/* 3. Full-Screen WhatsApp Shell (Edge-to-Edge, Zero Bottom Padding) */
+.wa-app-wrap {
+    flex: 1;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    overflow: hidden;
+    background: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
 
-                                <!-- Action Toolbar -->
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <!-- WebRTC Voice Call -->
-                                    <button onclick="startAdminWebRtcCall('audio')" class="btn btn-default btn-sm" style="border-radius: 20px; color: #059669; border-color: #a7f3d0;" title="Start Audio Call">
-                                        <i class="fa fa-phone"></i> Voice Call
-                                    </button>
-                                    <!-- WebRTC Video Call -->
-                                    <button onclick="startAdminWebRtcCall('video')" class="btn btn-default btn-sm" style="border-radius: 20px; color: #2563eb; border-color: #bfdbfe;" title="Start Video Call">
-                                        <i class="fa fa-video-camera"></i> Video Call
-                                    </button>
-                                    <!-- AI Handover Button -->
-                                    <button id="btnAdminTakeover" onclick="toggleAdminTakeover()" class="btn btn-warning btn-sm" style="border-radius: 20px; font-weight: 600;">
-                                        <i class="fa fa-handshake-o"></i> Take Over Chat
-                                    </button>
-                                </div>
-                            </div>
+/* Custom WhatsApp Scrollbar */
+.wa-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.wa-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.wa-scroll::-webkit-scrollbar-thumb {
+    background: rgba(11, 20, 26, 0.2);
+}
+.wa-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(11, 20, 26, 0.35);
+}
 
-                            <!-- Messages Area -->
-                            <div id="adminMessagesContainer" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 520px; background: #f8fafc;">
-                                <!-- Messages injected dynamically -->
-                            </div>
+/* --------------------------------------------------------------------------
+   COLUMN 1: WHATSAPP CHATS SIDEBAR (Width: 330px, Collapsible)
+   -------------------------------------------------------------------------- */
+.wa-col-chats {
+    width: 330px;
+    border-right: 1px solid #e9edef;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+}
+.wa-col-chats.collapsed {
+    display: none !important;
+}
 
-                            <!-- Quick Reply Buttons -->
-                            <div style="padding: 8px 15px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; gap: 6px; overflow-x: auto; white-space: nowrap;">
-                                <button onclick="insertQuickReply('Hello! How can I help you today?')" class="btn btn-xs btn-default" style="border-radius: 12px; font-size: 11px;">👋 Greeting</button>
-                                <button onclick="insertQuickReply('Let me check our stock and order details for you right now.')" class="btn btn-xs btn-default" style="border-radius: 12px; font-size: 11px;">📦 Checking Order</button>
-                                <button onclick="insertQuickReply('Yes, this item is eligible for cash on delivery with 3-5 days delivery.')" class="btn btn-xs btn-default" style="border-radius: 12px; font-size: 11px;">🚚 Delivery Info</button>
-                                <button onclick="insertQuickReply('Thank you for contacting us! Is there anything else I can help with?')" class="btn btn-xs btn-default" style="border-radius: 12px; font-size: 11px;">🙏 Closing</button>
-                            </div>
+/* Sidebar Header */
+.wa-sidebar-header {
+    height: 52px;
+    background: #f0f2f5;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    border-bottom: 1px solid #d1d7db;
+}
+.wa-brand-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #111b21;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.3px;
+}
+.wa-header-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.wa-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #54656f;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.wa-icon-btn:hover {
+    background: rgba(11, 20, 26, 0.08);
+    color: #111b21;
+}
 
-                            <!-- Input Area -->
-                            <div style="padding: 12px 15px; background: #ffffff; border-top: 1px solid #e2e8f0;">
-                                <form id="adminReplyForm" onsubmit="handleAdminSendReply(event)" style="display: flex; align-items: center; gap: 10px; margin: 0;">
-                                    <input type="file" id="adminFileInput" accept="image/*,application/pdf" style="display: none;" onchange="handleAdminFileUpload(this)">
-                                    <button type="button" onclick="document.getElementById('adminFileInput').click()" class="btn btn-default" style="border-radius: 50%; width: 38px; height: 38px; padding: 0; color: #64748b;" title="Attach Image or Document">
-                                        <i class="fa fa-paperclip"></i>
-                                    </button>
-                                    
-                                    <input type="text" id="adminReplyInput" class="form-control" placeholder="Type your reply to customer..." style="border-radius: 20px; border-color: #cbd5e1; font-size: 13px;" autocomplete="off">
-                                    
-                                    <button type="submit" class="btn btn-primary" style="border-radius: 20px; padding: 6px 18px; font-weight: 600;">
-                                        <i class="fa fa-paper-plane"></i> Send
-                                    </button>
-                                </form>
-                            </div>
+/* Search Bar & Filter Pills */
+.wa-search-bar-wrap {
+    padding: 8px 12px;
+    background: #ffffff;
+    border-bottom: 1px solid #e9edef;
+    flex-shrink: 0;
+}
+.wa-search-box {
+    display: flex;
+    align-items: center;
+    background: #f0f2f5;
+    border-radius: 8px;
+    height: 35px;
+    padding: 0 10px;
+    gap: 8px;
+}
+.wa-search-box i {
+    color: #54656f;
+    font-size: 13px;
+}
+.wa-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: #111b21;
+}
+.wa-search-input::placeholder {
+    color: #667781;
+}
 
-                        </div>
+/* WhatsApp Filter Chips (LIVE CHAT ONLY) */
+.wa-filter-chips {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    overflow-x: auto;
+}
+.wa-filter-chip {
+    padding: 4px 11px;
+    border-radius: 14px;
+    background: #f0f2f5;
+    color: #54656f;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.wa-filter-chip:hover {
+    background: #e9edef;
+    color: #111b21;
+}
+.wa-filter-chip.active {
+    background: #d9fdd3;
+    color: #008069;
+    font-weight: 600;
+}
 
-                    </div>
+/* Conversation Items */
+.wa-chat-list {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+}
+.wa-chat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f2f5;
+    transition: background 0.15s ease;
+    position: relative;
+}
+.wa-chat-item:hover {
+    background: #f5f6f6;
+}
+.wa-chat-item.active {
+    background: #f0f2f5;
+}
+.wa-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+    position: relative;
+    user-select: none;
+}
+.wa-online-dot {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    width: 11px;
+    height: 11px;
+    background: #25d366;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+}
+.wa-chat-content {
+    flex: 1;
+    min-width: 0;
+}
+.wa-chat-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+.wa-chat-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111b21;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.wa-chat-time {
+    font-size: 11px;
+    color: #667781;
+    flex-shrink: 0;
+}
+.wa-chat-item.has-unread .wa-chat-time {
+    color: #25d366;
+    font-weight: 600;
+}
+.wa-chat-msg-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+.wa-chat-snippet {
+    font-size: 13px;
+    color: #667781;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+.wa-unread-count {
+    background: #25d366;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.wa-live-badge {
+    background: #fef3c7;
+    color: #b45309;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   COLUMN 2: WHATSAPP CHAT WORKSPACE (Flex-1)
+   -------------------------------------------------------------------------- */
+.wa-col-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #efeae2;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Chat Header (54px) */
+.wa-main-header {
+    height: 52px;
+    background: #f0f2f5;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #d1d7db;
+    border-left: 1px solid #d1d7db;
+    flex-shrink: 0;
+    gap: 8px;
+    z-index: 10;
+}
+.wa-contact-info-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+.wa-contact-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+.wa-contact-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111b21;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+.wa-contact-status {
+    font-size: 12px;
+    color: #667781;
+    margin: 2px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Prominent Call & Action Buttons */
+.wa-call-btn {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid #d1d7db;
+    background: #ffffff;
+    color: #111b21;
+    white-space: nowrap;
+}
+.wa-call-btn:hover {
+    background: #f0f2f5;
+    border-color: #8696a0;
+}
+.wa-call-btn.video {
+    color: #008069;
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+.wa-call-btn.video:hover {
+    background: #dcfce7;
+    border-color: #00a884;
+}
+.wa-call-btn.audio {
+    color: #0284c7;
+    border-color: #bae6fd;
+    background: #f0f9ff;
+}
+.wa-call-btn.audio:hover {
+    background: #e0f2fe;
+    border-color: #0284c7;
+}
+
+.wa-collapse-btn {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid #d1d7db;
+    background: #ffffff;
+    color: #54656f;
+    white-space: nowrap;
+}
+.wa-collapse-btn:hover {
+    background: #f0f2f5;
+    color: #111b21;
+    border-color: #8696a0;
+}
+
+/* WhatsApp Doodle Feed Background */
+.wa-feed-body {
+    flex: 1;
+    min-height: 0;
+    padding: 14px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background-color: #efeae2;
+    background-image: radial-gradient(#d1d7db 0.75px, transparent 0.75px), radial-gradient(#d1d7db 0.75px, #efeae2 0.75px);
+    background-size: 30px 30px;
+    background-position: 0 0, 15px 15px;
+}
+
+/* Date Pill Divider */
+.wa-date-divider {
+    text-align: center;
+    margin: 8px 0;
+}
+.wa-date-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #ffffff;
+    color: #54656f;
+    font-size: 12px;
+    border-radius: 7.5px;
+    box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+/* WhatsApp Message Bubbles */
+.wa-bubble-wrap {
+    display: flex;
+    flex-direction: column;
+    max-width: 65%;
+}
+.wa-bubble-wrap.incoming {
+    align-self: flex-start;
+}
+.wa-bubble-wrap.outgoing {
+    align-self: flex-end;
+}
+.wa-bubble {
+    padding: 6px 9px 8px 9px;
+    font-size: 14px;
+    line-height: 19px;
+    word-wrap: break-word;
+    box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    position: relative;
+}
+.wa-bubble.incoming {
+    background: #ffffff;
+    color: #111b21;
+    border-radius: 8px 8px 8px 0;
+}
+.wa-bubble.outgoing {
+    background: #d9fdd3; /* Official WhatsApp outbound green */
+    color: #111b21;
+    border-radius: 8px 8px 0 8px;
+}
+.wa-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 2px;
+    float: right;
+    margin-left: 12px;
+}
+.wa-bubble-time {
+    font-size: 11px;
+    color: #667781;
+}
+.wa-ticks {
+    color: #53bdeb; /* Official WhatsApp blue checkmarks */
+    font-size: 12px;
+}
+
+/* Product Card in Chat */
+.wa-product-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 6px;
+    text-decoration: none !important;
+    color: inherit;
+    transition: background 0.15s ease;
+}
+.wa-product-card:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+.wa-product-img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+.wa-product-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111b21;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+.wa-product-price {
+    font-size: 12px;
+    font-weight: 700;
+    color: #008069;
+}
+
+/* Canned Quick Replies Bar */
+.wa-quick-bar {
+    padding: 5px 16px;
+    background: #f0f2f5;
+    border-top: 1px solid #e9edef;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.wa-canned-chip {
+    background: #ffffff;
+    border: 1px solid #d1d7db;
+    color: #54656f;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.wa-canned-chip:hover {
+    background: #d9fdd3;
+    color: #008069;
+    border-color: #a7f3d0;
+}
+
+/* WhatsApp Message Input Bar */
+.wa-input-bar {
+    min-height: 58px;
+    background: #f0f2f5;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.wa-input-field {
+    flex: 1;
+    height: 40px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: none;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: #111b21;
+    outline: none;
+}
+.wa-input-field::placeholder {
+    color: #667781;
+}
+.wa-send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #00a884;
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+}
+.wa-send-btn:hover {
+    background: #008f6f;
+}
+
+/* --------------------------------------------------------------------------
+   COLUMN 3: CONTACT INFO & CRM DRAWER (Width: 320px, Collapsible)
+   -------------------------------------------------------------------------- */
+.wa-col-drawer {
+    width: 320px;
+    border-left: 1px solid #d1d7db;
+    background: #f0f2f5;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+    height: 100%;
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+.wa-col-drawer.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    border-left: none !important;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden !important;
+}
+
+.wa-drawer-header {
+    height: 52px;
+    padding: 10px 16px;
+    background: #f0f2f5;
+    border-bottom: 1px solid #d1d7db;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111b21;
+    flex-shrink: 0;
+}
+.wa-drawer-section {
+    background: #ffffff;
+    padding: 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(11, 20, 26, 0.08);
+}
+.wa-drawer-sec-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #54656f;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.wa-order-item {
+    padding: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+.wa-order-item:last-child {
+    margin-bottom: 0;
+}
+</style>
+
+<!-- TOP APP BAR: Video Call, Voice Call, Collapse Buttons at the TOP -->
+<section class="content-header">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <!-- Collapse Left Chats Button at Top -->
+        <button type="button" onclick="toggleThreadsCol()" id="btnTopCollapseChats" class="btn btn-default btn-sm" style="border-radius: 6px; font-weight: 600;">
+            <i class="fa fa-bars"></i> <span id="lblTopCollapse">Collapse Inbox</span>
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <i class="fa fa-whatsapp" style="color: #25d366; font-size: 20px;"></i>
+            <span style="font-weight: 700; font-size: 15px; color: #111b21;">Live Support</span>
+            <span class="label label-success" style="font-size: 10px; border-radius: 10px; padding: 2px 7px; background: #00a884;">ONLINE</span>
+        </div>
+    </div>
+
+    <!-- Prominent Voice Call, Video Call, and Action Buttons at the TOP -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <!-- Video Call Button at TOP -->
+        <button type="button" onclick="triggerTopVideoCall()" class="btn btn-sm" id="btnTopVideoCall" style="background: #00a884; border-color: #00a884; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 5px 12px;">
+            <i class="fa fa-video-camera"></i> Video Call
+        </button>
+
+        <!-- Voice Call Button at TOP -->
+        <button type="button" onclick="triggerTopVoiceCall()" class="btn btn-sm" id="btnTopVoiceCall" style="background: #0284c7; border-color: #0284c7; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 5px 12px;">
+            <i class="fa fa-phone"></i> Voice Call
+        </button>
+
+        <!-- Live Takeover Button at TOP -->
+        <button type="button" id="btnTopTakeover" onclick="toggleAdminTakeover()" class="btn btn-default btn-sm" style="border-radius: 6px; font-weight: 600;">
+            <i class="fa fa-handshake-o"></i> <span>Take Over</span>
+        </button>
+
+        <!-- Fullscreen / Focus Mode Button -->
+        <button type="button" onclick="toggleAdminNavSidebar()" class="btn btn-default btn-sm" style="border-radius: 6px;" title="Toggle Fullscreen Focus">
+            <i class="fa fa-arrows-alt"></i>
+        </button>
+
+        <!-- Customer CRM Details Drawer Toggle -->
+        <button type="button" onclick="toggleContextCol()" class="btn btn-default btn-sm" style="border-radius: 6px;" title="Customer Details & Orders">
+            <i class="fa fa-id-card-o"></i> Details
+        </button>
+
+        <!-- Refresh Button -->
+        <button type="button" onclick="loadThreads()" class="btn btn-default btn-sm" style="border-radius: 6px;" title="Refresh conversations">
+            <i class="fa fa-refresh" id="refreshThreadsIcon"></i>
+        </button>
+    </div>
+</section>
+
+<!-- MAIN WHATSAPP WEB APPLICATION (Zero bottom black padding, edge-to-edge) -->
+<section class="content">
+    <div class="wa-app-wrap">
+        
+        <!-- ============================================== -->
+        <!-- COLUMN 1: LIVE CONVERSATIONS LIST (330px) -->
+        <!-- ============================================== -->
+        <div class="wa-col-chats" id="threadsCol">
+            <!-- Sidebar Header -->
+            <div class="wa-sidebar-header">
+                <div class="wa-brand-title">
+                    <span>Live Customer Chats</span>
+                </div>
+                <div class="wa-header-icons">
+                    <button type="button" onclick="toggleThreadsCol()" class="btn btn-default btn-xs" title="Collapse Chats List" style="border-radius: 4px; padding: 3px 8px; font-weight: 600;">
+                        <i class="fa fa-chevron-left"></i> Collapse
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Bar & Filter Chips (LIVE CHAT ONLY) -->
+            <div class="wa-search-bar-wrap">
+                <div class="wa-search-box">
+                    <i class="fa fa-search"></i>
+                    <input type="text" id="threadSearchInput" onkeyup="filterThreads()" class="wa-search-input" placeholder="Search customer, phone, message...">
+                </div>
+                <div class="wa-filter-chips">
+                    <button type="button" class="wa-filter-chip active" onclick="setThreadFilter('all', this)">
+                        Live Support <span id="cntAll" style="opacity: 0.8;">0</span>
+                    </button>
+                    <button type="button" class="wa-filter-chip" onclick="setThreadFilter('unread', this)">
+                        Unread <span id="cntUnread" style="display: none;" class="wa-unread-count">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Live Conversations Stream -->
+            <div class="wa-chat-list wa-scroll" id="threadListContainer">
+                <div style="padding: 40px 15px; text-align: center; color: #667781; font-size: 13px;">
+                    <i class="fa fa-spinner fa-spin fa-2x"></i>
+                    <p style="margin-top: 10px;">Loading live conversations...</p>
                 </div>
             </div>
         </div>
-    </section>
-</div>
+
+        <!-- ============================================== -->
+        <!-- COLUMN 2: WHATSAPP CHAT WORKSPACE (Flex-1) -->
+        <!-- ============================================== -->
+        <div class="wa-col-main">
+            <!-- Empty State (No conversation selected) -->
+            <div id="emptyThreadState" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; background: #f0f2f5;">
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: #ffffff; color: #25d366; display: flex; align-items: center; justify-content: center; font-size: 38px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(11,20,26,0.06);">
+                    <i class="fa fa-whatsapp"></i>
+                </div>
+                <h3 style="font-size: 20px; font-weight: 600; color: #111b21; margin: 0 0 8px;">Live Customer Support Console</h3>
+                <p style="color: #667781; font-size: 14px; max-width: 440px; line-height: 20px; margin: 0 0 16px;">
+                    Select an active customer chat on the left to start live messaging, start audio/video calls, and review customer order history.
+                </p>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="expandThreadsIfCollapsed()" id="btnOpenInboxEmpty" class="btn btn-success btn-sm" style="background: #00a884; border-color: #00a884; border-radius: 6px; font-weight: 600; padding: 6px 16px; display: none;">
+                        <i class="fa fa-comments"></i> <span>Open Chats Inbox</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Chat Screen (Pinned Input, 100% Height) -->
+            <div id="activeThreadPanel" style="display: none; flex-direction: column; height: 100%; min-height: 0; overflow: hidden;">
+                <!-- Chat Header -->
+                <div class="wa-main-header">
+                    <div class="wa-contact-info-wrap">
+                        <button type="button" onclick="toggleThreadsCol();" class="wa-collapse-btn" id="btnCollapseChatsInline" title="Collapse / Show Chats List">
+                            <i class="fa fa-bars"></i> <span>Chats</span>
+                        </button>
+                        <div class="wa-avatar" id="activeAvatar" style="width: 38px; height: 38px; cursor: pointer;" onclick="toggleContextCol()">C</div>
+                        <div style="min-width: 0; flex: 1; cursor: pointer;" onclick="toggleContextCol()">
+                            <div class="wa-contact-name-row">
+                                <h4 id="activeCustomerName" class="wa-contact-name">Customer Name</h4>
+                                <span class="wa-live-badge"><i class="fa fa-user"></i> Live Support</span>
+                            </div>
+                            <p id="activeCustomerDetails" class="wa-contact-status">online • storefront visitor</p>
+                        </div>
+                    </div>
+
+                    <!-- Header Video & Audio Call Buttons -->
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <button type="button" onclick="startAdminWebRtcCall('video')" class="wa-call-btn video" title="Start Live Video Call">
+                            <i class="fa fa-video-camera"></i> <span>Video Call</span>
+                        </button>
+                        <button type="button" onclick="startAdminWebRtcCall('audio')" class="wa-call-btn audio" title="Start Live Voice Call">
+                            <i class="fa fa-phone"></i> <span>Voice Call</span>
+                        </button>
+                        <button type="button" onclick="toggleContextCol()" class="wa-collapse-btn" title="View Customer Details & Orders">
+                            <i class="fa fa-id-card-o"></i> <span>Details</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- WhatsApp Message Feed Body (Live Chat Only, AI Suppressed) -->
+                <div class="wa-feed-body wa-scroll" id="adminMessagesContainer">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                <!-- Canned Responses / Quick Reply Toolbar -->
+                <div class="wa-quick-bar wa-scroll">
+                    <span style="font-size: 11px; font-weight: 700; color: #667781; margin-right: 4px;">QUICK:</span>
+                    <button type="button" onclick="insertQuickReply('Hello! How can I assist you with your order today?')" class="wa-canned-chip">👋 Greeting</button>
+                    <button type="button" onclick="insertQuickReply('Let me check your order and shipping status right away.')" class="wa-canned-chip">📦 Check Order</button>
+                    <button type="button" onclick="insertQuickReply('Delivery inside Dhaka takes 24-48 hours. Outside Dhaka takes 48-72 hours via courier.')" class="wa-canned-chip">🚚 Delivery Time</button>
+                    <button type="button" onclick="insertQuickReply('We accept SwapnoPay (bKash, Nagad, Rocket, Cards) and Cash on Delivery (COD).')" class="wa-canned-chip">💳 Payment Info</button>
+                    <button type="button" onclick="insertQuickReply('We offer a 7-day hassle-free replacement or return warranty.')" class="wa-canned-chip">🔄 Return Policy</button>
+                    <button type="button" onclick="insertQuickReply('Thank you for shopping with us! Have a wonderful day.')" class="wa-canned-chip">🙏 Thank You</button>
+                </div>
+
+                <!-- WhatsApp Message Input Bar (Zero Gap at Bottom) -->
+                <div class="wa-input-bar">
+                    <input type="file" id="adminFileInput" accept="image/*,application/pdf" style="display: none;" onchange="handleAdminFileUpload(this)">
+                    <button type="button" onclick="document.getElementById('adminFileInput').click()" class="wa-icon-btn" title="Attach file or photo">
+                        <i class="fa fa-paperclip"></i>
+                    </button>
+                    <input type="text" id="adminReplyInput" class="wa-input-field" placeholder="Type a message to customer..." onkeypress="handleKeyPress(event)" autocomplete="off">
+                    <button type="button" onclick="handleAdminSendReply()" class="wa-send-btn" title="Send message">
+                        <i class="fa fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- COLUMN 3: WHATSAPP CONTACT INFO & CRM DRAWER -->
+        <!-- ============================================== -->
+        <div class="wa-col-drawer wa-scroll" id="contextCol">
+            <!-- Drawer Header -->
+            <div class="wa-drawer-header">
+                <button type="button" onclick="toggleContextCol()" class="wa-icon-btn" style="width: 30px; height: 30px;" title="Close Details">
+                    <i class="fa fa-times"></i>
+                </button>
+                <span>Contact Info</span>
+            </div>
+
+            <!-- Profile Section -->
+            <div class="wa-drawer-section" style="text-align: center;">
+                <div class="wa-avatar" id="ctxAvatar" style="width: 72px; height: 72px; font-size: 26px; margin: 0 auto 12px; background: #e0f2fe; color: #0369a1;">C</div>
+                <h4 style="font-size: 17px; font-weight: 600; color: #111b21; margin: 0 0 4px;" id="ctxName">Customer</h4>
+                <p style="font-size: 13px; color: #667781; margin: 0 0 10px; word-break: break-all;" id="ctxEmail">No email registered</p>
+                <p style="font-size: 13px; color: #667781; margin: 0 0 14px;" id="ctxPhone">No phone registered</p>
+
+                <div id="ctxWhatsAppBtnWrap" style="display: none;">
+                    <button type="button" onclick="openCustomerWhatsApp()" class="btn btn-success btn-sm btn-block" style="border-radius: 6px; font-weight: 600; background: #25d366; border: none;">
+                        <i class="fa fa-whatsapp"></i> Chat on Official WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Orders from tbl_payment -->
+            <div class="wa-drawer-section" style="flex: 1;">
+                <div class="wa-drawer-sec-title">
+                    <span>Store Orders</span>
+                    <span class="badge" id="ctxOrdersCount" style="background: #111b21; font-size: 11px;">0</span>
+                </div>
+                <div id="ctxOrdersList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="color: #667781; font-size: 13px; text-align: center; padding: 15px 0;">
+                        No store orders found.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Internal Staff Notes -->
+            <div class="wa-drawer-section">
+                <div class="wa-drawer-sec-title">Internal Staff Notes</div>
+                <textarea id="staffNoteInput" onkeyup="saveStaffNote()" class="form-control" rows="3" placeholder="Private notes about this customer..." style="font-size: 13px; border-radius: 6px; resize: vertical; border: 1px solid #d1d7db;"></textarea>
+                <div style="font-size: 11px; color: #667781; margin-top: 4px;">Saved locally for your staff account</div>
+            </div>
+        </div>
+
+    </div>
+</section>
 
 <!-- WEBRTC ADMIN CALL OVERLAY -->
-<div id="adminCallModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); z-index: 99999; flex-direction: column; justify-content: space-between; padding: 30px; color: #ffffff;">
-    <div style="text-align: center; margin-top: 40px;">
-        <div style="width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);">
+<div id="adminCallModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 20, 26, 0.95); backdrop-filter: blur(8px); z-index: 99999; flex-direction: column; justify-content: space-between; padding: 30px; color: #ffffff;">
+    <div style="text-align: center; margin-top: 30px;">
+        <div style="width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 8px 25px rgba(0, 168, 132, 0.4);">
             <i id="adminCallTypeIcon" class="fa fa-phone"></i>
         </div>
-        <h3 id="adminCallPeerTitle" style="font-weight: 700; margin: 0 0 5px;">Calling Customer...</h3>
-        <p id="adminCallTimer" style="font-family: monospace; font-size: 14px; color: #94a3b8; margin: 0;">Connecting...</p>
+        <h3 id="adminCallPeerTitle" style="font-weight: 600; margin: 0 0 4px; font-size: 18px;">Calling Customer...</h3>
+        <p id="adminCallTimer" style="font-family: monospace; font-size: 13px; color: #aebac1; margin: 0;">Connecting WebRTC peer stream...</p>
     </div>
 
     <!-- Video Containers -->
-    <div id="adminVideoWrap" style="display: none; flex: 1; position: relative; max-width: 700px; width: 100%; margin: 20px auto; border-radius: 16px; overflow: hidden; background: #000000;">
+    <div id="adminVideoWrap" style="display: none; flex: 1; position: relative; max-width: 680px; width: 100%; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000000; border: 1px solid rgba(255,255,255,0.1);">
         <video id="adminRemoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-        <video id="adminLocalVideo" autoplay playsinline muted style="position: absolute; bottom: 15px; right: 15px; width: 130px; height: 180px; border-radius: 12px; border: 2px solid #ffffff; object-fit: cover;"></video>
+        <video id="adminLocalVideo" autoplay playsinline muted style="position: absolute; bottom: 12px; right: 12px; width: 120px; height: 160px; border-radius: 8px; border: 2px solid #ffffff; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"></video>
     </div>
 
     <audio id="adminRemoteAudio" autoplay playsinline></audio>
 
     <!-- Controls -->
-    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 40px;">
-        <button onclick="toggleAdminMic()" id="btnAdminMic" class="btn btn-default" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; color: #ffffff; font-size: 18px;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 30px;">
+        <button onclick="toggleAdminMic()" id="btnAdminMic" class="btn btn-default" style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; color: #ffffff; font-size: 16px;">
             <i class="fa fa-microphone" id="adminMicIcon"></i>
         </button>
-        <button onclick="hangupAdminCall()" class="btn btn-danger" style="width: 60px; height: 60px; border-radius: 50%; font-size: 22px; box-shadow: 0 8px 20px rgba(225, 29, 72, 0.5);">
+        <button onclick="hangupAdminCall()" class="btn btn-danger" style="width: 58px; height: 58px; border-radius: 50%; font-size: 20px; box-shadow: 0 8px 20px rgba(225, 29, 72, 0.4); background: #ea0038; border: none;">
             <i class="fa fa-phone"></i>
         </button>
-        <button onclick="toggleAdminCam()" id="btnAdminCam" class="btn btn-default" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; color: #ffffff; font-size: 18px;">
+        <button onclick="toggleAdminCam()" id="btnAdminCam" class="btn btn-default" style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; color: #ffffff; font-size: 16px;">
             <i class="fa fa-video-camera" id="adminCamIcon"></i>
         </button>
     </div>
 </div>
 
-<script>
-let currentThreadId = null;
-let currentThreadData = null;
-let pollTimer = null;
-let lastMsgId = 0;
+<!-- INCOMING CALL MODAL FOR ADMIN -->
+<div id="adminIncomingCallModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 20, 26, 0.95); backdrop-filter: blur(8px); z-index: 99999; flex-direction: column; align-items: center; justify-content: center; padding: 30px; color: #ffffff; text-align: center;">
+    <div style="width: 86px; height: 86px; margin: 0 auto 20px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 10px 30px rgba(0, 168, 132, 0.5);">
+        <i id="adminIncomingCallIcon" class="fa fa-phone"></i>
+    </div>
+    <h3 id="adminIncomingCallerTitle" style="font-weight: 700; margin: 0 0 6px; font-size: 22px;">Incoming Customer Call</h3>
+    <p id="adminIncomingCallSubtitle" style="font-size: 14px; color: #aebac1; margin: 0 0 35px;">Customer requested live voice support</p>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 40px;">
+        <div style="text-align: center;">
+            <button type="button" onclick="declineAdminIncomingCall()" class="btn btn-danger" style="width: 64px; height: 64px; border-radius: 50%; font-size: 22px; background: #ea0038; border: none; box-shadow: 0 8px 25px rgba(234, 0, 56, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                <i class="fa fa-phone" style="transform: rotate(135deg);"></i>
+            </button>
+            <span style="font-size: 12px; font-weight: 600; color: #fca5a5;">Decline</span>
+        </div>
+        <div style="text-align: center;">
+            <button type="button" onclick="acceptAdminIncomingCall()" class="btn btn-success" style="width: 64px; height: 64px; border-radius: 50%; font-size: 22px; background: #00a884; border: none; box-shadow: 0 8px 25px rgba(0, 168, 132, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                <i class="fa fa-phone"></i>
+            </button>
+            <span style="font-size: 12px; font-weight: 600; color: #86efac;">Accept</span>
+        </div>
+    </div>
+</div>
 
-// Fetch thread list from server
-async function loadThreads() {
+<!-- 1. ADMIN FULLSCREEN IMAGE LIGHTBOX WITH CROSS BUTTON -->
+<div id="adminImageLightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 20, 26, 0.95); backdrop-filter: blur(8px); z-index: 99999; flex-direction: column; justify-content: space-between; padding: 20px; color: #ffffff;" onclick="closeAdminImageLightbox()">
+    <!-- Top Bar with Cross Button -->
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px;" onclick="event.stopPropagation()">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; color: #e9edef;">
+            <i class="fa fa-picture-o" style="color: #00a884;"></i> Photo Preview
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <a id="adminLightboxDownload" href="#" download="customer-photo.jpg" class="btn btn-default btn-sm" style="border-radius: 50%; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); border: none; color: #ffffff;" title="Download photo">
+                <i class="fa fa-download"></i>
+            </a>
+            <button type="button" onclick="closeAdminImageLightbox()" class="btn btn-default btn-sm" style="border-radius: 50%; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2); border: none; color: #ffffff; font-size: 18px;" title="Close (Esc)">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <!-- Centered Image Container -->
+    <div style="flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 10px;" onclick="event.stopPropagation()">
+        <img id="adminLightboxImg" src="" alt="Full Photo" style="max-width: 92vw; max-height: 80vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+    </div>
+    <div style="text-align: center; color: #8696a0; font-size: 12px; padding: 6px;" onclick="event.stopPropagation()">
+        Click outside or press Escape to close
+    </div>
+</div>
+
+<!-- 2. ADMIN PRE-SEND IMAGE ATTACHMENT PREVIEW MODAL WITH CROSS BUTTON -->
+<div id="adminAttachmentPreviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 20, 26, 0.85); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 440px; width: 100%; overflow: hidden; box-shadow: 0 12px 36px rgba(0,0,0,0.3); display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+        <!-- Header with Cross Button -->
+        <div style="padding: 12px 16px; background: #f0f2f5; border-bottom: 1px solid #d1d7db; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 700; font-size: 14px; color: #111b21; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-camera" style="color: #00a884;"></i> Send Photo Preview
+            </span>
+            <button type="button" onclick="cancelAdminAttachmentPreview()" class="wa-icon-btn" style="width: 30px; height: 30px;" title="Close / Cancel">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <!-- Image Preview Frame -->
+        <div style="padding: 16px; background: #efeae2; display: flex; align-items: center; justify-content: center; max-height: 320px; overflow: hidden;">
+            <img id="adminAttachmentPreviewImg" src="" alt="Preview" style="max-height: 280px; max-width: 100%; border-radius: 8px; object-fit: contain; box-shadow: 0 2px 8px rgba(11,20,26,0.15);">
+        </div>
+        <!-- Caption & Action Buttons -->
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #ffffff;">
+            <input type="text" id="adminAttachmentCaptionInput" placeholder="Add a caption to photo... (optional)" style="width: 100%; border: 1px solid #d1d7db; border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none;">
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="cancelAdminAttachmentPreview()" class="btn btn-default btn-sm" style="border-radius: 6px; font-weight: 600; padding: 6px 14px;">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmAdminSendAttachment()" class="btn btn-sm" style="background: #00a884; border-color: #00a884; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 6px 18px;">
+                    <i class="fa fa-paper-plane"></i> Send Photo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========================================================================
+// CLIENT STATE & INITIALIZATION
+// ==========================================================================
+let currentThreadId = null;
+let currentCustomerData = null;
+let pollTimer = null;
+let allThreads = [];
+let currentFilter = 'all';
+let lastMessageCount = 0;
+let ringtoneInterval = null;
+
+// Deterministic soft pastel avatars
+const avatarPalettes = [
+    { bg: '#e0f2fe', text: '#0369a1' },
+    { bg: '#fef3c7', text: '#b45309' },
+    { bg: '#dcfce7', text: '#15803d' },
+    { bg: '#ede9fe', text: '#6d28d9' },
+    { bg: '#ffe4e6', text: '#be123c' },
+    { bg: '#e2e8f0', text: '#334155' }
+];
+
+function getAvatarStyle(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % avatarPalettes.length;
+    const pal = avatarPalettes[idx];
+    return `background-color: ${pal.bg}; color: ${pal.text};`;
+}
+
+// Subtle browser audio chime for incoming messages (pure Web Audio API)
+function playMessageChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {}
+}
+
+function playRingtone() {
+    stopRingtone();
+    ringtoneInterval = setInterval(() => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o1 = ctx.createOscillator();
+            const o2 = ctx.createOscillator();
+            const g = ctx.createGain();
+            o1.frequency.setValueAtTime(440, ctx.currentTime);
+            o2.frequency.setValueAtTime(480, ctx.currentTime);
+            o1.connect(g);
+            o2.connect(g);
+            g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.04, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+            o1.start(ctx.currentTime);
+            o2.start(ctx.currentTime);
+            o1.stop(ctx.currentTime + 1.2);
+            o2.stop(ctx.currentTime + 1.2);
+        } catch(e) {}
+    }, 2800);
+}
+
+function stopRingtone() {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Check URL parameters for thread_id
+    const params = new URLSearchParams(window.location.search);
+    const initialThreadId = params.get('thread_id');
+
+    // Restore saved left sidebar collapsed preference
+    const savedLeftCollapsed = localStorage.getItem('wa_threads_collapsed');
+    if (savedLeftCollapsed === '1') {
+        const col = document.getElementById('threadsCol');
+        if (col) col.classList.add('collapsed');
+        updateToggleButtonsState(true);
+    }
+
+    loadThreads().then(() => {
+        if (initialThreadId) {
+            selectThread(parseInt(initialThreadId, 10));
+        } else if (allThreads.length > 0) {
+            // Auto select the first real live customer chat
+            selectThread(allThreads[0].id);
+        }
+    });
+
+    // Background polling every 4 seconds
+    pollTimer = setInterval(() => {
+        loadThreads(true);
+        if (currentThreadId) {
+            refreshActiveThread(true);
+        }
+        pollAdminWebRtcSignals();
+    }, 3000);
+});
+
+// Top bar triggers for Voice & Video Call
+function triggerTopVoiceCall() {
+    if (!currentThreadId) {
+        alert('Please select a customer chat from the list first.');
+        expandThreadsIfCollapsed();
+        return;
+    }
+    startAdminWebRtcCall('audio');
+}
+
+function triggerTopVideoCall() {
+    if (!currentThreadId) {
+        alert('Please select a customer chat from the list first.');
+        expandThreadsIfCollapsed();
+        return;
+    }
+    startAdminWebRtcCall('video');
+}
+
+// Toggle Left Sidebar (Conversations Inbox)
+function toggleThreadsCol() {
+    const col = document.getElementById('threadsCol');
+    col.classList.toggle('collapsed');
+    const isCollapsed = col.classList.contains('collapsed');
+    localStorage.setItem('wa_threads_collapsed', isCollapsed ? '1' : '0');
+    updateToggleButtonsState(isCollapsed);
+}
+
+function expandThreadsIfCollapsed() {
+    const col = document.getElementById('threadsCol');
+    if (col && col.classList.contains('collapsed')) {
+        col.classList.remove('collapsed');
+        localStorage.setItem('wa_threads_collapsed', '0');
+        updateToggleButtonsState(false);
+    }
+}
+
+function updateToggleButtonsState(isCollapsed) {
+    const topLbl = document.getElementById('lblTopCollapse');
+    if (topLbl) topLbl.textContent = isCollapsed ? 'Show Inbox' : 'Collapse Inbox';
+
+    const emptyBtn = document.getElementById('btnOpenInboxEmpty');
+    if (emptyBtn) {
+        emptyBtn.style.display = isCollapsed ? 'inline-block' : 'none';
+    }
+}
+
+// Toggle Context Column (details panel)
+function toggleContextCol() {
+    const col = document.getElementById('contextCol');
+    col.classList.toggle('collapsed');
+}
+
+// Toggle Main Admin Navigation Sidebar (Full Screen Focus)
+function toggleAdminNavSidebar() {
+    document.body.classList.toggle('sidebar-collapse');
+}
+
+// ==========================================================================
+// THREADS LIST LOGIC (LIVE CHATS ONLY)
+// ==========================================================================
+async function loadThreads(silent = false) {
+    const icon = document.getElementById('refreshThreadsIcon');
+    if (!silent && icon) icon.classList.add('fa-spin');
+
     try {
         const res = await fetch('../live_chat_api.php?action=admin_get_threads');
         const data = await res.json();
         if (data.status === 'success') {
-            renderThreadList(data.threads);
+            allThreads = data.threads || [];
+            updateCounts();
+            renderThreadList();
         }
     } catch (e) {
-        console.error('Failed to load threads:', e);
+        if (!silent) console.error('Failed to load threads:', e);
+    } finally {
+        if (!silent && icon) icon.classList.remove('fa-spin');
     }
 }
 
-function renderThreadList(threads) {
+function updateCounts() {
+    const cntAll = allThreads.length;
+    const cntUnread = allThreads.filter(t => t.unread_admin > 0).length;
+
+    document.getElementById('cntAll').textContent = cntAll;
+    const unreadBadge = document.getElementById('cntUnread');
+    if (cntUnread > 0) {
+        unreadBadge.textContent = cntUnread;
+        unreadBadge.style.display = 'inline-flex';
+    } else {
+        unreadBadge.style.display = 'none';
+    }
+}
+
+function setThreadFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.wa-filter-chip').forEach(el => el.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderThreadList();
+}
+
+function filterThreads() {
+    renderThreadList();
+}
+
+function renderThreadList() {
     const container = document.getElementById('threadListContainer');
-    if (!threads || threads.length === 0) {
-        container.innerHTML = '<div style="padding: 30px; text-align: center; color: #94a3b8; font-size: 13px;">No customer chats yet.</div>';
+    const query = (document.getElementById('threadSearchInput').value || '').toLowerCase().trim();
+
+    const filtered = allThreads.filter(t => {
+        // Status filter
+        if (currentFilter === 'unread' && !(t.unread_admin > 0)) return false;
+
+        // Search filter
+        if (query) {
+            const name = (t.customer_name || '').toLowerCase();
+            const phone = (t.customer_phone || '').toLowerCase();
+            const msg = (t.last_message || '').toLowerCase();
+            if (!name.includes(query) && !phone.includes(query) && !msg.includes(query)) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div style="padding: 30px 15px; text-align: center; color: #667781; font-size: 13px;">No live chats found.</div>';
         return;
     }
 
     let html = '';
-    threads.forEach(t => {
+    filtered.forEach(t => {
         const isSelected = (currentThreadId === t.id);
-        const unreadBadge = t.unread_admin > 0 ? `<span class="badge" style="background: #ef4444; font-size: 10px; margin-left: 6px;">${t.unread_admin}</span>` : '';
-        const modeBadge = t.mode === 'live' 
-            ? '<span class="label label-danger" style="font-size: 9px; border-radius: 8px;">LIVE</span>'
-            : '<span class="label label-default" style="font-size: 9px; border-radius: 8px;">AI</span>';
+        const name = t.customer_name || `Customer #${t.id}`;
+        const initial = name.charAt(0).toUpperCase();
+        const hasUnread = (t.unread_admin > 0);
+        const unreadBadge = hasUnread ? `<span class="wa-unread-count">${t.unread_admin}</span>` : '';
 
         html += `
-            <div onclick="selectThread(${t.id})" style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: ${isSelected ? '#e0f2fe' : '#ffffff'}; transition: all 0.15s ease;" class="thread-item">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <strong style="color: #1e293b; font-size: 14px;">${escapeHtml(t.customer_name || 'Guest')}</strong>
-                        ${unreadBadge}
-                    </div>
-                    <div>${modeBadge}</div>
+            <div onclick="selectThread(${t.id})" class="wa-chat-item ${isSelected ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}">
+                <div class="wa-avatar" style="${getAvatarStyle(name)}">
+                    ${initial}
+                    <div class="wa-online-dot"></div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">
-                        ${escapeHtml(t.last_message || 'Started conversation')}
-                    </span>
-                    <span style="font-size: 11px; color: #94a3b8;">${formatTime(t.updated_at)}</span>
+                <div class="wa-chat-content">
+                    <div class="wa-chat-header-row">
+                        <span class="wa-chat-title">${escapeHtml(name)}</span>
+                        <span class="wa-chat-time">${formatTime(t.last_message_at || t.updated_at)}</span>
+                    </div>
+                    <div class="wa-chat-msg-row">
+                        <span class="wa-chat-snippet">${escapeHtml(t.last_message || 'Customer requested live support')}</span>
+                        <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                            ${unreadBadge}
+                            <span class="wa-live-badge">LIVE</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -218,18 +1325,21 @@ function renderThreadList(threads) {
     container.innerHTML = html;
 }
 
-// Select a customer thread
+// ==========================================================================
+// ACTIVE CHAT & WORKSPACE
+// ==========================================================================
 async function selectThread(id) {
     currentThreadId = id;
+    lastMessageCount = 0;
     document.getElementById('emptyThreadState').style.display = 'none';
     const panel = document.getElementById('activeThreadPanel');
     panel.style.display = 'flex';
 
     await refreshActiveThread();
-    loadThreads(); // Refresh list selection state
+    renderThreadList();
 }
 
-async function refreshActiveThread() {
+async function refreshActiveThread(silent = false) {
     if (!currentThreadId) return;
 
     try {
@@ -237,47 +1347,72 @@ async function refreshActiveThread() {
         const data = await res.json();
         
         if (data.status === 'success') {
+            currentCustomerData = data.thread || {};
+
             // Update thread header
-            document.getElementById('activeCustomerName').textContent = `Customer #${currentThreadId}`;
-            const badge = document.getElementById('activeModeBadge');
-            const takeoverBtn = document.getElementById('btnAdminTakeover');
+            const name = currentCustomerData.customer_name || `Customer #${currentThreadId}`;
+            document.getElementById('activeCustomerName').textContent = name;
+            
+            const avatarEl = document.getElementById('activeAvatar');
+            avatarEl.textContent = name.charAt(0).toUpperCase();
+            avatarEl.setAttribute('style', getAvatarStyle(name));
 
-            if (data.mode === 'live') {
-                badge.className = 'label label-danger';
-                badge.textContent = 'Live Agent Active';
-                takeoverBtn.className = 'btn btn-default btn-sm';
-                takeoverBtn.innerHTML = '<i class="fa fa-robot"></i> Hand Back to AI';
-            } else {
-                badge.className = 'label label-primary';
-                badge.textContent = 'AI Pilot Active';
-                takeoverBtn.className = 'btn btn-warning btn-sm';
-                takeoverBtn.innerHTML = '<i class="fa fa-handshake-o"></i> Take Over Chat';
+            const details = [];
+            if (currentCustomerData.customer_phone) details.push(currentCustomerData.customer_phone);
+            if (currentCustomerData.customer_email) details.push(currentCustomerData.customer_email);
+            document.getElementById('activeCustomerDetails').textContent = details.length > 0 ? details.join(' • ') : 'online • storefront visitor';
+
+            // Detect new incoming messages for audio chime
+            const newCount = (data.messages || []).length;
+            if (lastMessageCount > 0 && newCount > lastMessageCount) {
+                const latestMsg = data.messages[newCount - 1];
+                if (latestMsg && latestMsg.sender_type !== 'admin') {
+                    playMessageChime();
+                }
             }
+            lastMessageCount = newCount;
 
-            renderMessages(data.messages);
-            lastMsgId = data.messages.length > 0 ? data.messages[data.messages.length - 1].id : 0;
+            // Render Messages (Live human chat only, AI messages suppressed)
+            renderMessages(data.messages || []);
+
+            // Render Context Sidebar (Customer Orders & Info)
+            renderContextPanel(currentCustomerData, data.orders || []);
         }
 
         // Check incoming WebRTC signals
         pollAdminWebRtcSignals();
     } catch (e) {
-        console.error('Error refreshing active thread:', e);
+        if (!silent) console.error('Error refreshing active thread:', e);
     }
 }
 
 function renderMessages(messages) {
     const container = document.getElementById('adminMessagesContainer');
+    
+    // Check if user was already at the bottom before re-rendering
+    const isAtBottom = (container.scrollHeight - container.scrollTop <= container.clientHeight + 80);
     container.innerHTML = '';
 
+    // Date header pill
+    container.innerHTML += `
+        <div class="wa-date-divider">
+            <span class="wa-date-pill">Today</span>
+        </div>
+    `;
+
     messages.forEach(m => {
-        const isMe = m.sender_type === 'admin';
-        const isSystem = m.sender_type === 'system';
-        const isAi = m.sender_type === 'ai';
+        const isMe = (m.sender_type === 'admin');
+        const isSystem = (m.sender_type === 'system');
+
+        // STRICTLY HIDE AI automated responses; only show Live customer & admin messages
+        if (m.sender_type === 'ai') {
+            return;
+        }
 
         if (isSystem) {
             container.innerHTML += `
-                <div style="text-align: center; margin: 8px 0;">
-                    <span style="display: inline-block; padding: 4px 12px; background: #e2e8f0; border-radius: 12px; font-size: 11px; color: #475569;">
+                <div style="text-align: center; margin: 6px 0;">
+                    <span style="display: inline-block; padding: 4px 12px; background: rgba(255,255,255,0.85); border-radius: 7.5px; font-size: 11px; color: #54656f; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13);">
                         ${escapeHtml(m.message)}
                     </span>
                 </div>
@@ -285,38 +1420,149 @@ function renderMessages(messages) {
             return;
         }
 
-        const align = isMe ? 'flex-end' : 'flex-start';
-        const bg = isMe ? '#2563eb' : (isAi ? '#fef3c7' : '#ffffff');
-        const color = isMe ? '#ffffff' : (isAi ? '#92400e' : '#1e293b');
-        const border = isMe ? 'none' : (isAi ? '1px solid #fde68a' : '1px solid #e2e8f0');
-        const senderLabel = isMe ? 'You' : (isAi ? 'AI Pilot' : 'Customer');
+        const alignClass = isMe ? 'outgoing' : 'incoming';
+        const bubbleClass = isMe ? 'outgoing' : 'incoming';
+        const ticksHtml = isMe ? '<span class="wa-ticks">✓✓</span>' : '';
 
+        // Product inquiry card attachment
+        let productCardHtml = '';
+        if (m.product_data) {
+            try {
+                const prod = (typeof m.product_data === 'string') ? JSON.parse(m.product_data) : m.product_data;
+                if (prod && prod.name) {
+                    let photoUrl = prod.photo || '';
+                    if (photoUrl && !photoUrl.startsWith('http') && !photoUrl.startsWith('/') && !photoUrl.startsWith('../')) {
+                        photoUrl = '../' + photoUrl;
+                    }
+                    productCardHtml = `
+                        <a href="${prod.url || '#'}" target="_blank" class="wa-product-card" title="Open product in store">
+                            <img src="${photoUrl || '../assets/uploads/no-photo.jpg'}" class="wa-product-img" alt="Product">
+                            <div style="min-width: 0;">
+                                <div class="wa-product-title">${escapeHtml(prod.name)}</div>
+                                <div class="wa-product-price">৳${parseFloat(prod.price || 0).toLocaleString()}</div>
+                            </div>
+                        </a>
+                    `;
+                }
+            } catch (err) {}
+        }
+
+        // Attachment link/image
         let attach = '';
         if (m.attachment_url) {
+            let attUrl = m.attachment_url;
+            if (attUrl && !attUrl.startsWith('http') && !attUrl.startsWith('/') && !attUrl.startsWith('../')) {
+                attUrl = '../' + attUrl;
+            }
+
             if (m.attachment_type === 'image') {
-                attach = `<div style="margin-top: 6px;"><img src="../${m.attachment_url}" style="max-width: 240px; border-radius: 8px; cursor: pointer;" onclick="window.open('../${m.attachment_url}')"></div>`;
+                attach = `<div style="margin-top: 6px;"><img src="${attUrl}" style="max-width: 240px; max-height: 200px; border-radius: 6px; cursor: pointer; border: 1px solid rgba(0,0,0,0.08);" onclick="openAdminImageLightbox('${attUrl}')" title="Click to view full photo"></div>`;
             } else {
-                attach = `<div style="margin-top: 6px;"><a href="../${m.attachment_url}" target="_blank" style="color: inherit; text-decoration: underline;">Attachment File</a></div>`;
+                attach = `<div style="margin-top: 6px;"><a href="${attUrl}" target="_blank" style="color: inherit; text-decoration: underline; font-size: 12px;"><i class="fa fa-paperclip"></i> Attached Document</a></div>`;
             }
         }
 
         container.innerHTML += `
-            <div style="display: flex; flex-direction: column; align-items: ${align};">
-                <span style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">${senderLabel}</span>
-                <div style="background: ${bg}; color: ${color}; border: ${border}; padding: 10px 14px; border-radius: 14px; max-width: 75%; font-size: 13px; line-height: 1.4; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    ${escapeHtml(m.message)}
+            <div class="wa-bubble-wrap ${alignClass}">
+                <div class="wa-bubble ${bubbleClass}">
+                    <div style="white-space: pre-wrap;">${escapeHtml(m.message)}</div>
+                    ${productCardHtml}
                     ${attach}
+                    <div class="wa-meta-row">
+                        <span class="wa-bubble-time">${formatTime(m.created_at)}</span>
+                        ${ticksHtml}
+                    </div>
                 </div>
             </div>
         `;
     });
 
-    container.scrollTop = container.scrollHeight;
+    if (isAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
-// Send Admin Reply
-async function handleAdminSendReply(e) {
-    if (e && e.preventDefault) e.preventDefault();
+// ==========================================================================
+// CONTEXT SIDEBAR & ORDERS (from tbl_payment)
+// ==========================================================================
+function renderContextPanel(customer, orders) {
+    document.getElementById('ctxName').textContent = customer.customer_name || `Customer #${customer.id}`;
+    document.getElementById('ctxEmail').textContent = customer.customer_email || 'No email registered';
+    document.getElementById('ctxPhone').textContent = customer.customer_phone || 'No phone registered';
+
+    const avatar = document.getElementById('ctxAvatar');
+    if (avatar) {
+        avatar.textContent = (customer.customer_name || 'C').charAt(0).toUpperCase();
+        avatar.setAttribute('style', getAvatarStyle(customer.customer_name || 'C'));
+    }
+
+    // WhatsApp Direct button
+    const waWrap = document.getElementById('ctxWhatsAppBtnWrap');
+    if (customer.customer_phone) {
+        waWrap.style.display = 'block';
+    } else {
+        waWrap.style.display = 'none';
+    }
+
+    // Orders List
+    document.getElementById('ctxOrdersCount').textContent = orders.length;
+    const ordersList = document.getElementById('ctxOrdersList');
+
+    if (!orders || orders.length === 0) {
+        ordersList.innerHTML = '<div style="color: #667781; font-size: 13px; text-align: center; padding: 15px 0;">No store orders recorded for this customer.</div>';
+    } else {
+        let html = '';
+        orders.forEach(o => {
+            const isPaid = (o.payment_status === 'Completed');
+            const paidPill = isPaid 
+                ? '<span style="color: #008069; font-weight: 600;"><i class="fa fa-check-circle"></i> Paid</span>' 
+                : '<span style="color: #b45309; font-weight: 600;"><i class="fa fa-clock-o"></i> Pending</span>';
+
+            html += `
+                <div class="wa-order-item">
+                    <div style="display: flex; justify-content: space-between; font-weight: 600; color: #111b21;">
+                        <a href="order.php?search=${encodeURIComponent(o.payment_id)}" target="_blank" style="color: #111b21; text-decoration: underline;" title="View in Order Manager">#${escapeHtml(o.payment_id)}</a>
+                        <span>৳${parseFloat(o.paid_amount || 0).toLocaleString()}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #667781; font-size: 11px; margin-top: 4px;">
+                        <span>${paidPill}</span>
+                        <span>${escapeHtml(o.shipping_status || 'Processing')}</span>
+                    </div>
+                    <button onclick="sendOrderUpdateToChat('${escapeHtml(o.payment_id)}', '${escapeHtml(o.shipping_status || 'Processing')}', '${parseFloat(o.paid_amount || 0).toLocaleString()}')" class="btn btn-default btn-xs btn-block" style="margin-top: 6px; border-radius: 4px; font-size: 11px; border: 1px solid #d1d7db; background: #ffffff;">
+                        <i class="fa fa-share" style="color: #008069;"></i> Share in Chat
+                    </button>
+                </div>
+            `;
+        });
+        ordersList.innerHTML = html;
+    }
+
+    // Load staff note
+    const savedNote = localStorage.getItem('chat_note_' + customer.id) || '';
+    document.getElementById('staffNoteInput').value = savedNote;
+}
+
+function saveStaffNote() {
+    if (!currentThreadId) return;
+    const val = document.getElementById('staffNoteInput').value;
+    localStorage.setItem('chat_note_' + currentThreadId, val);
+}
+
+function sendOrderUpdateToChat(orderId, status, amount) {
+    const text = `Order Update: Your order #${orderId} (৳${amount}) status is currently "${status}". Please let us know if you need any adjustments.`;
+    insertQuickReply(text);
+}
+
+function openCustomerWhatsApp() {
+    if (!currentCustomerData || !currentCustomerData.customer_phone) return;
+    const clean = currentCustomerData.customer_phone.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${clean}`, '_blank');
+}
+
+// ==========================================================================
+// SENDING MESSAGES & ATTACHMENTS
+// ==========================================================================
+async function handleAdminSendReply() {
     if (!currentThreadId) return;
 
     const input = document.getElementById('adminReplyInput');
@@ -334,25 +1580,29 @@ async function handleAdminSendReply(e) {
         const data = await res.json();
         if (data.status === 'success') {
             await refreshActiveThread();
-            loadThreads();
+            loadThreads(true);
         }
     } catch (e) {
         alert('Could not send reply.');
     }
 }
 
-// Insert Quick Reply
+function handleKeyPress(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleAdminSendReply();
+    }
+}
+
 function insertQuickReply(text) {
     const input = document.getElementById('adminReplyInput');
     input.value = text;
     input.focus();
 }
 
-// Toggle Takeover between Admin and AI
 async function toggleAdminTakeover() {
     if (!currentThreadId) return;
-    const badge = document.getElementById('activeModeBadge');
-    const targetMode = badge.textContent.includes('Live') ? 'ai' : 'live';
+    const targetMode = 'live';
 
     try {
         const fd = new FormData();
@@ -363,19 +1613,84 @@ async function toggleAdminTakeover() {
         const data = await res.json();
         if (data.status === 'success') {
             await refreshActiveThread();
-            loadThreads();
+            loadThreads(true);
         }
     } catch (e) {
         console.error('Failed to change mode:', e);
     }
 }
 
-// Handle Admin File Attachment
-async function handleAdminFileUpload(input) {
-    if (!input.files || !input.files[0] || !currentThreadId) return;
+// ==========================================================================
+// IMAGE LIGHTBOX & PREVIEW WITH CROSS / CANCEL BUTTON
+// ==========================================================================
+let pendingAdminAttachmentFile = null;
 
+function openAdminImageLightbox(url) {
+    if (!url) return;
+    const lightbox = document.getElementById('adminImageLightbox');
+    const img = document.getElementById('adminLightboxImg');
+    const dl = document.getElementById('adminLightboxDownload');
+    if (img) img.src = url;
+    if (dl) dl.href = url;
+    if (lightbox) {
+        lightbox.style.display = 'flex';
+    }
+}
+
+function closeAdminImageLightbox() {
+    const lightbox = document.getElementById('adminImageLightbox');
+    if (lightbox) {
+        lightbox.style.display = 'none';
+        const img = document.getElementById('adminLightboxImg');
+        if (img) img.src = '';
+    }
+}
+
+function handleAdminFileUpload(input) {
+    if (!input.files || !input.files[0] || !currentThreadId) return;
+    const file = input.files[0];
+    pendingAdminAttachmentFile = file;
+
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const previewImg = document.getElementById('adminAttachmentPreviewImg');
+            const captionInput = document.getElementById('adminAttachmentCaptionInput');
+            const modal = document.getElementById('adminAttachmentPreviewModal');
+            if (previewImg) previewImg.src = e.target.result;
+            if (captionInput) captionInput.value = '';
+            if (modal) modal.style.display = 'flex';
+            if (captionInput) setTimeout(() => captionInput.focus(), 150);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        executeAdminAttachmentSend(file, '');
+        input.value = '';
+    }
+}
+
+function cancelAdminAttachmentPreview() {
+    pendingAdminAttachmentFile = null;
+    const input = document.getElementById('adminFileInput');
+    if (input) input.value = '';
+    const modal = document.getElementById('adminAttachmentPreviewModal');
+    if (modal) modal.style.display = 'none';
+    const previewImg = document.getElementById('adminAttachmentPreviewImg');
+    if (previewImg) previewImg.src = '';
+}
+
+async function confirmAdminSendAttachment() {
+    if (!pendingAdminAttachmentFile) return;
+    const file = pendingAdminAttachmentFile;
+    const caption = document.getElementById('adminAttachmentCaptionInput')?.value?.trim() || '';
+    cancelAdminAttachmentPreview();
+    await executeAdminAttachmentSend(file, caption);
+}
+
+async function executeAdminAttachmentSend(file, caption) {
+    if (!currentThreadId) return;
     const fd = new FormData();
-    fd.append('attachment', input.files[0]);
+    fd.append('attachment', file);
 
     try {
         const res = await fetch('../live_chat_api.php?action=upload_attachment', { method: 'POST', body: fd });
@@ -385,16 +1700,24 @@ async function handleAdminFileUpload(input) {
             sendFd.append('thread_id', currentThreadId);
             sendFd.append('attachment_url', d.url);
             sendFd.append('attachment_type', d.type);
-            sendFd.append('message', '');
+            sendFd.append('message', caption);
 
             await fetch('../live_chat_api.php?action=admin_send_reply', { method: 'POST', body: sendFd });
             await refreshActiveThread();
+        } else {
+            alert(d.message || 'File upload failed.');
         }
     } catch (e) {
         alert('File upload failed.');
     }
-    input.value = '';
 }
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeAdminImageLightbox();
+        cancelAdminAttachmentPreview();
+    }
+});
 
 // Helpers
 function escapeHtml(text) {
@@ -407,24 +1730,90 @@ function escapeHtml(text) {
 function formatTime(timestamp) {
     if (!timestamp) return '';
     const d = new Date(timestamp);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// ==========================================
-// ADMIN WEBRTC AUDIO & VIDEO CALL ENGINE
-// ==========================================
+// ==========================================================================
+// ROBUST WEBRTC CALLING ENGINE (Voice & Video - Production Ready)
+// ==========================================================================
 let adminPeer = null;
 let adminLocalStream = null;
 let adminCallType = 'audio';
 let adminCallTimerInterval = null;
 let adminCallStartTime = null;
+let pendingAdminOfferSignal = null;
+let queuedAdminCandidates = [];
+let fastAdminSignalTimer = null;
+let adminCallRingtoneInterval = null;
 
 const adminRtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' }
+    ],
+    iceCandidatePoolSize: 10
 };
+
+// Web Audio API Ringtone for Admin (Reliable double-chime)
+function playAdminRingtone() {
+    stopAdminRingtone();
+    adminCallRingtoneInterval = setInterval(() => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const now = ctx.currentTime;
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+            osc1.frequency.setValueAtTime(440, now);
+            osc2.frequency.setValueAtTime(480, now);
+
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(ctx.destination);
+
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.setValueAtTime(0.12, now + 0.4);
+            gain.gain.setValueAtTime(0, now + 0.45);
+            gain.gain.setValueAtTime(0.12, now + 0.65);
+            gain.gain.setValueAtTime(0.12, now + 1.05);
+            gain.gain.setValueAtTime(0, now + 1.1);
+
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + 1.15);
+            osc2.stop(now + 1.15);
+        } catch (e) {}
+    }, 2200);
+}
+
+function stopAdminRingtone() {
+    if (adminCallRingtoneInterval) {
+        clearInterval(adminCallRingtoneInterval);
+        adminCallRingtoneInterval = null;
+    }
+}
+
+// Fast 600ms signal polling during active / incoming calls
+function startFastAdminSignalPolling() {
+    if (fastAdminSignalTimer) clearInterval(fastAdminSignalTimer);
+    fastAdminSignalTimer = setInterval(pollAdminWebRtcSignals, 600);
+}
+
+function stopFastAdminSignalPolling() {
+    if (fastAdminSignalTimer) {
+        clearInterval(fastAdminSignalTimer);
+        fastAdminSignalTimer = null;
+    }
+}
 
 async function startAdminWebRtcCall(type) {
     if (!currentThreadId) {
@@ -433,10 +1822,16 @@ async function startAdminWebRtcCall(type) {
     }
 
     adminCallType = type;
+    pendingAdminOfferSignal = null;
+    queuedAdminCandidates = [];
+
     const modal = document.getElementById('adminCallModal');
     modal.style.display = 'flex';
-    document.getElementById('adminCallTimer').textContent = 'Connecting...';
+    document.getElementById('adminCallTimer').textContent = 'Calling customer...';
     document.getElementById('adminCallTypeIcon').className = type === 'video' ? 'fa fa-video-camera' : 'fa fa-phone';
+
+    const custName = (currentCustomerData && currentCustomerData.customer_name) ? currentCustomerData.customer_name : 'Customer';
+    document.getElementById('adminCallPeerTitle').textContent = (type === 'video' ? 'Video Calling ' : 'Voice Calling ') + custName + '...';
 
     if (type === 'video') {
         document.getElementById('adminVideoWrap').style.display = 'flex';
@@ -444,9 +1839,16 @@ async function startAdminWebRtcCall(type) {
         document.getElementById('adminVideoWrap').style.display = 'none';
     }
 
+    playAdminRingtone();
+    startFastAdminSignalPolling();
+
     try {
         const constraints = {
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
             video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
         };
 
@@ -456,75 +1858,222 @@ async function startAdminWebRtcCall(type) {
         }
 
         adminPeer = new RTCPeerConnection(adminRtcConfig);
-        adminLocalStream.getTracks().forEach(t => adminPeer.addTrack(t, adminLocalStream));
+        adminLocalStream.getTracks().forEach(track => adminPeer.addTrack(track, adminLocalStream));
 
-        adminPeer.ontrack = (e) => {
-            if (type === 'video') {
-                document.getElementById('adminRemoteVideo').srcObject = e.streams[0];
-            } else {
-                document.getElementById('adminRemoteAudio').srcObject = e.streams[0];
+        adminPeer.ontrack = (event) => {
+            stopAdminRingtone();
+            const remoteAudio = document.getElementById('adminRemoteAudio');
+            if (remoteAudio) {
+                remoteAudio.srcObject = event.streams[0];
+                remoteAudio.muted = false;
+                remoteAudio.volume = 1.0;
+                remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
             }
-            startAdminCallTimer();
+
+            if (type === 'video') {
+                const remoteVid = document.getElementById('adminRemoteVideo');
+                if (remoteVid) {
+                    remoteVid.srcObject = event.streams[0];
+                    remoteVid.play().catch(e => console.warn('Admin video play error:', e));
+                }
+            }
+            startCallTimer();
         };
 
-        adminPeer.onicecandidate = (e) => {
-            if (e.candidate) {
-                sendAdminSignal('candidate', JSON.stringify(e.candidate), type);
+        adminPeer.onicecandidate = (event) => {
+            if (event.candidate) {
+                sendWebRtcSignal('candidate', JSON.stringify(event.candidate));
             }
         };
 
         const offer = await adminPeer.createOffer();
         await adminPeer.setLocalDescription(offer);
 
-        sendAdminSignal('call_start', '', type);
-        sendAdminSignal('offer', JSON.stringify(offer), type);
+        await sendWebRtcSignal('call_start', type);
+        await sendWebRtcSignal('offer', JSON.stringify(offer));
 
     } catch (e) {
-        alert('Could not access microphone/camera. Please grant permissions.');
+        stopAdminRingtone();
+        stopFastAdminSignalPolling();
+        alert('Microphone/Camera permission required for calls.');
         hangupAdminCall();
     }
 }
 
-async function pollAdminWebRtcSignals() {
+async function sendWebRtcSignal(type, payload) {
     if (!currentThreadId) return;
-
     try {
-        const res = await fetch(`../live_chat_api.php?action=fetch_signals&receiver=admin&thread_id=${currentThreadId}`);
+        const fd = new FormData();
+        fd.append('thread_id', currentThreadId);
+        fd.append('sender', 'admin');
+        fd.append('signal_type', type);
+        fd.append('call_type', adminCallType);
+        fd.append('payload', payload || '');
+        await fetch('../live_chat_api.php?action=call_signal', { method: 'POST', body: fd });
+    } catch (e) {}
+}
+
+async function pollAdminWebRtcSignals() {
+    try {
+        const targetThreadId = currentThreadId || 0;
+        const res = await fetch(`../live_chat_api.php?action=fetch_signals&receiver=admin&thread_id=${targetThreadId}`);
         const data = await res.json();
         if (data.status === 'success' && data.signals && data.signals.length > 0) {
             for (const sig of data.signals) {
-                handleIncomingAdminSignal(sig);
+                await handleAdminIncomingSignal(sig);
             }
         }
     } catch (e) {}
 }
 
-async function handleIncomingAdminSignal(sig) {
-    if (sig.signal_type === 'answer' && adminPeer) {
-        const ans = JSON.parse(sig.payload);
-        await adminPeer.setRemoteDescription(new RTCSessionDescription(ans));
-    } else if (sig.signal_type === 'candidate' && adminPeer) {
-        const cand = JSON.parse(sig.payload);
-        await adminPeer.addIceCandidate(new RTCIceCandidate(cand));
+async function handleAdminIncomingSignal(sig) {
+    if (sig.signal_type === 'call_start') {
+        // Customer is calling Admin
+        if (sig.thread_id && (!currentThreadId || currentThreadId !== sig.thread_id)) {
+            await selectThread(sig.thread_id);
+        }
+        adminCallType = sig.call_type || 'audio';
+        startFastAdminSignalPolling();
+        playAdminRingtone();
+
+        const custName = sig.customer_name || (currentCustomerData && currentCustomerData.customer_name) || `Customer #${sig.thread_id}`;
+        document.getElementById('adminIncomingCallerTitle').textContent = `Call from ${custName}`;
+        document.getElementById('adminIncomingCallSubtitle').textContent = `Customer requested live ${adminCallType} support...`;
+        document.getElementById('adminIncomingCallIcon').className = adminCallType === 'video' ? 'fa fa-video-camera' : 'fa fa-phone';
+        document.getElementById('adminIncomingCallModal').style.display = 'flex';
+
+    } else if (sig.signal_type === 'offer') {
+        pendingAdminOfferSignal = sig.payload;
+        if (adminPeer && adminPeer.signalingState !== 'closed') {
+            try {
+                await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+                await drainQueuedAdminCandidates(adminPeer);
+                const answer = await adminPeer.createAnswer();
+                await adminPeer.setLocalDescription(answer);
+                sendWebRtcSignal('answer', JSON.stringify(answer));
+            } catch (e) {
+                console.error('Admin offer handling error:', e);
+            }
+        }
+    } else if (sig.signal_type === 'answer') {
+        stopAdminRingtone();
+        if (adminPeer && adminPeer.signalingState === 'have-local-offer') {
+            try {
+                await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+                await drainQueuedAdminCandidates(adminPeer);
+            } catch (e) {
+                console.error('Admin answer handling error:', e);
+            }
+        }
+    } else if (sig.signal_type === 'candidate') {
+        try {
+            const cand = JSON.parse(sig.payload);
+            if (adminPeer && adminPeer.remoteDescription && adminPeer.remoteDescription.type) {
+                await adminPeer.addIceCandidate(new RTCIceCandidate(cand));
+            } else {
+                queuedAdminCandidates.push(cand);
+            }
+        } catch (e) {}
     } else if (sig.signal_type === 'call_end') {
         hangupAdminCall(false);
     }
 }
 
-async function sendAdminSignal(type, payload, callType) {
-    if (!currentThreadId) return;
-    try {
-        const fd = new FormData();
-        fd.append('sender', 'admin');
-        fd.append('thread_id', currentThreadId);
-        fd.append('signal_type', type);
-        fd.append('call_type', callType);
-        fd.append('payload', payload);
-        await fetch('../live_chat_api.php?action=call_signal', { method: 'POST', body: fd });
-    } catch (e) {}
+async function drainQueuedAdminCandidates(pc) {
+    while (queuedAdminCandidates.length > 0) {
+        const cand = queuedAdminCandidates.shift();
+        try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {}
+    }
 }
 
-function startAdminCallTimer() {
+async function acceptAdminIncomingCall() {
+    stopAdminRingtone();
+    document.getElementById('adminIncomingCallModal').style.display = 'none';
+
+    const modal = document.getElementById('adminCallModal');
+    modal.style.display = 'flex';
+    document.getElementById('adminCallTimer').textContent = 'Connecting...';
+    document.getElementById('adminCallTypeIcon').className = adminCallType === 'video' ? 'fa fa-video-camera' : 'fa fa-phone';
+
+    const custName = (currentCustomerData && currentCustomerData.customer_name) ? currentCustomerData.customer_name : 'Customer';
+    document.getElementById('adminCallPeerTitle').textContent = (adminCallType === 'video' ? 'Video Call with ' : 'Voice Call with ') + custName;
+
+    if (adminCallType === 'video') {
+        document.getElementById('adminVideoWrap').style.display = 'flex';
+    } else {
+        document.getElementById('adminVideoWrap').style.display = 'none';
+    }
+
+    try {
+        const constraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: adminCallType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
+        };
+
+        adminLocalStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (adminCallType === 'video') {
+            document.getElementById('adminLocalVideo').srcObject = adminLocalStream;
+        }
+
+        adminPeer = new RTCPeerConnection(adminRtcConfig);
+        adminLocalStream.getTracks().forEach(track => adminPeer.addTrack(track, adminLocalStream));
+
+        adminPeer.ontrack = (event) => {
+            const remoteAudio = document.getElementById('adminRemoteAudio');
+            if (remoteAudio) {
+                remoteAudio.srcObject = event.streams[0];
+                remoteAudio.muted = false;
+                remoteAudio.volume = 1.0;
+                remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
+            }
+
+            if (adminCallType === 'video') {
+                const remoteVid = document.getElementById('adminRemoteVideo');
+                if (remoteVid) {
+                    remoteVid.srcObject = event.streams[0];
+                    remoteVid.play().catch(e => console.warn('Admin video play error:', e));
+                }
+            }
+            startCallTimer();
+        };
+
+        adminPeer.onicecandidate = (event) => {
+            if (event.candidate) {
+                sendWebRtcSignal('candidate', JSON.stringify(event.candidate));
+            }
+        };
+
+        if (pendingAdminOfferSignal) {
+            await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingAdminOfferSignal)));
+            await drainQueuedAdminCandidates(adminPeer);
+            const answer = await adminPeer.createAnswer();
+            await adminPeer.setLocalDescription(answer);
+            sendWebRtcSignal('answer', JSON.stringify(answer));
+        }
+
+    } catch (e) {
+        console.error('Accept call media error:', e);
+        alert('Could not access microphone/camera. Call disconnected.');
+        hangupAdminCall();
+    }
+}
+
+function declineAdminIncomingCall() {
+    stopAdminRingtone();
+    stopFastAdminSignalPolling();
+    document.getElementById('adminIncomingCallModal').style.display = 'none';
+    sendWebRtcSignal('call_end', 'declined');
+    pendingAdminOfferSignal = null;
+    queuedAdminCandidates = [];
+}
+
+function startCallTimer() {
     adminCallStartTime = Date.now();
     if (adminCallTimerInterval) clearInterval(adminCallTimerInterval);
     adminCallTimerInterval = setInterval(() => {
@@ -536,25 +2085,28 @@ function startAdminCallTimer() {
 }
 
 function hangupAdminCall(notify = true) {
-    if (notify) sendAdminSignal('call_end', '', adminCallType);
+    stopAdminRingtone();
+    stopFastAdminSignalPolling();
 
+    if (notify) sendWebRtcSignal('call_end', 'ended');
     if (adminCallTimerInterval) {
         clearInterval(adminCallTimerInterval);
         adminCallTimerInterval = null;
     }
-
     if (adminLocalStream) {
         adminLocalStream.getTracks().forEach(t => t.stop());
         adminLocalStream = null;
     }
-
     if (adminPeer) {
         adminPeer.close();
         adminPeer = null;
     }
 
+    pendingAdminOfferSignal = null;
+    queuedAdminCandidates = [];
+
+    document.getElementById('adminIncomingCallModal').style.display = 'none';
     document.getElementById('adminCallModal').style.display = 'none';
-    document.getElementById('adminCallTimer').textContent = 'Connecting...';
 }
 
 function toggleAdminMic() {
@@ -567,24 +2119,13 @@ function toggleAdminMic() {
 }
 
 function toggleAdminCam() {
-    if (!adminLocalStream) return;
+    if (!adminLocalStream || adminCallType !== 'video') return;
     const track = adminLocalStream.getVideoTracks()[0];
     if (track) {
         track.enabled = !track.enabled;
         document.getElementById('adminCamIcon').className = track.enabled ? 'fa fa-video-camera' : 'fa fa-video-camera text-danger';
     }
 }
-
-// Background poller
-document.addEventListener('DOMContentLoaded', () => {
-    loadThreads();
-    pollTimer = setInterval(() => {
-        loadThreads();
-        if (currentThreadId) {
-            refreshActiveThread();
-        }
-    }, 3500);
-});
 </script>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

@@ -530,6 +530,87 @@ if (!empty($_SESSION['cart_p_qty'])) {
         </div>
     </div>
 
+    <!-- INCOMING CALL MODAL FOR CUSTOMER -->
+    <div id="incomingCallModal" class="hidden fixed inset-0 z-[150] bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center">
+        <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-4xl shadow-2xl shadow-amber-500/40 mb-5 animate-pulse">
+            <i id="incomingCallIcon" class="fa-solid fa-phone"></i>
+        </div>
+        <h3 class="font-bold text-xl text-white mb-1" id="incomingCallerTitle">Store Support Specialist</h3>
+        <p class="text-sm text-slate-300 mb-8" id="incomingCallSubtitle">Incoming audio call...</p>
+        <div class="flex items-center justify-center gap-10">
+            <!-- Decline Button -->
+            <button type="button" onclick="declineIncomingCall()" class="flex flex-col items-center gap-2 text-xs font-semibold text-rose-300 active:scale-95 transition">
+                <div class="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-2xl shadow-lg shadow-rose-600/40">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </div>
+                <span>Decline</span>
+            </button>
+            <!-- Accept Button -->
+            <button type="button" onclick="acceptIncomingCall()" class="flex flex-col items-center gap-2 text-xs font-semibold text-emerald-300 active:scale-95 transition">
+                <div class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/40 animate-bounce">
+                    <i class="fa-solid fa-phone"></i>
+                </div>
+                <span>Accept</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 1. FULLSCREEN CHAT IMAGE LIGHTBOX WITH CROSS BUTTON -->
+    <div id="chatImageLightbox" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md hidden flex-col justify-between p-4" onclick="closeChatImageLightbox()">
+        <!-- Top bar with close cross button -->
+        <div class="flex items-center justify-between text-white w-full px-2 py-2" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                <i class="fa-solid fa-image text-amber-400"></i> Image Preview
+            </div>
+            <div class="flex items-center gap-3">
+                <a id="chatLightboxDownload" href="#" download="chat-photo.jpg" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-95" title="Download Image">
+                    <i class="fa-solid fa-download text-sm"></i>
+                </a>
+                <button type="button" onclick="closeChatImageLightbox()" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition active:scale-95" title="Close (Esc)">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Center image container -->
+        <div class="flex-1 flex items-center justify-center min-h-0 p-2" onclick="event.stopPropagation()">
+            <img id="chatLightboxImg" src="" alt="Photo Preview" class="max-w-[95vw] max-h-[80vh] object-contain rounded-xl shadow-2xl transition duration-200">
+        </div>
+        <div class="text-center text-xs text-slate-400 py-1" onclick="event.stopPropagation()">
+            Click outside or press Escape to close
+        </div>
+    </div>
+
+    <!-- 2. PRE-SEND IMAGE ATTACHMENT PREVIEW MODAL WITH CROSS BUTTON -->
+    <div id="attachmentPreviewModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl flex flex-col border border-slate-100" onclick="event.stopPropagation()">
+            <!-- Header with cross button -->
+            <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-amber-500"></i> Send Photo Preview
+                </span>
+                <button type="button" onclick="cancelAttachmentPreview()" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition active:scale-95" title="Close / Cancel">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <!-- Image preview -->
+            <div class="p-3 bg-slate-900/5 flex items-center justify-center max-h-72 overflow-hidden">
+                <img id="attachmentPreviewImg" src="" alt="Preview" class="max-h-64 max-w-full rounded-xl object-contain shadow-sm">
+            </div>
+            <!-- Caption & Action Buttons -->
+            <div class="p-4 flex flex-col gap-3 bg-white">
+                <input type="text" id="attachmentCaptionInput" placeholder="Add a caption... (optional)" class="w-full text-xs bg-slate-100 px-3.5 py-2.5 rounded-xl border border-transparent focus:border-amber-400 focus:bg-white focus:outline-none">
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" onclick="cancelAttachmentPreview()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Cancel
+                    </button>
+                    <button type="button" id="btnConfirmSendAttachment" onclick="confirmSendAttachment()" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-900 shadow-md transition flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-paper-plane text-xs"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- JAVASCRIPT LOGIC & WEBRTC ENGINE -->
@@ -887,7 +968,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         let attachmentHtml = '';
         if (msg.attachment_url) {
             if (msg.attachment_type === 'image') {
-                attachmentHtml = `<div class="mt-2 rounded-xl overflow-hidden border border-slate-200/50"><img src="${msg.attachment_url}" class="w-full max-h-56 object-cover" alt="Attachment" onclick="window.open('${msg.attachment_url}')"></div>`;
+                attachmentHtml = `<div class="mt-2 rounded-xl overflow-hidden border border-slate-200/50 cursor-pointer group" onclick="openChatImageLightbox('${encodeURI(msg.attachment_url)}')" title="Click to view full photo"><img src="${msg.attachment_url}" class="w-full max-h-56 object-cover group-hover:opacity-95 transition" alt="Attachment"></div>`;
             } else {
                 attachmentHtml = `<div class="mt-2"><a href="${msg.attachment_url}" target="_blank" class="text-xs text-blue-500 underline flex items-center gap-1"><i class="fa-solid fa-file"></i> View Attachment</a></div>`;
             }
@@ -1011,12 +1092,85 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
     }
 
-    // Image & File Upload
-    async function handleAttachmentUpload(input) {
+    // ==========================================================================
+    // IMAGE PREVIEW & ATTACHMENT UPLOAD (With Cross / Cancel Button)
+    // ==========================================================================
+    let pendingAttachmentFile = null;
+
+    function openChatImageLightbox(url) {
+        if (!url) return;
+        const lightbox = document.getElementById('chatImageLightbox');
+        const img = document.getElementById('chatLightboxImg');
+        const dl = document.getElementById('chatLightboxDownload');
+        if (img) img.src = url;
+        if (dl) dl.href = url;
+        if (lightbox) {
+            lightbox.classList.remove('hidden');
+            lightbox.classList.add('flex');
+        }
+    }
+
+    function closeChatImageLightbox() {
+        const lightbox = document.getElementById('chatImageLightbox');
+        if (lightbox) {
+            lightbox.classList.add('hidden');
+            lightbox.classList.remove('flex');
+            const img = document.getElementById('chatLightboxImg');
+            if (img) img.src = '';
+        }
+    }
+
+    function handleAttachmentUpload(input) {
         if (!input.files || !input.files[0]) return;
         const file = input.files[0];
-        vanishSocialChannels();
+        pendingAttachmentFile = file;
 
+        // If file is an image, show preview modal with cross button
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewImg = document.getElementById('attachmentPreviewImg');
+                const captionInput = document.getElementById('attachmentCaptionInput');
+                const modal = document.getElementById('attachmentPreviewModal');
+                if (previewImg) previewImg.src = e.target.result;
+                if (captionInput) captionInput.value = '';
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+                if (captionInput) setTimeout(() => captionInput.focus(), 150);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Non-image files: send directly
+            executeAttachmentSend(file, '');
+            input.value = '';
+        }
+    }
+
+    function cancelAttachmentPreview() {
+        pendingAttachmentFile = null;
+        const input = document.getElementById('attachmentInput');
+        if (input) input.value = '';
+        const modal = document.getElementById('attachmentPreviewModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        const previewImg = document.getElementById('attachmentPreviewImg');
+        if (previewImg) previewImg.src = '';
+    }
+
+    async function confirmSendAttachment() {
+        if (!pendingAttachmentFile) return;
+        const file = pendingAttachmentFile;
+        const caption = document.getElementById('attachmentCaptionInput')?.value?.trim() || '';
+        cancelAttachmentPreview();
+        await executeAttachmentSend(file, caption);
+    }
+
+    async function executeAttachmentSend(file, caption) {
+        vanishSocialChannels();
         const fd = new FormData();
         fd.append('attachment', file);
 
@@ -1027,11 +1181,10 @@ if (!empty($_SESSION['cart_p_qty'])) {
             showTyping(false);
 
             if (data.status === 'success') {
-                // Post as message
                 const msgFd = new FormData();
                 msgFd.append('attachment_url', data.url);
                 msgFd.append('attachment_type', data.type);
-                msgFd.append('message', '');
+                msgFd.append('message', caption);
 
                 const sendRes = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: msgFd });
                 const sendData = await sendRes.json();
@@ -1049,8 +1202,15 @@ if (!empty($_SESSION['cart_p_qty'])) {
             showTyping(false);
             alert('Upload error');
         }
-        input.value = '';
     }
+
+    // Keyboard support: Escape closes image lightbox and preview modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeChatImageLightbox();
+            cancelAttachmentPreview();
+        }
+    });
 
     // Background message & signal poller
     function startPolling() {
@@ -1077,8 +1237,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
     }
 
     // ==========================================
-    // BUFFERLESS WEBRTC AUDIO & VIDEO CALL ENGINE
-    // ==========================================
+    // ==========================================================================
+    // ROBUST WEBRTC AUDIO & VIDEO CALL ENGINE (Production Ready)
+    // ==========================================================================
     let peerConnection = null;
     let localStream = null;
     let isMutedAudio = false;
@@ -1086,18 +1247,87 @@ if (!empty($_SESSION['cart_p_qty'])) {
     let callTimerInterval = null;
     let callStartTime = null;
     let currentCallType = 'audio';
+    let pendingOfferSignal = null;
+    let queuedCandidates = [];
+    let fastSignalTimer = null;
+    let ringtoneInterval = null;
 
     const rtcConfig = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-        ]
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' }
+        ],
+        iceCandidatePoolSize: 10
     };
+
+    // Web Audio Ringtone Generator (100% reliable, zero asset dependencies)
+    function playCallRingtone() {
+        stopCallRingtone();
+        ringtoneInterval = setInterval(() => {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const now = ctx.currentTime;
+                const osc1 = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                osc1.frequency.setValueAtTime(440, now);
+                osc2.frequency.setValueAtTime(480, now);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ctx.destination);
+
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.setValueAtTime(0.12, now + 0.4);
+                gain.gain.setValueAtTime(0, now + 0.45);
+                gain.gain.setValueAtTime(0.12, now + 0.65);
+                gain.gain.setValueAtTime(0.12, now + 1.05);
+                gain.gain.setValueAtTime(0, now + 1.1);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 1.15);
+                osc2.stop(now + 1.15);
+            } catch (e) {}
+        }, 2200);
+    }
+
+    function stopCallRingtone() {
+        if (ringtoneInterval) {
+            clearInterval(ringtoneInterval);
+            ringtoneInterval = null;
+        }
+    }
+
+    // High frequency signal poller during active calls (600ms)
+    function startFastSignalPolling() {
+        if (fastSignalTimer) clearInterval(fastSignalTimer);
+        fastSignalTimer = setInterval(pollWebRtcSignals, 600);
+    }
+
+    function stopFastSignalPolling() {
+        if (fastSignalTimer) {
+            clearInterval(fastSignalTimer);
+            fastSignalTimer = null;
+        }
+    }
 
     async function startWebRtcCall(type) {
         currentCallType = type;
+        pendingOfferSignal = null;
+        queuedCandidates = [];
+
         document.getElementById('callOverlay').classList.remove('hidden');
-        document.getElementById('callDuration').textContent = 'Connecting...';
+        document.getElementById('callDuration').textContent = 'Calling specialist...';
         document.getElementById('callTypeIcon').className = type === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
 
         if (type === 'video') {
@@ -1106,56 +1336,67 @@ if (!empty($_SESSION['cart_p_qty'])) {
             document.getElementById('videoContainer').classList.add('hidden');
         }
 
+        playCallRingtone();
+        startFastSignalPolling();
+
         try {
-            // Bufferless audio constraints (zero-lag echo cancellation & noise suppression)
             const mediaConstraints = {
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true,
-                    latency: 0
+                    autoGainControl: true
                 },
-                video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } } : false
+                video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
             };
 
             localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
 
             if (type === 'video') {
-                document.getElementById('localVideo').srcObject = localStream;
+                const localVid = document.getElementById('localVideo');
+                if (localVid) localVid.srcObject = localStream;
             }
 
             peerConnection = new RTCPeerConnection(rtcConfig);
-
-            // Add local tracks
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-            // Remote track handler
             peerConnection.ontrack = (event) => {
+                stopCallRingtone();
+                const remoteAudio = document.getElementById('remoteAudio');
+                if (remoteAudio) {
+                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.muted = false;
+                    remoteAudio.volume = 1.0;
+                    remoteAudio.play().catch(e => console.warn('Audio play request:', e));
+                }
+
                 if (type === 'video') {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                } else {
-                    document.getElementById('remoteAudio').srcObject = event.streams[0];
+                    const remoteVid = document.getElementById('remoteVideo');
+                    if (remoteVid) {
+                        remoteVid.srcObject = event.streams[0];
+                        remoteVid.play().catch(e => console.warn('Video play request:', e));
+                    }
                 }
                 startCallTimer();
             };
 
-            // ICE Candidate trickling
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
                     sendSignal('candidate', JSON.stringify(event.candidate), type);
                 }
             };
 
-            // Create Offer
+            // Create and send offer
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
 
-            sendSignal('call_start', '', type);
-            sendSignal('offer', JSON.stringify(offer), type);
+            await sendSignal('call_start', '', type);
+            await sendSignal('offer', JSON.stringify(offer), type);
 
         } catch (err) {
-            console.error('Media error:', err);
-            alert('Could not access microphone/camera. Please grant permissions.');
+            console.error('Call media error:', err);
+            stopCallRingtone();
+            stopFastSignalPolling();
+            alert('Could not access microphone/camera. Please grant permission.');
             hangupCall();
         }
     }
@@ -1166,7 +1407,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
             const data = await res.json();
             if (data.status === 'success' && data.signals && data.signals.length > 0) {
                 for (const sig of data.signals) {
-                    handleIncomingSignal(sig);
+                    await handleIncomingSignal(sig);
                 }
             }
         } catch (e) {}
@@ -1174,35 +1415,76 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
     async function handleIncomingSignal(sig) {
         if (sig.signal_type === 'call_start') {
-            // Incoming call from Admin
-            if (confirm(`Incoming ${sig.call_type} call from Store Specialist. Accept?`)) {
-                answerCall(sig.call_type);
-            } else {
-                sendSignal('call_end', '', sig.call_type);
+            currentCallType = sig.call_type || 'audio';
+            startFastSignalPolling();
+            playCallRingtone();
+
+            const modal = document.getElementById('incomingCallModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                document.getElementById('incomingCallIcon').className = currentCallType === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
+                document.getElementById('incomingCallSubtitle').textContent = `Incoming ${currentCallType} call from Store Support...`;
             }
-        } else if (sig.signal_type === 'offer' && peerConnection) {
-            const offerDesc = JSON.parse(sig.payload);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offerDesc));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            sendSignal('answer', JSON.stringify(answer), sig.call_type);
-        } else if (sig.signal_type === 'answer' && peerConnection) {
-            const ansDesc = JSON.parse(sig.payload);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(ansDesc));
-        } else if (sig.signal_type === 'candidate' && peerConnection) {
-            const cand = JSON.parse(sig.payload);
-            await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+        } else if (sig.signal_type === 'offer') {
+            pendingOfferSignal = sig.payload;
+            if (peerConnection && peerConnection.signalingState !== 'closed') {
+                try {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+                    await drainQueuedCandidates(peerConnection);
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    sendSignal('answer', JSON.stringify(answer), sig.call_type || currentCallType);
+                } catch (e) {
+                    console.error('Error handling offer:', e);
+                }
+            }
+        } else if (sig.signal_type === 'answer') {
+            stopCallRingtone();
+            if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
+                try {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+                    await drainQueuedCandidates(peerConnection);
+                } catch (e) {
+                    console.error('Error handling answer:', e);
+                }
+            }
+        } else if (sig.signal_type === 'candidate') {
+            try {
+                const cand = JSON.parse(sig.payload);
+                if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+                } else {
+                    queuedCandidates.push(cand);
+                }
+            } catch (e) {}
         } else if (sig.signal_type === 'call_end') {
             hangupCall(false);
         }
     }
 
-    async function answerCall(type) {
-        currentCallType = type;
-        document.getElementById('callOverlay').classList.remove('hidden');
-        document.getElementById('callTypeIcon').className = type === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
+    async function drainQueuedCandidates(pc) {
+        while (queuedCandidates.length > 0) {
+            const cand = queuedCandidates.shift();
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (e) {}
+        }
+    }
 
-        if (type === 'video') {
+    async function acceptIncomingCall() {
+        stopCallRingtone();
+        const incomingModal = document.getElementById('incomingCallModal');
+        if (incomingModal) {
+            incomingModal.classList.add('hidden');
+            incomingModal.classList.remove('flex');
+        }
+
+        document.getElementById('callOverlay').classList.remove('hidden');
+        document.getElementById('callTypeIcon').className = currentCallType === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
+        document.getElementById('callDuration').textContent = 'Connecting...';
+
+        if (currentCallType === 'video') {
             document.getElementById('videoContainer').classList.remove('hidden');
         } else {
             document.getElementById('videoContainer').classList.add('hidden');
@@ -1210,36 +1492,76 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
         try {
             const mediaConstraints = {
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+                video: currentCallType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
             };
 
             localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-            if (type === 'video') {
-                document.getElementById('localVideo').srcObject = localStream;
+
+            if (currentCallType === 'video') {
+                const localVid = document.getElementById('localVideo');
+                if (localVid) localVid.srcObject = localStream;
             }
 
             peerConnection = new RTCPeerConnection(rtcConfig);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.ontrack = (event) => {
-                if (type === 'video') {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                } else {
-                    document.getElementById('remoteAudio').srcObject = event.streams[0];
+                const remoteAudio = document.getElementById('remoteAudio');
+                if (remoteAudio) {
+                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.muted = false;
+                    remoteAudio.volume = 1.0;
+                    remoteAudio.play().catch(e => console.warn('Audio play request:', e));
+                }
+
+                if (currentCallType === 'video') {
+                    const remoteVid = document.getElementById('remoteVideo');
+                    if (remoteVid) {
+                        remoteVid.srcObject = event.streams[0];
+                        remoteVid.play().catch(e => console.warn('Video play request:', e));
+                    }
                 }
                 startCallTimer();
             };
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    sendSignal('candidate', JSON.stringify(event.candidate), type);
+                    sendSignal('candidate', JSON.stringify(event.candidate), currentCallType);
                 }
             };
+
+            // If offer was already received, set remote description and answer right away
+            if (pendingOfferSignal) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingOfferSignal)));
+                await drainQueuedCandidates(peerConnection);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                sendSignal('answer', JSON.stringify(answer), currentCallType);
+            }
+
         } catch (e) {
             console.error('Answer call error:', e);
+            alert('Could not access microphone/camera. Call disconnected.');
             hangupCall();
         }
+    }
+
+    function declineIncomingCall() {
+        stopCallRingtone();
+        stopFastSignalPolling();
+        const incomingModal = document.getElementById('incomingCallModal');
+        if (incomingModal) {
+            incomingModal.classList.add('hidden');
+            incomingModal.classList.remove('flex');
+        }
+        sendSignal('call_end', '', currentCallType);
+        pendingOfferSignal = null;
+        queuedCandidates = [];
     }
 
     async function sendSignal(type, payload, callType) {
@@ -1247,8 +1569,8 @@ if (!empty($_SESSION['cart_p_qty'])) {
             const fd = new FormData();
             fd.append('sender', 'customer');
             fd.append('signal_type', type);
-            fd.append('call_type', callType);
-            fd.append('payload', payload);
+            fd.append('call_type', callType || currentCallType);
+            fd.append('payload', payload || '');
             await fetch('live_chat_api.php?action=call_signal', { method: 'POST', body: fd });
         } catch (e) {}
     }
@@ -1279,6 +1601,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
     }
 
     function hangupCall(notifyPeer = true) {
+        stopCallRingtone();
+        stopFastSignalPolling();
+
         if (notifyPeer) {
             sendSignal('call_end', '', currentCallType);
         }
@@ -1296,6 +1621,15 @@ if (!empty($_SESSION['cart_p_qty'])) {
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
+        }
+
+        pendingOfferSignal = null;
+        queuedCandidates = [];
+
+        const incomingModal = document.getElementById('incomingCallModal');
+        if (incomingModal) {
+            incomingModal.classList.add('hidden');
+            incomingModal.classList.remove('flex');
         }
 
         document.getElementById('callOverlay').classList.add('hidden');

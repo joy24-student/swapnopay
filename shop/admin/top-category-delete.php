@@ -2,7 +2,16 @@
 require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/inc/catalog-delete.php';
 try {
-    deleteStoreCatalogEntry($pdo, 'top-category', (int)($_GET['id'] ?? 0));
+    $catId = (int)($_GET['id'] ?? 0);
+    $photoStmt = $pdo->prepare("SELECT photo FROM tbl_top_category WHERE tcat_id=?");
+    $photoStmt->execute([$catId]);
+    $catPhoto = $photoStmt->fetchColumn();
+
+    deleteStoreCatalogEntry($pdo, 'top-category', $catId);
+
+    if(!empty($catPhoto) && file_exists('../assets/uploads/'.$catPhoto)) {
+        @unlink('../assets/uploads/'.$catPhoto);
+    }
     header('Location: top-category.php');exit;
 } catch (Throwable $error) {
     http_response_code(409);

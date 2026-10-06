@@ -52,6 +52,7 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
 </style>
 <?php endif; ?>
 
+</div><!-- /#sn-page-container -->
 </div><!-- /.content-wrapper-main -->
 
 <footer class="sn-footer-wrap <?php echo ($mobile_footer_on_off == 0 ? 'sn-mobile-footer-hidden' : ''); ?>">
@@ -87,9 +88,9 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
                 <h5>Quick Links</h5>
                 <ul class="sn-footer-links">
                     <li><a href="<?php echo BASE_URL; ?>">Home</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category">All Categories</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category">Deals</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>product-category.php?id=2&type=top-category">New Arrivals</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>categories.php">All Categories</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>deals.php">Deals</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category">New Arrivals</a></li>
                     <li><a href="<?php echo BASE_URL; ?>about.php">About Us</a></li>
                     <li><a href="<?php echo BASE_URL; ?>contact.php">Contact</a></li>
                 </ul>
@@ -101,7 +102,7 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
                 <ul class="sn-footer-links">
                     <li><a href="<?php echo BASE_URL; ?>faq.php">Help Center</a></li>
                     <li><a href="<?php echo BASE_URL; ?>contact.php">Shipping Information</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>contact.php">Return & Refund</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>customer-returns.php">Return & Refund</a></li>
                     <li><a href="<?php echo BASE_URL; ?>contact.php">Terms & Conditions</a></li>
                     <li><a href="<?php echo BASE_URL; ?>contact.php">Privacy Policy</a></li>
                 </ul>
@@ -262,7 +263,14 @@ function toggleSnDesktopChat() {
 
 <script src="assets/js/jquery-2.2.4.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>
+<script src="assets/js/jquery.magnific-popup.min.js"></script>
+<script src="assets/js/owl.carousel.min.js"></script>
+<script src="assets/js/jquery.bxslider.min.js"></script>
+<script src="assets/js/bootstrap-touch-slider.js"></script>
+<script src="assets/js/rating.js"></script>
+<script src="assets/js/select2.full.min.js"></script>
 <script src="assets/js/custom.js"></script>
+<script src="assets/js/spa-navigation.js?v=<?php echo time(); ?>"></script>
 
 <?php echo $before_body; ?>
 </body>

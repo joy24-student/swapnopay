@@ -121,30 +121,20 @@ foreach ($result as $row) {
 
 			        <li class="treeview <?php if( ($cur_page == 'marketing.php') ) {echo 'active';} ?>">
 			          <a href="#">
-			            <i class="fa fa-facebook-square text-primary"></i> <span>Facebook & Meta Ads</span>
+			            <i class="fa fa-comments"></i> <span>Messenger & WhatsApp</span>
 			            <span class="pull-right-container">
-			              <small class="label pull-right bg-blue" style="border-radius:8px;">Autopilot</small>
-			              <i class="fa fa-angle-left pull-right" style="margin-right: 5px;"></i>
+			              <i class="fa fa-angle-left pull-right"></i>
 			            </span>
 			          </a>
 			          <ul class="treeview-menu">
-			            <li><a href="marketing.php?tab=facebook_ads"><i class="fa fa-circle-o text-primary"></i> Meta Ads Manager</a></li>
-			            <li><a href="marketing.php?tab=campaigns"><i class="fa fa-circle-o"></i> All Campaigns</a></li>
-			            <li><a href="marketing.php?tab=social"><i class="fa fa-circle-o"></i> Social & Calendar</a></li>
-			            <li><a href="marketing.php?tab=whatsapp"><i class="fa fa-circle-o text-green"></i> WhatsApp Automation</a></li>
-			            <li><a href="marketing.php?tab=youtube"><i class="fa fa-circle-o text-red"></i> YouTube Studio</a></li>
-			            <li><a href="marketing.php?tab=audiences"><i class="fa fa-circle-o"></i> Audiences</a></li>
-			            <li><a href="marketing.php?tab=analytics"><i class="fa fa-circle-o"></i> ROAS Attribution</a></li>
-			            <li><a href="marketing.php?tab=settings"><i class="fa fa-circle-o"></i> Meta Settings & Pixel</a></li>
+			            <li><a href="marketing.php?tab=messenger"><i class="fa fa-circle-o"></i> Messenger Bot</a></li>
+			            <li><a href="marketing.php?tab=whatsapp"><i class="fa fa-circle-o"></i> WhatsApp Automation</a></li>
 			          </ul>
 			        </li>
 
 			        <li class="treeview <?php if( ($cur_page == 'live-chat.php') ) {echo 'active';} ?>">
 			          <a href="live-chat.php">
-			            <i class="fa fa-comments text-green"></i> <span>Live Support Chat</span>
-			            <span class="pull-right-container">
-			              <small class="label pull-right bg-green" style="border-radius:8px;">Live</small>
-			            </span>
+			            <i class="fa fa-comments-o"></i> <span>Live Support Chat</span>
 			          </a>
 			        </li>
 

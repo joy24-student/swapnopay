@@ -1,5 +1,5 @@
 <?php 
-require_once('header.php'); 
+require_once(__DIR__ . '/header.php'); 
 
 // -------------------------------------------------------------------------
 // 1. ENSURE CART ARRAYS ARE PROPERLY INITIALIZED
@@ -171,15 +171,15 @@ try {
 ?>
 
 <div class="sn-cart-page-wrapper">
-    <div class="sn-container">
+    <div class="sn-cart-single-container">
         
-        <!-- Breadcrumbs (Home > Cart) -->
+        <!-- Breadcrumbs (Home > Shopping Cart) -->
         <nav class="sn-breadcrumbs" aria-label="breadcrumb">
             <a href="index.php">Home</a>
             <span class="sn-bc-sep">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </span>
-            <span class="sn-bc-current">Cart</span>
+            <span class="sn-bc-current">Shopping Cart</span>
         </nav>
 
         <?php if ($total_cart_items === 0): ?>
@@ -203,333 +203,252 @@ try {
         <?php else: ?>
 
             <!-- ========================================================
-                 PAGE TITLE BAR (Desktop Header Area)
+                 PAGE TITLE BAR (Formal Header)
                  ======================================================== -->
             <div class="sn-cart-page-header">
                 <div class="sn-cart-heading-wrap">
-                    <div class="sn-cart-title-icon">
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="9" cy="21" r="1"></circle>
-                            <circle cx="20" cy="21" r="1"></circle>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="sn-page-title">Your Cart</h1>
-                        <p class="sn-page-subtitle">
-                            <span id="pageItemCount"><?php echo $total_cart_items; ?></span> items • Save for later • Easy checkout
-                        </p>
-                    </div>
+                    <h1 class="sn-page-title">Shopping Cart</h1>
+                    <p class="sn-page-subtitle">
+                        <span id="pageItemCount"><?php echo $total_cart_items; ?></span> item(s) in your cart
+                    </p>
                 </div>
 
-                <!-- Auto-Saved Cart Pill -->
                 <div class="sn-auto-saved-badge">
-                    <div class="sn-saved-icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="sn-saved-title">Your cart is saved automatically</div>
-                        <div class="sn-saved-desc">Items will be here even if you close the page.</div>
-                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Items saved automatically</span>
                 </div>
             </div>
 
             <!-- ========================================================
-                 MAIN TWO-COLUMN GRID (Desktop & Tablet)
+                 SINGLE COLUMN FORMAL TABLE LAYOUT
                  ======================================================== -->
-            <div class="sn-cart-layout-grid">
+            <div class="sn-cart-single-col">
                 
-                <!-- LEFT COLUMN: CART ITEMS LIST -->
-                <div class="sn-cart-left-col">
+                <!-- CART ITEMS FORMAL TABLE CARD -->
+                <div class="sn-cart-card">
                     
-                    <!-- Main Items Container Card -->
-                    <div class="sn-cart-card">
-                        
-                        <!-- Toolbar Row: Select All + Bulk Actions -->
-                        <div class="sn-cart-toolbar">
-                            <label class="sn-checkbox-label">
-                                <input type="checkbox" id="selectAllCheckbox" checked>
-                                <span class="sn-custom-check"></span>
-                                <span class="sn-toolbar-text">Select All (<span id="selectedCountToolbar"><?php echo $total_cart_items; ?></span>)</span>
-                            </label>
+                    <!-- Table Toolbar -->
+                    <div class="sn-cart-toolbar">
+                        <label class="sn-checkbox-label">
+                            <input type="checkbox" id="selectAllCheckbox" checked>
+                            <span class="sn-custom-check"></span>
+                            <span class="sn-toolbar-text">Select All (<span id="selectedCountToolbar"><?php echo $total_cart_items; ?></span>)</span>
+                        </label>
 
-                            <div class="sn-toolbar-actions">
-                                <button type="button" class="sn-tool-btn" onclick="batchMoveToWishlist()">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                                    <span>Move to Wishlist</span>
-                                </button>
-                                <button type="button" class="sn-tool-btn" onclick="batchRemoveSelected()">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                    <span>Remove</span>
-                                </button>
-                            </div>
+                        <div class="sn-toolbar-actions">
+                            <button type="button" class="sn-tool-btn" onclick="batchMoveToWishlist()">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                <span>Move to Wishlist</span>
+                            </button>
+                            <button type="button" class="sn-tool-btn" onclick="batchRemoveSelected()">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                <span>Remove Selected</span>
+                            </button>
                         </div>
+                    </div>
 
-                        <!-- Product Rows List -->
-                        <div class="sn-cart-items-list" id="cartItemsList">
-                            <?php 
-                            for ($i = 0; $i < $total_cart_items; $i++): 
-                                $p_id = $cart_p_ids[$i];
-                                $p_name = $cart_p_names[$i];
-                                $p_qty = (int)($cart_p_qtys[$i] ?? 1);
-                                $p_price = (float)($cart_p_current_prices[$i] ?? 0);
-                                $p_old_price = (float)($cart_p_old_prices[$i] ?? ($p_price * 1.18));
-                                $p_photo = $cart_p_featured_photos[$i];
-                                if (!str_starts_with($p_photo, 'http') && !empty($p_photo)) {
-                                    $p_photo = 'assets/uploads/' . $p_photo;
-                                }
-                                $p_subtitle = $cart_p_subtitles[$i] ?? 'Standard Edition';
-                                $p_badge = $cart_p_badges[$i] ?? '';
-                                $p_color = $cart_color_names[$i] ?? 'Default';
-                                $discount_pct = round((($p_old_price - $p_price) / max(1, $p_old_price)) * 100);
-                                $row_total = $p_price * $p_qty;
-                            ?>
-                            <div class="sn-cart-item-row" data-index="<?php echo $i; ?>" data-id="<?php echo $p_id; ?>" data-price="<?php echo $p_price; ?>" data-old-price="<?php echo $p_old_price; ?>">
-                                
-                                <!-- Selection Checkbox -->
-                                <div class="sn-item-checkbox-cell">
-                                    <label class="sn-checkbox-label">
-                                        <input type="checkbox" class="sn-item-checkbox" value="<?php echo $i; ?>" checked onchange="handleItemCheckboxChange()">
-                                        <span class="sn-custom-check"></span>
-                                    </label>
-                                </div>
-
-                                <!-- Thumbnail with optional badge -->
-                                <div class="sn-item-image-cell">
-                                    <div class="sn-img-container">
-                                        <?php if (!empty($p_badge)): ?>
-                                            <span class="sn-top-rated-tag">
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                                                <?php echo htmlspecialchars($p_badge); ?>
-                                            </span>
-                                        <?php endif; ?>
-                                        <img src="<?php echo htmlspecialchars($p_photo); ?>" alt="<?php echo htmlspecialchars($p_name); ?>" loading="lazy" onerror="this.src='assets/uploads/default_product.jpg'">
-                                    </div>
-                                </div>
-
-                                <!-- Product Details -->
-                                <div class="sn-item-details-cell">
-                                    <h2 class="sn-item-name">
-                                        <a href="product.php?id=<?php echo $p_id; ?>"><?php echo htmlspecialchars($p_name); ?></a>
-                                    </h2>
+                    <!-- Formal Table Container -->
+                    <div class="sn-table-responsive">
+                        <table class="sn-formal-cart-table">
+                            <thead>
+                                <tr>
+                                    <th class="th-check" style="width: 44px; text-align: center;">#</th>
+                                    <th class="th-img" style="width: 80px;">Item</th>
+                                    <th class="th-desc">Product Details</th>
+                                    <th class="th-price" style="width: 120px; text-align: right;">Unit Price</th>
+                                    <th class="th-qty" style="width: 130px; text-align: center;">Quantity</th>
+                                    <th class="th-total" style="width: 130px; text-align: right;">Total</th>
+                                    <th class="th-action" style="width: 80px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItemsList">
+                                <?php 
+                                for ($i = 0; $i < $total_cart_items; $i++): 
+                                    $p_id = $cart_p_ids[$i];
+                                    $p_name = $cart_p_names[$i];
+                                    $p_qty = (int)($cart_p_qtys[$i] ?? 1);
+                                    $p_price = (float)($cart_p_current_prices[$i] ?? 0);
+                                    $p_old_price = (float)($cart_p_old_prices[$i] ?? ($p_price * 1.18));
+                                    $p_photo = $cart_p_featured_photos[$i];
+                                    if (!str_starts_with($p_photo, 'http') && !empty($p_photo)) {
+                                        $p_photo = 'assets/uploads/' . $p_photo;
+                                    }
+                                    $p_subtitle = $cart_p_subtitles[$i] ?? '';
+                                    $p_badge = $cart_p_badges[$i] ?? '';
+                                    $p_color = $cart_color_names[$i] ?? 'Default';
+                                    $discount_pct = round((($p_old_price - $p_price) / max(1, $p_old_price)) * 100);
+                                    $row_total = $p_price * $p_qty;
+                                ?>
+                                <tr class="sn-cart-item-row" data-index="<?php echo $i; ?>" data-id="<?php echo $p_id; ?>" data-price="<?php echo $p_price; ?>" data-old-price="<?php echo $p_old_price; ?>">
                                     
-                                    <?php if (!empty($p_subtitle)): ?>
-                                        <div class="sn-item-specs"><?php echo htmlspecialchars($p_subtitle); ?></div>
-                                    <?php endif; ?>
+                                    <!-- Selection Checkbox -->
+                                    <td class="sn-item-checkbox-cell" style="text-align: center;">
+                                        <label class="sn-checkbox-label">
+                                            <input type="checkbox" class="sn-item-checkbox" value="<?php echo $i; ?>" checked onchange="handleItemCheckboxChange()">
+                                            <span class="sn-custom-check"></span>
+                                        </label>
+                                    </td>
 
-                                    <!-- Color Swatch Row -->
-                                    <?php if (!empty($p_color) && $p_color !== 'Default'): ?>
-                                    <div class="sn-item-variant-swatches">
-                                        <span class="sn-swatch-label">Color: <strong class="sn-active-color-name"><?php echo htmlspecialchars($p_color); ?></strong></span>
-                                    </div>
-                                    <?php endif; ?>
+                                    <!-- Thumbnail -->
+                                    <td class="sn-item-image-cell">
+                                        <div class="sn-img-container">
+                                            <img src="<?php echo htmlspecialchars($p_photo); ?>" alt="<?php echo htmlspecialchars($p_name); ?>" loading="lazy" onerror="this.src='assets/uploads/default_product.jpg'">
+                                        </div>
+                                    </td>
 
-                                    <!-- Stock Status Badge -->
-                                    <div class="sn-stock-status">
-                                        <span class="sn-stock-pill in-stock">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                            In Stock
-                                        </span>
-                                    </div>
+                                    <!-- Product Details -->
+                                    <td class="sn-item-details-cell">
+                                        <h2 class="sn-item-name">
+                                            <a href="product.php?id=<?php echo $p_id; ?>"><?php echo htmlspecialchars($p_name); ?></a>
+                                        </h2>
+                                        
+                                        <?php if (!empty($p_subtitle)): ?>
+                                            <div class="sn-item-specs"><?php echo htmlspecialchars($p_subtitle); ?></div>
+                                        <?php endif; ?>
 
-                                    <!-- Bottom Action Links (Move to Wishlist | Remove) -->
-                                    <div class="sn-item-action-links">
-                                        <button type="button" class="sn-item-link-btn" onclick="moveToWishlist(<?php echo $i; ?>, <?php echo $p_id; ?>, '<?php echo addslashes($p_name); ?>')">
-                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                                            <span>Move to Wishlist</span>
-                                        </button>
-                                        <button type="button" class="sn-item-link-btn" onclick="removeSingleItem(<?php echo $i; ?>, <?php echo $p_id; ?>)">
-                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                            <span>Remove</span>
-                                        </button>
-                                    </div>
-                                </div>
+                                        <?php if (!empty($p_color) && $p_color !== 'Default'): ?>
+                                        <div class="sn-item-variant-swatches">
+                                            <span class="sn-swatch-label">Color: <strong class="sn-active-color-name"><?php echo htmlspecialchars($p_color); ?></strong></span>
+                                        </div>
+                                        <?php endif; ?>
 
-                                <!-- Unit Price & Stepper Control -->
-                                <div class="sn-item-pricing-cell">
-                                    <div class="sn-price-stack">
+                                        <div class="sn-stock-status">
+                                            <span class="sn-stock-pill in-stock">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                In Stock
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Unit Price -->
+                                    <td class="sn-item-pricing-cell" style="text-align: right;">
                                         <div class="sn-curr-price">৳ <?php echo number_format($p_price); ?></div>
                                         <?php if ($p_old_price > $p_price): ?>
                                             <div class="sn-old-price">৳ <?php echo number_format($p_old_price); ?></div>
-                                            <div class="sn-discount-badge"><?php echo $discount_pct; ?>% OFF</div>
                                         <?php endif; ?>
-                                    </div>
+                                    </td>
 
                                     <!-- Quantity Stepper -->
-                                    <div class="sn-stepper-control">
-                                        <button type="button" class="sn-step-btn minus" onclick="updateItemQuantity(<?php echo $i; ?>, -1)" aria-label="Decrease quantity">−</button>
-                                        <input type="text" readonly class="sn-qty-input" value="<?php echo $p_qty; ?>" data-index="<?php echo $i; ?>" aria-label="Quantity">
-                                        <button type="button" class="sn-step-btn plus" onclick="updateItemQuantity(<?php echo $i; ?>, 1)" aria-label="Increase quantity">+</button>
-                                    </div>
-                                </div>
+                                    <td style="text-align: center;">
+                                        <div class="sn-stepper-control">
+                                            <button type="button" class="sn-step-btn minus" onclick="updateItemQuantity(<?php echo $i; ?>, -1)" aria-label="Decrease quantity">−</button>
+                                            <input type="text" readonly class="sn-qty-input" value="<?php echo $p_qty; ?>" data-index="<?php echo $i; ?>" aria-label="Quantity">
+                                            <button type="button" class="sn-step-btn plus" onclick="updateItemQuantity(<?php echo $i; ?>, 1)" aria-label="Increase quantity">+</button>
+                                        </div>
+                                    </td>
 
-                                <!-- Row Item Total -->
-                                <div class="sn-item-total-cell">
-                                    <div class="sn-item-total-price" id="lineTotal-<?php echo $i; ?>">
-                                        ৳ <?php echo number_format($row_total); ?>
-                                    </div>
-                                </div>
+                                    <!-- Line Total -->
+                                    <td class="sn-item-total-cell" style="text-align: right;">
+                                        <div class="sn-item-total-price" id="lineTotal-<?php echo $i; ?>">
+                                            ৳ <?php echo number_format($row_total); ?>
+                                        </div>
+                                    </td>
 
-                            </div>
-                            <?php endfor; ?>
-                        </div>
+                                    <!-- Action Buttons -->
+                                    <td style="text-align: center;">
+                                        <div class="sn-row-actions">
+                                            <button type="button" class="sn-action-btn-icon" onclick="moveToWishlist(<?php echo $i; ?>, <?php echo $p_id; ?>, '<?php echo addslashes($p_name); ?>')" title="Move to Wishlist">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                            </button>
+                                            <button type="button" class="sn-action-btn-icon remove" onclick="removeSingleItem(<?php echo $i; ?>, <?php echo $p_id; ?>)" title="Remove Item">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
 
-                    </div>
-
-                    <!-- Shop with Confidence Banner -->
-                    <div class="sn-confidence-banner">
-                        <div class="sn-conf-left">
-                            <div class="sn-conf-shield">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                                    <path d="m9 12 2 2 4-4"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="sn-conf-title">Shop with Confidence</h3>
-                                <p class="sn-conf-desc">Secure checkout • 7-day return • 100% genuine products</p>
-                            </div>
-                        </div>
-                        <a href="about.php" class="sn-conf-learn-more">
-                            <span>Learn More</span>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                        </a>
+                                </tr>
+                                <?php endfor; ?>
+                            </tbody>
+                        </table>
                     </div>
 
                 </div>
 
-                <!-- RIGHT COLUMN: ORDER SUMMARY CARD -->
-                <div class="sn-cart-right-col">
-                    <div class="sn-order-summary-card">
-                        <h2 class="sn-summary-heading">Order Summary</h2>
-
-                        <!-- Breakdown lines -->
-                        <div class="sn-summary-rows">
-                            <div class="sn-summary-row">
-                                <span class="label">Subtotal (<span id="summarySelectedCount"><?php echo $total_cart_items; ?></span> items)</span>
-                                <span class="val" id="summarySubtotalVal">৳ <?php echo number_format($initial_subtotal); ?></span>
-                            </div>
-                            <div class="sn-summary-row">
-                                <span class="label">Shipping</span>
-                                <span class="val sn-shipping-free">FREE</span>
-                            </div>
-                            <div class="sn-summary-row">
-                                <span class="label">Tax (estimated)</span>
-                                <span class="val" id="summaryTaxVal">৳ 0</span>
-                            </div>
-
-                            <div class="sn-summary-row sn-coupon-row <?php echo !empty($applied_coupon) ? 'active' : ''; ?>" id="summaryCouponRow">
-                                <span class="label">Coupon Discount (<span id="couponCodeLabel"><?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?></span>)</span>
-                                <span class="val text-green" id="couponDiscountVal">-৳ <?php echo number_format($coupon_discount); ?></span>
-                            </div>
-                        </div>
-
-                        <hr class="sn-summary-divider">
-
-                        <!-- Total Line -->
-                        <div class="sn-total-line">
-                            <span class="sn-total-label">Total</span>
-                            <span class="sn-total-amount" id="summaryTotalVal">৳ <?php echo number_format($initial_total); ?></span>
-                        </div>
-
-                        <!-- Savings Badge Tag -->
-                        <div class="sn-savings-pill" id="savingsPillWrap">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2">
-                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                            </svg>
-                            <span>You save <strong id="savingsTotalAmount">৳ <?php echo number_format($initial_savings + $coupon_discount); ?></strong></span>
-                        </div>
-
-                        <!-- Have a Promo Code? Box -->
-                        <div class="sn-promo-card">
-                            <div class="sn-promo-header">
-                                <div class="sn-promo-tag-icon">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.2">
-                                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <div class="sn-promo-title">Have a Promo Code?</div>
-                                    <div class="sn-promo-sub">Enter your code to get discounts</div>
-                                </div>
-                            </div>
-
+                <!-- ORDER SUMMARY & PROMO CALCULATION BLOCK (Below Table in Single Column) -->
+                <div class="sn-formal-summary-section">
+                    <div class="sn-summary-grid-box">
+                        
+                        <!-- Left Block: Promo Code -->
+                        <div class="sn-promo-subcard">
+                            <h3 class="sn-block-title">Have a Promo Code?</h3>
+                            <p class="sn-block-sub">Enter your promo code to apply instant savings to your order.</p>
+                            
                             <div class="sn-promo-input-row">
                                 <input type="text" id="promoInput" class="sn-promo-input" placeholder="Enter promo code" value="<?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?>">
-                                <button type="button" class="sn-promo-btn" id="promoApplyBtn" onclick="handleApplyPromo()">Apply</button>
+                                <button type="button" class="sn-promo-btn" id="promoApplyBtn" onclick="handleApplyPromo()">Apply Code</button>
                             </div>
                             <div class="sn-promo-alert" id="promoAlertBox"></div>
                         </div>
 
-                        <!-- Proceed to Checkout Primary Button -->
-                        <form action="checkout.php" method="post" id="checkoutForm">
-                            <?php $csrf->echoInputField(); ?>
-                            <input type="hidden" name="selected_indexes" id="selectedIndexesInput" value="">
-                            <button type="submit" class="sn-btn-checkout" id="proceedCheckoutBtn">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                                </svg>
-                                <span>Proceed to Checkout</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                            </button>
-                        </form>
+                        <!-- Right Block: Calculation Summary Table -->
+                        <div class="sn-summary-calc-card">
+                            <h3 class="sn-block-title">Order Calculation</h3>
+                            
+                            <table class="sn-summary-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="lbl">Subtotal (<span id="summarySelectedCount"><?php echo $total_cart_items; ?></span> items)</td>
+                                        <td class="val" id="summarySubtotalVal">৳ <?php echo number_format($initial_subtotal); ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="lbl">Shipping</td>
+                                        <td class="val sn-shipping-free">FREE</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="lbl">Tax (estimated)</td>
+                                        <td class="val" id="summaryTaxVal">৳ 0</td>
+                                    </tr>
+                                    <tr class="sn-coupon-row <?php echo !empty($applied_coupon) ? 'active' : ''; ?>" id="summaryCouponRow">
+                                        <td class="lbl">Coupon Discount (<span id="couponCodeLabel"><?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?></span>)</td>
+                                        <td class="val text-green" id="couponDiscountVal">-৳ <?php echo number_format($coupon_discount); ?></td>
+                                    </tr>
+                                    <tr class="sn-total-tr">
+                                        <td class="lbl-total">Total Amount</td>
+                                        <td class="val-total" id="summaryTotalVal">৳ <?php echo number_format($initial_total); ?></td>
+                                    </tr>
+                                </tbody>
+                            </table>
 
-                        <!-- OR Divider -->
-                        <div class="sn-or-divider">
-                            <span>OR</span>
+                            <div class="sn-savings-pill" id="savingsPillWrap">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2">
+                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                                </svg>
+                                <span>You save <strong id="savingsTotalAmount">৳ <?php echo number_format($initial_savings + $coupon_discount); ?></strong></span>
+                            </div>
+
+                            <form action="checkout.php" method="post" id="checkoutForm">
+                                <?php $csrf->echoInputField(); ?>
+                                <input type="hidden" name="selected_indexes" id="selectedIndexesInput" value="">
+                                <button type="submit" class="sn-btn-checkout" id="proceedCheckoutBtn">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    <span>Proceed to Checkout</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                                </button>
+                            </form>
                         </div>
 
-                        <!-- Payment Methods Logos -->
-                        <div class="sn-payment-icons-row">
-                            <!-- Apple Pay -->
-                            <div class="sn-pay-pill" title="Apple Pay">
-                                <svg width="34" height="16" viewBox="0 0 40 20" fill="#111827">
-                                    <path d="M10.8 11.2c-.3 2.1-1.8 4.2-3.8 4.1-1-.1-1.9-.7-2.6-.7-.8 0-1.7.7-2.7.7-2 0-3.6-2.1-3.6-4.5 0-3 1.9-4.6 3.8-4.6 1 0 1.9.7 2.5.7.6 0 1.6-.7 2.8-.7 1 .1 2.3.6 3 1.6-2 1.2-1.7 3.9.6 4.7zm-2.8-7.7c.5-.7.9-1.6.8-2.5-.8 0-1.8.6-2.3 1.2-.5.6-.9 1.5-.8 2.4.9.1 1.8-.4 2.3-1.1zM18.5 4.8h3.3v10.4h-1.5v-1.6c-.6 1.1-1.7 1.8-2.8 1.8-2.3 0-3.7-1.8-3.7-4.4 0-2.6 1.5-4.4 3.7-4.4 1.1 0 2.1.6 2.7 1.7v-3.5zm-1.4 9.1c1.5 0 2.4-1.2 2.4-3.1 0-1.8-.9-3.1-2.4-3.1-1.5 0-2.4 1.2-2.4 3.1 0 1.8.9 3.1 2.4 3.1zM28.8 13.9c-.4.9-1.2 1.5-2.2 1.5-1.5 0-2.4-1.1-2.4-2.8 0-1.7 1-2.8 2.4-2.8.9 0 1.8.6 2.2 1.5v2.6zm0-5.1c-.6-.7-1.4-1.1-2.3-1.1-2.2 0-3.8 1.8-3.8 4.3 0 2.6 1.5 4.3 3.8 4.3 1 0 1.8-.5 2.3-1.2v1.1h1.5V7.9h-1.5v.9zM34.8 7.9l-2.4 6.7h-1.5l.9-2.2-2.3-4.5h1.7l1.4 3.2 1.4-3.2h1.8z"/>
-                                </svg>
-                            </div>
-                            <!-- Google Pay -->
-                            <div class="sn-pay-pill" title="Google Pay">
-                                <svg width="34" height="16" viewBox="0 0 40 20">
-                                    <path d="M12.4 10.3c0-.3 0-.7-.1-1H6v2.1h3.6c-.2.9-.7 1.7-1.5 2.2v1.8h2.4c1.4-1.3 2.2-3.2 2.2-5.1z" fill="#4285F4"/>
-                                    <path d="M6 16.8c1.9 0 3.6-.6 4.7-1.7l-2.4-1.8c-.6.4-1.4.7-2.3.7-1.8 0-3.3-1.2-3.8-2.9H-.1v1.9C1.1 15.3 3.4 16.8 6 16.8z" fill="#34A853"/>
-                                    <path d="M2.2 11.1c-.2-.7-.2-1.5 0-2.2V7H-.1C-.6 8.3-.6 9.7-.1 11.1l2.3-1.8z" fill="#FBBC05"/>
-                                    <path d="M6 5.4c1 0 2 .4 2.7 1.1l2-2C9.4 3.3 7.8 2.6 6 2.6 3.4 2.6 1.1 4.1-.1 6.5l2.3 1.8c.5-1.7 2-2.9 3.8-2.9z" fill="#EA4335"/>
-                                    <path d="M18.8 5.6h3.4v7.4h-1.5v-1.1c-.4.8-1.3 1.3-2.2 1.3-1.8 0-3-1.3-3-3.1 0-1.8 1.2-3.1 3-3.1.9 0 1.7.4 2.2 1.2V5.6zm-.9 6.5c1.1 0 1.8-.8 1.8-2.2 0-1.3-.7-2.1-1.8-2.1-1.1 0-1.8.8-1.8 2.1 0 1.4.7 2.2 1.8 2.2zM28.4 11.2l-2.1 4.8h-1.5l.8-1.8-2-4.8h1.6l1.2 3.1 1.2-3.1h1.6z" fill="#5F6368"/>
-                                </svg>
-                            </div>
-                            <!-- VISA -->
-                            <div class="sn-pay-pill" title="VISA">
-                                <span class="sn-visa-text">VISA</span>
-                            </div>
-                            <!-- Mastercard -->
-                            <div class="sn-pay-pill" title="Mastercard">
-                                <span class="sn-mc-circles">
-                                    <span class="mc-circle red"></span>
-                                    <span class="mc-circle yellow"></span>
-                                </span>
-                            </div>
-                            <!-- bKash -->
-                            <div class="sn-pay-pill bkash-pill" title="bKash">
-                                <span class="sn-bkash-text">bKash</span>
-                            </div>
-                        </div>
+                    </div>
+                </div>
 
-                        <!-- 256-bit SSL Security text -->
-                        <div class="sn-ssl-guarantee">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                <!-- Confidence Guarantee Banner -->
+                <div class="sn-confidence-banner">
+                    <div class="sn-conf-left">
+                        <div class="sn-conf-shield">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                <path d="m9 12 2 2 4-4"></path>
                             </svg>
-                            <div>
-                                <div class="ssl-main">Your payment information is safe and secure</div>
-                                <div class="ssl-sub">With 256-bit SSL encryption.</div>
-                            </div>
                         </div>
-
+                        <div>
+                            <h3 class="sn-conf-title">Shop with Confidence</h3>
+                            <p class="sn-conf-desc">256-bit SSL encrypted checkout • 7-day easy return • Genuine products guaranteed</p>
+                        </div>
                     </div>
                 </div>
 
@@ -540,6 +459,7 @@ try {
         <!-- ============================================================
              "YOU MIGHT ALSO LIKE" SECTION
              ============================================================ -->
+        <?php if (!empty($recommendations)): ?>
         <section class="sn-recommendations-section">
             <div class="sn-recom-head">
                 <h2 class="sn-recom-title">You Might Also Like</h2>
@@ -550,26 +470,28 @@ try {
             </div>
 
             <div class="sn-recom-grid">
-                <?php foreach ($recommendations as $rec): ?>
-                <div class="sn-recom-card">
-                    <div class="sn-recom-img-box">
+                <?php foreach ($recommendations as $rec): 
+                    $recUrl = function_exists('getProductURL') ? getProductURL($rec['id'], $rec['name'], BASE_URL) : BASE_URL . 'product.php?id=' . $rec['id'];
+                ?>
+                <div class="sn-recom-card" data-href="<?php echo htmlspecialchars($recUrl); ?>" style="cursor:pointer;">
+                    <a href="<?php echo htmlspecialchars($recUrl); ?>" class="sn-recom-img-box">
                         <img src="<?php echo htmlspecialchars($rec['image']); ?>" alt="<?php echo htmlspecialchars($rec['name']); ?>" loading="lazy">
-                    </div>
+                    </a>
                     <div class="sn-recom-content">
-                        <h4 class="sn-recom-item-name"><?php echo htmlspecialchars($rec['name']); ?></h4>
+                        <h4 class="sn-recom-item-name"><a href="<?php echo htmlspecialchars($recUrl); ?>" style="color:inherit; text-decoration:none;"><?php echo htmlspecialchars($rec['name']); ?></a></h4>
                         <div class="sn-recom-item-sub"><?php echo htmlspecialchars($rec['subtitle']); ?></div>
                         
                         <div class="sn-recom-price-row">
                             <span class="sn-recom-price">৳ <?php echo number_format($rec['price']); ?></span>
-                            <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
+                            <?php if ($rec['old_price'] > $rec['price']): ?>
+                                <span class="sn-recom-old-price">৳ <?php echo number_format($rec['old_price']); ?></span>
+                            <?php endif; ?>
                         </div>
-                        <div class="sn-recom-discount"><?php echo htmlspecialchars($rec['discount']); ?></div>
 
                         <button type="button" class="sn-recom-add-btn" onclick="quickAddToCart(<?php echo $rec['id']; ?>, '<?php echo addslashes($rec['name']); ?>', <?php echo $rec['price']; ?>, '<?php echo htmlspecialchars($rec['image']); ?>', '<?php echo addslashes($rec['subtitle']); ?>')" title="Add to Cart">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="9" cy="21" r="1"></circle>
-                                <circle cx="20" cy="21" r="1"></circle>
-                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                         </button>
                     </div>
@@ -577,15 +499,15 @@ try {
                 <?php endforeach; ?>
             </div>
         </section>
+        <?php endif; ?>
 
         <!-- ============================================================
              BOTTOM TRUST / ASSURANCE BAR
              ============================================================ -->
         <div class="sn-trust-assurance-bar">
-            <!-- 1. Free Shipping -->
             <div class="sn-trust-cell">
                 <div class="sn-trust-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="1" y="3" width="15" height="13"></rect>
                         <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
                         <circle cx="5.5" cy="18.5" r="2.5"></circle>
@@ -598,10 +520,9 @@ try {
                 </div>
             </div>
 
-            <!-- 2. Secure Payment -->
             <div class="sn-trust-cell">
                 <div class="sn-trust-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                         <path d="m9 12 2 2 4-4"></path>
                     </svg>
@@ -612,10 +533,9 @@ try {
                 </div>
             </div>
 
-            <!-- 3. Easy Returns -->
             <div class="sn-trust-cell">
                 <div class="sn-trust-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="23 4 23 10 17 10"></polyline>
                         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                     </svg>
@@ -626,12 +546,11 @@ try {
                 </div>
             </div>
 
-            <!-- 4. 24/7 Support -->
             <div class="sn-trust-cell">
                 <div class="sn-trust-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2H3z"></path>
                     </svg>
                 </div>
                 <div class="sn-trust-info">
@@ -645,22 +564,10 @@ try {
 </div>
 
 <!-- ============================================================
-     STICKY MOBILE FLOATING VOUCHER BAR & CHECKOUT DOCK (IMAGE 2)
+     STICKY MOBILE FLOATING VOUCHER BAR & CHECKOUT DOCK
      ============================================================ -->
 <?php if ($total_cart_items > 0): ?>
 <div class="sn-mobile-sticky-dock">
-    <!-- Floating Voucher Teaser -->
-    <div class="sn-mobile-voucher-bar">
-        <div class="sn-mv-left">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48">
-                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/>
-            </svg>
-            <span>Buy ৳ 299 save 5% off</span>
-        </div>
-        <button type="button" class="sn-mv-add-btn" onclick="applyPromo('SAVE5')">Add</button>
-    </div>
-
-    <!-- Bottom Action Dock -->
     <div class="sn-mobile-dock-row">
         <label class="sn-mobile-all-check">
             <input type="checkbox" id="mobileSelectAll" checked onchange="toggleSelectAllFromMobile(this)">
@@ -669,12 +576,12 @@ try {
         </label>
 
         <div class="sn-mobile-totals-col">
-            <div class="sn-mob-subtotal">Subtotal: <strong id="mobileSubtotalVal">৳ <?php echo number_format($initial_total); ?></strong></div>
-            <div class="sn-mob-shipping">Shipping Fee: <span>৳ 0</span></div>
+            <div class="sn-mob-subtotal">Total: <strong id="mobileSubtotalVal">৳ <?php echo number_format($initial_total); ?></strong></div>
+            <div class="sn-mob-shipping">Shipping: <span>৳ 0</span></div>
         </div>
 
         <button type="button" class="sn-mobile-checkout-btn" onclick="document.getElementById('checkoutForm').submit()">
-            Checkout(<span id="mobileCheckoutBadge"><?php echo $total_cart_items; ?></span>)
+            Checkout (<span id="mobileCheckoutBadge"><?php echo $total_cart_items; ?></span>)
         </button>
     </div>
 </div>
@@ -686,16 +593,13 @@ try {
 <div id="snToastContainer" class="sn-toast-container"></div>
 
 <!-- ============================================================
-     PIXEL-PERFECT CSS STYLING
+     FORMAL MINIMAL DESKTOP SINGLE COLUMN STYLING
      ============================================================ -->
 <style>
-/* CSS VARIABLES & BASE RESET */
 :root {
     --sn-font: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --sn-primary: #fab802;
     --sn-primary-hover: #e5a700;
-    --sn-primary-light: #fffbeb;
-    --sn-primary-active: #d97706;
     --sn-dark: #0f172a;
     --sn-dark-soft: #1e293b;
     --sn-muted: #64748b;
@@ -705,12 +609,8 @@ try {
     --sn-bg-page: #f8fafc;
     --sn-card-bg: #ffffff;
     --sn-green: #059669;
-    --sn-green-bg: #ecfdf5;
-    --sn-red: #ef4444;
-    --sn-red-bg: #fee2e2;
 }
 
-/* GLOBAL VIEWPORT SAFETY & OVERFLOW PREVENTION */
 html, body {
     max-width: 100vw;
     overflow-x: hidden !important;
@@ -720,36 +620,21 @@ body.shopnext-theme {
     background-color: var(--sn-bg-page);
     font-family: var(--sn-font);
     color: var(--sn-dark);
-    overflow-x: hidden !important;
-    width: 100%;
-}
-
-/* Explicit sn-container definition to protect against broken stylesheets */
-.sn-cart-page-wrapper .sn-container,
-.sn-container {
-    width: 100%;
-    max-width: 1240px;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding-left: 20px;
-    padding-right: 20px;
-    box-sizing: border-box;
-}
-
-/* Sticky Right Summary Column on Desktop */
-@media (min-width: 1025px) {
-    .sn-cart-right-col {
-        position: sticky;
-        top: 24px;
-        align-self: start;
-    }
 }
 
 .sn-cart-page-wrapper {
     width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
     padding: 24px 0 60px 0;
+    box-sizing: border-box;
+}
+
+/* SINGLE COLUMN CONTAINER - MAX WIDTH 920px CENTERED */
+.sn-cart-single-container {
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto !important;
+    padding-left: 20px;
+    padding-right: 20px;
     box-sizing: border-box;
 }
 
@@ -760,9 +645,7 @@ body.shopnext-theme {
     gap: 8px;
     font-size: 13.5px;
     color: var(--sn-muted);
-    margin-bottom: 24px;
-    width: 100%;
-    box-sizing: border-box;
+    margin-bottom: 20px;
 }
 .sn-breadcrumbs a {
     color: var(--sn-muted);
@@ -787,76 +670,50 @@ body.shopnext-theme {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 28px;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-.sn-cart-heading-wrap {
-    display: flex;
-    align-items: center;
+    margin-bottom: 24px;
     gap: 16px;
-}
-.sn-cart-title-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--sn-dark);
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--sn-border-strong);
 }
 .sn-page-title {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 800;
     color: var(--sn-dark);
     margin: 0;
     line-height: 1.2;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.4px;
 }
 .sn-page-subtitle {
     font-size: 13.5px;
     color: var(--sn-muted);
     margin: 4px 0 0 0;
 }
-
-/* Auto-saved notification badge */
 .sn-auto-saved-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
     background: #ffffff;
-    border: 1px solid #f1f5f9;
-    padding: 10px 18px;
+    border: 1px solid var(--sn-border-strong);
+    padding: 6px 14px;
     border-radius: 9999px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-.sn-saved-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.sn-saved-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--sn-dark);
-}
-.sn-saved-desc {
-    font-size: 11.5px;
+    font-size: 12.5px;
+    font-weight: 600;
     color: var(--sn-muted);
 }
 
-/* 3. TWO-COLUMN LAYOUT */
-.sn-cart-layout-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 380px;
-    gap: 28px;
-    align-items: start;
-    margin-bottom: 48px;
+/* 3. SINGLE COLUMN MAIN WRAPPER */
+.sn-cart-single-col {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
 
-/* 4. LEFT COLUMN - CART ITEMS CARD */
+/* 4. FORMAL CART CARD & TABLE */
 .sn-cart-card {
     background: #ffffff;
-    border-radius: 18px;
-    border: 1px solid #f1f5f9;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+    border: 1px solid var(--sn-border-strong);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     overflow: hidden;
 }
 
@@ -865,11 +722,12 @@ body.shopnext-theme {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 24px;
-    border-bottom: 1px solid #f8fafc;
+    padding: 14px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--sn-border-strong);
 }
 .sn-toolbar-text {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
     color: var(--sn-dark);
     user-select: none;
@@ -877,30 +735,30 @@ body.shopnext-theme {
 .sn-toolbar-actions {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
 }
 .sn-tool-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     background: none;
     border: none;
     color: var(--sn-muted);
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
     cursor: pointer;
-    padding: 4px 0;
-    transition: all 0.2s ease;
+    padding: 0;
+    transition: color 0.15s ease;
 }
 .sn-tool-btn:hover {
     color: var(--sn-dark);
 }
 
-/* Custom Checkbox */
+/* Checkbox Styling */
 .sn-checkbox-label {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     cursor: pointer;
     position: relative;
     user-select: none;
@@ -914,101 +772,102 @@ body.shopnext-theme {
     width: 0;
 }
 .sn-custom-check {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     background-color: #ffffff;
-    border: 2px solid #cbd5e1;
-    border-radius: 6px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s ease-in-out;
+    transition: all 0.15s ease;
 }
 .sn-checkbox-label:hover input ~ .sn-custom-check {
-    border-color: #f59e0b;
+    border-color: var(--sn-dark);
 }
 .sn-checkbox-label input:checked ~ .sn-custom-check {
-    background-color: #f59e0b;
-    border-color: #f59e0b;
+    background-color: var(--sn-dark);
+    border-color: var(--sn-dark);
 }
 .sn-checkbox-label input:checked ~ .sn-custom-check:after {
     content: "";
     display: block;
-    width: 5px;
-    height: 9px;
+    width: 4px;
+    height: 8px;
     border: solid white;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
     margin-bottom: 2px;
 }
 
-/* Product Rows */
-.sn-cart-items-list {
-    display: flex;
-    flex-direction: column;
+/* Formal HTML Table Structure */
+.sn-table-responsive {
+    width: 100%;
+    overflow-x: auto;
 }
-.sn-cart-item-row {
-    display: grid;
-    grid-template-columns: 24px 110px minmax(0, 1fr) 140px 110px;
-    gap: 20px;
-    align-items: center;
-    padding: 24px;
-    border-bottom: 1px solid #f8fafc;
-    transition: all 0.3s ease;
+.sn-formal-cart-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13.5px;
 }
-.sn-cart-item-row:last-child {
+.sn-formal-cart-table thead tr {
+    background: #f8fafc;
+    border-bottom: 1px solid var(--sn-border-strong);
+}
+.sn-formal-cart-table thead th {
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.sn-formal-cart-table tbody tr {
+    border-bottom: 1px solid var(--sn-border);
+    transition: background-color 0.15s;
+}
+.sn-formal-cart-table tbody tr:last-child {
     border-bottom: none;
+}
+.sn-formal-cart-table tbody tr:hover {
+    background-color: #fdfdfd;
+}
+.sn-formal-cart-table tbody td {
+    padding: 16px;
+    vertical-align: middle;
 }
 .sn-cart-item-row.removing {
     opacity: 0;
-    transform: translateX(-30px);
+    transform: translateX(-20px);
+    transition: all 0.25s ease;
 }
 
-/* Item Image */
+/* Image Thumbnail in Table */
 .sn-img-container {
-    width: 110px;
-    height: 100px;
+    width: 68px;
+    height: 68px;
     background: #f8fafc;
-    border-radius: 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
+    border: 1px solid var(--sn-border-strong);
     overflow: hidden;
-    border: 1px solid #f1f5f9;
 }
 .sn-img-container img {
     max-width: 90%;
     max-height: 90%;
     object-fit: contain;
-    transition: transform 0.25s ease;
-}
-.sn-img-container:hover img {
-    transform: scale(1.06);
-}
-.sn-top-rated-tag {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    background: #fffbeb;
-    border: 1px solid #fef3c7;
-    color: #92400e;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    z-index: 2;
 }
 
-/* Item Details */
+/* Details Cell */
 .sn-item-name {
-    font-size: 15.5px;
+    font-size: 14.5px;
     font-weight: 700;
-    margin: 0 0 5px 0;
-    line-height: 1.35;
+    margin: 0 0 3px 0;
+    line-height: 1.3;
 }
 .sn-item-name a {
     color: var(--sn-dark);
@@ -1016,120 +875,52 @@ body.shopnext-theme {
     transition: color 0.15s;
 }
 .sn-item-name a:hover {
-    color: #f59e0b;
+    color: #0284c7;
 }
 .sn-item-specs {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--sn-muted);
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 .sn-item-variant-swatches {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--sn-muted);
+    margin-bottom: 4px;
 }
 .sn-active-color-name {
     color: var(--sn-dark);
+    font-weight: 600;
 }
-.sn-swatch-dots {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.sn-color-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background-color: #cbd5e1;
-    border: 1px solid rgba(0,0,0,0.1);
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-}
-.sn-color-dot.dark { background-color: #334155; }
-.sn-color-dot.silver { background-color: #e2e8f0; }
-.sn-color-dot.active {
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px #f59e0b;
-}
-
-/* In Stock badge */
 .sn-stock-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
-    border-radius: 9999px;
     font-size: 11px;
     font-weight: 700;
-}
-.sn-stock-pill.in-stock {
-    background-color: #ecfdf5;
     color: #059669;
 }
 
-/* Item Action Links */
-.sn-item-action-links {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 10px;
-}
-.sn-item-link-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: none;
-    border: none;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--sn-muted);
-    cursor: pointer;
-    padding: 0;
-    transition: color 0.15s;
-}
-.sn-item-link-btn:hover {
-    color: var(--sn-dark);
-}
-
-/* Pricing & Stepper */
-.sn-price-stack {
-    margin-bottom: 12px;
-}
+/* Pricing Cell */
 .sn-curr-price {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 800;
     color: var(--sn-dark);
-    line-height: 1.2;
 }
 .sn-old-price {
-    font-size: 12.5px;
+    font-size: 12px;
     color: #94a3b8;
     text-decoration: line-through;
-    margin-top: 2px;
-}
-.sn-discount-badge {
-    display: inline-block;
-    background: #fee2e2;
-    color: #ef4444;
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-top: 4px;
+    margin-top: 1px;
 }
 
-/* Stepper */
+/* Quantity Stepper in Table */
 .sn-stepper-control {
     display: inline-flex;
     align-items: center;
     background: #ffffff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 9999px;
-    padding: 2px 6px;
-    gap: 6px;
+    border: 1px solid var(--sn-border-strong);
+    border-radius: 6px;
+    padding: 2px;
 }
 .sn-step-btn {
     width: 26px;
@@ -1137,257 +928,202 @@ body.shopnext-theme {
     border: none;
     background: none;
     color: var(--sn-dark);
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    transition: background-color 0.15s;
+    border-radius: 4px;
+    transition: background 0.15s;
 }
 .sn-step-btn:hover {
-    background-color: #f1f5f9;
+    background: #f1f5f9;
 }
 .sn-qty-input {
-    width: 24px;
+    width: 32px;
     border: none;
     background: none;
     text-align: center;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
     color: var(--sn-dark);
     outline: none;
 }
 
-/* Item Total */
-.sn-item-total-cell {
-    text-align: right;
-}
+/* Line Total */
 .sn-item-total-price {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 800;
     color: var(--sn-dark);
-    letter-spacing: -0.3px;
 }
 
-/* Shop with Confidence Banner */
-.sn-confidence-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #eff6ff;
-    border: 1px solid #dbeafe;
-    border-radius: 16px;
-    padding: 16px 22px;
-    margin-top: 20px;
-    gap: 16px;
-}
-.sn-conf-left {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-.sn-conf-shield {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: #ffffff;
+/* Table Row Action Buttons */
+.sn-row-actions {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+    gap: 8px;
 }
-.sn-conf-title {
-    font-size: 14px;
-    font-weight: 800;
-    color: #1e3a8a;
-    margin: 0;
-}
-.sn-conf-desc {
-    font-size: 12.5px;
-    color: #3b82f6;
-    margin: 2px 0 0 0;
-}
-.sn-conf-learn-more {
-    display: inline-flex;
+.sn-action-btn-icon {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--sn-border-strong);
+    background: #ffffff;
+    border-radius: 6px;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #2563eb;
-    text-decoration: none;
-    white-space: nowrap;
+    justify-content: center;
+    color: var(--sn-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
-.sn-conf-learn-more:hover {
-    text-decoration: underline;
+.sn-action-btn-icon:hover {
+    color: var(--sn-dark);
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+.sn-action-btn-icon.remove:hover {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background: #fef2f2;
 }
 
-/* 5. RIGHT COLUMN - ORDER SUMMARY CARD */
-.sn-order-summary-card {
+/* 5. FORMAL ORDER SUMMARY SECTION (BELOW TABLE IN SINGLE COLUMN) */
+.sn-formal-summary-section {
     background: #ffffff;
-    border-radius: 20px;
-    border: 1px solid #fef3c7;
-    padding: 26px;
-    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.04);
+    border-radius: 12px;
+    border: 1px solid var(--sn-border-strong);
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
-.sn-summary-heading {
-    font-size: 20px;
+.sn-summary-grid-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+}
+@media (max-width: 768px) {
+    .sn-summary-grid-box {
+        grid-template-columns: 100%;
+        gap: 24px;
+    }
+}
+.sn-block-title {
+    font-size: 16px;
     font-weight: 800;
     color: var(--sn-dark);
-    margin: 0 0 20px 0;
-    letter-spacing: -0.3px;
+    margin: 0 0 4px 0;
 }
-.sn-summary-rows {
+.sn-block-sub {
+    font-size: 12.5px;
+    color: var(--sn-muted);
+    margin: 0 0 16px 0;
+}
+
+/* Promo Subcard */
+.sn-promo-input-row {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
-.sn-summary-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 14px;
+.sn-promo-input {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid var(--sn-border-strong);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    color: var(--sn-dark);
+    outline: none;
+    transition: border-color 0.15s;
 }
-.sn-summary-row .label {
+.sn-promo-input:focus {
+    border-color: var(--sn-dark);
+}
+.sn-promo-btn {
+    background: #f1f5f9;
+    border: 1px solid var(--sn-border-strong);
+    color: var(--sn-dark);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.sn-promo-btn:hover {
+    background: #e2e8f0;
+}
+.sn-promo-alert {
+    font-size: 12px;
+    margin-top: 6px;
+    display: none;
+}
+.sn-promo-alert.success { display: block; color: #059669; }
+.sn-promo-alert.error { display: block; color: #dc2626; }
+
+/* Calculation Table */
+.sn-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+}
+.sn-summary-table td {
+    padding: 8px 0;
+    font-size: 13.5px;
+}
+.sn-summary-table td.lbl {
     color: var(--sn-muted);
 }
-.sn-summary-row .val {
+.sn-summary-table td.val {
+    text-align: right;
     font-weight: 700;
     color: var(--sn-dark);
 }
-.sn-shipping-free {
-    color: #10b981 !important;
-    font-weight: 800 !important;
+.sn-summary-table .sn-shipping-free {
+    color: #059669 !important;
+    font-weight: 800;
 }
 .sn-coupon-row {
     display: none;
 }
 .sn-coupon-row.active {
-    display: flex;
+    display: table-row;
 }
-.text-green {
-    color: #059669 !important;
+.text-green { color: #059669 !important; }
+.sn-summary-table tr.sn-total-tr td {
+    padding-top: 14px;
+    border-top: 1px solid var(--sn-border-strong);
 }
-
-.sn-summary-divider {
-    border: none;
-    border-top: 1px solid #f1f5f9;
-    margin: 18px 0;
-}
-
-/* Total row */
-.sn-total-line {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-.sn-total-label {
-    font-size: 18px;
+.lbl-total {
+    font-size: 16px;
     font-weight: 800;
     color: var(--sn-dark);
 }
-.sn-total-amount {
-    font-size: 22px;
+.val-total {
+    text-align: right;
+    font-size: 20px;
     font-weight: 800;
     color: var(--sn-dark);
-    letter-spacing: -0.5px;
 }
 
 /* Savings Pill */
 .sn-savings-pill {
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     background: #ecfdf5;
     border: 1px solid #a7f3d0;
     color: #059669;
     font-size: 12.5px;
     font-weight: 600;
-    padding: 6px 14px;
-    border-radius: 9999px;
-    margin-bottom: 20px;
-    width: 100%;
-    justify-content: center;
-}
-.sn-savings-pill strong {
-    font-weight: 800;
+    padding: 8px 14px;
+    border-radius: 6px;
+    margin-bottom: 16px;
 }
 
-/* Have a Promo Code? Box */
-.sn-promo-card {
-    background: #fffdf5;
-    border: 1px solid #fef3c7;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 20px;
-}
-.sn-promo-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-.sn-promo-tag-icon {
-    margin-top: 2px;
-}
-.sn-promo-title {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #78350f;
-}
-.sn-promo-sub {
-    font-size: 11.5px;
-    color: #92400e;
-}
-.sn-promo-input-row {
-    display: flex;
-    gap: 8px;
-}
-.sn-promo-input {
-    flex: 1;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 9px 12px;
-    font-size: 13px;
-    color: var(--sn-dark);
-    outline: none;
-    transition: border-color 0.15s;
-}
-.sn-promo-input:focus {
-    border-color: #f59e0b;
-}
-.sn-promo-btn {
-    background: #fde047;
-    border: 1px solid #facc15;
-    color: #713f12;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 0 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.sn-promo-btn:hover {
-    background: #eab308;
-}
-.sn-promo-alert {
-    font-size: 12px;
-    margin-top: 8px;
-    display: none;
-}
-.sn-promo-alert.success {
-    display: block;
-    color: #059669;
-}
-.sn-promo-alert.error {
-    display: block;
-    color: #dc2626;
-}
-
-/* Proceed to Checkout Button */
+/* Proceed Button */
 .sn-btn-checkout {
     width: 100%;
     background: #fab802;
@@ -1395,170 +1131,97 @@ body.shopnext-theme {
     color: #111827;
     font-size: 15px;
     font-weight: 800;
-    padding: 14px 20px;
-    border-radius: 12px;
+    padding: 13px 20px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(250, 184, 2, 0.35);
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 .sn-btn-checkout:hover {
     background: #e5a700;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(250, 184, 2, 0.45);
 }
 .sn-btn-checkout:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
 }
 
-/* OR divider */
-.sn-or-divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 20px 0 16px 0;
-    color: #94a3b8;
-    font-size: 11.5px;
-    font-weight: 600;
-}
-.sn-or-divider::before, .sn-or-divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #f1f5f9;
-}
-.sn-or-divider span {
-    padding: 0 10px;
-}
-
-/* Payment Icons Row */
-.sn-payment-icons-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-.sn-pay-pill {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+/* Confidence Banner */
+.sn-confidence-banner {
+    background: #f8fafc;
+    border: 1px solid var(--sn-border-strong);
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 14px 20px;
+}
+.sn-conf-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.sn-conf-shield {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 32px;
-    min-width: 48px;
 }
-.sn-visa-text {
-    font-size: 13px;
-    font-weight: 900;
-    color: #1e3a8a;
-    letter-spacing: 0.5px;
-}
-.sn-mc-circles {
-    display: flex;
-    align-items: center;
-}
-.mc-circle {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-}
-.mc-circle.red { background: #ef4444; }
-.mc-circle.yellow { background: #f59e0b; margin-left: -5px; }
-.bkash-pill {
-    background: #fdf2f8;
-    border-color: #fbcfe8;
-}
-.sn-bkash-text {
-    font-size: 12px;
+.sn-conf-title {
+    font-size: 13.5px;
     font-weight: 800;
-    color: #e11d48;
-}
-
-/* 256-bit SSL guarantee note */
-.sn-ssl-guarantee {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 11.5px;
-    color: var(--sn-muted);
-    border-top: 1px solid #f8fafc;
-    padding-top: 14px;
-}
-.ssl-main {
-    font-weight: 600;
     color: var(--sn-dark);
+    margin: 0;
 }
-.ssl-sub {
-    font-size: 11px;
+.sn-conf-desc {
+    font-size: 12px;
+    color: var(--sn-muted);
+    margin: 2px 0 0 0;
 }
 
-/* 6. "YOU MIGHT ALSO LIKE" SECTION */
+/* 6. RECOMMENDATIONS SECTION */
 .sn-recommendations-section {
-    margin-top: 20px;
-    margin-bottom: 48px;
+    margin-top: 36px;
 }
 .sn-recom-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 .sn-recom-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 800;
     color: var(--sn-dark);
     margin: 0;
-    letter-spacing: -0.3px;
 }
 .sn-recom-link {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--sn-dark);
     text-decoration: none;
-    transition: color 0.15s;
 }
-.sn-recom-link:hover {
-    color: #f59e0b;
-}
-
 .sn-recom-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    gap: 16px;
 }
 .sn-recom-card {
     background: #ffffff;
-    border: 1px solid #f1f5f9;
-    border-radius: 16px;
-    padding: 16px;
+    border: 1px solid var(--sn-border-strong);
+    border-radius: 8px;
+    padding: 12px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     position: relative;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    transition: all 0.25s ease;
-}
-.sn-recom-card:hover {
-    border-color: #fef08a;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.05);
-    transform: translateY(-2px);
 }
 .sn-recom-img-box {
-    width: 72px;
-    height: 72px;
+    width: 54px;
+    height: 54px;
     background: #f8fafc;
-    border-radius: 12px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1575,18 +1238,18 @@ body.shopnext-theme {
     min-width: 0;
 }
 .sn-recom-item-name {
-    font-size: 13.5px;
+    font-size: 12.5px;
     font-weight: 700;
     color: var(--sn-dark);
-    margin: 0 0 3px 0;
+    margin: 0 0 2px 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .sn-recom-item-sub {
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--sn-muted);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1594,29 +1257,24 @@ body.shopnext-theme {
 .sn-recom-price-row {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 5px;
 }
 .sn-recom-price {
-    font-size: 14.5px;
+    font-size: 13.5px;
     font-weight: 800;
     color: var(--sn-dark);
 }
 .sn-recom-old-price {
-    font-size: 11.5px;
+    font-size: 11px;
     color: #94a3b8;
     text-decoration: line-through;
 }
-.sn-recom-discount {
-    font-size: 10px;
-    font-weight: 700;
-    color: #d97706;
-}
 .sn-recom-add-btn {
     position: absolute;
-    right: 14px;
-    bottom: 14px;
-    width: 32px;
-    height: 32px;
+    right: 10px;
+    bottom: 10px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: #fab802;
     border: none;
@@ -1624,49 +1282,43 @@ body.shopnext-theme {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(250, 184, 2, 0.3);
-    transition: all 0.2s ease;
-}
-.sn-recom-add-btn:hover {
-    background: #e5a700;
-    transform: scale(1.08);
 }
 
-/* 7. BOTTOM TRUST / ASSURANCE BAR */
+/* 7. TRUST ASSURANCE BAR */
 .sn-trust-assurance-bar {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
+    gap: 16px;
     background: #ffffff;
-    border: 1px solid #f1f5f9;
-    border-radius: 18px;
-    padding: 24px 30px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    border: 1px solid var(--sn-border-strong);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 36px;
 }
 .sn-trust-cell {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 .sn-trust-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
     background: #f8fafc;
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--sn-border-strong);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
 .sn-trust-info h4 {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
     color: var(--sn-dark);
-    margin: 0 0 2px 0;
+    margin: 0 0 1px 0;
 }
 .sn-trust-info p {
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--sn-muted);
     margin: 0;
 }
@@ -1674,215 +1326,171 @@ body.shopnext-theme {
 /* 8. EMPTY CART STAGE */
 .sn-empty-cart-stage {
     background: #ffffff;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
-    padding: 60px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--sn-border-strong);
+    padding: 48px 20px;
     text-align: center;
-    margin: 48px auto;
-    max-width: 520px;
-    width: 100%;
-    box-sizing: border-box;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    margin: 40px auto;
+    max-width: 480px;
 }
 .sn-empty-icon-ring {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: #fffbeb;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 24px auto;
+    margin: 0 auto 20px auto;
 }
 .sn-empty-cart-stage h2 {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
     color: var(--sn-dark);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 .sn-empty-cart-stage p {
-    font-size: 14px;
+    font-size: 13.5px;
     color: var(--sn-muted);
-    margin-bottom: 24px;
-    max-width: 360px;
-    margin-left: auto;
-    margin-right: auto;
-}
-.sn-empty-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+    margin-bottom: 20px;
 }
 .sn-btn-primary {
     background: #fab802;
     color: #111827;
     font-weight: 800;
-    font-size: 14px;
-    padding: 12px 24px;
-    border-radius: 10px;
+    font-size: 13.5px;
+    padding: 10px 20px;
+    border-radius: 6px;
     text-decoration: none;
-    transition: background 0.15s;
-}
-.sn-btn-primary:hover {
-    background: #e5a700;
-    color: #111827;
-}
-.sn-btn-secondary {
-    background: #f1f5f9;
-    color: var(--sn-dark);
-    font-weight: 700;
-    font-size: 14px;
-    padding: 12px 20px;
-    border-radius: 10px;
-    text-decoration: none;
+    display: inline-block;
 }
 
-/* 9. STICKY MOBILE DOCK (HIDDEN ON DESKTOP) */
+/* STICKY MOBILE DOCK (HIDDEN ON DESKTOP) */
 .sn-mobile-sticky-dock {
     display: none;
 }
 
-/* 10. FLOATING TOAST NOTIFICATIONS */
+/* TOAST NOTIFICATIONS */
 .sn-toast-container {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    bottom: 24px;
+    right: 24px;
     z-index: 99999;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 .sn-toast {
     background: #0f172a;
     color: #ffffff;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-size: 13.5px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 10px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.18);
-    animation: toastSlideUp 0.3s ease-out;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: toastSlideUp 0.25s ease-out;
 }
-.sn-toast.success { border-left: 4px solid #10b981; }
-.sn-toast.error { border-left: 4px solid #ef4444; }
+.sn-toast.success { border-left: 3px solid #10b981; }
+.sn-toast.error { border-left: 3px solid #ef4444; }
 
 @keyframes toastSlideUp {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* ============================================================
-   RESPONSIVE BREAKPOINTS (Mobile & Tablet)
-   ============================================================ */
-@media (max-width: 1024px) {
-    .sn-cart-layout-grid {
-        grid-template-columns: 100%;
-        gap: 20px;
-    }
-    .sn-recom-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .sn-trust-assurance-bar {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
+/* MOBILE RESPONSIVE STYLING */
 @media (max-width: 768px) {
     .sn-cart-page-wrapper {
         padding-top: 14px;
-        padding-bottom: 140px;
+        padding-bottom: 120px;
     }
-    .sn-empty-cart-stage {
-        padding: 40px 16px;
-        margin: 24px auto;
-        border-radius: 16px;
+    .sn-cart-single-container {
+        padding-left: 12px;
+        padding-right: 12px;
     }
     .sn-cart-page-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 16px;
+        gap: 8px;
     }
     .sn-page-title {
-        font-size: 22px;
+        font-size: 20px;
     }
-    .sn-auto-saved-badge {
+    
+    /* Table headers responsive */
+    .sn-formal-cart-table thead {
+        display: none; /* Hide table headers on narrow mobile */
+    }
+    .sn-formal-cart-table, 
+    .sn-formal-cart-table tbody, 
+    .sn-formal-cart-table tr, 
+    .sn-formal-cart-table td {
+        display: block;
         width: 100%;
-        border-radius: 12px;
         box-sizing: border-box;
     }
-
-    /* Product row becomes mobile card layout */
-    .sn-cart-item-row {
-        grid-template-columns: 24px 85px minmax(0, 1fr);
-        grid-template-areas: 
-            "check img details"
-            "check img pricing"
-            "check img total";
-        gap: 12px;
-        padding: 16px;
-        box-sizing: border-box;
+    .sn-formal-cart-table tbody tr {
+        padding: 14px;
+        border-bottom: 1px solid var(--sn-border-strong);
+        position: relative;
     }
-    .sn-item-checkbox-cell { grid-area: check; }
-    .sn-item-image-cell { grid-area: img; }
-    .sn-img-container { width: 85px; height: 85px; }
-    .sn-item-details-cell { grid-area: details; min-width: 0; }
-    .sn-item-pricing-cell { grid-area: pricing; min-width: 0; }
-    .sn-item-total-cell { grid-area: total; text-align: left; margin-top: -6px; }
-
+    .sn-formal-cart-table tbody td {
+        padding: 4px 0;
+        border: none;
+    }
+    .sn-item-checkbox-cell {
+        position: absolute;
+        top: 16px;
+        left: 14px;
+        z-index: 2;
+    }
+    .sn-item-image-cell {
+        margin-left: 32px;
+        margin-bottom: 8px;
+    }
+    .sn-item-details-cell {
+        margin-left: 32px;
+        margin-bottom: 8px;
+    }
+    .sn-item-pricing-cell {
+        text-align: left !important;
+        margin-left: 32px;
+        margin-bottom: 8px;
+    }
+    .sn-stepper-control {
+        margin-left: 32px;
+    }
+    .sn-item-total-cell {
+        text-align: left !important;
+        margin-left: 32px;
+        margin-top: 6px;
+    }
+    .sn-row-actions {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+    }
+    
     .sn-recom-grid {
         grid-template-columns: 100%;
     }
     .sn-trust-assurance-bar {
         grid-template-columns: 100%;
-        padding: 20px;
     }
 
-    /* Mobile Sticky Bottom Checkout & Voucher Dock */
     .sn-mobile-sticky-dock {
-        display: flex;
-        flex-direction: column;
+        display: block;
         position: fixed;
-        bottom: 56px; /* Sits directly above bottom nav */
+        bottom: 0;
         left: 0;
         right: 0;
         z-index: 999;
         background: #ffffff;
-        border-top: 1px solid #f1f5f9;
-        box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
-    }
-    .sn-mobile-voucher-bar {
-        background: #fff1f2;
-        border-bottom: 1px solid #ffe4e6;
-        padding: 8px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 700;
-        color: #e11d48;
-    }
-    .sn-mv-left {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .sn-mv-add-btn {
-        background: #ffffff;
-        border: 1px solid #fda4af;
-        color: #e11d48;
-        font-size: 11px;
-        font-weight: 800;
-        padding: 2px 10px;
-        border-radius: 9999px;
-        cursor: pointer;
+        border-top: 1px solid var(--sn-border-strong);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
     }
     .sn-mobile-dock-row {
         display: flex;
@@ -1899,6 +1507,15 @@ body.shopnext-theme {
         font-weight: 700;
         color: var(--sn-dark);
         margin: 0;
+        cursor: pointer;
+        user-select: none;
+    }
+    .sn-mobile-all-check input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        pointer-events: none;
     }
     .sn-mobile-totals-col {
         text-align: right;
@@ -1920,12 +1537,11 @@ body.shopnext-theme {
         background: #fab802;
         border: none;
         color: #111827;
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 800;
-        padding: 10px 18px;
-        border-radius: 10px;
+        padding: 9px 16px;
+        border-radius: 6px;
         cursor: pointer;
-        box-shadow: 0 2px 8px rgba(250, 184, 2, 0.3);
     }
 }
 </style>
@@ -1951,15 +1567,15 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `sn-toast ${type}`;
     toast.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
         <span>${message}</span>
     `;
     container.appendChild(toast);
     setTimeout(() => {
-        toast.style.transition = 'all 0.3s ease';
+        toast.style.transition = 'all 0.25s ease';
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(10px)';
-        setTimeout(() => toast.remove(), 300);
+        setTimeout(() => toast.remove(), 250);
     }, 3500);
 }
 
@@ -2117,7 +1733,7 @@ function removeSingleItem(index, productId) {
             row.remove();
             recalculateCart();
             checkEmptyState();
-        }, 280);
+        }, 250);
     }
 
     const formData = new FormData();
@@ -2162,7 +1778,7 @@ function batchRemoveSelected() {
     setTimeout(() => {
         recalculateCart();
         checkEmptyState();
-    }, 300);
+    }, 280);
 
     const formData = new FormData();
     formData.append('action', 'bulk_delete');
@@ -2190,7 +1806,7 @@ function moveToWishlist(index, productId, productName) {
             row.remove();
             recalculateCart();
             checkEmptyState();
-        }, 280);
+        }, 250);
     }
 
     const formData = new FormData();
@@ -2230,18 +1846,7 @@ function batchMoveToWishlist() {
     });
 }
 
-// 7. COLOR SWATCH SELECTOR
-function selectColor(el, colorName) {
-    const row = el.closest('.sn-cart-item-row');
-    if (!row) return;
-    row.querySelectorAll('.sn-color-dot').forEach(dot => dot.classList.remove('active'));
-    el.classList.add('active');
-    const colorLabel = row.querySelector('.sn-active-color-name');
-    if (colorLabel) colorLabel.textContent = colorName;
-    showToast(`Color updated to ${colorName}`);
-}
-
-// 8. PROMO CODE APPLICATION
+// 7. PROMO CODE APPLICATION
 function handleApplyPromo(manualCode = null) {
     const input = document.getElementById('promoInput');
     const code = manualCode || (input ? input.value.trim().toUpperCase() : '');
@@ -2292,13 +1897,7 @@ function handleApplyPromo(manualCode = null) {
     });
 }
 
-function applyPromo(code) {
-    const input = document.getElementById('promoInput');
-    if (input) input.value = code;
-    handleApplyPromo(code);
-}
-
-// 9. QUICK ADD RECOMMENDATION TO CART
+// 8. QUICK ADD RECOMMENDATION TO CART
 function quickAddToCart(productId, productName, price, image, subtitle) {
     const formData = new FormData();
     formData.append('product_id', productId);
@@ -2314,16 +1913,15 @@ function quickAddToCart(productId, productName, price, image, subtitle) {
         if (data.cart_count) {
             updateHeaderCartBadges(data.cart_count);
         }
-        // Smoothly reload page after 800ms to integrate the new item
-        setTimeout(() => window.location.reload(), 700);
+        setTimeout(() => window.location.reload(), 600);
     })
     .catch(() => {
         showToast(`"${productName}" added to cart!`, 'success');
-        setTimeout(() => window.location.reload(), 700);
+        setTimeout(() => window.location.reload(), 600);
     });
 }
 
-// 10. CHECK EMPTY STATE & AUTO-TRANSITION
+// 9. CHECK EMPTY STATE & AUTO-TRANSITION
 function checkEmptyState() {
     const rows = document.querySelectorAll('.sn-cart-item-row');
     if (rows.length === 0) {
@@ -2331,7 +1929,7 @@ function checkEmptyState() {
     }
 }
 
-// 11. UPDATE HEADER CART BADGES
+// 10. UPDATE HEADER CART BADGES
 function updateHeaderCartBadges(count) {
     const desktopBadge = document.getElementById('sn-cart-badge-count');
     if (desktopBadge) desktopBadge.textContent = count;
@@ -2357,4 +1955,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<?php require_once('footer.php'); ?>
+<?php require_once(__DIR__ . '/footer.php'); ?>

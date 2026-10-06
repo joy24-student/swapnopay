@@ -12,45 +12,57 @@ header('Access-Control-Allow-Origin: *');
 $query = isset($_GET['query']) ? trim($_GET['query']) : '';
 $suggestions = [];
 
-if (strlen($query) >= 2) {
+if (strlen($query) >= 1) {
     try {
-        // Search in product names and descriptions
+        $searchTerm = '%' . mb_strtolower($query, 'UTF-8') . '%';
+        $prefixTerm = mb_strtolower($query, 'UTF-8') . '%';
+
+        // Search in product names and descriptions with prefix matches ordered first for typing completion
         $statement = $pdo->prepare(
-            "SELECT DISTINCT
+            "SELECT 
                 p_id, 
                 p_name,
                 p_featured_photo,
                 p_current_price,
                 ecat_id
              FROM tbl_product 
-             WHERE (p_name LIKE ? OR p_short_description LIKE ?) 
-             WHERE (p_name ILIKE ? OR p_short_description ILIKE ?) 
+             WHERE (
+                 LOWER(p_name) LIKE ? 
+                 OR LOWER(COALESCE(p_short_description, '')) LIKE ? 
+                 OR LOWER(COALESCE(p_description, '')) LIKE ?
+             ) 
              AND p_is_active = 1
-             ORDER BY p_name ASC
-             LIMIT 15"
+             ORDER BY 
+                 CASE 
+                     WHEN LOWER(p_name) LIKE ? THEN 0 
+                     WHEN LOWER(p_name) LIKE ? THEN 1 
+                     ELSE 2 
+                 END, 
+                 p_name ASC
+             LIMIT 12"
         );
         
-        $searchTerm = '%' . $query . '%';
-        $statement->execute([$searchTerm, $searchTerm]);
+        $statement->execute([$searchTerm, $searchTerm, $searchTerm, $prefixTerm, $searchTerm]);
         $results = $statement->fetchAll(PDO::FETCH_ASSOC);
         
-        // Format suggestions with additional info
+        // Format suggestions with additional info for typing completion
         foreach ($results as $product) {
             $suggestions[] = [
-                'id' => $product['p_id'],
+                'id' => (int)$product['p_id'],
                 'name' => $product['p_name'],
                 'price' => $product['p_current_price'],
-                'image' => isset($product['p_featured_photo']) ? $product['p_featured_photo'] : '',
-                'url' => BASE_URL . 'product.php?id=' . $product['p_id']
+                'image' => !empty($product['p_featured_photo']) ? $product['p_featured_photo'] : '',
+                'url' => BASE_URL . 'product.php?id=' . (int)$product['p_id'],
+                'completion' => $product['p_name']
             ];
         }
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         // Return error response
         http_response_code(500);
-        $suggestions = ['error' => 'Database error occurred'];
+        $suggestions = ['error' => 'Database error occurred: ' . $e->getMessage()];
     }
 } else {
-    // Return empty suggestions if query is too short
+    // Return empty suggestions if query is empty
     $suggestions = [];
 }
 

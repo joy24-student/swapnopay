@@ -175,7 +175,7 @@ require_once('header.php');
         <?php foreach ($curatedDeals as $idx => $item): 
             $isWishlisted = in_array($item['id'], $customerWishlist);
         ?>
-            <div class="sn-deal-card" data-category="<?php echo htmlspecialchars($item['category']); ?>">
+            <div class="sn-deal-card" data-href="<?php echo htmlspecialchars($item['url']); ?>" data-category="<?php echo htmlspecialchars($item['category']); ?>" style="cursor:pointer;">
                 <!-- Card Top: Discount Badge & Wishlist Button -->
                 <div class="sn-deal-card-top">
                     <span class="sn-deal-discount-badge"><?php echo htmlspecialchars($item['discount']); ?></span>

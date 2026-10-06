@@ -27,10 +27,34 @@ if(isset($_POST['form1'])) {
     	}
     }
 
+    $path = $_FILES['photo']['name'] ?? '';
+    $path_tmp = $_FILES['photo']['tmp_name'] ?? '';
+
+    if($path != '') {
+        $ext = pathinfo( $path, PATHINFO_EXTENSION );
+        $ext = strtolower($ext);
+        if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' && $ext!='webp' ) {
+            $valid = 0;
+            $error_message .= 'You must have to upload jpg, jpeg, gif, webp or png file<br>';
+        }
+    }
+
     if($valid == 1) {    	
-		// updating into the database
-		$statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=? WHERE tcat_id=?");
-		$statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$_REQUEST['id']));
+        if($path == '') {
+            // updating into the database without changing photo
+            $statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=? WHERE tcat_id=?");
+            $statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$_REQUEST['id']));
+        } else {
+            $current_photo = $_POST['current_photo'] ?? '';
+            if(!empty($current_photo) && file_exists('../assets/uploads/'.$current_photo)) {
+                unlink('../assets/uploads/'.$current_photo);
+            }
+            $final_name = 'tcat-'.$_REQUEST['id'].'-'.time().'.'.$ext;
+            move_uploaded_file( $path_tmp, '../assets/uploads/'.$final_name );
+
+            $statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=?,photo=? WHERE tcat_id=?");
+            $statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$final_name,$_REQUEST['id']));
+        }
 
     	$success_message = 'Top Category is updated successfully.';
     }
@@ -68,6 +92,7 @@ if(!isset($_REQUEST['id'])) {
 foreach ($result as $row) {
 	$tcat_name = $row['tcat_name'];
     $show_on_menu = $row['show_on_menu'];
+    $photo = $row['photo'] ?? '';
 }
 ?>
 
@@ -92,7 +117,8 @@ foreach ($result as $row) {
 		</div>
 		<?php endif; ?>
 
-        <form class="form-horizontal" action="" method="post">
+        <form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="current_photo" value="<?php echo htmlspecialchars($photo, ENT_QUOTES, 'UTF-8'); ?>">
 
         <div class="box box-info">
 
@@ -100,7 +126,24 @@ foreach ($result as $row) {
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">Top Category Name <span>*</span></label>
                     <div class="col-sm-4">
-                        <input type="text" class="form-control" name="tcat_name" value="<?php echo $tcat_name; ?>">
+                        <input type="text" class="form-control" name="tcat_name" value="<?php echo htmlspecialchars($tcat_name, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">Existing Photo</label>
+                    <div class="col-sm-6" style="padding-top:6px;">
+                        <?php if(!empty($photo) && file_exists('../assets/uploads/'.$photo)): ?>
+                            <img src="../assets/uploads/<?php echo htmlspecialchars($photo, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($tcat_name, ENT_QUOTES, 'UTF-8'); ?>" style="max-width:140px;max-height:140px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.15);object-fit:cover;">
+                        <?php else: ?>
+                            <span class="text-muted" style="font-size:12px;color:#888;">No photo uploaded</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">Photo</label>
+                    <div class="col-sm-6" style="padding-top:6px;">
+                        <input type="file" name="photo">
+                        <p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp</p>
                     </div>
                 </div>
                 <div class="form-group">

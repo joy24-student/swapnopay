@@ -23,7 +23,29 @@ if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?page/([0-9]+)/?$#', $path, $m)) {
     $_GET['page'] = (int)$m[1];
 }
 
-require_once('header.php'); 
+require_once(__DIR__ . '/header.php'); 
+if (file_exists(__DIR__ . '/inc_feed_card.php')) {
+    require_once(__DIR__ . '/inc_feed_card.php');
+}
+if (!function_exists('renderAliProductCard')) {
+    function renderAliProductCard($p, $currencySymbol = '৳ ') {
+        $pId = (int)($p['p_id'] ?? 0);
+        $pName = htmlspecialchars($p['p_name'] ?? '');
+        $currPrice = (float)str_replace(',', '', (string)($p['p_current_price'] ?? 0));
+        $prodPhoto = !empty($p['p_featured_photo']) ? $p['p_featured_photo'] : 'assets/images/no-image.png';
+        if (!str_starts_with($prodPhoto, 'http')) {
+            $prodPhoto = BASE_URL . 'assets/uploads/' . $prodPhoto;
+        }
+        $pUrl = function_exists('getProductURL') ? getProductURL($pId, $p['p_name'] ?? '', BASE_URL) : BASE_URL . 'product.php?id=' . $pId;
+        return '<div class="sn-product-card sn-feed-card" data-id="' . $pId . '" data-href="' . htmlspecialchars($pUrl) . '">
+            <a href="' . htmlspecialchars($pUrl) . '" class="sn-product-card-link" style="text-decoration:none; color:inherit;">
+                <div class="sn-product-img-box"><img src="' . htmlspecialchars($prodPhoto) . '" alt="' . $pName . '" loading="lazy"></div>
+                <h3 class="sn-product-title">' . $pName . '</h3>
+                <div class="sn-price-current">' . $currencySymbol . number_format($currPrice, 2) . '</div>
+            </a>
+        </div>';
+    }
+}
 
 // -------------------------------------------------------------------------
 // 1. FETCH GLOBAL SETTINGS & SLIDERS FROM SUPABASE (MICROCACHED)
@@ -96,47 +118,102 @@ $promo2_btn   = !empty($s['promo_banner2_btn_text']) ? $s['promo_banner2_btn_tex
 $promo2_url   = !empty($s['promo_banner2_btn_url']) ? $s['promo_banner2_btn_url'] : 'product-category.php?id=1&type=top-category';
 $promo2_img   = !empty($s['promo_banner2_image']) ? $s['promo_banner2_image'] : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/promo_fashion.jpg';
 
-// Featured Products Defaults & Data
-$featured_products_title = !empty($s['featured_products_title']) ? $s['featured_products_title'] : 'Featured Products';
+// -------------------------------------------------------------------------
+// 2. PERSONALIZED HOME FEED (ALIEXPRESS STYLE) INITIAL BATCH
+// -------------------------------------------------------------------------
+$featured_products_title = !empty($s['featured_products_title']) ? $s['featured_products_title'] : 'More to Love';
+$featured_limit = (!empty($s['total_featured_product_home']) && (int)$s['total_featured_product_home'] > 0) ? (int)$s['total_featured_product_home'] : 10;
 $featuredProducts = [];
-try {
-    $prodStmt = $pdo->prepare("SELECT p_id, p_name, p_short_description, p_current_price, p_old_price, p_featured_photo, is_top_sale 
-                             FROM tbl_product 
-                             WHERE p_is_featured = 1 AND p_is_active = 1 
-                             ORDER BY p_id DESC 
-                             LIMIT 8");
-    $prodStmt->execute();
-    $featuredProducts = $prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-} catch (Throwable $_) {}
 
-if (empty($featuredProducts)) {
-    // If no products explicitly marked featured, display active store products
+// Gather server-side personalization signals
+$ssrSignalIds = [];
+if (!empty($_SESSION['recently_viewed']) && is_array($_SESSION['recently_viewed'])) {
+    $ssrSignalIds = array_merge($ssrSignalIds, array_map('intval', $_SESSION['recently_viewed']));
+}
+if (!empty($_COOKIE['sn_recently_viewed'])) {
+    $cRec = json_decode($_COOKIE['sn_recently_viewed'], true);
+    if (is_array($cRec)) {
+        $ssrSignalIds = array_merge($ssrSignalIds, array_map('intval', $cRec));
+    }
+}
+if (!empty($_SESSION['cart_p_id']) && is_array($_SESSION['cart_p_id'])) {
+    $ssrSignalIds = array_merge($ssrSignalIds, array_map('intval', $_SESSION['cart_p_id']));
+}
+if (!empty($_SESSION['customer']['cust_id'])) {
+    $cId = (int)$_SESSION['customer']['cust_id'];
     try {
-        $prodStmt = $pdo->prepare("SELECT p_id, p_name, p_short_description, p_current_price, p_old_price, p_featured_photo, is_top_sale 
-                                 FROM tbl_product 
-                                 WHERE p_is_active = 1 
-                                 ORDER BY p_id DESC 
-                                 LIMIT 8");
-        $prodStmt->execute();
-        $featuredProducts = $prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $wStmt = $pdo->prepare("SELECT product_id FROM tbl_wishlist WHERE cust_id = ? ORDER BY wishlist_id DESC LIMIT 10");
+        $wStmt->execute([$cId]);
+        $wIds = $wStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $ssrSignalIds = array_merge($ssrSignalIds, array_map('intval', $wIds));
+    } catch (Throwable $_) {}
+}
+$ssrSignalIds = array_values(array_unique(array_filter($ssrSignalIds)));
+
+$preferredEcats = [];
+$preferredMcats = [];
+$preferredTcats = [];
+
+if (!empty($ssrSignalIds)) {
+    $inSignals = implode(',', array_slice($ssrSignalIds, 0, 20));
+    try {
+        $catStmt = $pdo->query("
+            SELECT p.p_id, p.ecat_id, e.mcat_id, m.tcat_id
+            FROM tbl_product p
+            LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
+            LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+            WHERE p.p_id IN ($inSignals)
+        ");
+        while ($row = $catStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($row['ecat_id'])) $preferredEcats[$row['ecat_id']] = ($preferredEcats[$row['ecat_id']] ?? 0) + 1;
+            if (!empty($row['mcat_id'])) $preferredMcats[$row['mcat_id']] = ($preferredMcats[$row['mcat_id']] ?? 0) + 1;
+            if (!empty($row['tcat_id'])) $preferredTcats[$row['tcat_id']] = ($preferredTcats[$row['tcat_id']] ?? 0) + 1;
+        }
     } catch (Throwable $_) {}
 }
 
-// Fetch Real Ratings from Database
-$ratingMap = [];
-if (!empty($featuredProducts)) {
+$numCurr = "CAST(NULLIF(REPLACE(COALESCE(p.p_current_price, '0'), ',', ''), '') AS numeric)";
+$numOld  = "CAST(NULLIF(REPLACE(COALESCE(p.p_old_price, '0'), ',', ''), '') AS numeric)";
+
+$scoreParts = [];
+if (!empty($preferredEcats)) {
+    $scoreParts[] = "(CASE WHEN p.ecat_id IN (" . implode(',', array_keys($preferredEcats)) . ") THEN 60 ELSE 0 END)";
+}
+if (!empty($preferredMcats)) {
+    $scoreParts[] = "(CASE WHEN e.mcat_id IN (" . implode(',', array_keys($preferredMcats)) . ") THEN 30 ELSE 0 END)";
+}
+if (!empty($preferredTcats)) {
+    $scoreParts[] = "(CASE WHEN m.tcat_id IN (" . implode(',', array_keys($preferredTcats)) . ") THEN 15 ELSE 0 END)";
+}
+$scoreParts[] = "(CASE WHEN {$numOld} > {$numCurr} AND {$numOld} > 0 THEN (({$numOld} - {$numCurr}) / {$numOld}) * 25 ELSE 0 END)";
+$scoreParts[] = "(CASE WHEN p.p_is_featured = 1 THEN 20 ELSE 0 END)";
+$scoreParts[] = "(CASE WHEN p.is_top_sale = 1 THEN 15 ELSE 0 END)";
+$scoreParts[] = "(CASE WHEN p.is_official = 1 OR p.is_premium = 1 THEN 10 ELSE 0 END)";
+$scoreParts[] = "LEAST(p.p_total_view * 0.02, 30)";
+
+$scoreSql = implode(' + ', $scoreParts);
+$initialOrder = "({$scoreSql}) DESC, p.p_id DESC";
+
+try {
+    $prodStmt = $pdo->query("
+        SELECT p.*, e.mcat_id, m.tcat_id,
+               COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating,
+               COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count
+        FROM tbl_product p
+        LEFT JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
+        LEFT JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
+        WHERE p.p_is_active = 1
+        ORDER BY {$initialOrder}
+        LIMIT {$featured_limit}
+    ");
+    $featuredProducts = $prodStmt ? ($prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+} catch (Throwable $_) {
     try {
-        $prodIds = array_column($featuredProducts, 'p_id');
-        $inClause = implode(',', array_map('intval', $prodIds));
-        $rStmt = $pdo->query("SELECT p_id, AVG(rating) as avg_rating, COUNT(*) as rev_count FROM tbl_rating WHERE p_id IN ($inClause) GROUP BY p_id");
-        $rRows = $rStmt ? $rStmt->fetchAll(PDO::FETCH_ASSOC) : [];
-        foreach ($rRows as $rr) {
-            $ratingMap[$rr['p_id']] = [
-                'rating' => round((float)$rr['avg_rating'], 1),
-                'count' => $rr['rev_count']
-            ];
-        }
-    } catch (Throwable $_) {}
+        $prodStmt = $pdo->query("SELECT p.*, COALESCE((SELECT AVG(rating) FROM tbl_rating WHERE p_id = p.p_id), 0) as avg_rating, COALESCE((SELECT COUNT(*) FROM tbl_rating WHERE p_id = p.p_id), 0) as rev_count FROM tbl_product p WHERE p.p_is_active = 1 ORDER BY p.p_total_view DESC, p.p_id DESC LIMIT {$featured_limit}");
+        $featuredProducts = $prodStmt ? ($prodStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    } catch (Throwable $__) {
+        $featuredProducts = [];
+    }
 }
 
 // Trust Bar Defaults
@@ -169,6 +246,7 @@ $currencySymbol = '৳ ';
 }
 
 *, *::before, *::after {
+    box-sizing: border-box;
     outline: none !important;
 }
 
@@ -207,6 +285,11 @@ button:focus-visible {
     box-shadow: none !important;
 }
 
+html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
 body {
     background-color: var(--sn-bg-page);
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -222,15 +305,27 @@ body {
     }
 }
 
+.content-wrapper-main,
+.sn-page-container {
+    overflow-x: clip;
+    max-width: 100vw;
+}
+
 .sn-main-content {
     margin-top: 0 !important;
     padding: 16px 0 48px 0 !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: clip;
 }
 
 .sn-container {
     max-width: 1240px;
+    width: 100%;
     margin: 0 auto;
     padding: 0 16px;
+    box-sizing: border-box;
 }
 
 /* SECTION HEADERS */
@@ -633,14 +728,111 @@ body {
     margin: 0;
 }
 
-/* 4. PAYDAY SALE PROMO BANNER */
+/* ==========================================================================
+   LIVE DEAL MARQUEE RIBBON (DARAZ / ALIEXPRESS TICKER)
+   ========================================================================== */
+.sn-live-marquee-wrap {
+    background: linear-gradient(105deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    border-radius: 14px;
+    padding: 10px 16px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(250, 184, 2, 0.25);
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
+    display: flex;
+    align-items: center;
+}
+
+.sn-live-marquee-wrap::before,
+.sn-live-marquee-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    z-index: 2;
+    pointer-events: none;
+}
+.sn-live-marquee-wrap::before {
+    left: 0;
+    background: linear-gradient(90deg, #0f172a 20%, transparent);
+}
+.sn-live-marquee-wrap::after {
+    right: 0;
+    background: linear-gradient(270deg, #0f172a 20%, transparent);
+}
+
+.sn-live-marquee-track {
+    display: inline-flex;
+    align-items: center;
+    gap: 36px;
+    white-space: nowrap;
+    animation: snMarqueeScroll 28s linear infinite;
+    will-change: transform;
+}
+
+.sn-live-marquee-wrap:hover .sn-live-marquee-track {
+    animation-play-state: paused;
+}
+
+@keyframes snMarqueeScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.sn-marquee-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none !important;
+}
+
+.sn-marquee-tag {
+    background: #fab802;
+    color: #0f172a;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 7px;
+    border-radius: 5px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.sn-marquee-tag.red {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.sn-marquee-tag.purple {
+    background: #8b5cf6;
+    color: #ffffff;
+}
+
+.sn-marquee-tag.green {
+    background: #10b981;
+    color: #ffffff;
+}
+
+.sn-marquee-sep {
+    color: #fab802;
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+/* ==========================================================================
+   4. PAYDAY SALE PROMO BANNER (MATCHING SCREENSHOT + HIGH MOTION)
+   ========================================================================== */
 .sn-payday-section {
     margin-bottom: 26px;
 }
 
 .sn-payday-banner {
-    background: linear-gradient(100deg, #0d121c 0%, #151d2a 50%, #1e293b 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(100deg, #0a0e17 0%, #151d2a 50%, #1e293b 100%);
+    border: 1px solid rgba(250, 184, 2, 0.22);
     border-radius: 20px;
     padding: 24px 36px;
     display: flex;
@@ -648,9 +840,29 @@ body {
     justify-content: space-between;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16), 0 0 20px rgba(250, 184, 2, 0.05);
 }
 
+/* Diagonal Shimmer Sweep Light Animation */
+.sn-payday-banner::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(60deg, transparent 40%, rgba(255, 255, 255, 0.08) 50%, transparent 60%);
+    transform: translateX(-100%) rotate(25deg);
+    animation: snPaydayShimmer 6s infinite ease-in-out;
+    pointer-events: none;
+}
+
+@keyframes snPaydayShimmer {
+    0% { transform: translateX(-100%) rotate(25deg); }
+    35%, 100% { transform: translateX(100%) rotate(25deg); }
+}
+
+/* Left Angled Badge with Neon Outline */
 .sn-payday-left {
     background: #0f172a;
     border: 2px solid #fab802;
@@ -658,8 +870,22 @@ body {
     padding: 12px 20px;
     text-align: center;
     transform: rotate(-3deg);
-    box-shadow: 0 4px 14px rgba(250, 184, 2, 0.2);
+    box-shadow: 0 4px 18px rgba(250, 184, 2, 0.25), inset 0 0 12px rgba(250, 184, 2, 0.1);
     flex-shrink: 0;
+    animation: snBadgeNeon 3s infinite ease-in-out alternate;
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes snBadgeNeon {
+    0% {
+        border-color: #fab802;
+        box-shadow: 0 4px 16px rgba(250, 184, 2, 0.25), inset 0 0 8px rgba(250, 184, 2, 0.1);
+    }
+    100% {
+        border-color: #fde047;
+        box-shadow: 0 6px 24px rgba(250, 184, 2, 0.45), inset 0 0 16px rgba(250, 184, 2, 0.2);
+    }
 }
 
 .sn-payday-badge-title {
@@ -668,13 +894,23 @@ body {
     color: #ffffff;
     line-height: 1.05;
     letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Solid Yellow Bar under SALE (exact match to screenshot) */
+.sn-payday-badge-bar {
+    width: 100%;
+    height: 3px;
+    background: #fab802;
+    border-radius: 2px;
+    margin: 4px auto 3px auto;
+    box-shadow: 0 0 8px rgba(250, 184, 2, 0.6);
 }
 
 .sn-payday-badge-sub {
     font-size: 11px;
     font-weight: 800;
     color: #fab802;
-    margin-top: 4px;
     letter-spacing: 0.8px;
 }
 
@@ -682,6 +918,8 @@ body {
     flex: 1;
     padding: 0 32px;
     color: #ffffff;
+    position: relative;
+    z-index: 1;
 }
 
 .sn-payday-center-title {
@@ -699,53 +937,208 @@ body {
     margin-bottom: 14px;
 }
 
+/* Claim Now Button with Radiating Ambient Glow Pulse */
 .sn-payday-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     background: #fab802;
     color: #0f172a !important;
     font-size: 13px;
     font-weight: 700;
-    padding: 8px 20px;
+    padding: 9px 22px;
     border-radius: 50px;
     text-decoration: none !important;
-    box-shadow: 0 4px 12px rgba(250, 184, 2, 0.3);
-    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(250, 184, 2, 0.35);
+    transition: all 0.25s ease;
+    animation: snGlowPulse 2.4s infinite ease-in-out;
+}
+
+@keyframes snGlowPulse {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(250, 184, 2, 0.4), 0 0 15px rgba(250, 184, 2, 0.15);
+    }
+    50% {
+        box-shadow: 0 4px 24px rgba(250, 184, 2, 0.75), 0 0 28px rgba(250, 184, 2, 0.35);
+    }
 }
 
 .sn-payday-btn:hover {
-    background: #e5a700;
-    transform: translateY(-1px);
+    background: #f59e0b;
+    transform: translateY(-2px) scale(1.02);
 }
 
+.sn-payday-btn svg {
+    transition: transform 0.25s ease;
+}
+
+.sn-payday-btn:hover svg {
+    transform: translateX(4px);
+}
+
+/* Right 3D Cart Floating Animation */
 .sn-payday-right {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     max-height: 120px;
+    position: relative;
+    z-index: 1;
 }
 
 .sn-payday-right img {
-    max-height: 110px;
+    max-height: 115px;
     max-width: 180px;
     object-fit: contain;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.25));
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
+    animation: snCartFloat 3.8s ease-in-out infinite alternate;
+    will-change: transform;
 }
 
-/* 5. FLASH SALE SECTION */
+@keyframes snCartFloat {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-6px) rotate(-1.5deg);
+    }
+    100% {
+        transform: translateY(2px) rotate(1deg);
+    }
+}
+
+/* ==========================================================================
+   MULTI-CARD SLIDING CAROUSEL SYSTEM & SECTION HEADERS
+   ========================================================================== */
+.sn-header-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sn-carousel-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sn-carousel-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 0;
+}
+
+.sn-carousel-btn:hover:not(:disabled) {
+    background: #fab802;
+    border-color: #fab802;
+    color: #0f172a;
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(250, 184, 2, 0.35);
+}
+
+.sn-carousel-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sn-carousel-container {
+    position: relative;
+    width: 100%;
+}
+
+/* ==========================================================================
+   5. FLASH SALE SECTION (MULTI-CARD CAROUSEL + LIVE COUNTDOWN + STOCK METER)
+   ========================================================================== */
 .sn-flash-section {
-    margin-bottom: 26px;
+    margin-bottom: 28px;
 }
 
+.sn-flash-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.sn-flash-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    padding: 4px 12px;
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.08);
+}
+
+.sn-countdown-label {
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.6px;
+    color: #ef4444;
+    font-weight: 800;
+}
+
+.sn-countdown-boxes {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.sn-timer-box {
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    min-width: 22px;
+    height: 20px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+}
+
+.sn-timer-colon {
+    font-weight: 900;
+    color: #ef4444;
+    font-size: 11px;
+}
+
+/* Multi-Card Smooth Sliding Track */
 .sn-flash-scroll {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 2px 14px 2px;
+}
+
+.sn-flash-scroll::-webkit-scrollbar {
+    display: none;
 }
 
 .sn-flash-card {
+    flex: 0 0 calc((100% - 48px) / 4);
+    min-width: 220px;
+    scroll-snap-align: start;
     background: #ffffff;
     border: 1px solid #f1f5f9;
     border-radius: 16px;
@@ -755,15 +1148,14 @@ body {
     position: relative;
     text-decoration: none !important;
     color: var(--sn-dark) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    transition: all 0.25s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sn-flash-card:hover {
-    transform: translateY(-3px);
-    border-color: #f1f5f9;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    outline: none !important;
+    transform: translateY(-4px);
+    border-color: rgba(250, 184, 2, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 .sn-flash-card-top {
@@ -775,12 +1167,16 @@ body {
 }
 
 .sn-flash-discount {
-    background: #ef4444;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     color: #ffffff;
     font-size: 11px;
     font-weight: 800;
-    padding: 2px 7px;
+    padding: 2.5px 8px;
     border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
 
 .sn-flash-wishlist {
@@ -802,10 +1198,23 @@ body {
     background: #fef2f2;
     color: #ef4444;
     border-color: #fecaca;
+    transform: scale(1.1);
 }
 
 .sn-flash-wishlist.active svg {
     fill: #ef4444;
+}
+
+/* Heart Pop Micro-Interaction */
+@keyframes snHeartPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.4); }
+    70% { transform: scale(0.88); }
+    100% { transform: scale(1); }
+}
+
+.sn-heart-pop {
+    animation: snHeartPop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
 
 .sn-flash-img-box {
@@ -824,11 +1233,11 @@ body {
     max-height: 135px;
     max-width: 85%;
     object-fit: contain;
-    transition: transform 0.3s ease;
+    transition: transform 0.35s ease;
 }
 
 .sn-flash-card:hover .sn-flash-img-box img {
-    transform: scale(1.05);
+    transform: scale(1.07);
 }
 
 .sn-flash-title {
@@ -863,18 +1272,64 @@ body {
     text-decoration: line-through;
 }
 
-/* 6. DAILY SHIRA DEALS */
+/* Stock Claim Meter Bar */
+.sn-flash-stock-wrap {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sn-flash-stock-bar {
+    width: 100%;
+    height: 6px;
+    background: #fee2e2;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.sn-flash-stock-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f97316 0%, #ef4444 100%);
+    border-radius: 999px;
+    transition: width 0.6s ease;
+}
+
+.sn-flash-stock-text {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ==========================================================================
+   6. DAILY SHIRA DEALS (MULTI-CARD CAROUSEL)
+   ========================================================================== */
 .sn-shira-section {
-    margin-bottom: 26px;
+    margin-bottom: 28px;
 }
 
 .sn-shira-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 2px 14px 2px;
+}
+
+.sn-shira-grid::-webkit-scrollbar {
+    display: none;
 }
 
 .sn-shira-card {
+    flex: 0 0 calc((100% - 48px) / 4);
+    min-width: 200px;
+    scroll-snap-align: start;
     background: #ffffff;
     border: 1px solid #f1f5f9;
     border-radius: 16px;
@@ -884,14 +1339,14 @@ body {
     align-items: center;
     text-decoration: none !important;
     color: var(--sn-dark) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    transition: all 0.25s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sn-shira-card:hover {
-    transform: translateY(-3px);
-    border-color: #f1f5f9;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    transform: translateY(-4px);
+    border-color: rgba(250, 184, 2, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
     outline: none !important;
 }
 
@@ -911,11 +1366,11 @@ body {
     max-height: 120px;
     max-width: 85%;
     object-fit: contain;
-    transition: transform 0.3s ease;
+    transition: transform 0.35s ease;
 }
 
 .sn-shira-card:hover .sn-shira-img-box img {
-    transform: scale(1.05);
+    transform: scale(1.07);
 }
 
 .sn-shira-badge {
@@ -939,15 +1394,92 @@ body {
     max-width: 100%;
 }
 
-/* 7. FEATURED PRODUCTS SECTION */
-.sn-featured-section {
-    margin-bottom: 26px;
+/* 7. ALIEXPRESS STYLE PERSONALIZED FEED & FEATURED SECTION */
+.sn-featured-section,
+.sn-feed-section {
+    margin-bottom: 34px;
+}
+
+.sn-feed-header-wrap {
+    margin-bottom: 14px;
+}
+
+.sn-feed-title-icon {
+    font-size: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sn-feed-header-badge {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid #fde68a;
+    letter-spacing: -0.2px;
+}
+
+.sn-feed-hint-text {
+    font-size: 12.5px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.sn-feed-tabs-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 6px 2px 14px 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sn-feed-tabs-wrap::-webkit-scrollbar {
+    display: none;
+}
+
+.sn-feed-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.sn-feed-tab:hover {
+    border-color: #cbd5e1;
+    color: #0f172a;
+    background: #f8fafc;
+    transform: translateY(-1px);
+}
+
+.sn-feed-tab.active {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
 }
 
 .sn-products-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 14px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .sn-product-card {
@@ -961,6 +1493,19 @@ body {
     border: 1px solid #f1f5f9;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     transition: all 0.25s ease;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.sn-product-card-link {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .sn-product-card:hover {
@@ -971,9 +1516,6 @@ body {
 }
 
 .sn-badge {
-    position: absolute;
-    top: 12px;
-    left: 12px;
     font-size: 10px;
     font-weight: 800;
     padding: 2px 8px;
@@ -981,6 +1523,194 @@ body {
     background: var(--sn-primary);
     color: #0f172a;
     z-index: 5;
+    display: inline-block;
+}
+
+.sn-feed-top-badges {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sn-badge-discount {
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    padding: 2px 7px !important;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}
+
+.sn-badge-choice {
+    background: #0f172a !important;
+    color: #fab802 !important;
+    font-weight: 800 !important;
+    padding: 2px 7px !important;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+}
+
+.sn-badge-topsale {
+    background: #f59e0b !important;
+    color: #0f172a !important;
+}
+
+.sn-card-wishlist {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 6;
+    color: #64748b;
+    transition: all 0.2s ease;
+}
+
+.sn-card-wishlist:hover,
+.sn-card-wishlist.active {
+    color: #ef4444;
+    background: #ffffff;
+    transform: scale(1.12);
+}
+
+.sn-feed-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 0 6px 0;
+    flex-wrap: wrap;
+}
+
+.sn-pill-choice {
+    background: #0f172a;
+    color: #fab802;
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.sn-pill-free {
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.sn-pill-top {
+    background: #fef3c7;
+    color: #b45309;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.sn-feed-dot-sep {
+    color: #cbd5e1;
+    font-weight: 700;
+    margin: 0 1px;
+}
+
+.sn-feed-sales {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.sn-feed-skeleton {
+    margin-top: 14px;
+}
+
+.sn-skeleton-card {
+    pointer-events: none;
+    background: #ffffff;
+}
+
+.sn-skeleton-box {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: snSkeletonShimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes snSkeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.sn-btn-feed-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 24px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    transition: all 0.2s ease;
+}
+
+.sn-btn-feed-more:hover {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15,23,42,0.12);
+}
+
+.sn-feed-end {
+    text-align: center;
+    padding: 30px 16px 10px 16px;
+}
+
+.sn-feed-end-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    padding: 9px 22px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.sn-feed-btn-top {
+    display: block;
+    margin: 12px auto 0 auto;
+    background: transparent;
+    border: none;
+    color: #d97706;
+    font-weight: 800;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.15s ease;
+}
+
+.sn-feed-btn-top:hover {
+    color: #b45309;
 }
 
 .sn-product-img-box {
@@ -1137,7 +1867,10 @@ body {
         grid-template-columns: repeat(6, 1fr);
     }
     .sn-products-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
     }
     .sn-hero-heading {
         font-size: 32px;
@@ -1333,6 +2066,21 @@ body {
         font-size: 8.5px !important;
     }
 
+    /* Live Deal Marquee mobile */
+    .sn-live-marquee-wrap {
+        padding: 7px 10px !important;
+        margin-bottom: 16px !important;
+        border-radius: 10px !important;
+    }
+    .sn-marquee-item {
+        font-size: 11.5px !important;
+        gap: 6px !important;
+    }
+    .sn-marquee-tag {
+        font-size: 8.5px !important;
+        padding: 1.5px 5px !important;
+    }
+
     /* Payday banner mobile */
     .sn-payday-banner {
         padding: 12px 14px !important;
@@ -1345,6 +2093,10 @@ body {
     }
     .sn-payday-badge-title {
         font-size: 12px !important;
+    }
+    .sn-payday-badge-bar {
+        height: 2px !important;
+        margin: 2px auto !important;
     }
     .sn-payday-badge-sub {
         font-size: 7.5px !important;
@@ -1361,15 +2113,30 @@ body {
         margin-bottom: 6px !important;
     }
     .sn-payday-btn {
-        padding: 4px 10px !important;
+        padding: 5px 12px !important;
         font-size: 9.5px !important;
     }
     .sn-payday-right img {
-        max-height: 52px !important;
-        max-width: 70px !important;
+        max-height: 55px !important;
+        max-width: 72px !important;
     }
 
     /* Flash sale mobile */
+    .sn-flash-header-left {
+        gap: 8px !important;
+    }
+    .sn-flash-countdown {
+        padding: 2.5px 8px !important;
+    }
+    .sn-countdown-label {
+        font-size: 8.5px !important;
+    }
+    .sn-timer-box {
+        font-size: 9.5px !important;
+        min-width: 18px !important;
+        height: 17px !important;
+        padding: 0 2px !important;
+    }
     .sn-flash-scroll {
         display: flex !important;
         gap: 12px !important;
@@ -1382,12 +2149,17 @@ body {
         display: none !important;
     }
     .sn-flash-card {
-        width: 175px !important;
+        width: 170px !important;
+        min-width: 170px !important;
+        flex: 0 0 170px !important;
         flex-shrink: 0 !important;
         padding: 12px !important;
     }
     .sn-flash-img-box {
         height: 120px !important;
+    }
+    .sn-flash-stock-text {
+        font-size: 9.5px !important;
     }
 
     /* Daily Shira deals mobile */
@@ -1404,11 +2176,192 @@ body {
     }
     .sn-shira-card {
         width: 140px !important;
+        min-width: 140px !important;
+        flex: 0 0 140px !important;
         flex-shrink: 0 !important;
         padding: 10px !important;
     }
     .sn-shira-img-box {
         height: 95px !important;
+    }
+
+    /* Mobile Container Padding & Clamp */
+    .sn-container {
+        padding: 0 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Featured Products mobile layout - STRICT 2-COLUMN CLAMPING */
+    .sn-featured-section,
+    .sn-feed-section {
+        margin-bottom: 24px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+    .sn-products-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .sn-product-card {
+        padding: 10px 8px !important;
+        border-radius: 12px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+    .sn-product-card-link {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .sn-product-img-box {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 125px !important;
+        border-radius: 10px !important;
+        margin-bottom: 6px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+    .sn-product-img-box img {
+        max-height: 110px !important;
+        max-width: 100% !important;
+        width: auto !important;
+        object-fit: contain !important;
+    }
+    .sn-product-title {
+        font-size: 11.5px !important;
+        min-height: 28px !important;
+        margin-bottom: 2px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        word-break: break-word !important;
+        overflow: hidden !important;
+    }
+    .sn-product-spec {
+        font-size: 9.5px !important;
+        margin-bottom: 4px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+    }
+    .sn-product-rating {
+        font-size: 10px !important;
+        margin-bottom: 5px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .sn-product-bottom {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+        padding-top: 6px !important;
+        box-sizing: border-box !important;
+    }
+    .sn-price-box {
+        min-width: 0 !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+    }
+    .sn-price-row {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+    }
+    .sn-current-price {
+        font-size: 13px !important;
+        white-space: nowrap !important;
+    }
+    .sn-old-price {
+        font-size: 9.5px !important;
+        white-space: nowrap !important;
+    }
+    .sn-btn-cart {
+        width: 28px !important;
+        height: 28px !important;
+        flex-shrink: 0 !important;
+    }
+    .sn-btn-cart svg {
+        width: 13px !important;
+        height: 13px !important;
+    }
+    .sn-badge {
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+        top: 8px !important;
+        left: 8px !important;
+    }
+
+    /* AliExpress Feed Mobile Layout */
+    .sn-feed-section {
+        margin-bottom: 24px !important;
+    }
+    .sn-feed-header-badge {
+        font-size: 9.5px !important;
+        padding: 2px 6px !important;
+    }
+    .sn-feed-tabs-wrap {
+        padding: 4px 2px 10px 2px !important;
+        gap: 6px !important;
+    }
+    .sn-feed-tab {
+        padding: 6px 12px !important;
+        font-size: 11.5px !important;
+        gap: 4px !important;
+    }
+    .sn-card-wishlist {
+        width: 26px !important;
+        height: 26px !important;
+        top: 8px !important;
+        right: 8px !important;
+    }
+    .sn-card-wishlist svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    .sn-feed-pill-row {
+        gap: 3px !important;
+        margin: 1px 0 4px 0 !important;
+    }
+    .sn-pill-choice, .sn-pill-free, .sn-pill-top {
+        font-size: 8.5px !important;
+        padding: 1px 4px !important;
+    }
+    .sn-feed-sales {
+        font-size: 10px !important;
+    }
+    .sn-btn-feed-more {
+        padding: 8px 18px !important;
+        font-size: 12px !important;
+    }
+    .sn-feed-end-badge {
+        font-size: 11.5px !important;
+        padding: 7px 16px !important;
     }
 }
 </style>
@@ -1615,13 +2568,75 @@ body {
         <?php endif; ?>
 
         <!-- ============================================================
-             4. PAYDAY SALE PROMO BANNER (MATCHING SCREENSHOT)
+             LIVE DEAL MARQUEE RIBBON (DARAZ / ALIEXPRESS INFINITE TICKER)
+             ============================================================ -->
+        <div class="sn-live-marquee-wrap">
+            <div class="sn-live-marquee-track">
+                <!-- Group 1 -->
+                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag red">HOT</span>
+                    <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag">VOUCHER</span>
+                    <span>Extra 15% OFF On Your First Order</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-item">
+                    <span class="sn-marquee-tag green">FREE DELIVERY</span>
+                    <span>Free Shipping Across Bangladesh on ৳2,000+</span>
+                </span>
+                <span class="sn-marquee-sep">✦</span>
+                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag purple">FLASH DEAL</span>
+                    <span>Limited Time Deals Refreshing Every 6 Hours</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-item">
+                    <span class="sn-marquee-tag">100% AUTHENTIC</span>
+                    <span>Verified Brands & 7 Days Hassle-Free Returns</span>
+                </span>
+                <span class="sn-marquee-sep">✦</span>
+
+                <!-- Group 2 (Duplicate for Seamless Infinite Marquee Loop) -->
+                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag red">HOT</span>
+                    <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag">VOUCHER</span>
+                    <span>Extra 15% OFF On Your First Order</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-item">
+                    <span class="sn-marquee-tag green">FREE DELIVERY</span>
+                    <span>Free Shipping Across Bangladesh on ৳2,000+</span>
+                </span>
+                <span class="sn-marquee-sep">✦</span>
+                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
+                    <span class="sn-marquee-tag purple">FLASH DEAL</span>
+                    <span>Limited Time Deals Refreshing Every 6 Hours</span>
+                </a>
+                <span class="sn-marquee-sep">✦</span>
+                <span class="sn-marquee-item">
+                    <span class="sn-marquee-tag">100% AUTHENTIC</span>
+                    <span>Verified Brands & 7 Days Hassle-Free Returns</span>
+                </span>
+                <span class="sn-marquee-sep">✦</span>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             4. PAYDAY SALE PROMO BANNER (MATCHING SCREENSHOT + MOTION)
              ============================================================ -->
         <section class="sn-payday-section">
             <div class="sn-payday-banner">
-                <!-- Left: Angled Badge -->
+                <!-- Left: Angled Badge with Solid Yellow Bar -->
                 <div class="sn-payday-left">
                     <div class="sn-payday-badge-title">PAYDAY<br>SALE</div>
+                    <div class="sn-payday-badge-bar"></div>
                     <div class="sn-payday-badge-sub">UP TO 80% OFF</div>
                 </div>
 
@@ -1635,7 +2650,7 @@ body {
                     </a>
                 </div>
 
-                <!-- Right: Shopping Cart with Packages Image -->
+                <!-- Right: Shopping Cart with Packages Image (Floating Levitation) -->
                 <div class="sn-payday-right">
                     <img src="assets/uploads/payday_cart.jpg" alt="Payday Shopping Cart" loading="lazy">
                 </div>
@@ -1643,76 +2658,116 @@ body {
         </section>
 
         <!-- ============================================================
-             5. FLASH SALE SECTION (MATCHING SCREENSHOT)
+             5. FLASH SALE SECTION (MULTI-CARD SLIDING CAROUSEL + LIVE COUNTDOWN)
              ============================================================ -->
         <section class="sn-flash-section">
             <div class="sn-section-header">
-                <h2 class="sn-section-title">
-                    <span class="sn-flash-icon">⚡</span>
-                    <span>Flash Sale</span>
-                </h2>
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-view-all">
-                    <span>Shop More</span>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>
+                <div class="sn-flash-header-left">
+                    <h2 class="sn-section-title">
+                        <span class="sn-flash-icon">⚡</span>
+                        <span>Flash Sale</span>
+                    </h2>
+                    <!-- Live Countdown Clock -->
+                    <div class="sn-flash-countdown" id="snFlashCountdown" title="Deals end soon!">
+                        <span class="sn-countdown-label">Ends In</span>
+                        <div class="sn-countdown-boxes">
+                            <span class="sn-timer-box" id="snFlashH">04</span>
+                            <span class="sn-timer-colon">:</span>
+                            <span class="sn-timer-box" id="snFlashM">28</span>
+                            <span class="sn-timer-colon">:</span>
+                            <span class="sn-timer-box" id="snFlashS">15</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sn-header-right-actions">
+                    <!-- Carousel Sliding Arrow Controls -->
+                    <div class="sn-carousel-nav sn-desktop-only">
+                        <button type="button" class="sn-carousel-btn" id="snFlashPrev" onclick="slideMultiCards('snFlashScroll', -1)" aria-label="Previous Flash Deals">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <button type="button" class="sn-carousel-btn" id="snFlashNext" onclick="slideMultiCards('snFlashScroll', 1)" aria-label="Next Flash Deals">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>deals.php" class="sn-view-all">
+                        <span>Shop More</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </a>
+                </div>
             </div>
 
-            <div class="sn-flash-scroll">
-                <?php
-                // Fetch dynamic flash sale items from active products in the store's database
-                $dbFlash = [];
-                try {
-                    $flashQuery = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active=1 ORDER BY p_id DESC LIMIT 8");
-                    if ($flashQuery) $dbFlash = $flashQuery->fetchAll(PDO::FETCH_ASSOC);
-                } catch (Throwable $e) {}
+            <div class="sn-carousel-container">
+                <div class="sn-flash-scroll" id="snFlashScroll">
+                    <?php
+                    // Fetch dynamic flash sale items from active products in the store's database
+                    $dbFlash = [];
+                    try {
+                        $flashQuery = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active=1 ORDER BY p_id DESC LIMIT 12");
+                        if ($flashQuery) $dbFlash = $flashQuery->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Throwable $e) {}
 
-                $flashItems = [];
-                if (!empty($dbFlash)) {
-                    foreach ($dbFlash as $prod) {
-                        $curr = (float)str_replace(',', '', (string)$prod['p_current_price']);
-                        $old = (float)str_replace(',', '', (string)($prod['p_old_price'] ?? '0'));
-                        $discountStr = ($old > $curr && $old > 0) ? '-' . round((($old - $curr) / $old) * 100) . '%' : 'HOT';
-                        $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
-                        $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : BASE_URL . 'assets/uploads/' . $photo) : BASE_URL . 'assets/images/no-image.png';
-                        $flashItems[] = [
-                            'id' => (int)$prod['p_id'],
-                            'name' => $prod['p_name'],
-                            'curr' => number_format($curr, 2),
-                            'old' => ($old > $curr && $old > 0) ? number_format($old, 2) : '',
-                            'discount' => $discountStr,
-                            'img' => $imgUrl,
-                            'fallback' => BASE_URL . 'assets/images/no-image.png'
-                        ];
+                    $flashItems = [];
+                    if (!empty($dbFlash)) {
+                        foreach ($dbFlash as $prod) {
+                            $curr = (float)str_replace(',', '', (string)$prod['p_current_price']);
+                            $old = (float)str_replace(',', '', (string)($prod['p_old_price'] ?? '0'));
+                            $discountStr = ($old > $curr && $old > 0) ? '-' . round((($old - $curr) / $old) * 100) . '%' : 'HOT';
+                            $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
+                            $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : BASE_URL . 'assets/uploads/' . $photo) : BASE_URL . 'assets/images/no-image.png';
+                            
+                            // Calculate realistic claimed percentage
+                            $pidInt = (int)$prod['p_id'];
+                            $soldPct = 55 + (($pidInt * 19) % 40); // 55% - 94%
+
+                            $flashItems[] = [
+                                'id' => $pidInt,
+                                'name' => $prod['p_name'],
+                                'curr' => number_format($curr, 2),
+                                'old' => ($old > $curr && $old > 0) ? number_format($old, 2) : '',
+                                'discount' => $discountStr,
+                                'sold' => $soldPct,
+                                'img' => $imgUrl,
+                                'fallback' => BASE_URL . 'assets/images/no-image.png'
+                            ];
+                        }
                     }
-                }
 
-                foreach ($flashItems as $fi):
-                    $prodUrl = function_exists('getProductURL') ? getProductURL($fi['id'], $fi['name'], BASE_URL) : BASE_URL . 'product.php?id=' . $fi['id'];
-                ?>
-                    <a href="<?php echo htmlspecialchars($prodUrl); ?>" class="sn-flash-card">
-                        <div class="sn-flash-card-top">
-                            <span class="sn-flash-discount"><?php echo $fi['discount']; ?></span>
-                            <button type="button" class="sn-flash-wishlist" title="Save to Wishlist" onclick="homeToggleWishlist(<?php echo $fi['id']; ?>, this, event)">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                            </button>
-                        </div>
-                        <div class="sn-flash-img-box">
-                            <img src="<?php echo htmlspecialchars($fi['img']); ?>" alt="<?php echo htmlspecialchars($fi['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo htmlspecialchars($fi['fallback']); ?>';">
-                        </div>
-                        <h3 class="sn-flash-title"><?php echo htmlspecialchars($fi['name']); ?></h3>
-                        <div class="sn-flash-pricing-row">
-                            <div class="sn-flash-curr-price">৳ <?php echo $fi['curr']; ?></div>
-                            <?php if (!empty($fi['old'])): ?>
-                                <div class="sn-flash-old-price">৳ <?php echo $fi['old']; ?></div>
-                            <?php endif; ?>
-                        </div>
-                    </a>
-                <?php endforeach; ?>
+                    foreach ($flashItems as $fi):
+                        $prodUrl = function_exists('getProductURL') ? getProductURL($fi['id'], $fi['name'], BASE_URL) : BASE_URL . 'product.php?id=' . $fi['id'];
+                    ?>
+                        <a href="<?php echo htmlspecialchars($prodUrl); ?>" class="sn-flash-card" data-href="<?php echo htmlspecialchars($prodUrl); ?>">
+                            <div class="sn-flash-card-top">
+                                <span class="sn-flash-discount">🔥 <?php echo $fi['discount']; ?></span>
+                                <button type="button" class="sn-flash-wishlist" title="Save to Wishlist" onclick="homeToggleWishlist(<?php echo $fi['id']; ?>, this, event)">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                </button>
+                            </div>
+                            <div class="sn-flash-img-box">
+                                <img src="<?php echo htmlspecialchars($fi['img']); ?>" alt="<?php echo htmlspecialchars($fi['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo htmlspecialchars($fi['fallback']); ?>';">
+                            </div>
+                            <h3 class="sn-flash-title"><?php echo htmlspecialchars($fi['name']); ?></h3>
+                            <div class="sn-flash-pricing-row">
+                                <div class="sn-flash-curr-price">৳ <?php echo $fi['curr']; ?></div>
+                                <?php if (!empty($fi['old'])): ?>
+                                    <div class="sn-flash-old-price">৳ <?php echo $fi['old']; ?></div>
+                                <?php endif; ?>
+                            </div>
+                            <!-- Stock Claim Meter -->
+                            <div class="sn-flash-stock-wrap">
+                                <div class="sn-flash-stock-bar">
+                                    <div class="sn-flash-stock-fill" style="width: <?php echo $fi['sold']; ?>%;"></div>
+                                </div>
+                                <span class="sn-flash-stock-text">🔥 <?php echo $fi['sold']; ?>% Claimed</span>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </section>
 
         <!-- ============================================================
-             6. DAILY SHIRA DEALS SECTION (MATCHING SCREENSHOT)
+             6. DAILY SHIRA DEALS SECTION (MULTI-CARD SLIDING CAROUSEL)
              ============================================================ -->
         <section class="sn-shira-section">
             <div class="sn-section-header">
@@ -1720,132 +2775,162 @@ body {
                     <span class="sn-flash-icon">🕒</span>
                     <span>Daily Shira Deals</span>
                 </h2>
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-view-all">
-                    <span>Shop Now</span>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>
+                <div class="sn-header-right-actions">
+                    <!-- Carousel Sliding Arrow Controls -->
+                    <div class="sn-carousel-nav sn-desktop-only">
+                        <button type="button" class="sn-carousel-btn" id="snShiraPrev" onclick="slideMultiCards('snShiraGrid', -1)" aria-label="Previous Deals">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <button type="button" class="sn-carousel-btn" id="snShiraNext" onclick="slideMultiCards('snShiraGrid', 1)" aria-label="Next Deals">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>deals.php" class="sn-view-all">
+                        <span>Shop Now</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </a>
+                </div>
             </div>
 
-            <div class="sn-shira-grid">
-                <?php
-                $shiraDeals = [];
-                try {
-                    $sdCats = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($sdCats as $sc) {
-                        $cPhoto = !empty($sc['photo']) ? $sc['photo'] : 'cat_all.jpg';
-                        if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
-                            $cPhoto = 'assets/uploads/' . $cPhoto;
-                        }
-                        $shiraDeals[] = [
-                            'name' => $sc['tcat_name'],
-                            'badge' => 'Featured',
-                            'img' => $cPhoto,
-                            'url' => BASE_URL . 'categories.php?cat_id=' . $sc['tcat_id']
-                        ];
-                    }
-                } catch (Throwable $_) {}
-
-                if (empty($shiraDeals)) {
+            <div class="sn-carousel-container">
+                <div class="sn-shira-grid" id="snShiraGrid">
+                    <?php
+                    $shiraDeals = [];
                     try {
-                        $pDeals = $pdo->query("SELECT p_id, p_name, p_featured_photo, p_current_price, p_old_price FROM tbl_product WHERE p_is_active = 1 ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), p_id DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($pDeals as $pd) {
-                            $rPhoto = $pd['p_featured_photo'] ?? '';
-                            $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
-                            $pOld = (float)($pd['p_old_price'] ?? 0);
-                            $pCurr = (float)($pd['p_current_price'] ?? 0);
-                            $badge = ($pOld > $pCurr && $pOld > 0) ? ('-' . round((($pOld - $pCurr) / $pOld) * 100) . '%') : 'Hot Deal';
+                        $sdCats = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+                        foreach ($sdCats as $sc) {
+                            $cPhoto = !empty($sc['photo']) ? $sc['photo'] : 'cat_all.jpg';
+                            if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
+                                $cPhoto = 'assets/uploads/' . $cPhoto;
+                            }
                             $shiraDeals[] = [
-                                'name' => $pd['p_name'],
-                                'badge' => $badge,
-                                'img' => $rPhotoUrl,
-                                'url' => BASE_URL . 'product.php?id=' . $pd['p_id']
+                                'name' => $sc['tcat_name'],
+                                'badge' => 'Featured',
+                                'img' => $cPhoto,
+                                'url' => BASE_URL . 'categories.php?cat_id=' . $sc['tcat_id']
                             ];
                         }
                     } catch (Throwable $_) {}
-                }
 
-                foreach ($shiraDeals as $sd):
-                ?>
-                    <a href="<?php echo htmlspecialchars($sd['url']); ?>" class="sn-shira-card">
-                        <div class="sn-shira-img-box">
-                            <img src="<?php echo htmlspecialchars($sd['img']); ?>" alt="<?php echo htmlspecialchars($sd['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/images/no-image.png';">
-                        </div>
-                        <span class="sn-shira-badge"><?php echo $sd['badge']; ?></span>
-                        <span class="sn-shira-name"><?php echo htmlspecialchars($sd['name']); ?></span>
-                    </a>
-                <?php endforeach; ?>
+                    if (empty($shiraDeals) || count($shiraDeals) < 4) {
+                        try {
+                            $pDeals = $pdo->query("SELECT p_id, p_name, p_featured_photo, p_current_price, p_old_price FROM tbl_product WHERE p_is_active = 1 ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), p_id DESC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($pDeals as $pd) {
+                                $rPhoto = $pd['p_featured_photo'] ?? '';
+                                $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
+                                $pOld = (float)($pd['p_old_price'] ?? 0);
+                                $pCurr = (float)($pd['p_current_price'] ?? 0);
+                                $badge = ($pOld > $pCurr && $pOld > 0) ? ('-' . round((($pOld - $pCurr) / $pOld) * 100) . '%') : 'Hot Deal';
+                                $pSlugUrl = function_exists('getProductURL') ? getProductURL($pd['p_id'], $pd['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $pd['p_id'];
+                                $shiraDeals[] = [
+                                    'name' => $pd['p_name'],
+                                    'badge' => $badge,
+                                    'img' => $rPhotoUrl,
+                                    'url' => $pSlugUrl
+                                ];
+                            }
+                        } catch (Throwable $_) {}
+                    }
+
+                    foreach ($shiraDeals as $sd):
+                    ?>
+                        <a href="<?php echo htmlspecialchars($sd['url']); ?>" class="sn-shira-card" data-href="<?php echo htmlspecialchars($sd['url']); ?>">
+                            <div class="sn-shira-img-box">
+                                <img src="<?php echo htmlspecialchars($sd['img']); ?>" alt="<?php echo htmlspecialchars($sd['name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/images/no-image.png';">
+                            </div>
+                            <span class="sn-shira-badge"><?php echo $sd['badge']; ?></span>
+                            <span class="sn-shira-name"><?php echo htmlspecialchars($sd['name']); ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </section>
 
         <!-- ============================================================
-             7. FEATURED PRODUCTS & PROMO (DESKTOP EXTENSION)
+             7. ALIEXPRESS STYLE PERSONALIZED FEED & CONTINUOUS SCROLL
              ============================================================ -->
-        <?php if ($featured_on == 1 && !empty($featuredProducts)): ?>
-        <section class="sn-featured-section sn-desktop-only">
-            <div class="sn-section-header">
-                <h2 class="sn-section-title"><?php echo htmlspecialchars($featured_products_title); ?></h2>
-                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-view-all">
-                    <span>View All</span>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>
+        <?php if ($featured_on == 1): ?>
+        <section class="sn-feed-section sn-featured-section" id="snHomeFeedSection">
+            <div class="sn-feed-header-wrap">
+                <div class="sn-section-header" style="margin-bottom: 8px;">
+                    <h2 class="sn-section-title" style="display: flex; align-items: center; gap: 8px;">
+                        <span class="sn-feed-title-icon">✨</span>
+                        <span><?php echo htmlspecialchars($featured_products_title ?: 'Featured Products'); ?></span>
+                        <span class="sn-feed-header-badge">Personalized For You</span>
+                    </h2>
+                    <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-view-all">
+                        <span>View All</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </a>
+                </div>
+                
+                <!-- AliExpress Style Category & Feed Tabs -->
+                <div class="sn-feed-tabs-wrap" id="snFeedTabs">
+                    <button type="button" class="sn-feed-tab active" data-tab="for_you">
+                        <span>✨ For You</span>
+                    </button>
+                    <button type="button" class="sn-feed-tab" data-tab="trending">
+                        <span>🔥 Best Sellers</span>
+                    </button>
+                    <button type="button" class="sn-feed-tab" data-tab="deals">
+                        <span>🏷️ Super Deals</span>
+                    </button>
+                    <button type="button" class="sn-feed-tab" data-tab="top_rated">
+                        <span>⭐ Top Rated</span>
+                    </button>
+                    <button type="button" class="sn-feed-tab" data-tab="choice">
+                        <span>🚀 Choice</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="sn-products-grid">
-                <?php foreach ($featuredProducts as $idx => $p): 
-                    $currPrice = (float)str_replace(',', '', $p['p_current_price']);
-                    $oldPrice = (float)str_replace(',', '', $p['p_old_price'] ?? '0');
-                    $hasDiscount = ($oldPrice > $currPrice);
-                    $discountPct = $hasDiscount ? round((($oldPrice - $currPrice) / $oldPrice) * 100) : 0;
-                    
-                    $rInfo = $ratingMap[$p['p_id']] ?? null;
-                    $score = $rInfo ? $rInfo['rating'] : 0;
-                    $reviewsLabel = $rInfo ? $rInfo['count'] : 0;
-
-                    $prodPhoto = !empty($p['p_featured_photo']) ? $p['p_featured_photo'] : 'assets/images/no-image.png';
-                    if (!str_starts_with($prodPhoto, 'http')) {
-                        $prodPhoto = BASE_URL . 'assets/uploads/' . $prodPhoto;
+            <!-- Product Feed Grid -->
+            <div class="sn-products-grid" id="snProductsFeedGrid">
+                <?php 
+                $initialIds = [];
+                if (!empty($featuredProducts)) {
+                    foreach ($featuredProducts as $p) {
+                        $initialIds[] = (int)$p['p_id'];
+                        echo renderAliProductCard($p, $currencySymbol);
                     }
+                }
                 ?>
-                    <div class="sn-product-card">
-                        <?php if ($idx === 0): ?>
-                            <span class="sn-badge">Best Seller</span>
-                        <?php elseif ($hasDiscount): ?>
-                            <span class="sn-badge">-<?php echo $discountPct; ?>%</span>
-                        <?php endif; ?>
+            </div>
 
-                        <a href="<?php echo BASE_URL; ?>product.php?id=<?php echo $p['p_id']; ?>" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; flex:1;">
-                            <div class="sn-product-img-box">
-                                <img src="<?php echo htmlspecialchars($prodPhoto); ?>" alt="<?php echo htmlspecialchars($p['p_name']); ?>" loading="lazy">
-                            </div>
-                            <h3 class="sn-product-title"><?php echo htmlspecialchars($p['p_name']); ?></h3>
-                            <p class="sn-product-spec"><?php echo htmlspecialchars($p['p_short_description'] ?? ''); ?></p>
-                            
-                            <?php if ($score > 0 && $reviewsLabel > 0): ?>
-                            <div class="sn-product-rating">
-                                <span class="sn-rating-star">★</span>
-                                <span><?php echo $score; ?></span>
-                                <span class="sn-rating-count">(<?php echo $reviewsLabel; ?>)</span>
-                            </div>
-                            <?php endif; ?>
-                        </a>
-
+            <!-- AliExpress Shimmer Skeleton Loader (Pulsing while fetching) -->
+            <div class="sn-products-grid sn-feed-skeleton" id="snFeedSkeleton" style="display: none;">
+                <?php for ($sk = 0; $sk < 4; $sk++): ?>
+                    <div class="sn-product-card sn-skeleton-card">
+                        <div class="sn-product-img-box sn-skeleton-box"></div>
+                        <div class="sn-skeleton-box" style="width: 85%; height: 14px; margin-bottom: 6px;"></div>
+                        <div class="sn-skeleton-box" style="width: 55%; height: 12px; margin-bottom: 12px;"></div>
                         <div class="sn-product-bottom">
-                            <div class="sn-price-box">
-                                <span class="sn-current-price"><?php echo $currencySymbol . number_format($currPrice); ?></span>
-                                <?php if ($hasDiscount): ?>
-                                    <span class="sn-old-price"><?php echo $currencySymbol . number_format($oldPrice); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <button type="button" class="sn-btn-cart" onclick="homeAddToCart(<?php echo $p['p_id']; ?>, '<?php echo htmlspecialchars(addslashes($p['p_name'])); ?>', this)" title="Add to cart" aria-label="Add to Cart">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="9" cy="21" r="1"></circle>
-                                    <circle cx="20" cy="21" r="1"></circle>
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                                </svg>
-                            </button>
+                            <div class="sn-skeleton-box" style="width: 60px; height: 18px;"></div>
+                            <div class="sn-skeleton-box" style="width: 30px; height: 30px; border-radius: 50%;"></div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                <?php endfor; ?>
+            </div>
+
+            <!-- Sentinel element for IntersectionObserver infinite scroll -->
+            <div id="snFeedSentinel" style="height: 20px; margin-top: 10px;"></div>
+
+            <!-- Manual Load More button fallback -->
+            <div class="sn-feed-actions-row" id="snFeedActionsRow" style="text-align: center; margin: 18px 0 10px 0;">
+                <button type="button" class="sn-btn-feed-more" id="snFeedMoreBtn" onclick="triggerFeedLoadMore()">
+                    <span>Load More Deals</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+
+            <!-- End of Feed Banner -->
+            <div id="snFeedEnd" class="sn-feed-end" style="display: none;">
+                <div class="sn-feed-end-badge">
+                    <span>🎉 You've seen all top personalized recommendations!</span>
+                </div>
+                <button type="button" class="sn-feed-btn-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                    Back to Top ↑
+                </button>
             </div>
         </section>
         <?php endif; ?>
@@ -1858,7 +2943,7 @@ body {
      HERO SLIDER AUTOMATIC ENGINE (JS)
      ============================================================ -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+function initHeroSlider() {
     const slides = document.querySelectorAll('.sn-hero-slide');
     const dots = document.querySelectorAll('#snHeroDots .sn-dot');
     const prevBtn = document.getElementById('snHeroPrev');
@@ -1963,7 +3048,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     startAutoplay();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeroSlider);
+} else {
+    initHeroSlider();
+}
+document.addEventListener('shopnext:page-loaded', initHeroSlider);
 
 // Home Add To Cart AJAX
 function homeAddToCart(productId, productName, btn) {
@@ -1999,9 +3091,11 @@ function homeAddToCart(productId, productName, btn) {
     });
 }
 
-// Home Wishlist Toggle AJAX
+// Home Wishlist Toggle AJAX with Heart Pop Animation
 function homeToggleWishlist(productId, btn, e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
+    btn.classList.add('sn-heart-pop');
+    setTimeout(() => btn.classList.remove('sn-heart-pop'), 400);
     btn.classList.toggle('active');
     const isSaved = btn.classList.contains('active');
 
@@ -2024,6 +3118,89 @@ function homeToggleWishlist(productId, btn, e) {
     .catch(() => {
         showHomeToast(isSaved ? 'Saved to wishlist!' : 'Removed from wishlist', 'info');
     });
+}
+
+// ============================================================
+// DARAZ & ALIEXPRESS MULTI-CARD CAROUSEL & COUNTDOWN CONTROLLER
+// ============================================================
+function slideMultiCards(trackId, direction) {
+    const track = document.getElementById(trackId);
+    if (!track) return;
+    // Advance multiple cards (~75% of container width)
+    const slideAmount = Math.max(260, Math.floor(track.clientWidth * 0.75)) * direction;
+    track.scrollBy({ left: slideAmount, behavior: 'smooth' });
+}
+
+function setupCarouselTrack(trackId, prevBtnId, nextBtnId) {
+    const track = document.getElementById(trackId);
+    const prevBtn = document.getElementById(prevBtnId);
+    const nextBtn = document.getElementById(nextBtnId);
+    if (!track) return;
+
+    function updateNavButtons() {
+        const maxScroll = track.scrollWidth - track.clientWidth - 5;
+        if (prevBtn) prevBtn.disabled = track.scrollLeft <= 5;
+        if (nextBtn) nextBtn.disabled = track.scrollLeft >= maxScroll;
+    }
+
+    track.addEventListener('scroll', updateNavButtons, { passive: true });
+    window.addEventListener('resize', updateNavButtons, { passive: true });
+    updateNavButtons();
+
+    // Mouse drag scrolling support on desktop
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    track.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('a')) return;
+        isDown = true;
+        startX = e.pageX - track.offsetLeft;
+        scrollLeft = track.scrollLeft;
+        track.style.cursor = 'grabbing';
+    });
+    track.addEventListener('mouseleave', () => { isDown = false; track.style.cursor = ''; });
+    track.addEventListener('mouseup', () => { isDown = false; track.style.cursor = ''; });
+    track.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - track.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        track.scrollLeft = scrollLeft - walk;
+    });
+}
+
+function initFlashCountdown() {
+    const hEl = document.getElementById('snFlashH');
+    const mEl = document.getElementById('snFlashM');
+    const sEl = document.getElementById('snFlashS');
+    if (!hEl || !mEl || !sEl) return;
+
+    function updateTimer() {
+        const now = new Date();
+        const currentH = now.getHours();
+        const nextCycleH = (Math.floor(currentH / 6) + 1) * 6;
+        const target = new Date(now);
+        target.setHours(nextCycleH, 0, 0, 0);
+
+        let diff = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
+        const hours = Math.floor(diff / 3600);
+        diff %= 3600;
+        const minutes = Math.floor(diff / 60);
+        const seconds = diff % 60;
+
+        hEl.textContent = String(hours).padStart(2, '0');
+        mEl.textContent = String(minutes).padStart(2, '0');
+        sEl.textContent = String(seconds).padStart(2, '0');
+    }
+    updateTimer();
+    setInterval(updateTimer, 1000);
+}
+
+function initHomeCarousels() {
+    setupCarouselTrack('snFlashScroll', 'snFlashPrev', 'snFlashNext');
+    setupCarouselTrack('snShiraGrid', 'snShiraPrev', 'snShiraNext');
+    initFlashCountdown();
 }
 
 // Toast Feedback System
@@ -2049,11 +3226,203 @@ function showHomeToast(msg, type) {
 
 // Synchronize Header and Mobile Cart Badges
 function updateCartBadges(count) {
-    const desktopBadge = document.getElementById('sn-cart-badge-count');
-    if (desktopBadge) desktopBadge.textContent = count;
-    const mobileBadge = document.querySelector('.sn-dock-cart-badge');
-    if (mobileBadge) mobileBadge.textContent = count;
+    const badgeSelectors = [
+        '#sn-cart-badge-count',
+        '#sn-dock-cart-count',
+        '.sn-dock-cart-badge',
+        '#snSubCartCount',
+        '.sn-cart-count',
+        '.cart-count'
+    ];
+    badgeSelectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            el.textContent = count;
+            el.style.display = count > 0 ? '' : 'none';
+            el.style.transform = 'scale(1.4)';
+            el.style.transition = 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            setTimeout(() => { el.style.transform = 'scale(1)'; }, 250);
+        });
+    });
+    window.dispatchEvent(new CustomEvent('shopnext:cart-updated', { detail: { count: count } }));
 }
+
+// ============================================================
+// ALIEXPRESS STYLE PERSONALIZED FEED & CONTINUOUS SCROLL CONTROLLER
+// ============================================================
+let snFeedTab = 'for_you';
+let snFeedPage = 1;
+let snFeedLoading = false;
+let snFeedHasMore = true;
+let snLoadedIds = new Set(<?php echo json_encode($initialIds ?? []); ?>);
+
+function getClientRecentViewedIds() {
+    try {
+        const raw = localStorage.getItem('recentlyViewed');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.map(item => typeof item === 'object' ? item.id : item).filter(Boolean);
+            }
+        }
+    } catch(e) {}
+    return [];
+}
+
+async function fetchNextFeedBatch(reset = false) {
+    if (snFeedLoading || (!snFeedHasMore && !reset)) return;
+    
+    snFeedLoading = true;
+    const skeleton = document.getElementById('snFeedSkeleton');
+    const moreBtn = document.getElementById('snFeedMoreBtn');
+    const endNotice = document.getElementById('snFeedEnd');
+    const grid = document.getElementById('snProductsFeedGrid');
+    
+    if (skeleton) skeleton.style.display = 'grid';
+    if (moreBtn) moreBtn.style.display = 'none';
+    if (endNotice && reset) endNotice.style.display = 'none';
+
+    const targetPage = reset ? 1 : (snFeedPage + 1);
+    const excludeArr = reset ? [] : Array.from(snLoadedIds);
+    const recentArr = getClientRecentViewedIds();
+
+    const params = new URLSearchParams({
+        tab: snFeedTab,
+        page: targetPage,
+        limit: 10,
+        exclude: excludeArr.join(','),
+        recent: recentArr.join(',')
+    });
+
+    try {
+        const res = await fetch('fetch_home_feed.php?' + params.toString());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        if (data.success && data.html) {
+            if (reset) {
+                grid.innerHTML = data.html;
+                snLoadedIds = new Set(data.product_ids || []);
+                snFeedPage = 1;
+            } else {
+                grid.insertAdjacentHTML('beforeend', data.html);
+                if (data.product_ids && Array.isArray(data.product_ids)) {
+                    data.product_ids.forEach(id => snLoadedIds.add(id));
+                }
+                snFeedPage = targetPage;
+            }
+
+            snFeedHasMore = Boolean(data.has_more);
+            bindFeedCardNavigation();
+
+            if (!snFeedHasMore) {
+                if (endNotice) endNotice.style.display = 'block';
+                if (moreBtn) moreBtn.style.display = 'none';
+            } else {
+                if (moreBtn) moreBtn.style.display = 'inline-flex';
+            }
+        } else {
+            snFeedHasMore = false;
+            if (endNotice) endNotice.style.display = 'block';
+            if (moreBtn) moreBtn.style.display = 'none';
+        }
+    } catch (err) {
+        console.warn('Feed fetch error:', err);
+        if (moreBtn) {
+            moreBtn.style.display = 'inline-flex';
+            moreBtn.innerHTML = '<span>Retry Loading</span>';
+        }
+    } finally {
+        snFeedLoading = false;
+        if (skeleton) skeleton.style.display = 'none';
+    }
+}
+
+function triggerFeedLoadMore() {
+    fetchNextFeedBatch(false);
+}
+
+function bindFeedCardNavigation() {
+    document.querySelectorAll('.sn-feed-card:not([data-bound])').forEach(card => {
+        card.setAttribute('data-bound', '1');
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.sn-btn-cart') || e.target.closest('.sn-card-wishlist') || e.target.closest('a')) {
+                return;
+            }
+            const href = this.getAttribute('data-href');
+            if (href) window.location.href = href;
+        });
+    });
+}
+
+function initAliFeed() {
+    bindFeedCardNavigation();
+
+    // Tab buttons
+    const tabs = document.querySelectorAll('#snFeedTabs .sn-feed-tab');
+    tabs.forEach(tabBtn => {
+        tabBtn.addEventListener('click', function() {
+            if (snFeedLoading) return;
+            const newTab = this.getAttribute('data-tab');
+            if (newTab === snFeedTab) return;
+
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+
+            snFeedTab = newTab;
+            snFeedPage = 1;
+            snFeedHasMore = true;
+            snLoadedIds = new Set();
+
+            const grid = document.getElementById('snProductsFeedGrid');
+            if (grid) grid.innerHTML = '';
+
+            fetchNextFeedBatch(true);
+        });
+    });
+
+    // IntersectionObserver for Continuous Scroll Fetching
+    const sentinel = document.getElementById('snFeedSentinel');
+    if (sentinel && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+            const entry = entries[0];
+            if (entry && entry.isIntersecting && !snFeedLoading && snFeedHasMore) {
+                fetchNextFeedBatch(false);
+            }
+        }, {
+            root: null,
+            rootMargin: '450px',
+            threshold: 0.01
+        });
+        observer.observe(sentinel);
+    }
+
+    // Scroll fallback (supports all browsers and fast fling scrolling)
+    let scrollTimeout = null;
+    window.addEventListener('scroll', function() {
+        if (scrollTimeout) return;
+        scrollTimeout = setTimeout(() => {
+            scrollTimeout = null;
+            if (snFeedLoading || !snFeedHasMore) return;
+            const scrollBottom = window.innerHeight + window.scrollY;
+            const docHeight = document.documentElement.offsetHeight || document.body.offsetHeight;
+            if (scrollBottom >= docHeight - 750) {
+                fetchNextFeedBatch(false);
+            }
+        }, 150);
+    }, { passive: true });
+}
+
+function initHomePage() {
+    initAliFeed();
+    initHomeCarousels();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHomePage);
+} else {
+    initHomePage();
+}
+document.addEventListener('shopnext:page-loaded', initHomePage);
 </script>
 
-<?php require_once('footer.php'); ?>
+<?php require_once(__DIR__ . '/footer.php'); ?>

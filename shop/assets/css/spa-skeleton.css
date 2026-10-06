@@ -1,0 +1,367 @@
+/* ============================================================
+   SHOPNEXT ULTRA-FAST SPA NAVIGATION & SHIMMER SKELETON CSS
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. TOP PROGRESS BAR (NEON GOLD GLOW)
+   ------------------------------------------------------------ */
+#sn-spa-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background: linear-gradient(90deg, #F59E0B 0%, #FBBF24 50%, #EF4444 100%);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.8), 0 0 4px rgba(251, 191, 36, 0.6);
+    z-index: 9999999;
+    pointer-events: none;
+    transition: width 0.22s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.2s ease;
+    opacity: 0;
+}
+
+#sn-spa-progress.active {
+    opacity: 1;
+}
+
+#sn-spa-progress.finished {
+    width: 100% !important;
+    opacity: 0;
+    transition: width 0.15s ease, opacity 0.35s 0.1s ease;
+}
+
+/* ------------------------------------------------------------
+   2. NATIVE VIEW TRANSITIONS API
+   ------------------------------------------------------------ */
+@keyframes sn-view-fade-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.99); }
+}
+
+@keyframes sn-view-fade-in {
+    from { opacity: 0; transform: scale(0.99); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+::view-transition-old(root) {
+    animation: 100ms cubic-bezier(0.4, 0, 1, 1) both sn-view-fade-out;
+}
+
+::view-transition-new(root) {
+    animation: 160ms cubic-bezier(0, 0, 0.2, 1) both sn-view-fade-in;
+}
+
+/* ------------------------------------------------------------
+   3. SHIMMER WAVE ANIMATION ENGINE
+   ------------------------------------------------------------ */
+@keyframes sn-shimmer-wave {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.sn-skel-shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(226, 232, 240, 0.6) 0%,
+        rgba(241, 245, 249, 0.95) 50%,
+        rgba(226, 232, 240, 0.6) 100%
+    );
+    background-size: 200% 100%;
+    animation: sn-shimmer-wave 1.4s ease-in-out infinite;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ------------------------------------------------------------
+   4. SKELETON CONTAINERS (CONTEXTUAL LAYOUTS)
+   ------------------------------------------------------------ */
+#sn-spa-skeleton {
+    width: 100%;
+    min-height: 80vh;
+    padding: 16px;
+    max-width: 1240px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    display: none;
+    animation: sn-skel-appear 0.15s ease-out;
+}
+
+#sn-spa-skeleton.active {
+    display: block;
+}
+
+@keyframes sn-skel-appear {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- PRODUCT DETAIL SCREEN SKELETON --- */
+.sn-skel-product-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    padding: 12px 0 40px 0;
+}
+
+@media (max-width: 868px) {
+    .sn-skel-product-wrap {
+        grid-template-columns: 1fr;
+        gap: 18px;
+        padding: 6px 0 30px 0;
+    }
+}
+
+.sn-skel-gallery-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sn-skel-main-img {
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 18px;
+}
+
+.sn-skel-thumbs-row {
+    display: flex;
+    gap: 10px;
+}
+
+.sn-skel-thumb {
+    width: 65px;
+    height: 65px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.sn-skel-info-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sn-skel-line {
+    height: 16px;
+    border-radius: 6px;
+}
+
+.sn-skel-title-1 {
+    width: 85%;
+    height: 26px;
+    border-radius: 8px;
+}
+
+.sn-skel-title-2 {
+    width: 55%;
+    height: 20px;
+    border-radius: 8px;
+}
+
+.sn-skel-rating {
+    width: 130px;
+    height: 18px;
+    border-radius: 6px;
+}
+
+.sn-skel-price-box {
+    width: 180px;
+    height: 44px;
+    border-radius: 12px;
+}
+
+.sn-skel-variant-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.sn-skel-chip {
+    width: 55px;
+    height: 36px;
+    border-radius: 8px;
+}
+
+.sn-skel-actions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+@media (max-width: 480px) {
+    .sn-skel-actions-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sn-skel-btn {
+    height: 48px;
+    border-radius: 12px;
+}
+
+.sn-skel-tab-box {
+    width: 100%;
+    height: 140px;
+    border-radius: 14px;
+    margin-top: 16px;
+}
+
+/* --- PRODUCT GRID / CATEGORY / DEALS SKELETON --- */
+.sn-skel-grid-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 10px 0 40px 0;
+}
+
+.sn-skel-banner {
+    width: 100%;
+    height: 140px;
+    border-radius: 16px;
+}
+
+.sn-skel-filter-bar {
+    display: flex;
+    gap: 8px;
+    overflow: hidden;
+    padding-bottom: 4px;
+}
+
+.sn-skel-filter-pill {
+    width: 90px;
+    height: 34px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+}
+
+.sn-skel-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 992px) {
+    .sn-skel-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+}
+
+@media (max-width: 640px) {
+    .sn-skel-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+}
+
+.sn-skel-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sn-skel-card-img {
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 10px;
+}
+
+.sn-skel-card-title {
+    width: 80%;
+    height: 14px;
+    border-radius: 4px;
+}
+
+.sn-skel-card-sub {
+    width: 50%;
+    height: 11px;
+    border-radius: 4px;
+}
+
+.sn-skel-card-price {
+    width: 60%;
+    height: 18px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+
+.sn-skel-card-btn {
+    width: 100%;
+    height: 34px;
+    border-radius: 8px;
+    margin-top: 6px;
+}
+
+/* --- CART / CHECKOUT SKELETON --- */
+.sn-skel-cart-wrap {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    padding: 16px 0;
+}
+
+@media (max-width: 868px) {
+    .sn-skel-cart-wrap {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+.sn-skel-cart-item {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.sn-skel-cart-thumb {
+    width: 70px;
+    height: 70px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.sn-skel-cart-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* --- GENERIC PAGE SKELETON --- */
+.sn-skel-generic-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 0;
+}
+
+.sn-skel-generic-hero {
+    width: 100%;
+    height: 160px;
+    border-radius: 16px;
+}
+
+.sn-skel-generic-body {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+

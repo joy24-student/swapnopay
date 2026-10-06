@@ -9,6 +9,7 @@ if (session_status() == PHP_SESSION_NONE) {
 require_once("admin/inc/config.php");
 require_once("admin/inc/functions.php"); 
 require_once("admin/inc/CSRF_Protect.php");
+require_once("admin/inc/seo_helpers.php");
 $csrf = new CSRF_Protect();
 $error_message = '';
 $success_message = '';
@@ -46,6 +47,16 @@ if (!$settings) {
 
 // Assign settings variables
 $logo = $settings['logo'] ?? 'default_logo.png';
+$logo_file_path = 'assets/uploads/' . $logo;
+if (!file_exists(__DIR__ . '/' . $logo_file_path)) {
+    if (file_exists(__DIR__ . '/assets/store-defaults/' . $logo)) {
+        $logo_file_path = 'assets/store-defaults/' . $logo;
+    } elseif (file_exists(__DIR__ . '/assets/uploads/logo_branding.png')) {
+        $logo_file_path = 'assets/uploads/logo_branding.png';
+    } elseif (file_exists(__DIR__ . '/assets/store-defaults/logo.svg')) {
+        $logo_file_path = 'assets/store-defaults/logo.svg';
+    }
+}
 $favicon = $settings['favicon'] ?? 'default_favicon.png';
 $contact_email = $settings['contact_email'] ?? 'Not added';
 $contact_phone = $settings['contact_phone'] ?? 'Not added ';
@@ -138,6 +149,12 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <link rel="stylesheet" href="assets/css/responsive.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/modern_shop.css">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
 
     <?php if ($cur_page == 'blog-single.php' || $cur_page == 'product.php'): ?>
         <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>">
@@ -1033,11 +1050,230 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             flex-shrink: 0 !important;
             stroke: #64748b !important;
         }
+        .sn-search-clear-btn {
+            background: #e2e8f0 !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 20px !important;
+            height: 20px !important;
+            min-width: 20px !important;
+            min-height: 20px !important;
+            padding: 0 !important;
+            display: none !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            color: #64748b !important;
+            margin-right: 4px !important;
+            flex-shrink: 0 !important;
+            transition: all 0.15s ease !important;
+        }
+        .sn-search-clear-btn:hover {
+            background: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        .sn-search-clear-btn svg {
+            display: block !important;
+            width: 10px !important;
+            height: 10px !important;
+            stroke: currentColor !important;
+            stroke-width: 2.6 !important;
+        }
         .sn-search-btn {
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
             gap: 6px !important;
+        }
+
+        /* Search Dropdown Suggestions with Typing Completion */
+        .sn-search-suggestions {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid var(--sn-border, #e2e8f0);
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(0, 0, 0, 0.05);
+            max-height: 420px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1050;
+            animation: snSuggestionsFadeIn 0.18s ease-out;
+        }
+
+        @keyframes snSuggestionsFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sn-search-suggestions.active {
+            display: block !important;
+        }
+
+        .sn-suggestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: #f8fafc;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+
+        .sn-suggestion-hint {
+            font-size: 10.5px;
+            font-weight: 500;
+            color: #94a3b8;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .sn-suggestion-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            text-decoration: none;
+            color: var(--sn-dark, #0f172a);
+            border-bottom: 1px solid #f8fafc;
+            transition: background 0.12s ease;
+            cursor: pointer;
+        }
+
+        .sn-suggestion-row:hover,
+        .sn-suggestion-row.sn-selected {
+            background: #f1f5f9;
+        }
+
+        .sn-suggestion-click-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .sn-suggestion-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: contain;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            flex-shrink: 0;
+            padding: 2px;
+        }
+
+        .sn-suggestion-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sn-suggestion-title {
+            font-size: 13.5px;
+            font-weight: 500;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.35;
+        }
+
+        .sn-match-highlight {
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            background: rgba(245, 158, 11, 0.18);
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+        .sn-suggestion-price {
+            font-size: 12px;
+            font-weight: 700;
+            color: #d97706;
+            margin-top: 2px;
+        }
+
+        /* Typing Completion Button (arrow up-left to fill input) */
+        .sn-suggestion-complete-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 8px;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .sn-suggestion-complete-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            transform: scale(1.08);
+        }
+
+        .sn-suggestion-complete-btn svg {
+            display: block;
+            width: 15px;
+            height: 15px;
+        }
+
+        /* Bottom Quick-Search Row */
+        .sn-suggestion-search-all {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            font-size: 12.5px;
+            color: #475569;
+            cursor: pointer;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            transition: background 0.12s ease;
+        }
+
+        .sn-suggestion-search-all:hover,
+        .sn-suggestion-search-all.sn-selected {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .sn-suggestion-search-all-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sn-suggestion-enter-badge {
+            font-size: 10.5px;
+            font-weight: 600;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: #64748b;
+            flex-shrink: 0;
         }
 
         @media (max-width: 768px) {
@@ -1526,6 +1762,12 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                     <input type="text" name="search_text" id="sn-search-input" class="sn-search-input" placeholder="Search for products, brands and more..." autocomplete="off">
+                    <button type="button" class="sn-search-clear-btn" id="sn-search-clear-btn" title="Clear search" aria-label="Clear search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                     <button type="button" class="sn-scan-btn" title="Scan Barcode / Product" onclick="openShopAiModal()">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>
@@ -1687,7 +1929,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 <div class="desktop-sidebar">
     <div class="sidebar-header">
         <a href="<?php echo BASE_URL; ?>" class="sidebar-logo">
-            <img src="assets/uploads/<?php echo htmlspecialchars($logo); ?>" alt="Logo">
+            <img src="<?php echo htmlspecialchars($logo_file_path); ?>" alt="Logo" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
         </a>
         <button class="sidebar-toggle-btn" id="sidebar-toggle-btn">
             <i class="fas fa-times"></i> 
@@ -2053,67 +2295,323 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Search Autocomplete Functionality
+    // Search Autocomplete & Typing Completion Functionality
     let searchTimeout;
     const desktopSuggestionsDiv = document.getElementById('sn-search-suggestions') || document.getElementById('desktop-search-suggestions');
     const activeSearchInput = document.getElementById('sn-search-input') || document.getElementById('desktop-search-input');
 
     if (activeSearchInput && desktopSuggestionsDiv) {
-        activeSearchInput.addEventListener('input', function() {
-            const query = this.value.trim();
+        let currentSuggestions = [];
+        let selectedIndex = -1;
+        let originalTypedQuery = '';
 
-            clearTimeout(searchTimeout);
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
-            if (query.length < 2) {
+        function highlightMatch(text, query) {
+            if (!query) return escapeHtml(text);
+            const safeText = String(text);
+            const lowerText = safeText.toLowerCase();
+            const lowerQuery = query.toLowerCase();
+            const idx = lowerText.indexOf(lowerQuery);
+            if (idx === -1) return escapeHtml(safeText);
+            
+            const before = safeText.substring(0, idx);
+            const matched = safeText.substring(idx, idx + query.length);
+            const after = safeText.substring(idx + query.length);
+            return `${escapeHtml(before)}<span class="sn-match-highlight">${escapeHtml(matched)}</span>${escapeHtml(after)}`;
+        }
+
+        function renderSuggestions(data, query) {
+            currentSuggestions = Array.isArray(data) ? data.filter(item => item && !item.error) : [];
+            selectedIndex = -1;
+
+            if (currentSuggestions.length === 0) {
+                desktopSuggestionsDiv.innerHTML = `
+                    <div style="padding: 14px 16px; color: #94a3b8; font-size: 13px; text-align: center;">
+                        No matching products found for "<strong>${escapeHtml(query)}</strong>"
+                    </div>
+                `;
+                desktopSuggestionsDiv.classList.add('active');
+                return;
+            }
+
+            let html = `
+                <div class="sn-suggestion-header">
+                    <span>Products &amp; Suggestions</span>
+                    <span class="sn-suggestion-hint">Tab ⇥ or ➔ to complete</span>
+                </div>
+            `;
+
+            currentSuggestions.forEach((product, idx) => {
+                let imagePath = '<?php echo BASE_URL; ?>assets/images/no-image.png';
+                if (product.image) {
+                    imagePath = product.image.startsWith('http') ? product.image : `<?php echo BASE_URL; ?>assets/uploads/${product.image}`;
+                }
+                const name = product.name || '';
+                const completion = product.completion || name;
+                const highlighted = highlightMatch(name, query);
+                const priceFormatted = product.price ? parseFloat(product.price).toLocaleString() : '';
+
+                html += `
+                    <div class="sn-suggestion-row" data-index="${idx}" data-url="${escapeHtml(product.url)}" data-completion="${escapeHtml(completion)}">
+                        <div class="sn-suggestion-click-area">
+                            <img src="${imagePath}" class="sn-suggestion-img" alt="${escapeHtml(name)}" onerror="this.src='<?php echo BASE_URL; ?>assets/images/no-image.png'">
+                            <div class="sn-suggestion-info">
+                                <div class="sn-suggestion-title">${highlighted}</div>
+                                ${priceFormatted ? `<div class="sn-suggestion-price">৳ ${priceFormatted}</div>` : ''}
+                            </div>
+                        </div>
+                        <button type="button" class="sn-suggestion-complete-btn" title="Complete typing '${escapeHtml(completion)}'" aria-label="Complete query" data-completion="${escapeHtml(completion)}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="17" y1="17" x2="7" y2="7"></line>
+                                <polyline points="7 17 7 7 17 7"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            });
+
+            // Quick-search action at the bottom
+            html += `
+                <div class="sn-suggestion-search-all" data-query="${escapeHtml(query)}">
+                    <div class="sn-suggestion-search-all-left">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <span>Search for "<strong>${escapeHtml(query)}</strong>" in all products</span>
+                    </div>
+                    <span class="sn-suggestion-enter-badge">↵ Search</span>
+                </div>
+            `;
+
+            desktopSuggestionsDiv.innerHTML = html;
+            desktopSuggestionsDiv.classList.add('active');
+
+            // Attach click handler for navigation on the click area
+            desktopSuggestionsDiv.querySelectorAll('.sn-suggestion-click-area').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    const row = this.closest('.sn-suggestion-row');
+                    if (row && row.dataset.url) {
+                        window.location.href = row.dataset.url;
+                    }
+                });
+            });
+
+            // Attach click handler for typing completion button
+            desktopSuggestionsDiv.querySelectorAll('.sn-suggestion-complete-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const completionText = this.dataset.completion;
+                    if (completionText) {
+                        completeTyping(completionText);
+                    }
+                });
+            });
+
+            // Attach click handler for search-all row
+            const searchAllRow = desktopSuggestionsDiv.querySelector('.sn-suggestion-search-all');
+            if (searchAllRow) {
+                searchAllRow.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const q = this.dataset.query || activeSearchInput.value.trim();
+                    if (q) {
+                        window.location.href = `<?php echo BASE_URL; ?>search-result.php?search_text=${encodeURIComponent(q)}`;
+                    }
+                });
+            }
+        }
+
+        function completeTyping(text) {
+            activeSearchInput.value = text;
+            originalTypedQuery = text;
+            selectedIndex = -1;
+            updateClearBtnVisibility();
+            activeSearchInput.focus();
+            if (typeof activeSearchInput.setSelectionRange === 'function') {
+                activeSearchInput.setSelectionRange(text.length, text.length);
+            }
+            fetchSuggestions(text);
+        }
+
+        function fetchSuggestions(query) {
+            if (!query || query.length < 1) {
                 desktopSuggestionsDiv.classList.remove('active');
                 desktopSuggestionsDiv.innerHTML = '';
+                currentSuggestions = [];
+                selectedIndex = -1;
+                return;
+            }
+
+            fetch(`<?php echo BASE_URL; ?>search_suggestions.php?query=${encodeURIComponent(query)}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.json();
+                })
+                .then(data => {
+                    renderSuggestions(data, query);
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    desktopSuggestionsDiv.classList.remove('active');
+                });
+        }
+
+        function updateSelectionHighlight() {
+            const rows = desktopSuggestionsDiv.querySelectorAll('.sn-suggestion-row, .sn-suggestion-search-all');
+            rows.forEach((r, idx) => {
+                if (idx === selectedIndex) {
+                    r.classList.add('sn-selected');
+                    r.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } else {
+                    r.classList.remove('sn-selected');
+                }
+            });
+        }
+
+        // Input event: debounced typing suggestions
+        activeSearchInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            originalTypedQuery = query;
+            clearTimeout(searchTimeout);
+
+            if (query.length < 1) {
+                desktopSuggestionsDiv.classList.remove('active');
+                desktopSuggestionsDiv.innerHTML = '';
+                currentSuggestions = [];
+                selectedIndex = -1;
                 return;
             }
 
             searchTimeout = setTimeout(() => {
-                fetch(`<?php echo BASE_URL; ?>search_suggestions.php?query=${encodeURIComponent(query)}`)
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (Array.isArray(data) && data.length > 0 && !data[0].error) {
-                            let html = '';
-                            data.forEach(product => {
-                                let imagePath = '<?php echo BASE_URL; ?>assets/images/no-image.png';
-                                if (product.image) {
-                                    imagePath = product.image.startsWith('http') ? product.image : `<?php echo BASE_URL; ?>assets/uploads/${product.image}`;
-                                }
-                                const name = product.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                html += `
-                                    <div class="sn-suggestion-row" onclick="window.location.href='${product.url}';" style="cursor: pointer;">
-                                        <img src="${imagePath}" class="sn-suggestion-img" alt="${name}" onerror="this.src='<?php echo BASE_URL; ?>assets/images/no-image.png'">
-                                        <div class="sn-suggestion-info">
-                                            <div class="sn-suggestion-title">${name}</div>
-                                            <div class="sn-suggestion-price">৳ ${parseFloat(product.price).toLocaleString()}</div>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            desktopSuggestionsDiv.innerHTML = html;
-                            desktopSuggestionsDiv.classList.add('active');
-                        } else {
-                            desktopSuggestionsDiv.innerHTML = '<div style="padding: 12px 16px; color: #999; font-size: 13px;">No products found</div>';
-                            desktopSuggestionsDiv.classList.add('active');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Search error:', error);
-                        desktopSuggestionsDiv.classList.remove('active');
-                    });
-            }, 250);
+                fetchSuggestions(query);
+            }, 150);
+        });
+
+        // Focus event: re-open suggestions if already has text
+        activeSearchInput.addEventListener('focus', function() {
+            const query = this.value.trim();
+            if (query.length >= 1 && (!desktopSuggestionsDiv.classList.contains('active') || currentSuggestions.length === 0)) {
+                originalTypedQuery = query;
+                fetchSuggestions(query);
+            }
+        });
+
+        // Keyboard Typing Completion Navigation
+        activeSearchInput.addEventListener('keydown', function(e) {
+            const isDropdownActive = desktopSuggestionsDiv.classList.contains('active');
+
+            if (e.key === 'ArrowDown') {
+                if (!isDropdownActive) {
+                    const q = this.value.trim();
+                    if (q.length >= 1) fetchSuggestions(q);
+                    return;
+                }
+                const totalItems = currentSuggestions.length + 1; // +1 for the bottom "Search all" item
+                if (totalItems <= 1) return;
+
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % totalItems;
+                updateSelectionHighlight();
+
+                // Live typing completion: update input value to match the selected item
+                if (selectedIndex >= 0 && selectedIndex < currentSuggestions.length) {
+                    activeSearchInput.value = currentSuggestions[selectedIndex].completion || currentSuggestions[selectedIndex].name;
+                } else if (selectedIndex === currentSuggestions.length) {
+                    activeSearchInput.value = originalTypedQuery;
+                }
+                updateClearBtnVisibility();
+            } else if (e.key === 'ArrowUp') {
+                if (!isDropdownActive) return;
+                const totalItems = currentSuggestions.length + 1;
+                if (totalItems <= 1) return;
+
+                e.preventDefault();
+                selectedIndex--;
+                if (selectedIndex < 0) {
+                    selectedIndex = -1;
+                    activeSearchInput.value = originalTypedQuery;
+                } else if (selectedIndex < currentSuggestions.length) {
+                    activeSearchInput.value = currentSuggestions[selectedIndex].completion || currentSuggestions[selectedIndex].name;
+                }
+                updateSelectionHighlight();
+                updateClearBtnVisibility();
+            } else if (e.key === 'Tab' || (e.key === 'ArrowRight' && this.selectionStart === this.value.length)) {
+                // Tab or ArrowRight at end of line completes the top suggestion
+                if (isDropdownActive && currentSuggestions.length > 0) {
+                    const topMatch = currentSuggestions[0].completion || currentSuggestions[0].name;
+                    if (topMatch && topMatch.toLowerCase() !== this.value.toLowerCase()) {
+                        e.preventDefault();
+                        completeTyping(topMatch);
+                    }
+                }
+            } else if (e.key === 'Enter') {
+                if (isDropdownActive && selectedIndex >= 0 && selectedIndex < currentSuggestions.length) {
+                    e.preventDefault();
+                    const product = currentSuggestions[selectedIndex];
+                    if (product && product.url) {
+                        window.location.href = product.url;
+                    } else if (product && (product.completion || product.name)) {
+                        window.location.href = `<?php echo BASE_URL; ?>search-result.php?search_text=${encodeURIComponent(product.completion || product.name)}`;
+                    }
+                }
+                // Otherwise let the form submit normally
+            } else if (e.key === 'Escape') {
+                desktopSuggestionsDiv.classList.remove('active');
+                selectedIndex = -1;
+            }
         });
 
         // Close suggestions when clicking outside
         document.addEventListener('click', function(e) {
             if (!e.target.closest('#sn-search-form') && !e.target.closest('#desktop-search-bar')) {
                 desktopSuggestionsDiv.classList.remove('active');
+                selectedIndex = -1;
             }
+        });
+    }
+
+    // Cross / Clear Search Button Functionality
+    const clearSearchBtn = document.getElementById('sn-search-clear-btn');
+    function updateClearBtnVisibility() {
+        if (!clearSearchBtn || !activeSearchInput) return;
+        if (activeSearchInput.value && activeSearchInput.value.trim().length > 0) {
+            clearSearchBtn.style.setProperty('display', 'inline-flex', 'important');
+        } else {
+            clearSearchBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    if (activeSearchInput) {
+        activeSearchInput.addEventListener('input', updateClearBtnVisibility);
+        activeSearchInput.addEventListener('keyup', updateClearBtnVisibility);
+        activeSearchInput.addEventListener('change', updateClearBtnVisibility);
+        // Initial check on page load & slightly deferred checks (e.g., when populated via PHP/URL)
+        updateClearBtnVisibility();
+        setTimeout(updateClearBtnVisibility, 150);
+        setTimeout(updateClearBtnVisibility, 600);
+    }
+
+    if (clearSearchBtn && activeSearchInput) {
+        clearSearchBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            activeSearchInput.value = '';
+            updateClearBtnVisibility();
+            if (desktopSuggestionsDiv) {
+                desktopSuggestionsDiv.classList.remove('active');
+                desktopSuggestionsDiv.innerHTML = '';
+            }
+            activeSearchInput.focus();
         });
     }
 
@@ -2351,6 +2849,7 @@ document.addEventListener("DOMContentLoaded", function(){
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeWelcomePopup();
     });
+});
 // Global AI Assistant Modal Logic
 window.openShopAiModal = function() {
     const modal = document.getElementById('snGlobalAiModal');
@@ -2436,10 +2935,18 @@ window.sendShopAiMessage = function() {
     if (!empty($raw_photo)) {
         if (str_starts_with($raw_photo, 'http://') || str_starts_with($raw_photo, 'https://')) {
             $popup_photo_src = $raw_photo;
-        } elseif (file_exists(__DIR__ . '/assets/uploads/' . $raw_photo)) {
-            $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($raw_photo);
         } else {
-            $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($raw_photo);
+            // Strip any repeated assets/uploads/ prefixes
+            $clean_photo = preg_replace('#^(?:\.?/?assets/uploads/)+#i', '', trim($raw_photo));
+            if (file_exists(__DIR__ . '/assets/uploads/' . $clean_photo)) {
+                $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($clean_photo);
+            } elseif (file_exists(__DIR__ . '/' . ltrim($raw_photo, '/'))) {
+                $popup_photo_src = BASE_URL . htmlspecialchars(ltrim($raw_photo, '/'));
+            } elseif (file_exists(__DIR__ . '/assets/store-defaults/' . $clean_photo)) {
+                $popup_photo_src = BASE_URL . 'assets/store-defaults/' . htmlspecialchars($clean_photo);
+            } else {
+                $popup_photo_src = BASE_URL . 'assets/uploads/' . htmlspecialchars($clean_photo);
+            }
         }
     }
     $anim_class = 'anim-' . htmlspecialchars($settings['popup_animation'] ?? 'spin-zoom');
@@ -2451,7 +2958,7 @@ window.sendShopAiMessage = function() {
     
     <?php if(!empty($popup_photo_src)): ?>
         <a href="<?php echo htmlspecialchars($popup_target_link); ?>" class="sn-popup-banner-link">
-            <img src="<?php echo htmlspecialchars($popup_photo_src); ?>" alt="<?php echo htmlspecialchars($settings['popup_title'] ?? 'Special Offer'); ?>" class="sn-popup-banner-img">
+            <img src="<?php echo htmlspecialchars($popup_photo_src); ?>" alt="<?php echo htmlspecialchars($settings['popup_title'] ?? 'Special Offer'); ?>" class="sn-popup-banner-img" onerror="if (this.src.indexOf('welcome_voucher_sticker') !== -1 && this.src.indexOf('store-defaults') === -1) { this.src='assets/uploads/welcome_voucher_sticker.svg'; } else { this.style.display='none'; }">
         </a>
     <?php endif; ?>
 
@@ -2492,3 +2999,5 @@ window.sendShopAiMessage = function() {
 </div>
 <?php endif; ?>
 
+<!-- Main Page Container for Instant SPA Navigation & Skeletons -->
+<div id="sn-page-container" class="sn-page-container">

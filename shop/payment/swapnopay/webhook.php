@@ -19,6 +19,17 @@ $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? ($_SERVER['HTTP_X_SWAPNOPAY_SIGNATU
 $header_secret = $_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? '';
 $configured_secret = getenv('SWAPNOPAY_WEBHOOK_SECRET') ?: (defined('SWAPNOPAY_WEBHOOK_SECRET') ? SWAPNOPAY_WEBHOOK_SECRET : ($runtime['webhook_secret'] ?? ''));
 
+if (empty($configured_secret)) {
+    try {
+        $stmt_sett = $pdo->query("SELECT swapnopay_webhook_secret FROM tbl_settings WHERE id=1");
+        if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($sett_row['swapnopay_webhook_secret'])) {
+                $configured_secret = trim($sett_row['swapnopay_webhook_secret']);
+            }
+        }
+    } catch (Throwable $e) {}
+}
+
 // Webhook secret MUST be configured and request MUST provide valid authentication
 if (empty($configured_secret)) {
     error_log("[swapnopay-webhook] Rejecting webhook: SWAPNOPAY_WEBHOOK_SECRET is not configured.");

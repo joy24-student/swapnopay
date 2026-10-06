@@ -161,6 +161,8 @@ if (!$supabase_order_id) {
                 }
             }
 
+            $webhook_url = rtrim(BASE_URL, '/') . '/payment/swapnopay/webhook.php';
+            $success_url_gateway = rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id);
             $api_payload = json_encode([
                 'merchant_id' => $merchant_id,
                 'tran_id' => $tran_id,
@@ -170,7 +172,9 @@ if (!$supabase_order_id) {
                 'cus_name' => (string)($payment_data['customer_name'] ?? 'Customer'),
                 'cus_email' => (string)($payment_data['customer_email'] ?? ''),
                 'payment_method' => $selected_method,
-                'items' => $items_payload
+                'items' => $items_payload,
+                'callback_url' => $webhook_url,
+                'success_url' => $success_url_gateway
             ]);
 
             $ch_api = curl_init("{$api_url}/v1/payment/create-order");
@@ -288,6 +292,23 @@ $_SESSION['pending_gateway_order_id'] = $gateway_order_id ?: $tran_id;
 $_SESSION['pending_order_number'] = $order_number;
 $_SESSION['pending_method'] = $selected_method;
 $_SESSION['pending_amount'] = $total_amount;
+
+// Clear cart session data (order is now saved to DB)
+unset(
+    $_SESSION['cart_p_id'],
+    $_SESSION['cart_size_id'],
+    $_SESSION['cart_size_name'],
+    $_SESSION['cart_color_id'],
+    $_SESSION['cart_color_name'],
+    $_SESSION['cart_p_qty'],
+    $_SESSION['cart_p_current_price'],
+    $_SESSION['cart_p_name'],
+    $_SESSION['cart_p_featured_photo'],
+    $_SESSION['coupon'],
+    $_SESSION['payment_data'],
+    $_SESSION['billing_address_details'],
+    $_SESSION['shipping_address_details']
+);
 
 // Redirect to real-time verification screen
 header("Location: verify.php?tran_id={$tran_id}&method={$selected_method}");

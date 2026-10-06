@@ -223,7 +223,22 @@ switch ($action) {
     }
 
     case 'fetch_messages': {
-        $thread = get_or_create_thread($pdo);
+        $threadId = !empty($_GET['thread_id']) ? (int)$_GET['thread_id'] : (!empty($_POST['thread_id']) ? (int)$_POST['thread_id'] : 0);
+        $thread = null;
+        if ($threadId > 0) {
+            $thStmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_threads WHERE id = ? LIMIT 1");
+            $thStmt->execute([$threadId]);
+            $thread = $thStmt->fetch(PDO::FETCH_ASSOC);
+            if ($thread) {
+                try {
+                    $pdo->prepare("UPDATE tbl_shop_chat_threads SET unread_admin = 0 WHERE id = ?")->execute([$threadId]);
+                } catch (Throwable $e) {}
+            }
+        }
+        if (!$thread) {
+            $thread = get_or_create_thread($pdo);
+        }
+
         $lastId = (int)($_GET['last_id'] ?? $_POST['last_id'] ?? 0);
 
         $stmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_messages WHERE thread_id = ? AND id > ? ORDER BY id ASC");
@@ -231,13 +246,41 @@ switch ($action) {
         $newMessages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Refresh thread info
-        $st = $pdo->prepare("SELECT mode, call_status, active_call_type FROM tbl_shop_chat_threads WHERE id = ?");
+        $st = $pdo->prepare("SELECT mode, call_status, active_call_type, customer_name, customer_email, customer_phone, created_at, updated_at FROM tbl_shop_chat_threads WHERE id = ?");
         $st->execute([$thread['id']]);
         $curr = $st->fetch(PDO::FETCH_ASSOC) ?: [];
 
+        // Fetch recent orders for this customer if email or phone exists
+        $recentOrders = [];
+        if (!empty($curr['customer_email']) || !empty($curr['customer_phone'])) {
+            try {
+                $oQuery = "SELECT id, payment_id, customer_name, customer_email, paid_amount, payment_status, shipping_status, payment_date FROM tbl_payment WHERE 1=0";
+                $oParams = [];
+                if (!empty($curr['customer_email'])) {
+                    $oQuery .= " OR customer_email = ?";
+                    $oParams[] = $curr['customer_email'];
+                }
+                if (!empty($curr['customer_phone'])) {
+                    $cleanPh = preg_replace('/[^0-9]/', '', $curr['customer_phone']);
+                    if (strlen($cleanPh) >= 8) {
+                        $shortPh = substr($cleanPh, -8);
+                        $oQuery .= " OR shipping_phone LIKE ? OR billing_phone LIKE ?";
+                        $oParams[] = '%' . $shortPh . '%';
+                        $oParams[] = '%' . $shortPh . '%';
+                    }
+                }
+                $oQuery .= " ORDER BY id DESC LIMIT 5";
+                $oStmt = $pdo->prepare($oQuery);
+                $oStmt->execute($oParams);
+                $recentOrders = $oStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {}
+        }
+
         echo json_encode([
             'status' => 'success',
+            'thread' => array_merge($thread, $curr),
             'messages' => $newMessages,
+            'orders' => $recentOrders,
             'mode' => $curr['mode'] ?? 'ai',
             'call_status' => $curr['call_status'] ?? 'idle',
             'active_call_type' => $curr['active_call_type'] ?? 'none'
@@ -256,6 +299,12 @@ switch ($action) {
         $sysNotice = ($newMode === 'live')
             ? "Connecting you to a Live Human Specialist. Please hold on..."
             : "Switched back to AI Shopping Assistant. Ask anything!";
+
+        // Clean up previous mode switch system notices in this thread so they don't pile up
+        try {
+            $pdo->prepare("DELETE FROM tbl_shop_chat_messages WHERE thread_id = ? AND sender_type = 'system' AND (message LIKE 'Connecting you to a Live Human%' OR message LIKE 'Switched back to AI%')")
+                ->execute([$thread['id']]);
+        } catch (Throwable $e) {}
 
         $pdo->prepare("INSERT INTO tbl_shop_chat_messages (thread_id, sender_type, message) VALUES (?, 'system', ?)")
             ->execute([$thread['id'], $sysNotice]);
@@ -315,12 +364,13 @@ switch ($action) {
         }
 
         if ($type === 'call_start') {
+            // Clean up any stale signals from previous calls so new call starts fresh
+            $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'ringing', active_call_type = ? WHERE id = ?")
                 ->execute([$callType, $threadId]);
         } else if ($type === 'call_end') {
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'idle', active_call_type = 'none' WHERE id = ?")
                 ->execute([$threadId]);
-            // Purge unprocessed signals for this thread
             $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
         }
 
@@ -337,6 +387,26 @@ switch ($action) {
     case 'fetch_signals': {
         $receiver = $_GET['receiver'] ?? 'customer'; // 'customer' or 'admin'
         $threadId = (int)($_GET['thread_id'] ?? 0);
+
+        // If admin is polling globally (not focused on a thread), check for incoming calls across all threads
+        if ($receiver === 'admin' && $threadId === 0) {
+            $stmt = $pdo->prepare("
+                SELECT s.*, t.customer_name, t.customer_phone 
+                FROM tbl_shop_chat_signals s
+                JOIN tbl_shop_chat_threads t ON t.id = s.thread_id
+                WHERE s.sender = 'customer' AND s.processed = 0 AND s.signal_type = 'call_start'
+                ORDER BY s.id ASC LIMIT 1
+            ");
+            $stmt->execute();
+            $incoming = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($incoming)) {
+                $ids = array_column($incoming, 'id');
+                $inClause = implode(',', array_map('intval', $ids));
+                $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause)");
+            }
+            echo json_encode(['status' => 'success', 'signals' => $incoming]);
+            exit;
+        }
 
         if ($threadId === 0) {
             $thread = get_or_create_thread($pdo);
@@ -379,9 +449,11 @@ switch ($action) {
 
         $stmt = $pdo->query("
             SELECT t.*, 
-                   (SELECT message FROM tbl_shop_chat_messages WHERE thread_id = t.id ORDER BY id DESC LIMIT 1) as last_message,
-                   (SELECT created_at FROM tbl_shop_chat_messages WHERE thread_id = t.id ORDER BY id DESC LIMIT 1) as last_message_at
+                   (SELECT message FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'ai' ORDER BY id DESC LIMIT 1) as last_message,
+                   (SELECT created_at FROM tbl_shop_chat_messages WHERE thread_id = t.id AND sender_type != 'ai' ORDER BY id DESC LIMIT 1) as last_message_at
             FROM tbl_shop_chat_threads t
+            WHERE t.mode = 'live' 
+               OR EXISTS (SELECT 1 FROM tbl_shop_chat_messages m WHERE m.thread_id = t.id AND m.sender_type IN ('customer', 'admin'))
             ORDER BY t.updated_at DESC
             LIMIT 50
         ");
