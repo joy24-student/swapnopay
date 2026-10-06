@@ -35,12 +35,12 @@
 	    <a href="order.php" class="sn-dock-item <?= ($cur_page == 'order.php') ? 'active' : '' ?>">
 	        <div class="sn-dock-icon">
 	            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="<?= ($cur_page == 'order.php') ? '#0F172A' : '#64748B' ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-	                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-	                <line x1="16" y1="2" x2="16" y2="6"></line>
-	                <line x1="8" y1="2" x2="8" y2="6"></line>
-	                <line x1="3" y1="10" x2="21" y2="10"></line>
+	                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+	                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+	                <line x1="9" y1="11" x2="15" y2="11"></line>
+	                <line x1="9" y1="15" x2="13" y2="15"></line>
 	            </svg>
-	            <span class="sn-dock-count"><?= $dockPendingOrders > 0 ? $dockPendingOrders : 12 ?></span>
+	            <span class="sn-dock-count"><?= $dockPendingOrders > 0 ? $dockPendingOrders : 24 ?></span>
 	        </div>
 	        <span class="sn-dock-text">Orders</span>
 	    </a>
@@ -55,6 +55,15 @@
 	            </svg>
 	        </div>
 	        <span class="sn-dock-text">Customers</span>
+	    </a>
+
+	    <a href="ai-copilot.php" class="sn-dock-item <?= ($cur_page == 'ai-copilot.php') ? 'active' : '' ?>">
+	        <div class="sn-dock-icon">
+	            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= ($cur_page == 'ai-copilot.php') ? '#F59E0B' : 'none' ?>" stroke="<?= ($cur_page == 'ai-copilot.php') ? '#B45309' : '#F59E0B' ?>" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+	                <path d="M12 2l2.4 7.4 7.6 2.6-7.6 2.6L12 22l-2.4-7.4L2 12l7.6-2.6L12 2z"/>
+	            </svg>
+	        </div>
+	        <span class="sn-dock-text" style="color:#B45309; font-weight:800;">AI Copilot</span>
 	    </a>
 
 	    <a href="#" class="sn-dock-item" data-toggle="offcanvas" role="button">
@@ -783,5 +792,6 @@
     </script>
 
 <script src="enterprise.js"></script>
+<script src="js/ai-global-voice.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

@@ -850,21 +850,18 @@ if (!function_exists('renderMobThumbSvg')) {
 
                     <!-- Bottom Row -->
                     <div class="sn-mord-bottom">
-                        <div class="sn-mord-bottom-left">
-                            <div class="sn-mord-address" title="<?= htmlspecialchars($mo['address']) ?>">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span><?= htmlspecialchars($mo['address']) ?></span>
-                            </div>
-                            <div class="sn-mord-payment">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                                <span>Payment: <strong class="sn-mord-payment-val pay-<?= strtolower($mo['payment_label']) ?>"><?= htmlspecialchars($mo['payment_label']) ?></strong></span>
-                            </div>
+                        <div class="sn-mord-address" title="<?= htmlspecialchars($mo['address']) ?>">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            <span><?= htmlspecialchars($mo['address']) ?></span>
                         </div>
-
-                        <div class="sn-mord-bottom-right">
+                        <div class="sn-mord-payment">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                            <span>Payment: <strong class="sn-mord-payment-val pay-<?= strtolower($mo['payment_label']) ?>"><?= htmlspecialchars($mo['payment_label']) ?></strong></span>
+                        </div>
+                        <div class="sn-mord-actions">
                             <div class="dropdown">
                                 <button type="button" class="sn-mord-btn-more dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="More options">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                                         <circle cx="5" cy="12" r="2"/>
                                         <circle cx="12" cy="12" r="2"/>
                                         <circle cx="19" cy="12" r="2"/>
@@ -900,7 +897,7 @@ if (!function_exists('renderMobThumbSvg')) {
                             <button type="button" class="sn-mord-btn-edit" 
                                     onclick="openUpdateStatusModal('<?= htmlspecialchars($mo['payment_id'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['customer_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['shipping_status'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['payment_status'], ENT_QUOTES) ?>')"
                                     title="Quick Update Status">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                 </svg>
@@ -910,6 +907,21 @@ if (!function_exists('renderMobThumbSvg')) {
                 </div>
             <?php endforeach; ?>
         </div>
+
+        <?php $totalPages = max(1, (int)ceil($total / $limit)); ?>
+        <?php if ($totalPages > 1): ?>
+            <div class="sn-mobile-pagination visible-xs" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 16px 0 24px;">
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?= $page - 1 ?>&tab=<?= rawurlencode($tab) ?>&payment_status=<?= rawurlencode($paymentFilter) ?>&search=<?= rawurlencode($search) ?>" class="btn btn-default btn-sm" style="border-radius: 8px; font-weight: 600;">&laquo; Prev</a>
+                <?php endif; ?>
+                <span style="font-size: 12px; font-weight: 600; color: #64748b; padding: 4px 10px; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    Page <?= $page ?> of <?= $totalPages ?>
+                </span>
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?= $page + 1 ?>&tab=<?= rawurlencode($tab) ?>&payment_status=<?= rawurlencode($paymentFilter) ?>&search=<?= rawurlencode($search) ?>" class="btn btn-default btn-sm" style="border-radius: 8px; font-weight: 600;">Next &raquo;</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Sticky Control Section (Desktop Only) -->
@@ -992,7 +1004,7 @@ if (!function_exists('renderMobThumbSvg')) {
     </div>
 
     <!-- Formal Orders Table -->
-    <div class="order-table-container table-responsive">
+    <div class="order-table-container table-responsive hidden-xs">
         <table class="table order-table">
             <thead>
                 <tr>
@@ -1175,7 +1187,7 @@ if (!function_exists('renderMobThumbSvg')) {
 
     <!-- Formal Pagination -->
     <?php $totalPages = max(1, (int)ceil($total / $limit)); ?>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 10px; padding: 4px 2px;">
+    <div class="hidden-xs" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 10px; padding: 4px 2px;">
         <div style="font-size: 12px; color: #64748b;">
             Showing <strong><?= min($total, ($offset + 1)) ?></strong> to <strong><?= min($total, ($offset + count($orders))) ?></strong> of <strong><?= number_format($total) ?></strong> orders
         </div>
@@ -1401,6 +1413,40 @@ function updateOrderRowUI(orderId, shippingStatus, paymentStatus) {
             $row.css('background-color', '');
         }, 1800);
     }
+
+    // Synchronize Mobile Order Card
+    var $mobCard = $('.sn-mobile-order-card[data-id="' + String(orderId).toLowerCase() + '"]');
+    if ($mobCard.length) {
+        if (shippingStatus) {
+            $mobCard.attr('data-status', shippingStatus.toLowerCase());
+            var $statusPill = $mobCard.find('.sn-mord-status');
+            $statusPill.attr('class', 'sn-mord-status status-' + shippingStatus.toLowerCase());
+            var iconHtml = '';
+            var stLow = shippingStatus.toLowerCase();
+            if (stLow === 'delivered') {
+                iconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+            } else if (stLow === 'processing') {
+                iconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+            } else if (stLow === 'pending') {
+                iconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            } else if (stLow === 'shipped') {
+                iconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>';
+            } else if (stLow === 'cancelled') {
+                iconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+            }
+            $statusPill.html(iconHtml + ' <span>' + shippingStatus + '</span>');
+        }
+        if (paymentStatus) {
+            var pLabel = (paymentStatus === 'Completed') ? 'Paid' : ((paymentStatus === 'Cancelled') ? 'Refunded' : 'Pending');
+            $mobCard.attr('data-payment', pLabel.toLowerCase());
+            var $payVal = $mobCard.find('.sn-mord-payment-val');
+            $payVal.attr('class', 'sn-mord-payment-val pay-' + pLabel.toLowerCase()).text(pLabel);
+        }
+        $mobCard.css('transition', 'background-color 0.4s ease').css('background-color', '#ecfdf5');
+        setTimeout(function() {
+            $mobCard.css('background-color', '');
+        }, 1800);
+    }
 }
 
 // 1-Click Quick Status Change (Zero reload AJAX)
@@ -1535,6 +1581,112 @@ function openOrderMsgModal(type, recipient, name, orderId) {
 
     $('#modal-send-custom-msg').modal('show');
 }
+
+// Mobile real-time search filter
+$(document).ready(function() {
+    var $mobSearch = $('#snMobileOrderSearch');
+    if ($mobSearch.length) {
+        $mobSearch.on('input', function() {
+            var q = $(this).val().toLowerCase().trim();
+            var $cards = $('.sn-mobile-order-card');
+            if (q === '') {
+                $cards.show();
+                $('#snMobEmptySearchResult').remove();
+                return;
+            }
+            var matches = 0;
+            $cards.each(function() {
+                var $c = $(this);
+                var id = ($c.attr('data-id') || '').toLowerCase();
+                var inv = ($c.attr('data-invoice') || '').toLowerCase();
+                var cust = ($c.attr('data-cust') || '').toLowerCase();
+                var phone = ($c.attr('data-phone') || '').toLowerCase();
+                var status = ($c.attr('data-status') || '').toLowerCase();
+                var pay = ($c.attr('data-payment') || '').toLowerCase();
+                var addr = ($c.attr('data-address') || '').toLowerCase();
+                var combined = id + ' ' + inv + ' ' + cust + ' ' + phone + ' ' + status + ' ' + pay + ' ' + addr;
+                if (combined.indexOf(q) !== -1) {
+                    $c.show();
+                    matches++;
+                } else {
+                    $c.hide();
+                }
+            });
+
+            $('#snMobEmptySearchResult').remove();
+            if (matches === 0) {
+                $('#snMobileOrderList').append(
+                    '<div id="snMobEmptySearchResult" style="text-align:center; padding:36px 16px; background:#fff; border-radius:16px; border:1px solid #EDEFEF; color:#64748B;">' +
+                    '<i class="fa fa-search" style="font-size:26px; color:#CBD5E1; margin-bottom:8px; display:block;"></i>' +
+                    '<div style="font-weight:700; color:#0F172A; font-size:14px;">No matching orders found</div>' +
+                    '<div style="font-size:12px; margin-top:4px;">Try searching by order ID, customer name, or phone.</div>' +
+                    '</div>'
+                );
+            }
+        });
+
+        $mobSearch.on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                var term = $(this).val().trim();
+                window.location.href = 'order.php?tab=<?= rawurlencode($tab) ?>&search=' + encodeURIComponent(term);
+            }
+        });
+    }
+});
 </script>
+
+<!-- =============================================================
+     MODAL: MOBILE FILTER DIALOG (PIXEL-PERFECT)
+============================================================= -->
+<div class="modal fade" id="modal-mobile-filter" tabindex="-1" role="dialog" aria-labelledby="mobFilterModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-sm" style="max-width: 360px; margin: 50px auto;">
+        <div class="modal-content modal-content-formal" style="border-radius: 16px; overflow: hidden;">
+            <form method="get" action="order.php" style="margin: 0;">
+                <div class="modal-header-formal" style="padding: 14px 18px; border-bottom: 1px solid #F1F5F9;">
+                    <h4 class="modal-title" id="mobFilterModalTitle" style="font-size: 15px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        Filter Orders
+                    </h4>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="opacity: 0.5;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body-formal" style="padding: 18px;">
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label-formal">Fulfillment Status</label>
+                        <select name="tab" class="form-control-formal">
+                            <option value="all" <?= ($tab === 'all') ? 'selected' : '' ?>>All Orders</option>
+                            <option value="pending" <?= ($tab === 'pending') ? 'selected' : '' ?>>Pending</option>
+                            <option value="processing" <?= ($tab === 'processing') ? 'selected' : '' ?>>Processing</option>
+                            <option value="shipped" <?= ($tab === 'shipped') ? 'selected' : '' ?>>Shipped</option>
+                            <option value="delivered" <?= ($tab === 'delivered') ? 'selected' : '' ?>>Delivered</option>
+                            <option value="cancelled" <?= ($tab === 'cancelled') ? 'selected' : '' ?>>Cancelled</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label-formal">Payment Status</label>
+                        <select name="payment_status" class="form-control-formal">
+                            <option value="">Payment: All</option>
+                            <option value="Completed" <?= ($paymentFilter === 'Completed') ? 'selected' : '' ?>>Paid (Completed)</option>
+                            <option value="Pending" <?= ($paymentFilter === 'Pending') ? 'selected' : '' ?>>Payment Pending</option>
+                            <option value="Cancelled" <?= ($paymentFilter === 'Cancelled') ? 'selected' : '' ?>>Payment Cancelled</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 6px;">
+                        <label class="form-label-formal">Search Keyword</label>
+                        <input type="text" name="search" class="form-control-formal" placeholder="Order ID, Customer, Phone..." value="<?= orderEsc($search) ?>">
+                    </div>
+                </div>
+                <div class="modal-footer-formal" style="padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="order.php" class="btn btn-default btn-sm" style="border-radius: 8px; font-weight: 600;">Reset Filters</a>
+                    <button type="submit" class="btn btn-sm" style="border-radius: 8px; font-weight: 700; background: #FEDB65; border: 1px solid #FACC15; color: #0F172A; padding: 6px 16px;">Apply Filters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

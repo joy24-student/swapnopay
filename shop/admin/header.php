@@ -104,7 +104,19 @@ foreach ($result as $row) {
 				</div>
 
 				<div class="navbar-custom-menu">
-					<ul class="nav navbar-nav sn-nav-items">
+						<!-- Dedicated AI Voice Copilot Button (Beside Notification Bell) -->
+						<li class="sn-ai-li">
+							<a href="ai-copilot.php" class="sn-ai-header-btn" title="AI Voice Copilot & Autonomous Operations">
+								<span class="sn-ai-btn-sparkle">
+									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M12 2l2.4 7.4 7.6 2.6-7.6 2.6L12 22l-2.4-7.4L2 12l7.6-2.6L12 2z"/>
+									</svg>
+								</span>
+								<span class="sn-ai-btn-title hidden-xs">AI Copilot</span>
+								<span class="sn-ai-voice-dot" title="Voice & Vision Active"><i class="fa fa-microphone"></i></span>
+							</a>
+						</li>
+
 						<!-- Notification Bell -->
 						<li class="sn-bell-li">
 							<a href="notifications.php" class="sn-bell-link" title="Notifications">
@@ -175,6 +187,16 @@ foreach ($result as $row) {
 			        <li class="treeview <?php if($cur_page == 'index.php') {echo 'active';} ?>">
 			          <a href="index.php">
 			            <i class="fa fa-home"></i> <span>Dashboard</span>
+			          </a>
+			        </li>
+
+			        <!-- Autonomous AI Voice Copilot -->
+			        <li class="treeview <?php if($cur_page == 'ai-copilot.php') {echo 'active';} ?>">
+			          <a href="ai-copilot.php" style="background: linear-gradient(135deg, rgba(250, 184, 2, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);">
+			            <i class="fa fa-magic" style="color: #f59e0b;"></i> <span>AI Voice Copilot</span>
+			            <span class="pull-right-container">
+			              <small class="label pull-right bg-yellow" style="color:#0f172a; font-weight:800; border-radius:4px; font-size:10px;">PRO AI</small>
+			            </span>
 			          </a>
 			        </li>
 
