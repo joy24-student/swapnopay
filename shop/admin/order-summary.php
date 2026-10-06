@@ -84,6 +84,25 @@ function receiptText($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+if (isset($_GET['print']) && $_GET['print'] == '1') {
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Order Receipt - <?= receiptText($reference) ?></title>
+        <style>
+            body { margin: 0; padding: 15px; background: #ffffff; }
+        </style>
+    </head>
+    <body onload="window.print();">
+        <?php require_once __DIR__ . '/../inc/order_receipt_view.php'; ?>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 require_once __DIR__ . '/header.php';
 ?>
 
@@ -475,248 +494,8 @@ require_once __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- OFFICIAL INVOICE / RECEIPT SHEET -->
-        <div class="receipt-sheet">
-            <!-- HEADER: STORE IDENTITY & INVOICE META -->
-            <div class="receipt-header">
-                <div>
-                    <?php if (!empty($shopLogo) && file_exists(__DIR__ . '/../assets/uploads/' . $shopLogo)): ?>
-                        <img src="../assets/uploads/<?= receiptText($shopLogo) ?>" alt="<?= receiptText($shopName) ?>" class="receipt-brand-logo">
-                    <?php else: ?>
-                        <div style="font-size: 22px; font-weight: 900; color: #0f172a; margin-bottom: 8px;">
-                            <i class="fa fa-shopping-bag text-primary"></i> <?= receiptText($shopName) ?>
-                        </div>
-                    <?php endif; ?>
-                    <div class="receipt-company-info">
-                        <strong><?= receiptText($shopName) ?></strong><br>
-                        <?= receiptText($contactAddress) ?><br>
-                        <i class="fa fa-phone text-muted"></i> <?= receiptText($contactPhone) ?> &nbsp;|&nbsp; 
-                        <i class="fa fa-envelope text-muted"></i> <?= receiptText($contactEmail) ?><br>
-                        <i class="fa fa-globe text-muted"></i> https://<?= receiptText($_SERVER['HTTP_HOST'] ?? 'shopnext.style') ?>
-                    </div>
-                </div>
-
-                <div class="receipt-title-box">
-                    <h2 class="receipt-main-title">Official Receipt</h2>
-                    <div class="receipt-ref-code"><?= receiptText($reference) ?></div>
-                    <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">
-                        <strong>Date:</strong> <?= !empty($order['payment_date']) ? date('M d, Y · h:i A', strtotime($order['payment_date'])) : date('M d, Y') ?>
-                    </div>
-
-                    <div class="receipt-meta-pills">
-                        <?php if ($order['payment_status'] === 'Completed'): ?>
-                            <span class="status-pill status-paid"><i class="fa fa-check-circle"></i> Paid</span>
-                        <?php elseif ($order['payment_status'] === 'Cancelled'): ?>
-                            <span class="status-pill status-cancelled"><i class="fa fa-times-circle"></i> Cancelled</span>
-                        <?php else: ?>
-                            <span class="status-pill status-pending"><i class="fa fa-clock-o"></i> Pending Payment</span>
-                        <?php endif; ?>
-
-                        <?php if ($order['shipping_status'] === 'Delivered'): ?>
-                            <span class="status-pill status-delivered"><i class="fa fa-check"></i> Delivered</span>
-                        <?php elseif ($order['shipping_status'] === 'Shipped'): ?>
-                            <span class="status-pill status-shipped"><i class="fa fa-truck"></i> Shipped</span>
-                        <?php elseif ($order['shipping_status'] === 'Processing'): ?>
-                            <span class="status-pill status-processing"><i class="fa fa-refresh fa-spin"></i> Processing</span>
-                        <?php else: ?>
-                            <span class="status-pill" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;"><i class="fa fa-box"></i> Pending Dispatch</span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3-COLUMN STRUCTURED DETAILS -->
-            <div class="receipt-grid-3">
-                <!-- Billed To -->
-                <div class="receipt-info-card">
-                    <h4><i class="fa fa-user text-primary"></i> Customer (Billed To)</h4>
-                    <strong><?= receiptText($custName) ?></strong><br>
-                    <?php if (!empty($custEmail)): ?>
-                        <div style="color: #64748b; word-break: break-all;"><i class="fa fa-envelope-o text-muted"></i> <?= receiptText($custEmail) ?></div>
-                    <?php endif; ?>
-                    <?php if (!empty($custPhone)): ?>
-                        <div style="color: #0f172a; font-weight: 600;"><i class="fa fa-phone text-muted"></i> <?= receiptText($custPhone) ?></div>
-                    <?php endif; ?>
-                    <?php if (!empty($order['customer_id'])): ?>
-                        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Account ID: #CUST-<?= (int)$order['customer_id'] ?></div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Shipped To -->
-                <div class="receipt-info-card">
-                    <h4><i class="fa fa-map-marker text-danger"></i> Delivery Destination</h4>
-                    <strong><?= receiptText($shipName) ?></strong><br>
-                    <?= !empty($shipStreet) ? nl2br(receiptText($shipStreet)) . '<br>' : '' ?>
-                    <?= receiptText($shipCity) ?><?= (!empty($shipState) ? ', ' . receiptText($shipState) : '') ?> <?= receiptText($shipZip) ?><br>
-                    <?= receiptText($shipCountry) ?><br>
-                    <div style="font-weight: 600; color: #0f172a; margin-top: 4px;"><i class="fa fa-mobile-phone text-muted"></i> Recipient Tel: <?= receiptText($shipPhone) ?></div>
-                </div>
-
-                <!-- Payment & Order Meta -->
-                <div class="receipt-info-card">
-                    <h4><i class="fa fa-credit-card text-success"></i> Payment & Dispatch</h4>
-                    <div><strong>Method:</strong> <?= receiptText($order['payment_method'] ?: 'Online Gateway') ?></div>
-                    <?php if (!empty($order['txnid'])): ?>
-                        <div style="font-size: 12px; color: #475569;"><strong>Txn ID:</strong> <code style="font-size:11px;"><?= receiptText($order['txnid']) ?></code></div>
-                    <?php endif; ?>
-                    <?php if (!empty($order['ssl_payment_method'])): ?>
-                        <div style="font-size: 12px; color: #64748b;"><strong>Gateway:</strong> <?= receiptText($order['ssl_payment_method']) ?></div>
-                    <?php endif; ?>
-                    <div style="margin-top: 4px;"><strong>Fulfillment:</strong> Standard Express Courier</div>
-                    <div style="font-size: 11px; color: #64748b;">Invoice Currency: BDT (Bangladeshi Taka)</div>
-                </div>
-            </div>
-
-            <!-- ITEMIZED PRODUCT TABLE -->
-            <div class="receipt-table-box">
-                <table class="receipt-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px; text-align: center;">#</th>
-                            <th>Product Description</th>
-                            <th style="width: 130px; text-align: right;">Unit Price</th>
-                            <th style="width: 80px; text-align: center;">Qty</th>
-                            <th style="width: 140px; text-align: right;">Line Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($items)): ?>
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 28px; color: #94a3b8;">
-                                    <i class="fa fa-cube fa-2x"></i><br>No itemized products found for this order record.
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php $idx = 1; foreach ($items as $item): 
-                                $lineTotal = (float)$item['unit_price'] * (int)$item['quantity'];
-                                $photoName = $item['p_featured_photo'] ?? '';
-                                $hasPhoto = !empty($photoName) && file_exists(__DIR__ . '/../assets/uploads/' . $photoName);
-                            ?>
-                                <tr>
-                                    <td style="text-align: center; color: #94a3b8; font-weight: 600;"><?= $idx++ ?></td>
-                                    <td>
-                                        <div class="receipt-prod-meta">
-                                            <?php if ($hasPhoto): ?>
-                                                <img src="../assets/uploads/<?= receiptText($photoName) ?>" alt="<?= receiptText($item['product_name']) ?>" class="receipt-prod-img">
-                                            <?php else: ?>
-                                                <div class="receipt-prod-img" style="display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 20px;">
-                                                    <i class="fa fa-cube"></i>
-                                                </div>
-                                            <?php endif; ?>
-                                            <div>
-                                                <strong style="color: #0f172a; font-size: 14px; display: block; line-height: 1.3;">
-                                                    <?= receiptText($item['product_name']) ?>
-                                                </strong>
-                                                <div style="margin-top: 4px;">
-                                                    <?php if (!empty($item['size'])): ?>
-                                                        <span class="receipt-badge-option"><i class="fa fa-tag text-muted"></i> Size: <?= receiptText($item['size']) ?></span>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($item['color'])): ?>
-                                                        <span class="receipt-badge-option"><i class="fa fa-tint text-muted"></i> Color: <?= receiptText($item['color']) ?></span>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($item['product_id'])): ?>
-                                                        <span class="receipt-badge-option" style="background: #e0f2fe; color: #0369a1;">SKU/ID: #<?= (int)$item['product_id'] ?></span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td style="text-align: right; font-weight: 600; color: #334155;">
-                                        BDT <?= number_format((float)$item['unit_price'], 2) ?>
-                                    </td>
-                                    <td style="text-align: center; font-weight: 700; color: #0f172a;">
-                                        <?= (int)$item['quantity'] ?>
-                                    </td>
-                                    <td style="text-align: right; font-weight: 800; color: #0f172a;">
-                                        BDT <?= number_format($lineTotal, 2) ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- FINANCIAL SUMMARY & REMARKS -->
-            <div class="receipt-bottom-grid">
-                <!-- Left: Order Notes & Packing Barcode -->
-                <div class="receipt-notes-panel">
-                    <div style="font-weight: 700; color: #0f172a; font-size: 13px; margin-bottom: 8px;">
-                        <i class="fa fa-info-circle text-primary"></i> Order Notes & Fulfillment Instructions
-                    </div>
-                    <?php if (!empty($order['payment_note']) || !empty($order['customer_note'])): ?>
-                        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; font-style: italic; color: #1e293b;">
-                            "<?= receiptText($order['payment_note'] ?: $order['customer_note']) ?>"
-                        </div>
-                    <?php else: ?>
-                        <p style="margin: 0 0 8px; color: #64748b;">No special delivery instructions provided by the customer.</p>
-                    <?php endif; ?>
-
-                    <?php if ($isCash && !$isPaid): ?>
-                        <div style="background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 12px;">
-                            <i class="fa fa-money"></i> Cash On Delivery: Collect <strong>BDT <?= number_format($paidAmount, 2) ?></strong> in cash upon parcel handover.
-                        </div>
-                    <?php elseif ($isPaid): ?>
-                        <div style="background: #f0fdf4; border: 1px solid #dcfce7; color: #166534; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 12px;">
-                            <i class="fa fa-check-circle"></i> Payment verified in full via <?= receiptText($order['payment_method']) ?>. Hand over parcel without collection.
-                        </div>
-                    <?php endif; ?>
-
-                    <div class="barcode-box">
-                        <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Tracking Barcode / Scan ID</div>
-                        <div class="barcode-lines">||| | |||| | ||| || ||| |||| |</div>
-                        <div style="font-size: 11px; font-family: monospace; color: #475569;"><?= receiptText($reference) ?></div>
-                    </div>
-                </div>
-
-                <!-- Right: Calculations Table -->
-                <div>
-                    <table class="receipt-calc-table">
-                        <tr>
-                            <td style="color: #64748b;">Items Subtotal:</td>
-                            <td>BDT <?= number_format($subtotal, 2) ?></td>
-                        </tr>
-                        <tr>
-                            <td style="color: #64748b;">Shipping / Delivery Fee:</td>
-                            <td>BDT <?= number_format($shippingCost, 2) ?></td>
-                        </tr>
-                        <?php if ($couponDiscount > 0): ?>
-                            <tr>
-                                <td style="color: #059669;">
-                                    Coupon Discount <?= !empty($order['coupon_code']) ? '(' . receiptText($order['coupon_code']) . ')' : '' ?>:
-                                </td>
-                                <td style="color: #059669;">- BDT <?= number_format($couponDiscount, 2) ?></td>
-                            </tr>
-                        <?php endif; ?>
-                        <tr class="receipt-calc-total">
-                            <td>Grand Total:</td>
-                            <td>BDT <?= number_format($paidAmount, 2) ?></td>
-                        </tr>
-                        <tr>
-                            <td style="color: #64748b; padding-top: 10px;">Amount Paid:</td>
-                            <td style="padding-top: 10px; color: #059669;">BDT <?= number_format($amountPaid, 2) ?></td>
-                        </tr>
-                        <tr>
-                            <td style="color: #64748b;">Balance Due / COD:</td>
-                            <td style="color: <?= $balanceDue > 0 ? '#dc2626' : '#64748b' ?>; font-weight: 700;">
-                                BDT <?= number_format($balanceDue, 2) ?>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-
-            <!-- FOOTER NOTICE & DISPATCH AUTHORIZATION -->
-            <div class="receipt-sign-row">
-                <div style="font-size: 11px; color: #94a3b8; line-height: 1.6; max-width: 480px;">
-                    <strong>Thank you for choosing <?= receiptText($shopName) ?>!</strong><br>
-                    All items are thoroughly inspected prior to packing. For returns, warranty claims, or billing inquiries, please contact our support desk with your invoice number.
-                </div>
-                <div class="receipt-sign-box">
-                    <div class="receipt-sign-line">Authorized Signatory / QA</div>
-                </div>
-            </div>
-        </div>
+        <!-- OFFICIAL PIXEL-PERFECT INVOICE / RECEIPT SHEET -->
+        <?php require __DIR__ . '/../inc/order_receipt_view.php'; ?>
     </div>
 </section>
 

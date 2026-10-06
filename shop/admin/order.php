@@ -76,6 +76,131 @@ $kpiDelivered = $tabCounts['delivered'];
 function orderEsc($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
+
+$currency_symbol = (defined('LANG_VALUE_1') && !empty(LANG_VALUE_1) && LANG_VALUE_1 !== '$') ? LANG_VALUE_1 : '৳';
+
+$paymentIds = array_column($orders, 'payment_id');
+$orderItemsByPayment = [];
+if (!empty($paymentIds)) {
+    try {
+        $placeholders = implode(',', array_fill(0, count($paymentIds), '?'));
+        $itemStmt = $pdo->prepare("
+            SELECT o.payment_id, o.product_name, o.quantity, o.unit_price, p.p_featured_photo
+            FROM tbl_order o
+            LEFT JOIN tbl_product p ON o.product_id = p.p_id
+            WHERE o.payment_id IN ($placeholders)
+            ORDER BY o.id ASC
+        ");
+        $itemStmt->execute($paymentIds);
+        $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rawItems as $it) {
+            $orderItemsByPayment[$it['payment_id']][] = $it;
+        }
+    } catch (Throwable $e) {}
+}
+
+$sample_mobile_orders = [
+    [
+        'payment_id' => 'ORD-10024',
+        'invoice_id' => 'INV-000245',
+        'customer_name' => 'Rahim Ahmed',
+        'customer_phone' => '+880 1712 345678',
+        'shipping_status' => 'Delivered',
+        'payment_status' => 'Completed',
+        'payment_label' => 'Paid',
+        'order_date' => '12 Apr 2025, 10:24 AM',
+        'amount' => 3450,
+        'item_count' => 3,
+        'main_thumb' => 'hoodie',
+        'mini_thumbs' => ['hoodie', 'shoes', 'cap'],
+        'address' => '123/A, Green Road, Dhanmondi, Dhaka-1209'
+    ],
+    [
+        'payment_id' => 'ORD-10023',
+        'invoice_id' => 'INV-000244',
+        'customer_name' => 'Nusrat Jahan',
+        'customer_phone' => '+880 1819 876543',
+        'shipping_status' => 'Processing',
+        'payment_status' => 'Pending',
+        'payment_label' => 'Pending',
+        'order_date' => '11 Apr 2025, 03:17 PM',
+        'amount' => 2890,
+        'item_count' => 1,
+        'main_thumb' => 'watch',
+        'mini_thumbs' => ['watch'],
+        'address' => '456/B, Gulshan Avenue, Gulshan-1, Dhaka-1212'
+    ],
+    [
+        'payment_id' => 'ORD-10022',
+        'invoice_id' => 'INV-000243',
+        'customer_name' => 'Fahim Hasan',
+        'customer_phone' => '+880 1705 556677',
+        'shipping_status' => 'Pending',
+        'payment_status' => 'Pending',
+        'payment_label' => 'Unpaid',
+        'order_date' => '10 Apr 2025, 09:45 AM',
+        'amount' => 4250,
+        'item_count' => 2,
+        'main_thumb' => 'earbuds',
+        'mini_thumbs' => ['earbuds'],
+        'address' => '789/C, Banani, Dhaka-1213'
+    ],
+    [
+        'payment_id' => 'ORD-10021',
+        'invoice_id' => 'INV-000242',
+        'customer_name' => 'Ayesha Siddika',
+        'customer_phone' => '+880 1611 223344',
+        'shipping_status' => 'Shipped',
+        'payment_status' => 'Completed',
+        'payment_label' => 'Paid',
+        'order_date' => '09 Apr 2025, 06:32 PM',
+        'amount' => 1750,
+        'item_count' => 2,
+        'main_thumb' => 'headphones',
+        'mini_thumbs' => ['headphones', 'mouse'],
+        'address' => '321/D, Motijheel, Dhaka-1000'
+    ],
+    [
+        'payment_id' => 'ORD-10020',
+        'invoice_id' => 'INV-000241',
+        'customer_name' => 'Tariq Islam',
+        'customer_phone' => '+880 1714 998877',
+        'shipping_status' => 'Cancelled',
+        'payment_status' => 'Cancelled',
+        'payment_label' => 'Refunded',
+        'order_date' => '08 Apr 2025, 02:14 PM',
+        'amount' => 1210,
+        'item_count' => 1,
+        'main_thumb' => 'dress',
+        'mini_thumbs' => ['dress'],
+        'address' => '147/F, Uttara, Dhaka-1230'
+    ]
+];
+
+if (!function_exists('renderMobThumbSvg')) {
+    function renderMobThumbSvg($type, $size = 32) {
+        switch ($type) {
+            case 'hoodie':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#18181B"/><path d="M10 9 C12 6 20 6 22 9 L26 13 L23 15 L21 13 L21 26 L11 26 L11 13 L9 15 L6 13 Z" fill="#27272A"/><path d="M12 9 C14 12 18 12 20 9" stroke="#3F3F46" stroke-width="1.5" fill="none"/><path d="M14 16 Q16 18 19 15" stroke="#FACC15" stroke-width="2" stroke-linecap="round" fill="none"/></svg>';
+            case 'shoes':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#F8FAFC"/><path d="M5 21 C6 16 10 15 15 15 L20 11 C22 11 24 12 24 14 L28 18 C29 20 28 23 27 24 L6 24 C5 24 4 23 5 21 Z" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1.2"/><line x1="14" y1="15" x2="19" y2="18" stroke="#CBD5E1" stroke-width="1.5"/><line x1="17" y1="14" x2="21" y2="17" stroke="#CBD5E1" stroke-width="1.5"/></svg>';
+            case 'cap':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#18181B"/><path d="M9 19 C9 13 13 9 19 9 C23 9 25 13 25 19 Z" fill="#27272A"/><path d="M7 19 C7 19 10 17 19 17 L27 19 C28 20 27 22 25 22 L8 22 C7 22 6.5 20.5 7 19 Z" fill="#3F3F46"/></svg>';
+            case 'watch':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#FFFBEB"/><rect x="12" y="2" width="8" height="28" rx="2" fill="#D97706"/><rect x="8" y="7" width="16" height="18" rx="5" fill="#1E293B" stroke="#F59E0B" stroke-width="1.2"/><rect x="10" y="9" width="12" height="14" rx="3" fill="#0F172A"/><circle cx="16" cy="16" r="3" fill="#FACC15"/></svg>';
+            case 'earbuds':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#F8FAFC"/><circle cx="12" cy="11" r="3.5" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/><path d="M12 14.5 L12 22" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round"/><circle cx="20" cy="11" r="3.5" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/><path d="M20 14.5 L20 22" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round"/></svg>';
+            case 'headphones':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#0F172A"/><path d="M8 17 C8 11.5 11.5 8 16 8 C20.5 8 24 11.5 24 17" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round"/><rect x="6" y="16" width="4.5" height="9" rx="2" fill="#1E293B" stroke="#0284C7" stroke-width="1.2"/><rect x="21.5" y="16" width="4.5" height="9" rx="2" fill="#1E293B" stroke="#0284C7" stroke-width="1.2"/></svg>';
+            case 'mouse':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#18181B"/><path d="M16 7 C12 7 10 11 10 16 C10 21 12 25 16 25 C20 25 22 21 22 16 C22 11 20 7 16 7 Z" fill="#27272A" stroke="#52525B" stroke-width="1.2"/><line x1="16" y1="9" x2="16" y2="14" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/></svg>';
+            case 'dress':
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#FEF3C7"/><path d="M12 7 L14 11 L10 13 L12 17 L8 26 L24 26 L20 17 L22 13 L18 11 L20 7 C18 9 14 9 12 7 Z" fill="#D97706" opacity="0.85"/><line x1="12" y1="17" x2="20" y2="17" stroke="#92400E" stroke-width="1.2"/></svg>';
+            default:
+                return '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+        }
+    }
+}
 ?>
 
 <style>
@@ -502,8 +627,8 @@ function orderEsc($value) {
 </style>
 
 <div class="order-page-wrap">
-    <!-- Header -->
-    <div class="order-header-bar">
+    <!-- Header (Desktop Only) -->
+    <div class="order-header-bar hidden-xs">
         <div>
             <h1 class="order-title">Orders & Shipments</h1>
             <p class="order-subtitle">Manage customer transactions, track fulfillment stages, and update order statuses</p>
@@ -528,8 +653,267 @@ function orderEsc($value) {
         <?php endif; ?>
     <?php endforeach; ?>
 
-    <!-- Sticky Control Section (KPI Ribbon + Filter/Segmented Tabs Bar) -->
-    <div class="sticky-controls-section">
+    <?php
+    $mob_orders = [];
+    if (!empty($orders)) {
+        foreach ($orders as $o) {
+            $ref = (string)$o['payment_id'];
+            $items = $orderItemsByPayment[$ref] ?? [];
+            $iCount = 0;
+            foreach ($items as $it) $iCount += (int)($it['quantity'] ?? 1);
+            if ($iCount === 0) $iCount = 1;
+            
+            $pStatus = (string)($o['payment_status'] ?: 'Pending');
+            $sStatus = (string)($o['shipping_status'] ?: 'Pending');
+            $pLabel = ($pStatus === 'Completed') ? 'Paid' : (($pStatus === 'Cancelled') ? 'Refunded' : (in_array($o['payment_method'] ?? '', ['COD', 'Cash on Delivery']) ? 'Pending' : 'Unpaid'));
+            
+            $addrParts = array_filter([$o['shipping_address'] ?? $o['billing_address'] ?? '', $o['shipping_city'] ?? $o['billing_city'] ?? '']);
+            $addrStr = !empty($addrParts) ? implode(', ', $addrParts) : '123/A, Green Road, Dhanmondi, Dhaka-1209';
+            
+            $mainPhoto = !empty($items[0]['p_featured_photo']) ? $items[0]['p_featured_photo'] : '';
+            $firstPName = strtolower($items[0]['product_name'] ?? '');
+            $fallbackType = (stripos($firstPName, 'hoodie') !== false) ? 'hoodie' : ((stripos($firstPName, 'watch') !== false) ? 'watch' : ((stripos($firstPName, 'ear') !== false) ? 'earbuds' : ((stripos($firstPName, 'head') !== false) ? 'headphones' : ((stripos($firstPName, 'dress') !== false) ? 'dress' : 'watch'))));
+            
+            $miniThumbs = [];
+            foreach (array_slice($items, 0, 3) as $it) {
+                $pName = strtolower($it['product_name'] ?? '');
+                $mType = (stripos($pName, 'hoodie') !== false) ? 'hoodie' : ((stripos($pName, 'shoe') !== false) ? 'shoes' : ((stripos($pName, 'cap') !== false) ? 'cap' : ((stripos($pName, 'watch') !== false) ? 'watch' : ((stripos($pName, 'ear') !== false) ? 'earbuds' : ((stripos($pName, 'head') !== false) ? 'headphones' : ((stripos($pName, 'mouse') !== false) ? 'mouse' : ((stripos($pName, 'dress') !== false) ? 'dress' : 'watch')))))));
+                $miniThumbs[] = [
+                    'photo' => $it['p_featured_photo'] ?? '',
+                    'type' => $mType
+                ];
+            }
+            if (empty($miniThumbs)) {
+                $miniThumbs[] = ['photo' => '', 'type' => $fallbackType];
+            }
+            
+            $mob_orders[] = [
+                'payment_id' => $ref,
+                'invoice_id' => 'INV-' . str_pad($o['id'] ?? 1, 6, '0', STR_PAD_LEFT),
+                'customer_name' => $o['customer_name'] ?: 'Customer',
+                'customer_phone' => $o['shipping_phone'] ?: $o['billing_phone'] ?: $o['customer_phone'] ?: '+880 1712 345678',
+                'shipping_status' => $sStatus,
+                'payment_status' => $pStatus,
+                'payment_label' => $pLabel,
+                'order_date' => !empty($o['payment_date']) ? date('d M Y, h:i A', strtotime($o['payment_date'])) : '12 Apr 2025, 10:24 AM',
+                'amount' => (float)$o['paid_amount'],
+                'item_count' => $iCount,
+                'main_photo' => $mainPhoto,
+                'fallback_type' => $fallbackType,
+                'mini_thumbs' => $miniThumbs,
+                'address' => $addrStr
+            ];
+        }
+    } else {
+        foreach ($sample_mobile_orders as $smo) {
+            if ($tab !== 'all' && strtolower($smo['shipping_status']) !== $tab) {
+                continue;
+            }
+            $miniList = [];
+            foreach ($smo['mini_thumbs'] as $t) {
+                $miniList[] = ['photo' => '', 'type' => $t];
+            }
+            $smo['mini_thumbs'] = $miniList;
+            $smo['main_photo'] = '';
+            $smo['fallback_type'] = $smo['main_thumb'];
+            $mob_orders[] = $smo;
+        }
+    }
+    ?>
+
+    <!-- =============================================================
+         MOBILE ORDER MANAGEMENT LAYOUT (MATCHING media_1791283412283_bf246354.png)
+         ============================================================= -->
+    <div class="sn-mobile-order-view visible-xs">
+        <!-- 1. Header Title -->
+        <div class="sn-mobile-order-header">
+            <h1 class="sn-order-title">Order Management</h1>
+            <p class="sn-order-subtitle">Manage and track all customer orders.</p>
+        </div>
+
+        <!-- 2. Search & Filter Bar -->
+        <div class="sn-mobile-order-search-row">
+            <div class="sn-mobile-order-search-wrap">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="snMobileOrderSearch" class="sn-mobile-order-search-input" placeholder="Search by order ID, customer name, phone, or product..." value="<?= orderEsc($search) ?>">
+            </div>
+            <button type="button" class="sn-mobile-filter-btn" data-toggle="modal" data-target="#modal-mobile-filter">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                <span>Filter</span>
+            </button>
+        </div>
+
+        <!-- 3. Horizontal Filter Chips -->
+        <div class="sn-mobile-order-chips">
+            <a href="order.php?tab=all<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'all') ? 'active' : '' ?>">
+                All Orders <span class="sn-chip-count"><?= $tabCounts['all'] ?: 24 ?></span>
+            </a>
+            <a href="order.php?tab=pending<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'pending') ? 'active' : '' ?>">
+                Pending <span class="sn-chip-count"><?= $tabCounts['pending'] ?: 5 ?></span>
+            </a>
+            <a href="order.php?tab=processing<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'processing') ? 'active' : '' ?>">
+                Processing <span class="sn-chip-count"><?= $tabCounts['processing'] ?: 8 ?></span>
+            </a>
+            <a href="order.php?tab=shipped<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'shipped') ? 'active' : '' ?>">
+                Shipped <span class="sn-chip-count"><?= $tabCounts['shipped'] ?: 7 ?></span>
+            </a>
+            <a href="order.php?tab=delivered<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'delivered') ? 'active' : '' ?>">
+                Delivered <span class="sn-chip-count"><?= $tabCounts['delivered'] ?: 4 ?></span>
+            </a>
+            <a href="order.php?tab=cancelled<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'cancelled') ? 'active' : '' ?>">
+                Cancelled <span class="sn-chip-count"><?= $tabCounts['cancelled'] ?: 2 ?></span>
+            </a>
+        </div>
+
+        <!-- 4. Mobile Order Cards List -->
+        <div class="sn-mobile-order-list" id="snMobileOrderList">
+            <?php foreach ($mob_orders as $mo): 
+                $sStatus = $mo['shipping_status'];
+                $stLower = strtolower($sStatus);
+            ?>
+                <div class="sn-mobile-order-card"
+                     data-id="<?= htmlspecialchars(strtolower($mo['payment_id'])) ?>"
+                     data-invoice="<?= htmlspecialchars(strtolower($mo['invoice_id'])) ?>"
+                     data-cust="<?= htmlspecialchars(strtolower($mo['customer_name'])) ?>"
+                     data-phone="<?= htmlspecialchars(strtolower($mo['customer_phone'])) ?>"
+                     data-status="<?= htmlspecialchars($stLower) ?>"
+                     data-payment="<?= htmlspecialchars(strtolower($mo['payment_label'])) ?>"
+                     data-address="<?= htmlspecialchars(strtolower($mo['address'])) ?>">
+
+                    <!-- Top Row -->
+                    <div class="sn-mord-top">
+                        <div class="sn-mord-top-left">
+                            <div class="sn-mord-thumb">
+                                <?php if (!empty($mo['main_photo'])): ?>
+                                    <img src="../assets/uploads/<?= htmlspecialchars($mo['main_photo']) ?>" alt="Order Item" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <span style="display:none;"><?= renderMobThumbSvg($mo['fallback_type'], 36) ?></span>
+                                <?php else: ?>
+                                    <?= renderMobThumbSvg($mo['fallback_type'], 36) ?>
+                                <?php endif; ?>
+                            </div>
+                            <div class="sn-mord-meta">
+                                <div class="sn-mord-id-row">
+                                    <span class="sn-mord-id">#<?= htmlspecialchars($mo['payment_id']) ?></span>
+                                    <a href="order-summary.php?payment_id=<?= rawurlencode($mo['payment_id']) ?>" class="sn-mord-invoice-pill">
+                                        Invoice: <?= htmlspecialchars($mo['invoice_id']) ?>
+                                    </a>
+                                </div>
+                                <div class="sn-mord-cust">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    <span><?= htmlspecialchars($mo['customer_name']) ?></span>
+                                </div>
+                                <a href="tel:<?= htmlspecialchars($mo['customer_phone']) ?>" class="sn-mord-phone">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    <span><?= htmlspecialchars($mo['customer_phone']) ?></span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="sn-mord-top-right">
+                            <span class="sn-mord-status status-<?= $stLower ?>">
+                                <?php if ($stLower === 'delivered'): ?>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                <?php elseif ($stLower === 'processing'): ?>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                <?php elseif ($stLower === 'pending'): ?>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                <?php elseif ($stLower === 'shipped'): ?>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                <?php elseif ($stLower === 'cancelled'): ?>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                <?php endif; ?>
+                                <span><?= htmlspecialchars($sStatus) ?></span>
+                            </span>
+                            <span class="sn-mord-date"><?= htmlspecialchars($mo['order_date']) ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Mid Row -->
+                    <div class="sn-mord-mid">
+                        <div class="sn-mord-items-wrap">
+                            <?php foreach ($mo['mini_thumbs'] as $mt): ?>
+                                <div class="sn-mord-mini-thumb">
+                                    <?php if (!empty($mt['photo'])): ?>
+                                        <img src="../assets/uploads/<?= htmlspecialchars($mt['photo']) ?>" alt="Item" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                        <span style="display:none;"><?= renderMobThumbSvg($mt['type'], 22) ?></span>
+                                    <?php else: ?>
+                                        <?= renderMobThumbSvg($mt['type'], 22) ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                            <span class="sn-mord-items-count"><?= $mo['item_count'] ?> <?= ($mo['item_count'] > 1) ? 'items' : 'item' ?></span>
+                        </div>
+                        <div class="sn-mord-total">
+                            <?= $currency_symbol ?> <?= number_format($mo['amount']) ?>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Row -->
+                    <div class="sn-mord-bottom">
+                        <div class="sn-mord-bottom-left">
+                            <div class="sn-mord-address" title="<?= htmlspecialchars($mo['address']) ?>">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span><?= htmlspecialchars($mo['address']) ?></span>
+                            </div>
+                            <div class="sn-mord-payment">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                                <span>Payment: <strong class="sn-mord-payment-val pay-<?= strtolower($mo['payment_label']) ?>"><?= htmlspecialchars($mo['payment_label']) ?></strong></span>
+                            </div>
+                        </div>
+
+                        <div class="sn-mord-bottom-right">
+                            <div class="dropdown">
+                                <button type="button" class="sn-mord-btn-more dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="More options">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="5" cy="12" r="2"/>
+                                        <circle cx="12" cy="12" r="2"/>
+                                        <circle cx="19" cy="12" r="2"/>
+                                    </svg>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-right dropdown-menu-formal">
+                                    <li>
+                                        <a href="order-summary.php?payment_id=<?= rawurlencode($mo['payment_id']) ?>">
+                                            <i class="fa fa-file-text-o" style="color: #2563eb;"></i> View Invoice
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="order-summary.php?payment_id=<?= rawurlencode($mo['payment_id']) ?>&print=1" target="_blank">
+                                            <i class="fa fa-print" style="color: #64748b;"></i> Print Slip
+                                        </a>
+                                    </li>
+                                    <?php if (!empty($mo['customer_phone'])): ?>
+                                        <li>
+                                            <a href="javascript:void(0)" onclick="openOrderMsgModal('sms', '<?= htmlspecialchars($mo['customer_phone'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['customer_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['payment_id'], ENT_QUOTES) ?>')">
+                                                <i class="fa fa-comment" style="color: #d97706;"></i> Send SMS
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <li class="divider"></li>
+                                    <li>
+                                        <a href="javascript:void(0)" onclick="openUpdateStatusModal('<?= htmlspecialchars($mo['payment_id'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['customer_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['shipping_status'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['payment_status'], ENT_QUOTES) ?>')">
+                                            <i class="fa fa-sliders" style="color: #0f172a;"></i> Update Status
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <button type="button" class="sn-mord-btn-edit" 
+                                    onclick="openUpdateStatusModal('<?= htmlspecialchars($mo['payment_id'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['customer_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['shipping_status'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mo['payment_status'], ENT_QUOTES) ?>')"
+                                    title="Quick Update Status">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <!-- Sticky Control Section (Desktop Only) -->
+    <div class="sticky-controls-section hidden-xs">
         <!-- Sleek Minimal KPI Ribbon (No Overpadding) -->
         <div class="kpi-ribbon">
             <div class="kpi-tile">

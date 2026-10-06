@@ -765,6 +765,9 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
 
                                 <!-- Col 4: Action Buttons -->
                                 <div class="sn-order-actions-col">
+                                    <a href="invoice.php?payment_id=<?= urlencode($ord['payment_id']) ?>" target="_blank" class="sn-btn-order-track" style="color:#0284c7; border-color:#bae6fd; background:#f0f9ff;">
+                                        <i class="fa-solid fa-file-invoice"></i> View Invoice
+                                    </a>
                                     <?php if ($cat === 'delivered'): ?>
                                         <button type="button" class="sn-btn-order-buy-again" onclick="buyAgain('<?= htmlspecialchars($ord['payment_id']) ?>')">
                                             <i class="fa-solid fa-cart-shopping"></i> Buy Again
@@ -856,7 +859,7 @@ function openOrderModal(paymentId) {
                     <h4 style="margin: 0 0 10px 0; font-size: 14.5px; font-weight: 700; color: #0f172a;">Items in this Order</h4>
                     <div style="margin-bottom: 20px;">${itemsHtml}</div>
 
-                    <div style="background: #fbfdff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+                        <div style="background: #fbfdff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
                         <div style="display: flex; justify-content: space-between; font-size: 13px; color: #64748b; margin-bottom: 6px;">
                             <span>Subtotal</span>
                             <span>৳ ${parseFloat(ord.paid_amount).toFixed(2)}</span>
@@ -869,6 +872,15 @@ function openOrderModal(paymentId) {
                             <span>Total Paid</span>
                             <span>৳ ${parseFloat(ord.paid_amount).toFixed(2)}</span>
                         </div>
+                    </div>
+
+                    <div style="margin-top: 16px; display: flex; gap: 10px;">
+                        <a href="invoice.php?payment_id=${encodeURIComponent(ord.payment_id)}" target="_blank" style="flex:1; text-align:center; padding:10px; background:#0284c7; color:#fff; border-radius:8px; font-weight:700; text-decoration:none; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <i class="fa fa-file-text-o"></i> View Full Invoice
+                        </a>
+                        <a href="invoice.php?payment_id=${encodeURIComponent(ord.payment_id)}&print=1" target="_blank" style="padding:10px 16px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; text-decoration:none; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <i class="fa fa-print"></i> Print
+                        </a>
                     </div>
                 `;
             } else {
