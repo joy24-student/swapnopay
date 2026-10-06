@@ -1104,7 +1104,323 @@ if (count($mob_customers) < 6) {
     </div>
 </div>
 
+<!-- =============================================================
+     MODAL: MOBILE CUSTOMER FILTER SHEET
+============================================================= -->
+<div class="modal fade sn-mcust-sheet-modal" id="modal-mobile-cust-filter" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="sn-mcust-sheet-content">
+            <div class="sn-mcust-sheet-handle"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">Filter Customers</h4>
+                <button type="button" class="close" data-dismiss="modal" style="font-size: 24px; color: #64748B;">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 14px;">
+                <label style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Status</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <a href="customer.php?tab=all" class="btn btn-default btn-sm <?= $tab === 'all' ? 'active' : '' ?>" style="border-radius: 8px; font-weight: 600; text-align: left; padding: 8px 12px; <?= $tab === 'all' ? 'background:#FED538; border-color:#FED538; color:#0F172A;' : '' ?>">All (<?= $tabCounts['all'] ?>)</a>
+                    <a href="customer.php?tab=active" class="btn btn-default btn-sm <?= $tab === 'active' ? 'active' : '' ?>" style="border-radius: 8px; font-weight: 600; text-align: left; padding: 8px 12px; <?= $tab === 'active' ? 'background:#ECFDF5; border-color:#10B981; color:#059669;' : 'color:#059669;' ?>">Active (<?= $tabCounts['active'] ?>)</a>
+                    <a href="customer.php?tab=inactive" class="btn btn-default btn-sm <?= $tab === 'inactive' ? 'active' : '' ?>" style="border-radius: 8px; font-weight: 600; text-align: left; padding: 8px 12px; <?= $tab === 'inactive' ? 'background:#FEF2F2; border-color:#EF4444; color:#DC2626;' : 'color:#DC2626;' ?>">Inactive (<?= $tabCounts['inactive'] ?>)</a>
+                    <a href="customer.php?tab=blocked" class="btn btn-default btn-sm <?= $tab === 'blocked' ? 'active' : '' ?>" style="border-radius: 8px; font-weight: 600; text-align: left; padding: 8px 12px; <?= $tab === 'blocked' ? 'background:#FFFBEB; border-color:#F59E0B; color:#D97706;' : 'color:#D97706;' ?>">Blocked (<?= $tabCounts['blocked'] ?>)</a>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <a href="customer.php" class="btn btn-default" style="flex: 1; border-radius: 12px; font-weight: 600; height: 42px; display: flex; align-items: center; justify-content: center;">Reset</a>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" style="flex: 1; border-radius: 12px; font-weight: 700; height: 42px; background: #0F172A; border-color: #0F172A;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     MODAL: MOBILE CUSTOMER ACTION SHEET (3 DOTS)
+============================================================= -->
+<div class="modal fade sn-mcust-sheet-modal" id="modal-cust-action-sheet" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="sn-mcust-sheet-content">
+            <div class="sn-mcust-sheet-handle"></div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #F1F5F9;">
+                <div class="sn-mcust-avatar-wrap" style="width: 44px; height: 44px;">
+                    <img src="" id="sheetCustAvatar" class="sn-mcust-avatar" alt="">
+                </div>
+                <div>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;" id="sheetCustName">Customer Name</h4>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;" id="sheetCustCode">#CUST-0001</div>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <a href="#" id="sheetCallBtn" class="sn-mcust-sheet-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span>Call Customer</span>
+                </a>
+                <button type="button" id="sheetSmsBtn" class="sn-mcust-sheet-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Send SMS</span>
+                </button>
+                <button type="button" id="sheetEmailBtn" class="sn-mcust-sheet-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <span>Send Email</span>
+                </button>
+                <button type="button" id="sheetToggleStatusBtn" class="sn-mcust-sheet-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                    <span id="sheetToggleStatusText">Toggle Status (Active/Inactive)</span>
+                </button>
+                <button type="button" id="sheetEditBtn" class="sn-mcust-sheet-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <span>Edit Customer Profile</span>
+                </button>
+                <button type="button" id="sheetDeleteBtn" class="sn-mcust-sheet-item danger">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span>Delete Customer Account</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     MODAL: CUSTOMER QUICK EDIT (PENCIL BUTTON)
+============================================================= -->
+<div class="modal fade" id="modal-cust-quick-edit" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document" style="max-width: 440px; margin: 50px auto;">
+        <div class="modal-content modal-content-formal" style="border-radius: 16px; overflow: hidden;">
+            <form id="quickEditCustForm" onsubmit="handleQuickEditSubmit(event)">
+                <input type="hidden" name="cust_id" id="editCustId" value="">
+                <div class="modal-header-formal" style="padding: 16px 20px;">
+                    <h4 class="modal-title" style="font-weight: 700; color: #0F172A; font-size: 16px;">
+                        <i class="fa fa-pencil" style="margin-right: 6px; color: #D97706;"></i> Edit Customer Details
+                    </h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body-formal" style="padding: 20px;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label-formal">Customer Name</label>
+                        <input type="text" name="cust_name" id="editCustName" class="form-control-formal" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label-formal">Email Address</label>
+                        <input type="email" name="cust_email" id="editCustEmail" class="form-control-formal">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label-formal">Phone Number</label>
+                        <input type="text" name="cust_phone" id="editCustPhone" class="form-control-formal">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label-formal">City / Region</label>
+                        <input type="text" name="cust_city" id="editCustCity" class="form-control-formal">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label-formal">Account Status</label>
+                        <select name="cust_status" id="editCustStatus" class="form-control-formal">
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
+                            <option value="2">Pending / Blocked</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer-formal" style="padding: 12px 20px;">
+                    <button type="button" class="btn btn-default btn-sm" data-dismiss="modal" style="border-radius: 8px; font-weight: 600;">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="btnSaveCust" style="background: #0F172A; border-color: #0F172A; border-radius: 8px; font-weight: 700; padding: 6px 16px;">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+function showAdminToast(msg, type) {
+    if (typeof window.showAdminToast === 'function' && window.showAdminToast !== showAdminToast) {
+        window.showAdminToast(msg, type);
+        return;
+    }
+    var box = $('#admin-toast-container');
+    if (!box.length) {
+        $('body').append('<div id="admin-toast-container"></div>');
+        box = $('#admin-toast-container');
+    }
+    var card = $('<div class="admin-toast-card ' + (type || 'info') + '">' + msg + '</div>');
+    box.append(card);
+    setTimeout(function() { card.css('transform', 'translateX(0)'); }, 10);
+    setTimeout(function() {
+        card.css('transform', 'translateX(120%)');
+        setTimeout(function() { card.remove(); }, 300);
+    }, 3000);
+}
+
+var activeCustData = null;
+
+function openCustActionSheet(cust) {
+    activeCustData = cust;
+    $('#sheetCustName').text(cust.cust_name);
+    $('#sheetCustCode').text(cust.cust_code);
+    if (cust.avatar) {
+        $('#sheetCustAvatar').attr('src', cust.avatar).show();
+    } else {
+        $('#sheetCustAvatar').hide();
+    }
+
+    if (cust.cust_phone) {
+        $('#sheetCallBtn').attr('href', 'tel:' + cust.cust_phone).show();
+        $('#sheetSmsBtn').show().off('click').on('click', function() {
+            $('#modal-cust-action-sheet').modal('hide');
+            openCustomerMsgModal('sms', cust.cust_phone, cust.cust_name);
+        });
+    } else {
+        $('#sheetCallBtn').hide();
+        $('#sheetSmsBtn').hide();
+    }
+
+    if (cust.cust_email) {
+        $('#sheetEmailBtn').show().off('click').on('click', function() {
+            $('#modal-cust-action-sheet').modal('hide');
+            openCustomerMsgModal('email', cust.cust_email, cust.cust_name);
+        });
+    } else {
+        $('#sheetEmailBtn').hide();
+    }
+
+    var isAct = (cust.cust_status == 1);
+    $('#sheetToggleStatusText').text(isAct ? 'Deactivate Customer Account' : 'Activate Customer Account');
+    $('#sheetToggleStatusBtn').off('click').on('click', function() {
+        $('#modal-cust-action-sheet').modal('hide');
+        toggleCustStatusAjax(cust.cust_id);
+    });
+
+    $('#sheetEditBtn').off('click').on('click', function() {
+        $('#modal-cust-action-sheet').modal('hide');
+        openCustEditModal(cust);
+    });
+
+    $('#sheetDeleteBtn').off('click').on('click', function() {
+        $('#modal-cust-action-sheet').modal('hide');
+        $('#confirm-delete .btn-ok').attr('href', 'customer-delete.php?id=' + cust.cust_id);
+        $('#confirm-delete').modal('show');
+    });
+
+    $('#modal-cust-action-sheet').modal('show');
+}
+
+function openCustEditModal(cust) {
+    activeCustData = cust;
+    $('#editCustId').val(cust.cust_id);
+    $('#editCustName').val(cust.cust_name);
+    $('#editCustEmail').val(cust.cust_email);
+    $('#editCustPhone').val(cust.cust_phone);
+    $('#editCustCity').val(cust.cust_city || cust.location);
+    $('#editCustStatus').val(cust.cust_status);
+    $('#modal-cust-quick-edit').modal('show');
+}
+
+function handleQuickEditSubmit(e) {
+    e.preventDefault();
+    var btn = $('#btnSaveCust');
+    btn.prop('disabled', true).text('Saving...');
+
+    var formData = $('#quickEditCustForm').serialize();
+    $.ajax({
+        url: 'customer-quick-edit.php',
+        type: 'POST',
+        data: formData,
+        dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).text('Save Changes');
+            if (res.success) {
+                $('#modal-cust-quick-edit').modal('hide');
+                var d = res.data;
+                var card = $('#sn-mcust-card-' + d.cust_id);
+                if (card.length) {
+                    card.find('#sn-mcust-name-' + d.cust_id).text(d.cust_name);
+                    card.find('.sn-mcust-email-text').text(d.cust_email);
+                    card.find('.sn-mcust-phone-text').text(d.cust_phone);
+                    card.find('.sn-mcust-loc-text').text(d.cust_city);
+                    
+                    var badge = card.find('#sn-mcust-badge-' + d.cust_id);
+                    var stClass = (d.cust_status == 1) ? 'active' : ((d.cust_status == 0) ? 'inactive' : 'blocked');
+                    var stLabel = (d.cust_status == 1) ? 'Active' : ((d.cust_status == 0) ? 'Inactive' : 'Pending');
+                    badge.removeClass('active inactive blocked pending').addClass(stClass);
+                    badge.find('.sn-mcust-badge-label').text(stLabel);
+
+                    card.attr('data-name', d.cust_name.toLowerCase());
+                    card.attr('data-email', d.cust_email.toLowerCase());
+                    card.attr('data-phone', d.cust_phone.toLowerCase());
+                    card.attr('data-location', d.cust_city.toLowerCase());
+                    card.attr('data-status', stClass);
+                }
+                showAdminToast(res.message, 'success');
+            } else {
+                showAdminToast(res.message || 'Failed to update', 'error');
+            }
+        },
+        error: function() {
+            btn.prop('disabled', false).text('Save Changes');
+            showAdminToast('Server error while saving.', 'error');
+        }
+    });
+}
+
+function toggleCustStatusAjax(custId) {
+    $.ajax({
+        url: 'customer-change-status.php?id=' + custId + '&ajax=1',
+        type: 'GET',
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                var newStatus = res.new_status;
+                var card = $('#sn-mcust-card-' + custId);
+                if (card.length) {
+                    var badge = card.find('#sn-mcust-badge-' + custId);
+                    var stClass = (newStatus == 1) ? 'active' : 'inactive';
+                    var stLabel = (newStatus == 1) ? 'Active' : 'Inactive';
+                    badge.removeClass('active inactive blocked pending').addClass(stClass);
+                    badge.find('.sn-mcust-badge-label').text(stLabel);
+                    card.attr('data-status', stClass);
+                }
+                showAdminToast(res.message, 'success');
+            } else {
+                showAdminToast('Could not change status.', 'error');
+            }
+        },
+        error: function() {
+            showAdminToast('Failed to toggle status.', 'error');
+        }
+    });
+}
+
+$(document).ready(function() {
+    var searchInput = document.getElementById('snMobileCustSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var val = this.value.trim().toLowerCase();
+            var cards = document.querySelectorAll('.sn-mcust-card');
+            cards.forEach(function(card) {
+                var name = card.getAttribute('data-name') || '';
+                var email = card.getAttribute('data-email') || '';
+                var phone = card.getAttribute('data-phone') || '';
+                var code = card.getAttribute('data-code') || '';
+                var loc = card.getAttribute('data-location') || '';
+                if (!val || name.indexOf(val) !== -1 || email.indexOf(val) !== -1 || phone.indexOf(val) !== -1 || code.indexOf(val) !== -1 || loc.indexOf(val) !== -1) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var curTab = '<?= custEsc($tab) ?>';
+                window.location.href = 'customer.php?tab=' + curTab + '&search=' + encodeURIComponent(this.value.trim());
+            }
+        });
+    }
+});
+
 function openCustomerMsgModal(type, recipient, name) {
     document.getElementById('modal_send_type').value = type;
     document.getElementById('modal_recipient').value = recipient;
