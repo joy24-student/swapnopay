@@ -76,7 +76,12 @@ $store_feature_on_off = $settings['store_feature_on_off'] ?? 0;
 
 // Meta tags for dynamic pages
 if (!isset($cur_page) || empty($cur_page)) {
-    $cur_page = basename($_SERVER["SCRIPT_NAME"] ?? '');
+    $script = basename($_SERVER["SCRIPT_NAME"] ?? '');
+    if ($script === '' || $script === 'index.php' || !str_ends_with($script, '.php')) {
+        $cur_page = 'index.php';
+    } else {
+        $cur_page = $script;
+    }
 }
 if (basename($_SERVER["SCRIPT_NAME"] ?? '') === 'product.php' 
     || str_contains($_SERVER['REQUEST_URI'] ?? '', 'product.php') 
@@ -1279,10 +1284,6 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             flex-shrink: 0;
         }
 
-        .sn-mobile-header-chips {
-            display: none !important;
-        }
-
         @media (max-width: 768px) {
             .sn-header-wrap {
                 position: fixed !important;
@@ -1297,98 +1298,11 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 padding: 0 !important;
                 transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, box-shadow 0.25s ease !important;
             }
-            /* When home screen feed chips become sticky: replace search bar with filter chips inside sticky header */
+            /* When feed chips become fixed at searchbar position: smoothly hide the search header */
             body.shopnext-theme.sn-feed-sticky-active .sn-header-wrap {
-                transform: none !important;
-                opacity: 1 !important;
-                pointer-events: auto !important;
-                background: #ffffff !important;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
-                border-bottom: 1px solid #e2e8f0 !important;
-                top: 0 !important;
-            }
-            body.shopnext-theme.sn-feed-sticky-active .sn-header-top {
-                padding: 6px 0 !important;
-                gap: 0 !important;
-                justify-content: flex-start !important;
-                display: flex !important;
-                width: 100% !important;
-            }
-            body.shopnext-theme.sn-feed-sticky-active .sn-brand-logo,
-            body.shopnext-theme.sn-feed-sticky-active .sn-header-actions,
-            body.shopnext-theme.sn-feed-sticky-active .sn-search-form {
-                display: none !important;
-            }
-            body.shopnext-theme.sn-feed-sticky-active .sn-mobile-header-chips {
-                display: flex !important;
-                align-items: center !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                overflow: hidden !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .sn-mchips-scroll {
-                display: flex !important;
-                align-items: center !important;
-                gap: 6px !important;
-                overflow-x: auto !important;
-                overflow-y: hidden !important;
-                -webkit-overflow-scrolling: touch !important;
-                scrollbar-width: none !important;
-                width: 100% !important;
-                padding: 2px 2px 2px 0 !important;
-            }
-            .sn-mchips-scroll::-webkit-scrollbar {
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-            }
-            .sn-mchip {
-                display: inline-flex !important;
-                align-items: center !important;
-                gap: 5px !important;
-                padding: 6px 12px !important;
-                border-radius: 999px !important;
-                font-size: 12px !important;
-                font-weight: 500 !important;
-                color: #475569 !important;
-                background: #f1f5f9 !important;
-                border: 1px solid #e2e8f0 !important;
-                white-space: nowrap !important;
-                flex-shrink: 0 !important;
-                cursor: pointer !important;
-                transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease !important;
-                user-select: none !important;
-                -webkit-tap-highlight-color: transparent !important;
-                outline: none !important;
-            }
-            .sn-mchip:active {
-                transform: scale(0.96) !important;
-            }
-            .sn-mchip.active {
-                background: #111827 !important;
-                color: #ffffff !important;
-                border-color: #111827 !important;
-                font-weight: 600 !important;
-                box-shadow: 0 2px 6px rgba(17, 24, 39, 0.25) !important;
-            }
-            .sn-mchip.active svg {
-                filter: brightness(1.2) !important;
-            }
-            .sn-mchip.sn-mchip-search {
-                background: #f8fafc !important;
-                border-color: #cbd5e1 !important;
-                color: #334155 !important;
-                font-weight: 600 !important;
-                padding: 6px 11px !important;
-            }
-            .sn-mchip.sn-mchip-search svg {
-                stroke: #475569 !important;
-            }
-            .sn-mchip.sn-mchip-search:active {
-                background: #e2e8f0 !important;
-                transform: scale(0.95) !important;
+                transform: translateY(-100%) !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
             }
             /* When scrolled: collapse logo + actions, keep only search bar visible */
             .sn-header-wrap.sn-mobile-header-hidden .sn-brand-logo {
@@ -1985,38 +1899,6 @@ body.sn-popup-open {
                     <span class="sn-cart-badge" id="sn-cart-badge-count" style="<?php echo $cart_item_count > 0 ? '' : 'display:none;'; ?>"><?php echo $cart_item_count; ?></span>
                 </a>
             </div>
-
-            <?php if ($cur_page == 'index.php' || empty($cur_page)): ?>
-            <!-- Sticky Mobile Header Chips (Replaces search bar after feed section is reached) -->
-            <div class="sn-mobile-header-chips" id="snMobileHeaderChips">
-                <div class="sn-mchips-scroll">
-                    <button type="button" class="sn-mchip sn-mchip-search" onclick="snOpenMobileSearch(event)" title="Search Store" aria-label="Search">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <span>Search</span>
-                    </button>
-                    <button type="button" class="sn-mchip active" data-tab="for_you" onclick="if(window.snSwitchFeedTab) window.snSwitchFeedTab('for_you')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <span>For You</span>
-                    </button>
-                    <button type="button" class="sn-mchip" data-tab="trending" onclick="if(window.snSwitchFeedTab) window.snSwitchFeedTab('trending')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-.6 2.3-2.1 4.2-4.1 5.4C6 8.5 5 10.6 5 13c0 3.9 3.1 7 7 7s7-3.1 7-7c0-2.8-1.5-5.3-3.7-6.5-.4 1.3-1.4 2.4-2.5 3-1-3-1.8-6.1-.8-7.5z"/></svg>
-                        <span>Best Sellers</span>
-                    </button>
-                    <button type="button" class="sn-mchip" data-tab="deals" onclick="if(window.snSwitchFeedTab) window.snSwitchFeedTab('deals')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-                        <span>Super Deals</span>
-                    </button>
-                    <button type="button" class="sn-mchip" data-tab="top_rated" onclick="if(window.snSwitchFeedTab) window.snSwitchFeedTab('top_rated')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" stroke="#d97706" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <span>Top Rated</span>
-                    </button>
-                    <button type="button" class="sn-mchip" data-tab="choice" onclick="if(window.snSwitchFeedTab) window.snSwitchFeedTab('choice')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
-                        <span>Choice</span>
-                    </button>
-                </div>
-            </div>
-            <?php endif; ?>
         </div>
 
         <!-- Secondary Navigation Row: Home | All Categories ▾ | Deals | New Arrivals | Brands | Contact -->
@@ -3243,7 +3125,7 @@ window.sendShopAiMessage = function() {
     
     <?php if(!empty($popup_photo_src)): ?>
         <a href="<?php echo htmlspecialchars($popup_target_link); ?>" class="sn-popup-banner-link">
-            <img src="<?php echo htmlspecialchars($popup_photo_src); ?>" alt="<?php echo htmlspecialchars($settings['popup_title'] ?? 'Special Offer'); ?>" class="sn-popup-banner-img" onerror="if (this.src.indexOf('welcome_voucher_sticker') !== -1 && this.src.indexOf('store-defaults') === -1) { this.src='assets/uploads/welcome_voucher_sticker.svg'; } else { this.style.display='none'; }">
+            <img src="<?php echo htmlspecialchars($popup_photo_src); ?>" alt="<?php echo htmlspecialchars($settings['popup_title'] ?? 'Special Offer'); ?>" class="sn-popup-banner-img" onerror="if (this.src.indexOf('welcome_voucher_sticker') !== -1 && this.src.indexOf('store-defaults') === -1) { this.src='<?php echo BASE_URL; ?>assets/uploads/welcome_voucher_sticker.svg'; } else { this.style.display='none'; }">
         </a>
     <?php endif; ?>
 
