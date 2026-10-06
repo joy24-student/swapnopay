@@ -60,7 +60,7 @@ if (!function_exists('renderAliProductCard')) {
             <!-- Card Link & Image -->
             <a href="<?php echo htmlspecialchars($pUrl); ?>" class="sn-product-card-link" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; flex:1; min-width:0; max-width:100%; width:100%; box-sizing:border-box; overflow:hidden;">
                 <div class="sn-product-img-box">
-                    <img src="<?php echo htmlspecialchars($prodPhoto); ?>" alt="<?php echo htmlspecialchars($p['p_name']); ?>" loading="lazy" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/images/no-image.png';">
+                    <img src="<?php echo htmlspecialchars($prodPhoto); ?>" alt="<?php echo htmlspecialchars($p['p_name']); ?>" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/images/no-image.png';">
                 </div>
 
                 <!-- Product Title -->

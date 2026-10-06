@@ -1166,6 +1166,8 @@ require_once('header.php');
                              alt="<?php echo htmlspecialchars($p_name); ?>" 
                              class="sn-gallery-main-img" 
                              id="snMainImg"
+                             fetchpriority="high"
+                             decoding="async"
                              style="<?php echo $firstItem['type'] !== 'image' ? 'display:none;' : ''; ?>"
                              onerror="this.onerror=null; this.src='<?php echo (defined('BASE_URL') ? BASE_URL : '') . 'assets/images/no-image.png'; ?>';">
                         

@@ -2,9 +2,20 @@
    ShopNext - Modern Pixel-Perfect E-Commerce Stylesheet
    Designed to match the flagship UI design specifications exactly
    ========================================================================== */
+/* Google Fonts loaded via parallel <link rel="stylesheet"> in header for non-blocking FCP */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Fast Mobile Touch & Below-the-Fold Content-Visibility Performance */
+html {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+}
 
+.sn-shira-section,
+.sn-footer-main,
+.sn-reviews-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 550px;
+}
 :root {
     --sn-font: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --sn-primary: #f59e0b;

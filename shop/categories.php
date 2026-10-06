@@ -1040,7 +1040,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 ?>
                     <a href="<?php echo htmlspecialchars($sub['url']); ?>" class="sn-subcat-card">
                         <div class="sn-subcat-img-box">
-                            <img src="<?php echo htmlspecialchars($photoPath); ?>" alt="<?php echo htmlspecialchars($sub['name']); ?>" loading="lazy" onerror="this.src='assets/uploads/cat_all.jpg';">
+                            <img src="<?php echo htmlspecialchars($photoPath); ?>" alt="<?php echo htmlspecialchars($sub['name']); ?>" loading="lazy" decoding="async" onerror="this.src='assets/uploads/cat_all.jpg';">
                         </div>
                         <div class="sn-subcat-name"><?php echo htmlspecialchars($sub['name']); ?></div>
                     </a>
@@ -1067,7 +1067,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 ?>
                     <a href="product.php?id=<?php echo $prod['p_id']; ?>" class="sn-cat-prod-card">
                         <div class="sn-prod-img-box">
-                            <img src="<?php echo htmlspecialchars($photoPath); ?>" alt="<?php echo htmlspecialchars($prod['p_name']); ?>" loading="lazy" onerror="this.src='assets/uploads/cat_all.jpg';">
+                            <img src="<?php echo htmlspecialchars($photoPath); ?>" alt="<?php echo htmlspecialchars($prod['p_name']); ?>" loading="lazy" decoding="async" onerror="this.src='assets/uploads/cat_all.jpg';">
                         </div>
                         <div class="sn-prod-info">
                             <div class="sn-prod-title-wrap">

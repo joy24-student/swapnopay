@@ -148,7 +148,7 @@ require_once('header.php');
 
         <!-- Right Collage Image -->
         <div class="sn-deals-hero-right">
-            <img src="<?php echo BASE_URL; ?>assets/uploads/deal_hero_collage.jpg" alt="Top Electronics Deals Collage" class="sn-deals-hero-img">
+            <img src="<?php echo BASE_URL; ?>assets/uploads/deal_hero_collage.jpg" alt="Top Electronics Deals Collage" class="sn-deals-hero-img" fetchpriority="high" decoding="async">
         </div>
     </div>
 
@@ -190,7 +190,7 @@ require_once('header.php');
 
                 <!-- Product Image Link -->
                 <a href="<?php echo htmlspecialchars($item['url']); ?>" class="sn-deal-img-box">
-                    <img src="<?php echo htmlspecialchars($item['img']); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>" class="sn-deal-img" loading="lazy">
+                    <img src="<?php echo htmlspecialchars($item['img']); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>" class="sn-deal-img" loading="lazy" decoding="async">
                 </a>
 
                 <!-- Product Title Link -->

@@ -15,11 +15,20 @@
     // ------------------------------------------------------------
     // 1. CONFIGURATION & STATE
     // ------------------------------------------------------------
-    const CACHE_TTL_MS = 0; // Always fetch fresh HTML from server so edits take effect immediately
+    const CACHE_TTL_MS = 60000; // 60 seconds memory cache for lightning-fast 0ms navigation
     const pageCache = new Map();
     let isNavigating = false;
     let abortController = null;
     let progressTimer = null;
+
+    function isCacheable(url) {
+        if (!url) return false;
+        const lower = url.toLowerCase();
+        if (lower.includes('checkout') || lower.includes('cart.php') || lower.includes('order') || lower.includes('dashboard') || lower.includes('login') || lower.includes('register') || lower.includes('customer-') || lower.includes('payment')) {
+            return false;
+        }
+        return true;
+    }
 
     // Elements
     let progressBar = null;
@@ -256,6 +265,7 @@
     function prefetchUrl(targetUrl) {
         if (!targetUrl) return;
         const cleaned = cleanUrl(targetUrl);
+        if (!isCacheable(cleaned)) return;
         const cached = pageCache.get(cleaned);
         if (cached && (Date.now() - cached.time < CACHE_TTL_MS)) {
             return; // Already cached and fresh
@@ -368,8 +378,9 @@
         let skeletonTimeout = null;
 
         // Check in-memory cache
-        const cached = pageCache.get(targetClean);
-        const hasFreshCache = cached && (Date.now() - cached.time < CACHE_TTL_MS);
+        const isUrlCacheable = isCacheable(targetClean);
+        const cached = isUrlCacheable ? pageCache.get(targetClean) : null;
+        const hasFreshCache = isUrlCacheable && cached && (Date.now() - cached.time < CACHE_TTL_MS);
 
         if (!hasFreshCache) {
             // Render contextual shimmer skeleton within 30ms for instant visual feedback
@@ -404,17 +415,19 @@
                 }
 
                 htmlText = await response.text();
-                pageCache.set(targetClean, {
-                    html: htmlText,
-                    finalUrl: finalUrl,
-                    time: Date.now()
-                });
-                if (finalUrl !== targetClean) {
-                    pageCache.set(cleanUrl(finalUrl), {
+                if (isUrlCacheable) {
+                    pageCache.set(targetClean, {
                         html: htmlText,
                         finalUrl: finalUrl,
                         time: Date.now()
                     });
+                    if (finalUrl !== targetClean) {
+                        pageCache.set(cleanUrl(finalUrl), {
+                            html: htmlText,
+                            finalUrl: finalUrl,
+                            time: Date.now()
+                        });
+                    }
                 }
             }
 

@@ -2509,7 +2509,7 @@ body {
                                 }
                             ?>
                                 <div class="sn-hero-slide <?php if ($i === 0) echo 'active'; ?>" data-slide-index="<?php echo $i; ?>">
-                                    <img src="<?php echo htmlspecialchars($slideImg); ?>" alt="Hero Slide <?php echo $i+1; ?>" class="sn-hero-image" loading="<?php echo ($i === 0 ? 'eager' : 'lazy'); ?>">
+                                    <img src="<?php echo htmlspecialchars($slideImg); ?>" alt="Hero Slide <?php echo $i+1; ?>" class="sn-hero-image" loading="<?php echo ($i === 0 ? 'eager' : 'lazy'); ?>" fetchpriority="<?php echo ($i === 0 ? 'high' : 'low'); ?>" decoding="async">
                                 </div>
                             <?php endforeach; ?>
                         </div>

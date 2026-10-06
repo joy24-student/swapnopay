@@ -66,16 +66,7 @@
 	        <span class="sn-dock-text" <?= ($cur_page == 'live-chat.php') ? 'style="color:#0F172A; font-weight:800;"' : '' ?>>Support</span>
 	    </a>
 
-	    <a href="#" class="sn-dock-item" data-toggle="offcanvas" role="button">
-	        <div class="sn-dock-icon">
-	            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2">
-	                <circle cx="5" cy="12" r="1.5" fill="#64748B"/>
-	                <circle cx="12" cy="12" r="1.5" fill="#64748B"/>
-	                <circle cx="19" cy="12" r="1.5" fill="#64748B"/>
-	            </svg>
-	        </div>
-	        <span class="sn-dock-text">More</span>
-	    </a>
+
 	</nav>
 
 	<style>

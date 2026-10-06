@@ -138,6 +138,20 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
     <link rel="icon" type="image/png" href="assets/uploads/<?php echo htmlspecialchars($favicon); ?>">
 
+    <!-- Resource Hints & Fast Connection Preconnects -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+    <!-- Primary Web Fonts (font-display: swap for instant FCP) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+
+    <!-- Core Storefront Stylesheets -->
     <link rel="stylesheet" href="assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"> 
     <link rel="stylesheet" href="assets/css/owl.carousel.min.css">
@@ -150,20 +164,61 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <link rel="stylesheet" href="assets/css/animate.min.css">
     <link rel="stylesheet" href="assets/css/tree-menu.css">
     <link rel="stylesheet" href="assets/css/select2.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs4.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/responsive.css">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/modern_shop.css">
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/modern_shop.css?v=<?php echo file_exists(__DIR__ . '/assets/css/modern_shop.css') ? filemtime(__DIR__ . '/assets/css/modern_shop.css') : '1'; ?>">
+    <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo file_exists(__DIR__ . '/assets/css/spa-skeleton.css') ? filemtime(__DIR__ . '/assets/css/spa-skeleton.css') : '1'; ?>">
     <?php if ($cur_page === 'product.php'): ?>
-    <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
+    <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : '1'; ?>">
     <?php endif; ?>
-    <link rel="stylesheet" href="assets/css/notifications.css?v=<?php echo file_exists(__DIR__ . '/assets/css/notifications.css') ? filemtime(__DIR__ . '/assets/css/notifications.css') : time(); ?>">
+    <link rel="stylesheet" href="assets/css/notifications.css?v=<?php echo file_exists(__DIR__ . '/assets/css/notifications.css') ? filemtime(__DIR__ . '/assets/css/notifications.css') : '1'; ?>">
+
+    <!-- Native Speculation Rules (Speculative Pre-rendering & Prefetching for next-page clicks) -->
+    <script type="speculationrules">
+    {
+      "prefetch": [
+        {
+          "source": "list",
+          "urls": [
+            "<?php echo BASE_URL; ?>categories.php",
+            "<?php echo BASE_URL; ?>deals.php",
+            "<?php echo BASE_URL; ?>product-category.php?id=1&type=top-category"
+          ]
+        }
+      ]
+    }
+    </script>
+
+    <!-- Initial First-Load Ultra-Fast Progress Loader -->
+    <style>
+        #sn-initial-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 35%;
+            height: 3px;
+            background: linear-gradient(90deg, #F59E0B 0%, #FBBF24 50%, #EF4444 100%);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.8), 0 0 4px rgba(251, 191, 36, 0.6);
+            z-index: 99999999;
+            pointer-events: none;
+            transition: width 0.25s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease;
+        }
+    </style>
+    <script>
+    (function(){
+        window.addEventListener('DOMContentLoaded', function(){
+            var l = document.getElementById('sn-initial-loader');
+            if (l) {
+                l.style.width = '100%';
+                setTimeout(function(){
+                    l.style.opacity = '0';
+                    setTimeout(function(){ if (l && l.parentNode) l.parentNode.removeChild(l); }, 300);
+                }, 100);
+            }
+        });
+    })();
+    </script>
 
     <?php if ($cur_page == 'blog-single.php' || $cur_page == 'product.php'): ?>
         <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>">
@@ -1810,6 +1865,7 @@ body.sn-popup-open {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body class="shopnext-theme <?php echo ($cur_page == 'product.php') ? 'sn-product-page' : ''; ?>">
+<div id="sn-initial-loader"></div>
 <?php echo $after_body; ?>
 
 <header class="sn-header-wrap">

@@ -261,7 +261,6 @@ function toggleSnDesktopChat() {
 </script>
 <?php endif; ?>
 
-<script src="assets/js/jquery-2.2.4.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>
 <script src="assets/js/jquery.magnific-popup.min.js"></script>
 <script src="assets/js/owl.carousel.min.js"></script>
@@ -270,7 +269,7 @@ function toggleSnDesktopChat() {
 <script src="assets/js/rating.js"></script>
 <script src="assets/js/select2.full.min.js"></script>
 <script src="assets/js/custom.js"></script>
-<script src="assets/js/spa-navigation.js?v=<?php echo time(); ?>"></script>
+<script src="assets/js/spa-navigation.js?v=<?php echo file_exists(__DIR__ . '/assets/js/spa-navigation.js') ? filemtime(__DIR__ . '/assets/js/spa-navigation.js') : '1'; ?>"></script>
 <script>
 window.SHOP_BASE_URL = '<?php echo BASE_URL; ?>';
 window.SHOP_FIREBASE_CONFIG = {
