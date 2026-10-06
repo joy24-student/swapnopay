@@ -154,7 +154,9 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo time(); ?>">
+    <?php if ($cur_page === 'product.php'): ?>
     <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
+    <?php endif; ?>
     <link rel="stylesheet" href="assets/css/notifications.css?v=<?php echo file_exists(__DIR__ . '/assets/css/notifications.css') ? filemtime(__DIR__ . '/assets/css/notifications.css') : time(); ?>">
 
     <?php if ($cur_page == 'blog-single.php' || $cur_page == 'product.php'): ?>
@@ -1893,20 +1895,12 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 body.classList.add('sn-header-scrolled-away');
             }
         } else {
-            // DESKTOP HEADER BEHAVIOR:
+            // DESKTOP HEADER BEHAVIOR: Always keep search bar visible!
             if (headerWrap) headerWrap.classList.remove('sn-mobile-header-hidden');
             body.classList.remove('sn-header-scrolled-away');
             if (searchForm) {
-                if (currentScrollY <= 25) {
-                    searchForm.classList.remove('sn-search-hidden');
-                    body.classList.remove('sn-search-scrolled');
-                } else if (currentScrollY > lastScrollY + scrollDelta && currentScrollY > 60) {
-                    searchForm.classList.add('sn-search-hidden');
-                    body.classList.add('sn-search-scrolled');
-                } else if (currentScrollY < lastScrollY - scrollDelta) {
-                    searchForm.classList.remove('sn-search-hidden');
-                    body.classList.remove('sn-search-scrolled');
-                }
+                searchForm.classList.remove('sn-search-hidden');
+                body.classList.remove('sn-search-scrolled');
             }
         }
 

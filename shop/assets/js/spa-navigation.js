@@ -15,7 +15,7 @@
     // ------------------------------------------------------------
     // 1. CONFIGURATION & STATE
     // ------------------------------------------------------------
-    const CACHE_TTL_MS = 120 * 1000; // 2 minutes in-memory cache
+    const CACHE_TTL_MS = 0; // Always fetch fresh HTML from server so edits take effect immediately
     const pageCache = new Map();
     let isNavigating = false;
     let abortController = null;
