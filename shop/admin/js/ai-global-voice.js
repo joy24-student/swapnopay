@@ -56,16 +56,6 @@
             </button>
         </div>
     </div>
-
-    <!-- Floating Global Launcher Button (Bottom Right) -->
-    <button type="button" id="snFloatingAiBtn" class="sn-floating-ai-btn" onclick="toggleGlobalAiDrawer()" title="AI Voice Copilot (Ctrl+Space)">
-        <span class="sn-floating-sparkle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3">
-                <path d="M12 2l2.4 7.4 7.6 2.6-7.6 2.6L12 2l-2.4-7.4L2 12l7.6-2.6L12 2z"/>
-            </svg>
-        </span>
-        <span class="sn-floating-label">AI Voice</span>
-    </button>
     `;
 
     const container = document.createElement('div');

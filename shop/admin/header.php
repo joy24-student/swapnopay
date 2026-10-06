@@ -182,6 +182,29 @@ foreach ($result as $row) {
   		<?php $cur_page = substr($_SERVER["SCRIPT_NAME"],strrpos($_SERVER["SCRIPT_NAME"],"/")+1); ?>
 <!-- Side Bar to Manage Shop Activities -->
   		<aside class="main-sidebar">
+			<!-- Mobile Sidebar Header with Close/Collapse Cross Icon -->
+			<div class="sn-mobile-sidebar-header visible-xs">
+				<div class="sn-mobile-sidebar-brand">
+					<div class="sn-mobile-sidebar-logo-icon">
+						<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+							<line x1="3" y1="6" x2="21" y2="6"/>
+							<path d="M16 10a4 4 0 0 1-8 0"/>
+						</svg>
+					</div>
+					<div class="sn-mobile-sidebar-meta">
+						<span class="sn-mobile-sidebar-title">Admin Menu</span>
+						<span class="sn-mobile-sidebar-sub">Shop Management</span>
+					</div>
+				</div>
+				<button type="button" class="sn-mobile-sidebar-close" data-toggle="offcanvas" aria-label="Close sidebar" title="Close Sidebar">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+						<line x1="18" y1="6" x2="6" y2="18"></line>
+						<line x1="6" y1="6" x2="18" y2="18"></line>
+					</svg>
+				</button>
+			</div>
+
     		<section class="sidebar">
       
       			<ul class="sidebar-menu">
