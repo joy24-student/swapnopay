@@ -1056,3 +1056,44 @@ textarea.form-control {
         max-width: 100% !important;
     }
 }
+
+/* Login Page Styling */
+.login-page {
+    background: #F8FAFC !important;
+}
+
+.login-box {
+    margin-top: 80px !important;
+    max-width: 420px;
+    width: 90%;
+}
+
+.login-logo b {
+    font-weight: 800 !important;
+    color: var(--sn-dark) !important;
+    letter-spacing: -0.5px;
+}
+
+.login-box-body {
+    background: #FFFFFF !important;
+    border-radius: 16px !important;
+    border: 1px solid var(--sn-border) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+    padding: 30px !important;
+}
+
+.login-button {
+    background: var(--sn-yellow) !important;
+    border-color: var(--sn-yellow) !important;
+    color: var(--sn-dark) !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+    height: 42px;
+}
+
+.login-button:hover {
+    background: var(--sn-yellow-hover) !important;
+    border-color: var(--sn-yellow-hover) !important;
+    color: var(--sn-dark) !important;
+}
+

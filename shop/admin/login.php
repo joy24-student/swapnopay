@@ -66,6 +66,7 @@ if (isset($_POST['form1'])) {
 	<link rel="stylesheet" href="css/_all-skins.min.css">
 
 	<link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="css/enterprise.css?v=<?php echo filemtime(__DIR__ . '/css/enterprise.css'); ?>">
 </head>
 
 <body class="hold-transition login-page sidebar-mini">
