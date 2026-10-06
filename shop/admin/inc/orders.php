@@ -95,6 +95,19 @@ function updateStoreOrder(PDO $pdo,string $reference,string $action,?int $custom
                     send_email($custEmail, $custName, $emailSubject, $emailBody);
                 }
             }
+
+            // Automated In-App & Push Notification
+            try {
+                require_once __DIR__ . '/notifications.php';
+                $merchantId = defined('MERCHANT_ID') && MERCHANT_ID ? MERCHANT_ID : 'local-merchant-001';
+                $custId = !empty($order['customer_id']) ? (int)$order['customer_id'] : null;
+                $notifTitle = "Order #{$reference} Updated";
+                $notifBody = "Your order #{$reference} is now {$statusText}. Total: {$orderTotal}. Tap to track.";
+                $actionUrl = defined('BASE_URL') ? BASE_URL . 'customer-order.php' : 'customer-order.php';
+                broadcastPushNotification($pdo, $merchantId, $notifTitle, $notifBody, $actionUrl, 'order', $custId);
+            } catch (Throwable $notifErr) {
+                error_log("Order in-app/push error: " . $notifErr->getMessage());
+            }
         } catch (Throwable $e) {
             error_log("Order status update notification error: " . $e->getMessage());
         }
@@ -201,6 +214,19 @@ function setStoreOrderStatus(PDO $pdo, string $reference, string $shippingStatus
                     if (function_exists('send_email')) {
                         send_email($custEmail, $custName, $emailSubject, $emailBody);
                     }
+                }
+
+                // Automated In-App & Push Notification
+                try {
+                    require_once __DIR__ . '/notifications.php';
+                    $merchantId = defined('MERCHANT_ID') && MERCHANT_ID ? MERCHANT_ID : 'local-merchant-001';
+                    $custId = !empty($order['customer_id']) ? (int)$order['customer_id'] : null;
+                    $notifTitle = "Order #{$reference} Status: {$shippingStatus}";
+                    $notifBody = "Fulfillment is {$shippingStatus}, payment is {$paymentStatus}. Total: {$orderTotal}. Tap to track.";
+                    $actionUrl = defined('BASE_URL') ? BASE_URL . 'customer-order.php' : 'customer-order.php';
+                    broadcastPushNotification($pdo, $merchantId, $notifTitle, $notifBody, $actionUrl, 'order', $custId);
+                } catch (Throwable $notifErr) {
+                    error_log("Order in-app/push error: " . $notifErr->getMessage());
                 }
             } catch (Throwable $notifErr) {
                 error_log("Order notification error: " . $notifErr->getMessage());

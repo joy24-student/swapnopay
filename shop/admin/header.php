@@ -119,6 +119,12 @@ foreach ($result as $row) {
 			          </a>
 			        </li>
 
+			        <li class="treeview <?php if( ($cur_page == 'homepage-banners.php') ) {echo 'active';} ?>">
+			          <a href="homepage-banners.php">
+			            <i class="fa fa-television"></i> <span>Homepage Customizer</span>
+			          </a>
+			        </li>
+
 			        <li class="treeview <?php if( ($cur_page == 'marketing.php') ) {echo 'active';} ?>">
 			          <a href="#">
 			            <i class="fa fa-comments"></i> <span>Messenger & WhatsApp</span>
@@ -135,6 +141,12 @@ foreach ($result as $row) {
 			        <li class="treeview <?php if( ($cur_page == 'live-chat.php') ) {echo 'active';} ?>">
 			          <a href="live-chat.php">
 			            <i class="fa fa-comments-o"></i> <span>Live Support Chat</span>
+			          </a>
+			        </li>
+
+			        <li class="treeview <?php if( ($cur_page == 'broadcast-notification.php') ) {echo 'active';} ?>">
+			          <a href="broadcast-notification.php">
+			            <i class="fa fa-bullhorn"></i> <span>Push Notifications</span>
 			          </a>
 			        </li>
 

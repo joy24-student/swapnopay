@@ -1,0 +1,516 @@
+/**
+ * ShopNext Modern Notifications Stylesheet
+ */
+
+:root {
+    --sn-notif-primary: #fab802;
+    --sn-notif-primary-dark: #e0a300;
+    --sn-notif-bg: #f8fafc;
+    --sn-notif-card-bg: #ffffff;
+    --sn-notif-text: #0f172a;
+    --sn-notif-muted: #64748b;
+    --sn-notif-border: #e2e8f0;
+    --sn-notif-unread-bg: #fefce8;
+    --sn-notif-unread-border: #fef08a;
+    --sn-notif-radius: 14px;
+}
+
+/* Page Container */
+.sn-notif-page-wrapper {
+    background-color: var(--sn-notif-bg);
+    min-height: calc(100vh - 200px);
+    padding: 24px 0 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.sn-notif-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* Header Bar */
+.sn-notif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sn-notif-header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sn-notif-header-title h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--sn-notif-text);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sn-notif-header-title .sn-notif-pill-count {
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 20px;
+}
+
+.sn-notif-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sn-btn-notif-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--sn-notif-border);
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.sn-btn-notif-action:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+
+/* Permission Opt-in Banner */
+.sn-notif-perm-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: var(--sn-notif-radius);
+    padding: 16px 20px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+.sn-notif-perm-content {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.sn-notif-perm-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(250, 184, 2, 0.15);
+    color: #fab802;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.sn-notif-perm-text h4 {
+    margin: 0 0 2px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.sn-notif-perm-text p {
+    margin: 0;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.sn-btn-perm-enable {
+    background: #fab802;
+    color: #0f172a;
+    border: none;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.sn-btn-perm-enable:hover {
+    background: #e0a300;
+    transform: translateY(-1px);
+}
+
+/* Navigation Tabs */
+.sn-notif-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--sn-notif-border);
+    margin-bottom: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.sn-notif-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.sn-notif-tab {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.sn-notif-tab:hover {
+    color: #0f172a;
+    background: #f8fafc;
+}
+
+.sn-notif-tab.active {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+/* Notification List */
+.sn-notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Single Notification Card */
+.sn-notif-item {
+    background: #ffffff;
+    border-radius: var(--sn-notif-radius);
+    border: 1px solid var(--sn-notif-border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.sn-notif-item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.sn-notif-item.is-unread {
+    background: #fffdf5;
+    border-color: #fef08a;
+    border-left: 4px solid var(--sn-notif-primary);
+}
+
+/* Type Icons */
+.sn-notif-type-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.sn-notif-type-icon.type-order {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.sn-notif-type-icon.type-promo {
+    background: #fefce8;
+    color: #ca8a04;
+}
+
+.sn-notif-type-icon.type-broadcast {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.sn-notif-type-icon.type-system {
+    background: #faf5ff;
+    color: #9333ea;
+}
+
+/* Card Content */
+.sn-notif-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.sn-notif-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.sn-notif-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--sn-notif-text);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.sn-notif-time {
+    font-size: 12px;
+    color: var(--sn-notif-muted);
+    white-space: nowrap;
+}
+
+.sn-notif-body {
+    font-size: 13.5px;
+    color: #475569;
+    line-height: 1.5;
+    margin: 4px 0 10px 0;
+}
+
+.sn-notif-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sn-btn-notif-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #f1f5f9;
+    padding: 6px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.sn-btn-notif-link:hover {
+    background: var(--sn-notif-primary);
+    color: #0f172a;
+}
+
+.sn-btn-mark-read, .sn-btn-notif-del {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.sn-btn-mark-read:hover {
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+.sn-btn-notif-del:hover {
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.sn-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2563eb;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* Empty State */
+.sn-notif-empty {
+    text-align: center;
+    padding: 60px 20px;
+    background: #ffffff;
+    border-radius: var(--sn-notif-radius);
+    border: 1px solid var(--sn-notif-border);
+}
+
+.sn-notif-empty-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #94a3b8;
+    margin: 0 auto 16px;
+}
+
+.sn-notif-empty h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--sn-notif-text);
+    margin: 0 0 6px 0;
+}
+
+.sn-notif-empty p {
+    font-size: 14px;
+    color: var(--sn-notif-muted);
+    margin: 0 0 20px 0;
+}
+
+/* Header & Mobile Dock Badges */
+.sn-notif-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 17px;
+    height: 17px;
+    border-radius: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+    animation: snBadgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes snBadgePop {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+}
+
+/* In-App Push Banner */
+.sn-notif-push-banner {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 999999;
+    max-width: 380px;
+    width: calc(100% - 40px);
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transform: translateY(-50px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sn-notif-push-banner.sn-push-show {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sn-push-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    cursor: pointer;
+}
+
+.sn-push-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #fab802;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.sn-push-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.sn-push-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sn-push-body {
+    font-size: 12.5px;
+    color: #64748b;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sn-push-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+@media (max-width: 600px) {
+    .sn-notif-push-banner {
+        top: 10px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+    .sn-notif-perm-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .sn-btn-perm-enable {
+        width: 100%;
+        text-align: center;
+    }
+}

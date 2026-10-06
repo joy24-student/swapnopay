@@ -155,6 +155,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo time(); ?>">
     <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : time(); ?>">
+    <link rel="stylesheet" href="assets/css/notifications.css?v=<?php echo file_exists(__DIR__ . '/assets/css/notifications.css') ? filemtime(__DIR__ . '/assets/css/notifications.css') : time(); ?>">
 
     <?php if ($cur_page == 'blog-single.php' || $cur_page == 'product.php'): ?>
         <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>">
@@ -1786,12 +1787,13 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
             <!-- Actions: Bell (Mobile) + Account (Desktop) + Cart -->
             <div class="sn-header-actions">
-                <!-- Notifications Bell / Deals -->
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-bell-btn" title="Special Offers & Deals">
+                <!-- Notifications Bell -->
+                <a href="<?php echo BASE_URL; ?>notifications.php" class="sn-bell-btn" id="sn-header-notif-btn" title="Notifications" style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
                     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                     </svg>
+                    <span class="sn-notif-badge" id="sn-header-notif-badge">0</span>
                 </a>
 
                 <?php if (isset($_SESSION['customer'])): ?>

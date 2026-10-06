@@ -271,6 +271,19 @@ function toggleSnDesktopChat() {
 <script src="assets/js/select2.full.min.js"></script>
 <script src="assets/js/custom.js"></script>
 <script src="assets/js/spa-navigation.js?v=<?php echo time(); ?>"></script>
+<script>
+window.SHOP_BASE_URL = '<?php echo BASE_URL; ?>';
+window.SHOP_FIREBASE_CONFIG = {
+    apiKey: <?php echo json_encode($settings['firebase_api_key'] ?? ''); ?>,
+    authDomain: <?php echo json_encode($settings['firebase_auth_domain'] ?? ''); ?>,
+    projectId: <?php echo json_encode($settings['firebase_project_id'] ?? ''); ?>,
+    storageBucket: <?php echo json_encode($settings['firebase_storage_bucket'] ?? ''); ?>,
+    messagingSenderId: <?php echo json_encode($settings['firebase_messaging_sender_id'] ?? ''); ?>,
+    appId: <?php echo json_encode($settings['firebase_app_id'] ?? ''); ?>,
+    vapidKey: <?php echo json_encode($settings['firebase_vapid_key'] ?? ''); ?>
+};
+</script>
+<script src="assets/js/firebase-notifications.js?v=<?php echo file_exists(__DIR__ . '/assets/js/firebase-notifications.js') ? filemtime(__DIR__ . '/assets/js/firebase-notifications.js') : time(); ?>"></script>
 
 <?php echo $before_body; ?>
 </body>

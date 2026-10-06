@@ -66,6 +66,8 @@ $category_on        = isset($s['home_category_on_off']) ? (int)$s['home_category
 $featured_on        = isset($s['home_featured_product_on_off']) ? (int)$s['home_featured_product_on_off'] : 1;
 $promo_on           = isset($s['home_welcome_on_off']) ? (int)$s['home_welcome_on_off'] : 1;
 $service_on         = isset($s['home_service_on_off']) ? (int)$s['home_service_on_off'] : 1;
+$marquee_on         = isset($s['home_marquee_on_off']) ? (int)$s['home_marquee_on_off'] : 1;
+$payday_on          = isset($s['payday_banner_on_off']) ? (int)$s['payday_banner_on_off'] : 1;
 
 // Hero Defaults & Controls
 $hero_tag           = !empty($s['hero_tag']) ? $s['hero_tag'] : 'BETTER PRODUCTS • BETTER LIFE';
@@ -2592,67 +2594,82 @@ body {
         </section>
         <?php endif; ?>
 
+        <?php if ($marquee_on == 1): ?>
+        <?php
+        $marquee_items = [
+            [
+                'tag' => !empty($s['marquee_item1_tag']) ? $s['marquee_item1_tag'] : 'HOT',
+                'tag_class' => 'red',
+                'text' => !empty($s['marquee_item1_text']) ? $s['marquee_item1_text'] : 'MEGA SALE IS LIVE • Up to 80% Off Top Brands',
+                'url' => !empty($s['marquee_item1_url']) ? (str_starts_with($s['marquee_item1_url'], 'http') ? $s['marquee_item1_url'] : BASE_URL . ltrim($s['marquee_item1_url'], '/')) : ''
+            ],
+            [
+                'tag' => !empty($s['marquee_item2_tag']) ? $s['marquee_item2_tag'] : 'VOUCHER',
+                'tag_class' => '',
+                'text' => !empty($s['marquee_item2_text']) ? $s['marquee_item2_text'] : 'Extra 15% OFF On Your First Order',
+                'url' => !empty($s['marquee_item2_url']) ? (str_starts_with($s['marquee_item2_url'], 'http') ? $s['marquee_item2_url'] : BASE_URL . ltrim($s['marquee_item2_url'], '/')) : ''
+            ],
+            [
+                'tag' => !empty($s['marquee_item3_tag']) ? $s['marquee_item3_tag'] : 'FREE DELIVERY',
+                'tag_class' => 'green',
+                'text' => !empty($s['marquee_item3_text']) ? $s['marquee_item3_text'] : 'Free Shipping Across Bangladesh on ৳2,000+',
+                'url' => !empty($s['marquee_item3_url']) ? (str_starts_with($s['marquee_item3_url'], 'http') ? $s['marquee_item3_url'] : BASE_URL . ltrim($s['marquee_item3_url'], '/')) : ''
+            ],
+            [
+                'tag' => !empty($s['marquee_item4_tag']) ? $s['marquee_item4_tag'] : 'FLASH DEAL',
+                'tag_class' => 'purple',
+                'text' => !empty($s['marquee_item4_text']) ? $s['marquee_item4_text'] : 'Limited Time Deals Refreshing Every 6 Hours',
+                'url' => !empty($s['marquee_item4_url']) ? (str_starts_with($s['marquee_item4_url'], 'http') ? $s['marquee_item4_url'] : BASE_URL . ltrim($s['marquee_item4_url'], '/')) : ''
+            ],
+            [
+                'tag' => !empty($s['marquee_item5_tag']) ? $s['marquee_item5_tag'] : '100% AUTHENTIC',
+                'tag_class' => '',
+                'text' => !empty($s['marquee_item5_text']) ? $s['marquee_item5_text'] : 'Verified Brands & 7 Days Hassle-Free Returns',
+                'url' => !empty($s['marquee_item5_url']) ? (str_starts_with($s['marquee_item5_url'], 'http') ? $s['marquee_item5_url'] : BASE_URL . ltrim($s['marquee_item5_url'], '/')) : ''
+            ]
+        ];
+        ?>
         <!-- ============================================================
              LIVE DEAL MARQUEE RIBBON (DARAZ / ALIEXPRESS INFINITE TICKER)
              ============================================================ -->
         <div class="sn-live-marquee-wrap">
             <div class="sn-live-marquee-track">
-                <!-- Group 1 -->
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag red">HOT</span>
-                    <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag">VOUCHER</span>
-                    <span>Extra 15% OFF On Your First Order</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <span class="sn-marquee-item">
-                    <span class="sn-marquee-tag green">FREE DELIVERY</span>
-                    <span>Free Shipping Across Bangladesh on ৳2,000+</span>
-                </span>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag purple">FLASH DEAL</span>
-                    <span>Limited Time Deals Refreshing Every 6 Hours</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <span class="sn-marquee-item">
-                    <span class="sn-marquee-tag">100% AUTHENTIC</span>
-                    <span>Verified Brands & 7 Days Hassle-Free Returns</span>
-                </span>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-
-                <!-- Group 2 (Duplicate for Seamless Infinite Marquee Loop) -->
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag red">HOT</span>
-                    <span>MEGA SALE IS LIVE • Up to 80% Off Top Brands</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag">VOUCHER</span>
-                    <span>Extra 15% OFF On Your First Order</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <span class="sn-marquee-item">
-                    <span class="sn-marquee-tag green">FREE DELIVERY</span>
-                    <span>Free Shipping Across Bangladesh on ৳2,000+</span>
-                </span>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <a href="<?php echo BASE_URL; ?>deals.php" class="sn-marquee-item">
-                    <span class="sn-marquee-tag purple">FLASH DEAL</span>
-                    <span>Limited Time Deals Refreshing Every 6 Hours</span>
-                </a>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
-                <span class="sn-marquee-item">
-                    <span class="sn-marquee-tag">100% AUTHENTIC</span>
-                    <span>Verified Brands & 7 Days Hassle-Free Returns</span>
-                </span>
-                <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
+                <?php for ($loop = 0; $loop < 2; $loop++): ?>
+                    <?php foreach ($marquee_items as $mItem): ?>
+                        <?php if (!empty($mItem['url'])): ?>
+                            <a href="<?php echo htmlspecialchars($mItem['url']); ?>" class="sn-marquee-item">
+                                <span class="sn-marquee-tag <?php echo $mItem['tag_class']; ?>"><?php echo htmlspecialchars($mItem['tag']); ?></span>
+                                <span><?php echo htmlspecialchars($mItem['text']); ?></span>
+                            </a>
+                        <?php else: ?>
+                            <span class="sn-marquee-item">
+                                <span class="sn-marquee-tag <?php echo $mItem['tag_class']; ?>"><?php echo htmlspecialchars($mItem['tag']); ?></span>
+                                <span><?php echo htmlspecialchars($mItem['text']); ?></span>
+                            </span>
+                        <?php endif; ?>
+                        <span class="sn-marquee-sep"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>
+                    <?php endforeach; ?>
+                <?php endfor; ?>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if ($payday_on == 1): ?>
+        <?php
+        $payday_badge_title  = !empty($s['payday_badge_title']) ? $s['payday_badge_title'] : "PAYDAY\nSALE";
+        $payday_badge_sub    = !empty($s['payday_badge_sub']) ? $s['payday_badge_sub'] : 'UP TO 80% OFF';
+        $payday_center_title = !empty($s['payday_center_title']) ? $s['payday_center_title'] : 'Extra 15% OFF';
+        $payday_center_sub   = !empty($s['payday_center_sub']) ? $s['payday_center_sub'] : 'On Your First Order';
+        $payday_btn_text     = !empty($s['payday_btn_text']) ? $s['payday_btn_text'] : 'Claim Now';
+        $payday_btn_url      = !empty($s['payday_btn_url']) ? $s['payday_btn_url'] : 'product-category.php';
+        if (!str_starts_with($payday_btn_url, 'http')) {
+            $payday_btn_url = BASE_URL . ltrim($payday_btn_url, '/');
+        }
+        $payday_image        = !empty($s['payday_image']) ? $s['payday_image'] : 'assets/uploads/payday_cart_transparent.png';
+        if (!str_starts_with($payday_image, 'http') && !str_starts_with($payday_image, 'assets/')) {
+            $payday_image = 'assets/uploads/' . ltrim($payday_image, '/');
+        }
+        ?>
         <!-- ============================================================
              4. PAYDAY SALE PROMO BANNER (MATCHING SCREENSHOT + MOTION)
              ============================================================ -->
@@ -2660,27 +2677,28 @@ body {
             <div class="sn-payday-banner">
                 <!-- Left: Angled Badge with Warm Amber Bar -->
                 <div class="sn-payday-left">
-                    <div class="sn-payday-badge-title">PAYDAY<br>SALE</div>
+                    <div class="sn-payday-badge-title"><?php echo nl2br(htmlspecialchars($payday_badge_title)); ?></div>
                     <div class="sn-payday-badge-bar"></div>
-                    <div class="sn-payday-badge-sub">UP TO 80% OFF</div>
+                    <div class="sn-payday-badge-sub"><?php echo htmlspecialchars($payday_badge_sub); ?></div>
                 </div>
 
                 <!-- Center: Promo Offer -->
                 <div class="sn-payday-center">
-                    <div class="sn-payday-center-title">Extra 15% OFF</div>
-                    <div class="sn-payday-center-sub">On Your First Order</div>
-                    <a href="<?php echo BASE_URL; ?>product-category.php" class="sn-payday-btn">
-                        <span>Claim Now</span>
+                    <div class="sn-payday-center-title"><?php echo htmlspecialchars($payday_center_title); ?></div>
+                    <div class="sn-payday-center-sub"><?php echo htmlspecialchars($payday_center_sub); ?></div>
+                    <a href="<?php echo htmlspecialchars($payday_btn_url); ?>" class="sn-payday-btn">
+                        <span><?php echo htmlspecialchars($payday_btn_text); ?></span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </a>
                 </div>
 
                 <!-- Right: Shopping Cart with Packages Image (Floating Levitation) -->
                 <div class="sn-payday-right">
-                    <img src="assets/uploads/payday_cart_transparent.png" alt="Payday Shopping Cart" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/payday_cart.jpg';">
+                    <img src="<?php echo htmlspecialchars($payday_image); ?>" alt="Payday Shopping Cart" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/payday_cart.jpg';">
                 </div>
             </div>
         </section>
+        <?php endif; ?>
 
         <!-- ============================================================
              5. FLASH SALE SECTION (MULTI-CARD SLIDING CAROUSEL + LIVE COUNTDOWN)

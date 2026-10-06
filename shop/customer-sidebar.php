@@ -28,6 +28,7 @@ $is_profile   = in_array($cur_script, ['customer-profile-update.php', 'customer-
 $is_wishlist  = in_array($cur_script, ['customer-wishlist.php', 'wishlist.php']);
 $is_addresses = in_array($cur_script, ['customer-billing-shipping-update.php', 'customer-addresses.php', 'customer-address.php']);
 $is_orders    = in_array($cur_script, ['customer-order.php', 'customer-orders.php', 'customer-returns.php']);
+$is_notif     = in_array($cur_script, ['notifications.php', 'customer-notifications.php']);
 $is_settings  = in_array($cur_script, ['customer-password-update.php', 'customer-password.php']);
 ?>
 
@@ -83,6 +84,13 @@ $is_settings  = in_array($cur_script, ['customer-password-update.php', 'customer
                 <a href="customer-order.php" class="sn-nav-link <?= $is_orders ? 'active' : '' ?>">
                     <i class="fa-solid fa-box"></i>
                     <span>Orders</span>
+                </a>
+            </li>
+            <li style="list-style: none !important; list-style-type: none !important; margin: 0 !important; padding: 0 !important;">
+                <a href="notifications.php" class="sn-nav-link <?= $is_notif ? 'active' : '' ?>">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>Notifications</span>
+                    <span class="sn-notif-badge" style="position: static; margin-left: auto;">0</span>
                 </a>
             </li>
             <li style="list-style: none !important; list-style-type: none !important; margin: 0 !important; padding: 0 !important;">
