@@ -1491,8 +1491,22 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         console.warn(`[payment/create-order] Platform payment ledger recording skipped for order ${orderUuid}`)
       }
 
-      const backendUrl = process.env.BACKEND_PUBLIC_URL || process.env.API_BASE_URL || 'https://api.swapnopay.top'
-      const checkoutUrl = `${backendUrl.replace(/\/$/, '')}/widget.html?order_id=${orderUuid}&amount=${numAmount}&merchant_id=${encodeURIComponent(merchant_id)}`
+      const gatewayUrl = (process.env.SWAPNOPAY_GATEWAY_URL || process.env.GATEWAY_PUBLIC_URL || 'https://pay.swapnopay.top').replace(/\/$/, '')
+      const widgetParams = new URLSearchParams({
+        order_id: orderUuid,
+        amount: numAmount.toFixed(2),
+        merchant_id: String(merchant_id)
+      })
+      if (selectedMethod) widgetParams.set('method', selectedMethod)
+      const mName = req.body?.merchant_name || merchantCredentials?.business_name || merchantCredentials?.brand_name || 'SwapnoPay'
+      if (mName) widgetParams.set('merchant_name', mName)
+      if (cus_name) widgetParams.set('cus_name', cus_name)
+      if (cus_phone) widgetParams.set('cus_phone', cus_phone)
+      if (cus_email) widgetParams.set('cus_email', cus_email)
+      if (success_url) widgetParams.set('success_url', success_url)
+      if (req.body?.cancel_url) widgetParams.set('cancel_url', req.body.cancel_url)
+      if (req.body?.fail_url) widgetParams.set('fail_url', req.body.fail_url)
+      const checkoutUrl = `${gatewayUrl}/widget.html?${widgetParams.toString()}`
 
       res.status(201).json({
         ok: true,

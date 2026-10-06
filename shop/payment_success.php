@@ -132,18 +132,97 @@ function clearCartSessions() {
 
                 if ($payment) {
                     if (strtolower($payment['payment_status'] ?? '') !== 'completed') {
+                        // Attempt instant gateway status sync before showing pending warning
+                        $ret_trx_id = strip_tags($_GET['trx_id'] ?? '');
+                        $gateway_order_id = !empty($payment['txnid']) ? $payment['txnid'] : $tran_id;
+                        $api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
+                        $merchant_id = defined('MERCHANT_ID') && !empty(MERCHANT_ID) ? MERCHANT_ID : ($runtime['merchant_id'] ?? '');
+
+                        $is_paid = false;
+                        $matched_trx = $ret_trx_id;
+
+                        // Check with central gateway status API
+                        try {
+                            $check_q = "order_id=" . urlencode($gateway_order_id) . "&tran_id=" . urlencode($tran_id);
+                            if (!empty($merchant_id)) $check_q .= "&merchant_id=" . urlencode($merchant_id);
+                            $ch_chk = curl_init("{$api_url}/v1/payment/check-status?{$check_q}");
+                            curl_setopt($ch_chk, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch_chk, CURLOPT_CONNECTTIMEOUT, 3);
+                            curl_setopt($ch_chk, CURLOPT_TIMEOUT, 6);
+                            $chk_res = curl_exec($ch_chk);
+                            $chk_code = (int)curl_getinfo($ch_chk, CURLINFO_HTTP_CODE);
+                            curl_close($ch_chk);
+                            if ($chk_res && $chk_code >= 200 && $chk_code < 300) {
+                                $chk_json = json_decode($chk_res, true);
+                                $chk_st = strtoupper($chk_json['status'] ?? ($chk_json['order_status'] ?? ''));
+                                if ($chk_st === 'PAID' || $chk_st === 'COMPLETED') {
+                                    $is_paid = true;
+                                    if (!empty($chk_json['trx_id'])) $matched_trx = $chk_json['trx_id'];
+                                }
+                            }
+                        } catch (Throwable $e) {}
+
+                        // If confirmed paid or valid transaction ID received from hosted widget
+                        if ($is_paid || (!empty($matched_trx) && strlen($matched_trx) >= 6 && $matched_trx !== 'MFS Transfer Direct')) {
+                            try {
+                                $pdo->beginTransaction();
+                                $stmt_up = $pdo->prepare("UPDATE tbl_payment SET payment_status = 'Completed', shipping_status = 'Pending', bank_transaction_info = ? WHERE payment_id = ? AND payment_status <> 'Completed'");
+                                $stmt_up->execute([$matched_trx ?: 'GATEWAY_VERIFIED', $tran_id]);
+
+                                if ($stmt_up->rowCount() === 1) {
+                                    $stmt_items = $pdo->prepare("SELECT product_id, quantity FROM tbl_order WHERE payment_id = ?");
+                                    $stmt_items->execute([$tran_id]);
+                                    foreach ($stmt_items->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                                        $stmt_stock = $pdo->prepare("UPDATE tbl_product SET p_qty = GREATEST(0, p_qty - ?) WHERE p_id = ?");
+                                        $stmt_stock->execute([(int)$item['quantity'], (int)$item['product_id']]);
+                                    }
+                                }
+                                $pdo->commit();
+
+                                // Reload payment record
+                                $stmt->execute([$tran_id, $tran_id]);
+                                $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+                            } catch (Throwable $e) {
+                                if ($pdo->inTransaction()) $pdo->rollBack();
+                            }
+                        }
+                    }
+
+                    if (strtolower($payment['payment_status'] ?? '') !== 'completed') {
                         ?>
                         <div class="page">
                             <div class="container text-center py-5">
                                 <div class="alert alert-warning" style="padding: 30px; border-radius: 12px; margin-top: 30px;">
-                                    <i class="fa fa-clock-o fa-3x mb-3 text-warning" style="font-size: 50px;"></i>
+                                    <i class="fa fa-spinner fa-spin fa-3x mb-3 text-warning" style="font-size: 50px;"></i>
                                     <h3>Payment Pending Confirmation</h3>
-                                    <p>Your order (Transaction ID: <b><?= htmlspecialchars($tran_id) ?></b>) has not been confirmed as completed yet (Current status: <b><?= htmlspecialchars($payment['payment_status']) ?></b>).</p>
-                                    <p>Once your payment is verified by the gateway or merchant, your order will be finalized.</p>
-                                    <a href="index.php" class="btn btn-primary mt-3"><i class="fa fa-home"></i> Return to Shop</a>
+                                    <p>Your order (Transaction ID: <b><?= htmlspecialchars($tran_id) ?></b>) has been submitted.</p>
+                                    <p id="pendingSyncText">Checking for instant payment confirmation from the gateway...</p>
+                                    <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                        <button type="button" class="btn btn-primary" onclick="window.location.reload()"><i class="fa fa-refresh"></i> Refresh Status</button>
+                                        <a href="customer-order.php" class="btn btn-default"><i class="fa fa-list"></i> My Orders</a>
+                                        <a href="index.php" class="btn btn-default"><i class="fa fa-home"></i> Return to Shop</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <script>
+                        (function() {
+                            let attempts = 0;
+                            const interval = setInterval(function() {
+                                attempts++;
+                                if (attempts > 20) { clearInterval(interval); return; }
+                                fetch('payment/swapnopay/check_status.php?tran_id=<?= urlencode($tran_id) ?>')
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if (data && (data.status === 'PAID' || data.status === 'Completed')) {
+                                            clearInterval(interval);
+                                            window.location.reload();
+                                        }
+                                    })
+                                    .catch(function() {});
+                            }, 3000);
+                        })();
+                        </script>
                         <?php
                         require_once('footer.php');
                         exit;

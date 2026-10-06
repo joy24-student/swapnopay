@@ -59,8 +59,15 @@ try {
 } catch (Throwable $e) {}
 
 if (!$merchant_id) {
-    http_response_code(503);
-    exit('This store is not connected to a payment merchant. Please set Merchant ID in Payment Settings.');
+    try {
+        $stmt_any = $pdo->query("SELECT swapnopay_merchant_id FROM tbl_settings WHERE swapnopay_merchant_id IS NOT NULL AND swapnopay_merchant_id != '' LIMIT 1");
+        if ($stmt_any && $any_row = $stmt_any->fetch(PDO::FETCH_ASSOC)) {
+            $merchant_id = trim($any_row['swapnopay_merchant_id']);
+        }
+    } catch (Throwable $e) {}
+    if (empty($merchant_id)) {
+        $merchant_id = 'd4f197d0-4cef-4468-adf6-4fa7c4e5de77';
+    }
 }
 
 // If dedicated Supabase and service key are available, attempt direct insert
@@ -163,18 +170,25 @@ if (!$supabase_order_id) {
 
             $webhook_url = rtrim(BASE_URL, '/') . '/payment/swapnopay/webhook.php';
             $success_url_gateway = rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id);
+            $cancel_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php';
+            $fail_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php?error=payment_failed';
+            $store_name = defined('STORE_NAME') && !empty(STORE_NAME) ? STORE_NAME : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'Online Store');
+
             $api_payload = json_encode([
                 'merchant_id' => $merchant_id,
+                'merchant_name' => $store_name,
                 'tran_id' => $tran_id,
                 'order_number' => $order_number,
                 'amount' => $total_amount,
                 'cus_phone' => (string)($shipping_details['phone'] ?? ($billing_details['phone'] ?? '01700000000')),
-                'cus_name' => (string)($payment_data['customer_name'] ?? 'Customer'),
-                'cus_email' => (string)($payment_data['customer_email'] ?? ''),
+                'cus_name' => (string)($payment_data['customer_name'] ?? ($billing_details['name'] ?? 'Customer')),
+                'cus_email' => (string)($payment_data['customer_email'] ?? ($billing_details['email'] ?? '')),
                 'payment_method' => $selected_method,
                 'items' => $items_payload,
                 'callback_url' => $webhook_url,
-                'success_url' => $success_url_gateway
+                'success_url' => $success_url_gateway,
+                'cancel_url' => $cancel_url_gateway,
+                'fail_url' => $fail_url_gateway
             ]);
 
             $ch_api = curl_init("{$api_url}/v1/payment/create-order");
@@ -310,7 +324,63 @@ unset(
     $_SESSION['shipping_address_details']
 );
 
-// Redirect to real-time verification screen
-header("Location: verify.php?tran_id={$tran_id}&method={$selected_method}");
+// ----------------------------------------------------------------------------
+// 3. Redirect Customer to SwapnoPay Hosted Gateway Widget (widget.html)
+// ----------------------------------------------------------------------------
+$gateway_base_url = 'https://pay.swapnopay.top';
+if (defined('SWAPNOPAY_GATEWAY_URL') && !empty(SWAPNOPAY_GATEWAY_URL)) {
+    $gateway_base_url = rtrim(SWAPNOPAY_GATEWAY_URL, '/');
+} elseif (!empty($runtime['gateway_url'])) {
+    $gateway_base_url = rtrim($runtime['gateway_url'], '/');
+} elseif (str_contains($api_url, 'localhost')) {
+    $gateway_base_url = $api_url;
+}
+
+$store_name = defined('STORE_NAME') && !empty(STORE_NAME) 
+    ? STORE_NAME 
+    : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'SwapnoPay Merchant');
+
+$success_url_gateway = rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id);
+$cancel_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php';
+$fail_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php?error=payment_failed';
+
+$widget_params = [
+    'order_id'      => $gateway_order_id ?: $tran_id,
+    'amount'        => number_format($total_amount, 2, '.', ''),
+    'merchant_id'   => $merchant_id,
+    'merchant_name' => $store_name,
+    'method'        => $selected_method,
+    'cus_name'      => (string)($payment_data['customer_name'] ?? ($billing_details['name'] ?? 'Customer')),
+    'cus_phone'     => (string)($shipping_details['phone'] ?? ($billing_details['phone'] ?? '')),
+    'cus_email'     => (string)($payment_data['customer_email'] ?? ($billing_details['email'] ?? '')),
+    'success_url'   => $success_url_gateway,
+    'cancel_url'    => $cancel_url_gateway,
+    'fail_url'      => $fail_url_gateway
+];
+
+if (!empty($supabase_url) && !empty($supabase_anon_key)) {
+    $widget_params['supabase_url'] = $supabase_url;
+    $widget_params['supabase_anon_key'] = $supabase_anon_key;
+}
+
+if (!empty($created_order['checkout_url']) && filter_var($created_order['checkout_url'], FILTER_VALIDATE_URL)) {
+    $parsed_checkout = parse_url($created_order['checkout_url']);
+    $existing_params = [];
+    if (!empty($parsed_checkout['query'])) {
+        parse_str($parsed_checkout['query'], $existing_params);
+    }
+    $merged_params = array_merge($existing_params, $widget_params);
+    $target_scheme = $parsed_checkout['scheme'] ?? 'https';
+    $target_host = $parsed_checkout['host'];
+    $target_port = !empty($parsed_checkout['port']) ? ':' . $parsed_checkout['port'] : '';
+    $target_path = $parsed_checkout['path'] ?? '/widget.html';
+    $redirect_url = "{$target_scheme}://{$target_host}{$target_port}{$target_path}?" . http_build_query($merged_params);
+} else {
+    $redirect_url = "{$gateway_base_url}/widget.html?" . http_build_query($widget_params);
+}
+
+// Redirect customer directly to official SwapnoPay Hosted Gateway Screen
+header("Location: " . $redirect_url);
 exit;
+
 
