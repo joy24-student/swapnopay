@@ -216,11 +216,29 @@ body, .hold-transition {
     margin: 0 !important;
     padding: 0 !important;
     list-style: none !important;
+    list-style-type: none !important;
 }
 
-/* AI Voice Copilot Header Button (Beside Bell) */
-.sn-ai-li {
+.sn-nav-items > li,
+.sn-ai-li,
+.sn-bell-li,
+.sn-user-li {
     list-style: none !important;
+    list-style-type: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.sn-nav-items > li::before,
+.sn-ai-li::before,
+.sn-bell-li::before,
+.sn-user-li::before,
+.sn-nav-items > li::marker,
+.sn-ai-li::marker,
+.sn-bell-li::marker,
+.sn-user-li::marker {
+    display: none !important;
+    content: "" !important;
 }
 
 .sn-ai-header-btn {

@@ -105,6 +105,7 @@ foreach ($result as $row) {
 				</div>
 
 				<div class="navbar-custom-menu">
+					<ul class="nav navbar-nav sn-nav-items">
 						<!-- Dedicated AI Voice Copilot Button (Beside Notification Bell) -->
 						<li class="sn-ai-li">
 							<a href="ai-copilot.php" class="sn-ai-header-btn" title="AI Voice Copilot & Autonomous Operations">
@@ -191,17 +192,6 @@ foreach ($result as $row) {
 			          </a>
 			        </li>
 
-			        <!-- Autonomous AI Voice Copilot -->
-			        <li class="treeview <?php if($cur_page == 'ai-copilot.php') {echo 'active';} ?>">
-			          <a href="ai-copilot.php" style="background: linear-gradient(135deg, rgba(250, 184, 2, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);">
-			            <i class="fa fa-magic" style="color: #f59e0b;"></i> <span>AI Voice Copilot</span>
-			            <span class="pull-right-container">
-			              <small class="label pull-right bg-yellow" style="color:#0f172a; font-weight:800; border-radius:4px; font-size:10px;">PRO AI</small>
-			            </span>
-			          </a>
-			        </li>
-
-					
 			        <li class="treeview <?php if( ($cur_page == 'settings.php') ) {echo 'active';} ?>">
 			          <a href="settings.php">
 			            <i class="fa fa-sliders"></i> <span>Website Settings</span>
