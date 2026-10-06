@@ -1,0 +1,947 @@
+/* ==========================================================================
+   SHOPMART MOBILE SUPPORT SCREEN (LIVE SUPPORT CHAT)
+   Matches media_1791287559643_49f007d0.png with Pixel-Perfect Precision
+   ========================================================================== */
+
+/* 1. Global Viewport Adjustments for Live Chat */
+.live-chat-page-body,
+.live-chat-page-body .wrapper,
+.live-chat-page-body .main-sidebar {
+    background: #F8FAFC !important;
+}
+
+/* Hide desktop-only elements on mobile */
+@media (max-width: 767px) {
+    .live-chat-page-body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #F8FAFC !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .live-chat-page-body .wrapper {
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .live-chat-page-body .content-header {
+        display: none !important;
+    }
+
+    .live-chat-page-body .content-wrapper {
+        height: calc(100vh - 60px) !important;
+        max-height: calc(100vh - 60px) !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #F8FAFC !important;
+        border: none !important;
+    }
+
+    .live-chat-page-body .content {
+        padding: 0 !important;
+        margin: 0 !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        background: #F8FAFC !important;
+    }
+
+    .wa-app-wrap {
+        position: relative !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        background: #F8FAFC !important;
+    }
+
+    /* --------------------------------------------------------------------------
+       VIEW 1: CHAT THREADS LIST (Left Screen in Design)
+       -------------------------------------------------------------------------- */
+    .wa-col-chats {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: #F8FAFC !important;
+        display: flex !important;
+        flex-direction: column !important;
+        z-index: 10 !important;
+        border-right: none !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        padding-bottom: 64px !important; /* Space for bottom dock */
+        box-sizing: border-box !important;
+    }
+
+    /* Slide list away when conversation is active */
+    body.mobile-chat-active .wa-col-chats {
+        transform: translateX(-100%) !important;
+        pointer-events: none !important;
+    }
+
+    /* Hide standard bottom navigation bar when inside active conversation */
+    body.mobile-chat-active .sn-mobile-bottom-dock {
+        display: none !important;
+    }
+
+    /* Hide original desktop headers in mobile chats column */
+    .wa-sidebar-header {
+        display: none !important;
+    }
+
+    /* Live Support Chat Title Section */
+    .sup-mob-title-block {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        padding: 14px 16px 8px 16px !important;
+        background: #F8FAFC !important;
+    }
+
+    .sup-mob-icon-wrap {
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: 50% !important;
+        background: #FFFDF0 !important;
+        border: 1px solid #FEF08A !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 8px rgba(254, 219, 101, 0.25) !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-mob-title-text {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .sup-mob-heading {
+        margin: 0 !important;
+        font-size: 19px !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+        letter-spacing: -0.3px !important;
+        line-height: 1.2 !important;
+    }
+
+    .sup-mob-subheading {
+        margin: 3px 0 0 0 !important;
+        font-size: 12.5px !important;
+        color: #64748B !important;
+        font-weight: 500 !important;
+    }
+
+    /* Mobile Search Bar */
+    .sup-mob-search-wrap {
+        padding: 6px 16px 10px 16px !important;
+        background: #F8FAFC !important;
+    }
+
+    .sup-mob-search-box {
+        display: flex !important;
+        align-items: center !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 12px !important;
+        height: 42px !important;
+        padding: 0 14px !important;
+        gap: 10px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    }
+
+    .sup-mob-search-box input {
+        flex: 1 !important;
+        border: none !important;
+        outline: none !important;
+        background: transparent !important;
+        font-size: 13.5px !important;
+        color: #0F172A !important;
+    }
+
+    .sup-mob-search-box input::placeholder {
+        color: #94A3B8 !important;
+    }
+
+    /* Horizontal Filter Tabs */
+    .sup-mob-filter-strip {
+        display: flex !important;
+        gap: 8px !important;
+        padding: 0 16px 12px 16px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        background: #F8FAFC !important;
+        scrollbar-width: none !important;
+    }
+
+    .sup-mob-filter-strip::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .sup-filter-pill {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 7px 14px !important;
+        border-radius: 999px !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        color: #475569 !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+        transition: all 0.15s ease !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .sup-filter-pill .sup-count-tag {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        opacity: 0.8 !important;
+    }
+
+    .sup-filter-pill.active {
+        background: #FEDB65 !important;
+        color: #0F172A !important;
+        border-color: #FEDB65 !important;
+        box-shadow: 0 2px 6px rgba(254, 219, 101, 0.4) !important;
+    }
+
+    /* Scrollable Thread Cards List */
+    .wa-chat-list {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: 0 14px 20px 14px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        background: transparent !important;
+    }
+
+    /* Individual Chat Card (Matches Screenshot Cards Exactly) */
+    .sup-chat-card {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        background: #FFFFFF !important;
+        border: 1px solid #F1F5F9 !important;
+        border-radius: 16px !important;
+        padding: 12px 14px !important;
+        cursor: pointer !important;
+        transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03) !important;
+        position: relative !important;
+    }
+
+    .sup-chat-card:active {
+        transform: scale(0.985) !important;
+        background: #FFFDF0 !important;
+        border-color: #FEDB65 !important;
+    }
+
+    .sup-chat-card.selected {
+        background: #FFFDF0 !important;
+        border-color: #FEDB65 !important;
+        box-shadow: 0 4px 12px rgba(254, 219, 101, 0.25) !important;
+    }
+
+    /* Avatar with Pastel Colors & Online Indicator */
+    .sup-avatar-col {
+        position: relative !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-avatar {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 800 !important;
+        font-size: 16px !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .sup-online-dot {
+        position: absolute !important;
+        bottom: 0px !important;
+        right: 0px !important;
+        width: 11px !important;
+        height: 11px !important;
+        border-radius: 50% !important;
+        background: #10B981 !important;
+        border: 2px solid #FFFFFF !important;
+        box-shadow: 0 0 4px rgba(16, 185, 129, 0.4) !important;
+    }
+
+    .sup-online-dot.offline {
+        background: #94A3B8 !important;
+        box-shadow: none !important;
+    }
+
+    /* Info Column */
+    .sup-info-col {
+        flex: 1 !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3px !important;
+    }
+
+    .sup-row-top {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+
+    .sup-cust-name {
+        font-size: 14.5px !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .sup-meta-right {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-time {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #94A3B8 !important;
+    }
+
+    .sup-card-dots-btn {
+        background: transparent !important;
+        border: none !important;
+        color: #94A3B8 !important;
+        cursor: pointer !important;
+        padding: 2px 4px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .sup-card-dots-btn:hover {
+        color: #0F172A !important;
+        background: #F1F5F9 !important;
+    }
+
+    /* Middle Row: Phone with WhatsApp & Status Pill */
+    .sup-row-mid {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+        margin-top: 1px !important;
+    }
+
+    .sup-phone-tag {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        font-size: 11.5px !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+    }
+
+    /* Status Pill (Active, Pending, Processing, Blocked, Resolved) */
+    .sup-status-pill {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        font-size: 10.5px !important;
+        font-weight: 700 !important;
+        padding: 2px 8px !important;
+        border-radius: 999px !important;
+        text-transform: capitalize !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-status-pill.status-active {
+        background: #ECFDF5 !important;
+        color: #059669 !important;
+        border: 1px solid #A7F3D0 !important;
+    }
+
+    .sup-status-pill.status-pending {
+        background: #FFFBEB !important;
+        color: #D97706 !important;
+        border: 1px solid #FDE68A !important;
+    }
+
+    .sup-status-pill.status-processing {
+        background: #EFF6FF !important;
+        color: #2563EB !important;
+        border: 1px solid #BFDBFE !important;
+    }
+
+    .sup-status-pill.status-blocked {
+        background: #FEF2F2 !important;
+        color: #DC2626 !important;
+        border: 1px solid #FECACA !important;
+    }
+
+    .sup-status-pill.status-resolved,
+    .sup-status-pill.status-closed {
+        background: #FAF5FF !important;
+        color: #9333EA !important;
+        border: 1px solid #E9D5FF !important;
+    }
+
+    /* Bottom Row: Last Message Snippet & Edit Pencil */
+    .sup-row-bot {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+        margin-top: 2px !important;
+    }
+
+    .sup-snippet {
+        font-size: 12px !important;
+        color: #64748B !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex: 1 !important;
+    }
+
+    .sup-card-edit-btn {
+        background: transparent !important;
+        border: none !important;
+        color: #94A3B8 !important;
+        cursor: pointer !important;
+        padding: 3px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.15s ease !important;
+    }
+
+    .sup-card-edit-btn:hover {
+        color: #0F172A !important;
+        background: #F1F5F9 !important;
+    }
+
+    /* --------------------------------------------------------------------------
+       VIEW 2: ACTIVE CONVERSATION SCREEN (Right Screen in Design)
+       -------------------------------------------------------------------------- */
+    .wa-col-main {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: #F8FAFC !important;
+        display: flex !important;
+        flex-direction: column !important;
+        z-index: 20 !important;
+        transform: translateX(100%) !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        overflow: hidden !important;
+    }
+
+    body.mobile-chat-active .wa-col-main {
+        transform: translateX(0) !important;
+    }
+
+    #activeThreadPanel {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Hide desktop headers in conversation workspace */
+    .wa-main-header {
+        display: none !important;
+    }
+
+    /* Custom Mobile Chat Header (Warm Yellow #FEDB65) */
+    .sup-chat-header-bar {
+        height: 58px !important;
+        background: #FEDB65 !important;
+        border-bottom: 1px solid #EAB308 !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 12px !important;
+        gap: 10px !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+        z-index: 30 !important;
+    }
+
+    .sup-back-btn {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 50% !important;
+        background: transparent !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #0F172A !important;
+        cursor: pointer !important;
+        transition: background 0.15s ease !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+
+    .sup-back-btn:active {
+        background: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .sup-hdr-avatar-wrap {
+        position: relative !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-hdr-avatar {
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: 50% !important;
+        background: #FFFDF0 !important;
+        border: 1.5px solid #0F172A !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        color: #0F172A !important;
+    }
+
+    .sup-hdr-online-dot {
+        position: absolute !important;
+        bottom: -1px !important;
+        right: -1px !important;
+        width: 10px !important;
+        height: 10px !important;
+        border-radius: 50% !important;
+        background: #10B981 !important;
+        border: 2px solid #FEDB65 !important;
+    }
+
+    .sup-hdr-info {
+        flex: 1 !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .sup-hdr-name {
+        margin: 0 !important;
+        font-size: 15.5px !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.2 !important;
+    }
+
+    .sup-hdr-status {
+        font-size: 11.5px !important;
+        color: #0F172A !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+    }
+
+    .sup-dot-pulse {
+        width: 7px !important;
+        height: 7px !important;
+        border-radius: 50% !important;
+        background: #15803D !important;
+        display: inline-block !important;
+    }
+
+    .sup-hdr-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-hdr-action-btn {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 50% !important;
+        background: transparent !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #0F172A !important;
+        cursor: pointer !important;
+        transition: background 0.15s ease !important;
+    }
+
+    .sup-hdr-action-btn:active {
+        background: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* Pinned Top Context Order Card */
+    .sup-order-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 14px !important;
+        margin: 10px 12px 6px 12px !important;
+        padding: 10px 12px !important;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03) !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-order-card-top {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .sup-order-thumb {
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 10px !important;
+        background: #0F172A !important;
+        overflow: hidden !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .sup-order-thumb img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+
+    .sup-order-meta {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .sup-order-meta-head {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+    }
+
+    .sup-order-id {
+        font-size: 13.5px !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+    }
+
+    .sup-order-status-badge {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        padding: 2px 7px !important;
+        border-radius: 999px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 3px !important;
+    }
+
+    .sup-order-status-badge.status-delivered,
+    .sup-order-status-badge.status-completed {
+        background: #ECFDF5 !important;
+        color: #059669 !important;
+        border: 1px solid #A7F3D0 !important;
+    }
+
+    .sup-order-status-badge.status-pending {
+        background: #FFFBEB !important;
+        color: #D97706 !important;
+        border: 1px solid #FDE68A !important;
+    }
+
+    .sup-order-pname {
+        font-size: 12px !important;
+        color: #475569 !important;
+        font-weight: 500 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-top: 1px !important;
+    }
+
+    .sup-order-price {
+        font-size: 13.5px !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+        margin-top: 2px !important;
+    }
+
+    .sup-order-card-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 8px !important;
+        background: #F8FAFC !important;
+        border-radius: 10px !important;
+        padding: 8px 10px !important;
+        border: 1px solid #F1F5F9 !important;
+    }
+
+    .sup-order-subcol {
+        display: flex !important;
+        flex-direction: column !important;
+        min-width: 0 !important;
+    }
+
+    .sup-subcol-label {
+        font-size: 9.5px !important;
+        font-weight: 700 !important;
+        color: #64748B !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .sup-subcol-val {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #0F172A !important;
+        margin-top: 2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .sup-pay-pill {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 3px !important;
+        color: #059669 !important;
+        font-weight: 800 !important;
+    }
+
+    /* Message Stream (Chat Bubbles) */
+    .wa-feed-body {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: 10px 14px 16px 14px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        background: #FAF8F5 !important;
+    }
+
+    /* Date Divider */
+    .sup-date-divider {
+        text-align: center !important;
+        margin: 6px 0 !important;
+    }
+
+    .sup-date-divider span {
+        display: inline-block !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 999px !important;
+        padding: 3px 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #64748B !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* Message Row & Bubbles */
+    .sup-msg-row {
+        display: flex !important;
+        width: 100% !important;
+    }
+
+    .sup-msg-row.customer {
+        justify-content: flex-end !important;
+    }
+
+    .sup-msg-row.admin {
+        justify-content: flex-start !important;
+        align-items: flex-end !important;
+        gap: 8px !important;
+    }
+
+    /* Agent Avatar on Admin Messages */
+    .sup-agent-avatar {
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        border: 1.5px solid #FEDB65 !important;
+        margin-bottom: 2px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Customer Bubble: Warm Yellow (#FEDB65 / #FDE047) on Right */
+    .sup-bubble.customer {
+        background: #FEDB65 !important;
+        color: #0F172A !important;
+        border-radius: 18px 18px 4px 18px !important;
+        padding: 10px 14px !important;
+        max-width: 82% !important;
+        box-shadow: 0 2px 6px rgba(254, 219, 101, 0.25) !important;
+    }
+
+    /* Admin Bubble: Clean White on Left */
+    .sup-bubble.admin {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+        border-radius: 18px 18px 18px 4px !important;
+        padding: 10px 14px !important;
+        max-width: 82% !important;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+        border: 1px solid #F1F5F9 !important;
+    }
+
+    .sup-msg-text {
+        font-size: 13.5px !important;
+        line-height: 1.4 !important;
+        word-break: break-word !important;
+    }
+
+    .sup-msg-text a {
+        color: #1D4ED8 !important;
+        text-decoration: underline !important;
+        font-weight: 600 !important;
+    }
+
+    .sup-msg-footer {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 4px !important;
+        margin-top: 4px !important;
+    }
+
+    .sup-msg-time {
+        font-size: 10.5px !important;
+        opacity: 0.7 !important;
+    }
+
+    .sup-msg-ticks {
+        font-size: 11px !important;
+        color: #2563EB !important;
+        font-weight: 800 !important;
+    }
+
+    /* Bottom Chat Controls Bar (Clean single input row - No chips / No AI mode switcher) */
+    .sup-mob-bottom-controls {
+        background: #FFFFFF !important;
+        border-top: 1px solid #F1F5F9 !important;
+        padding: 10px 14px 12px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04) !important;
+        z-index: 30 !important;
+    }
+
+    /* Input Row */
+    .sup-mob-input-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+
+    .sup-clip-btn {
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: 50% !important;
+        background: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #64748B !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sup-msg-input {
+        flex: 1 !important;
+        height: 42px !important;
+        border-radius: 999px !important;
+        border: 1px solid #E2E8F0 !important;
+        background: #F8FAFC !important;
+        padding: 0 16px !important;
+        font-size: 13.5px !important;
+        color: #0F172A !important;
+        outline: none !important;
+    }
+
+    .sup-msg-input:focus {
+        border-color: #FEDB65 !important;
+        background: #FFFFFF !important;
+    }
+
+    .sup-send-btn {
+        width: 42px !important;
+        height: 42px !important;
+        border-radius: 50% !important;
+        background: #FEDB65 !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #0F172A !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 2px 8px rgba(254, 219, 101, 0.4) !important;
+        transition: transform 0.1s ease !important;
+    }
+
+    .sup-send-btn:active {
+        transform: scale(0.92) !important;
+    }
+}
+
+/* Hide mobile-specific blocks on desktop displays (>= 768px) */
+@media (min-width: 768px) {
+    .sup-mob-title-block,
+    .sup-mob-search-wrap,
+    .sup-mob-filter-strip,
+    .sup-chat-header-bar,
+    .sup-order-card,
+    .sup-mob-bottom-controls,
+    .sup-mob-chips-row,
+    .sup-mode-switcher-bar,
+    #supStatusModal,
+    #supQuickReplyModal {
+        display: none !important;
+    }
+}
+
+@keyframes slideUpModal {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

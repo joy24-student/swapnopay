@@ -1,7 +1,15 @@
 <?php
 require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/header.php';
+
+$adminAvatarUrl = (!empty($_SESSION['user']['photo']) && file_exists(__DIR__ . '/../assets/uploads/' . $_SESSION['user']['photo'])) 
+    ? '../assets/uploads/' . htmlspecialchars($_SESSION['user']['photo']) 
+    : '../assets/uploads/user-1.png';
 ?>
+<link rel="stylesheet" href="css/live-chat-mobile.css?v=<?php echo time(); ?>">
+<script>
+    document.body.classList.add('live-chat-page-body');
+</script>
 
 <style>
 /* ==========================================================================
@@ -767,7 +775,42 @@ html, body {
         <!-- COLUMN 1: LIVE CONVERSATIONS LIST (330px) -->
         <!-- ============================================== -->
         <div class="wa-col-chats" id="threadsCol">
-            <!-- Sidebar Header -->
+            <!-- Mobile Title Block (Matches media_1791287559643_49f007d0.png View 1) -->
+            <div class="sup-mob-title-block">
+                <div class="sup-mob-icon-wrap">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#EAB308"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                </div>
+                <div class="sup-mob-title-text">
+                    <h2 class="sup-mob-heading">Live Support Chat</h2>
+                    <p class="sup-mob-subheading">Chat with your customers in real-time.</p>
+                </div>
+            </div>
+
+            <!-- Mobile Search Bar (Matches View 1) -->
+            <div class="sup-mob-search-wrap">
+                <div class="sup-mob-search-box">
+                    <i class="fa fa-search" style="color: #94A3B8; font-size: 14px;"></i>
+                    <input type="text" id="supMobSearchInput" onkeyup="filterThreads()" placeholder="Search by customer name, phone or message...">
+                </div>
+            </div>
+
+            <!-- Mobile Horizontal Filter Strip (Matches View 1) -->
+            <div class="sup-mob-filter-strip">
+                <button type="button" class="sup-filter-pill active" onclick="setThreadFilter('all', this)">
+                    All Chats <span class="sup-count-tag" id="supCntAll">(0)</span>
+                </button>
+                <button type="button" class="sup-filter-pill" onclick="setThreadFilter('active', this)">
+                    Active <span class="sup-count-tag" id="supCntActive">(0)</span>
+                </button>
+                <button type="button" class="sup-filter-pill" onclick="setThreadFilter('pending', this)">
+                    Pending <span class="sup-count-tag" id="supCntPending">(0)</span>
+                </button>
+                <button type="button" class="sup-filter-pill" onclick="setThreadFilter('closed', this)">
+                    Closed <span class="sup-count-tag" id="supCntClosed"></span>
+                </button>
+            </div>
+
+            <!-- Desktop Sidebar Header -->
             <div class="wa-sidebar-header">
                 <div class="wa-brand-title">
                     <span>Live Customer Chats</span>
@@ -826,7 +869,7 @@ html, body {
 
             <!-- Active Chat Screen (Pinned Input, 100% Height) -->
             <div id="activeThreadPanel" style="display: none; flex-direction: column; height: 100%; min-height: 0; overflow: hidden;">
-                <!-- Chat Header -->
+                <!-- Desktop Chat Header -->
                 <div class="wa-main-header">
                     <div class="wa-contact-info-wrap">
                         <button type="button" onclick="toggleThreadsCol();" class="wa-collapse-btn" id="btnCollapseChatsInline" title="Collapse / Show Chats List">
@@ -856,12 +899,71 @@ html, body {
                     </div>
                 </div>
 
+                <!-- Mobile Warm Yellow Header Bar (Matches media_1791287559643_49f007d0.png View 2) -->
+                <div class="sup-chat-header-bar">
+                    <button type="button" class="sup-back-btn" onclick="backToThreadList()" title="Back to Inbox">
+                        <i class="fa fa-arrow-left" style="font-size: 18px; color: #0F172A;"></i>
+                    </button>
+                    <div class="sup-hdr-avatar-wrap">
+                        <div class="sup-hdr-avatar" id="supHdrAvatar">C</div>
+                        <span class="sup-hdr-online-dot" id="supHdrDot"></span>
+                    </div>
+                    <div class="sup-hdr-info" onclick="toggleContextCol()">
+                        <h4 class="sup-hdr-name" id="supHdrName">Customer Name</h4>
+                        <div class="sup-hdr-status">
+                            <span class="sup-dot-pulse"></span>
+                            <span id="supHdrStatus">Active now</span>
+                        </div>
+                    </div>
+                    <div class="sup-hdr-actions">
+                        <button type="button" class="sup-hdr-action-btn" onclick="triggerTopVoiceCall()" title="Voice call">
+                            <i class="fa fa-phone" style="font-size: 16px;"></i>
+                        </button>
+                        <button type="button" class="sup-hdr-action-btn" onclick="openThreadStatusForCurrent()" title="Thread options">
+                            <i class="fa fa-ellipsis-v" style="font-size: 16px;"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mobile Pinned Top Context Order Card (Matches View 2) -->
+                <div class="sup-order-card" id="supPinnedOrderCard">
+                    <div class="sup-order-card-top">
+                        <div class="sup-order-thumb">
+                            <img id="supCardProdImg" src="../assets/uploads/no-photo.jpg" alt="Product">
+                        </div>
+                        <div class="sup-order-meta">
+                            <div class="sup-order-meta-head">
+                                <span class="sup-order-id" id="supCardOrderId">Order #ORD-10024</span>
+                                <span class="sup-order-status-badge status-delivered" id="supCardOrderStatus">
+                                    <i class="fa fa-check-circle"></i> Delivered
+                                </span>
+                            </div>
+                            <div class="sup-order-pname" id="supCardProdName">Nike Hoodie (Black) - Size L</div>
+                            <div class="sup-order-price" id="supCardProdPrice">৳ 3,450</div>
+                        </div>
+                    </div>
+                    <div class="sup-order-card-grid">
+                        <div class="sup-order-subcol">
+                            <span class="sup-subcol-label"><i class="fa fa-map-marker"></i> Address</span>
+                            <span class="sup-subcol-val" id="supCardAddress">Dhanmondi, Dhaka</span>
+                        </div>
+                        <div class="sup-order-subcol">
+                            <span class="sup-subcol-label"><i class="fa fa-file-text-o"></i> Invoice No</span>
+                            <span class="sup-subcol-val" id="supCardInvoice">INV-98214</span>
+                        </div>
+                        <div class="sup-order-subcol">
+                            <span class="sup-subcol-label"><i class="fa fa-credit-card"></i> Payment Status</span>
+                            <span class="sup-subcol-val" id="supCardPayment"><span class="sup-pay-pill"><i class="fa fa-check-circle"></i> Paid</span></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- WhatsApp Message Feed Body (Live Chat Only, AI Suppressed) -->
                 <div class="wa-feed-body wa-scroll" id="adminMessagesContainer">
                     <!-- Rendered dynamically -->
                 </div>
 
-                <!-- Canned Responses / Quick Reply Toolbar -->
+                <!-- Desktop Canned Responses / Quick Reply Toolbar -->
                 <div class="wa-quick-bar wa-scroll">
                     <span style="font-size: 11px; font-weight: 700; color: #667781; margin-right: 4px;">QUICK:</span>
                     <button type="button" onclick="insertQuickReply('Hello! How can I assist you with your order today?')" class="wa-canned-chip">👋 Greeting</button>
@@ -872,7 +974,7 @@ html, body {
                     <button type="button" onclick="insertQuickReply('Thank you for shopping with us! Have a wonderful day.')" class="wa-canned-chip">🙏 Thank You</button>
                 </div>
 
-                <!-- WhatsApp Message Input Bar (Zero Gap at Bottom) -->
+                <!-- Desktop WhatsApp Message Input Bar -->
                 <div class="wa-input-bar">
                     <input type="file" id="adminFileInput" accept="image/*,application/pdf" style="display: none;" onchange="handleAdminFileUpload(this)">
                     <button type="button" onclick="document.getElementById('adminFileInput').click()" class="wa-icon-btn" title="Attach file or photo">
@@ -882,6 +984,19 @@ html, body {
                     <button type="button" onclick="handleAdminSendReply()" class="wa-send-btn" title="Send message">
                         <i class="fa fa-paper-plane"></i>
                     </button>
+                </div>
+
+                <!-- Mobile Bottom Chat Controls Bar (Clean Input Row) -->
+                <div class="sup-mob-bottom-controls">
+                    <div class="sup-mob-input-row">
+                        <button type="button" class="sup-clip-btn" onclick="document.getElementById('adminFileInput').click()" title="Attach file or photo">
+                            <i class="fa fa-paperclip" style="font-size: 16px;"></i>
+                        </button>
+                        <input type="text" id="supMobReplyInput" class="sup-msg-input" placeholder="Type a message..." onkeypress="handleMobileKeyPress(event)" autocomplete="off">
+                        <button type="button" class="sup-send-btn" onclick="handleMobileSendReply()" title="Send">
+                            <i class="fa fa-paper-plane" style="font-size: 14px;"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1047,10 +1162,38 @@ html, body {
     </div>
 </div>
 
+<!-- Mobile Status Edit Modal (Bottom Sheet) -->
+<div id="supStatusModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 99999; align-items: flex-end; justify-content: center;" onclick="closeStatusModal()">
+    <div style="background: #ffffff; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; padding: 20px; box-shadow: 0 -10px 25px rgba(0,0,0,0.15); animation: slideUpModal 0.2s ease;" onclick="event.stopPropagation()">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 16px; font-weight: 800; color: #0F172A;">Update Thread Status</h4>
+            <button type="button" onclick="closeStatusModal()" style="background: transparent; border: none; font-size: 22px; color: #64748B; cursor: pointer; padding: 0 4px;">&times;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button type="button" onclick="updateThreadStatus('active')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #ECFDF5; color: #059669; font-weight: 700; border: 1px solid #A7F3D0; font-size: 13.5px;">
+                🟢 Active (Live Conversation)
+            </button>
+            <button type="button" onclick="updateThreadStatus('pending')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #FFFBEB; color: #D97706; font-weight: 700; border: 1px solid #FDE68A; font-size: 13.5px;">
+                🟡 Pending (Awaiting Action)
+            </button>
+            <button type="button" onclick="updateThreadStatus('processing')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #EFF6FF; color: #2563EB; font-weight: 700; border: 1px solid #BFDBFE; font-size: 13.5px;">
+                🔵 Processing (Order / Exchange)
+            </button>
+            <button type="button" onclick="updateThreadStatus('blocked')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #FEF2F2; color: #DC2626; font-weight: 700; border: 1px solid #FECACA; font-size: 13.5px;">
+                🔴 Blocked (Spam / Disputed)
+            </button>
+            <button type="button" onclick="updateThreadStatus('resolved')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #FAF5FF; color: #9333EA; font-weight: 700; border: 1px solid #E9D5FF; font-size: 13.5px;">
+                🟣 Resolved (Completed)
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ==========================================================================
 // CLIENT STATE & INITIALIZATION
 // ==========================================================================
+const currentAdminAvatar = <?php echo json_encode($adminAvatarUrl); ?>;
 let currentThreadId = null;
 let currentCustomerData = null;
 let pollTimer = null;
@@ -1058,6 +1201,7 @@ let allThreads = [];
 let currentFilter = 'all';
 let lastMessageCount = 0;
 let ringtoneInterval = null;
+let activeStatusModalThreadId = null;
 
 // Deterministic soft pastel avatars
 const avatarPalettes = [
@@ -1243,21 +1387,47 @@ async function loadThreads(silent = false) {
 
 function updateCounts() {
     const cntAll = allThreads.length;
+    const cntActive = allThreads.filter(t => {
+        const s = (t.status || 'active').toLowerCase();
+        return s === 'active' || s === 'processing';
+    }).length;
+    const cntPending = allThreads.filter(t => {
+        const s = (t.status || '').toLowerCase();
+        return s === 'pending' || (t.unread_admin > 0);
+    }).length;
+    const cntClosed = allThreads.filter(t => {
+        const s = (t.status || '').toLowerCase();
+        return s === 'closed' || s === 'resolved';
+    }).length;
     const cntUnread = allThreads.filter(t => t.unread_admin > 0).length;
 
-    document.getElementById('cntAll').textContent = cntAll;
-    const unreadBadge = document.getElementById('cntUnread');
-    if (cntUnread > 0) {
-        unreadBadge.textContent = cntUnread;
-        unreadBadge.style.display = 'inline-flex';
-    } else {
-        unreadBadge.style.display = 'none';
+    // Desktop
+    const dAll = document.getElementById('cntAll');
+    if (dAll) dAll.textContent = cntAll;
+    const dUnread = document.getElementById('cntUnread');
+    if (dUnread) {
+        if (cntUnread > 0) {
+            dUnread.textContent = cntUnread;
+            dUnread.style.display = 'inline-flex';
+        } else {
+            dUnread.style.display = 'none';
+        }
     }
+
+    // Mobile Horizontal Strip (Matches media_1791287559643_49f007d0.png View 1)
+    const mAll = document.getElementById('supCntAll');
+    if (mAll) mAll.textContent = `(${cntAll})`;
+    const mActive = document.getElementById('supCntActive');
+    if (mActive) mActive.textContent = `(${cntActive})`;
+    const mPending = document.getElementById('supCntPending');
+    if (mPending) mPending.textContent = `(${cntPending})`;
+    const mClosed = document.getElementById('supCntClosed');
+    if (mClosed) mClosed.textContent = cntClosed > 0 ? `(${cntClosed})` : '';
 }
 
 function setThreadFilter(filter, btn) {
     currentFilter = filter;
-    document.querySelectorAll('.wa-filter-chip').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.wa-filter-chip, .sup-filter-pill').forEach(el => el.classList.remove('active'));
     if (btn) btn.classList.add('active');
     renderThreadList();
 }
@@ -1268,10 +1438,16 @@ function filterThreads() {
 
 function renderThreadList() {
     const container = document.getElementById('threadListContainer');
-    const query = (document.getElementById('threadSearchInput').value || '').toLowerCase().trim();
+    const mobInput = document.getElementById('supMobSearchInput');
+    const dskInput = document.getElementById('threadSearchInput');
+    const query = ((mobInput && mobInput.value) || (dskInput && dskInput.value) || '').toLowerCase().trim();
 
     const filtered = allThreads.filter(t => {
         // Status filter
+        const st = (t.status || 'active').toLowerCase();
+        if (currentFilter === 'active' && st !== 'active' && st !== 'processing') return false;
+        if (currentFilter === 'pending' && st !== 'pending' && !(t.unread_admin > 0)) return false;
+        if (currentFilter === 'closed' && st !== 'closed' && st !== 'resolved') return false;
         if (currentFilter === 'unread' && !(t.unread_admin > 0)) return false;
 
         // Search filter
@@ -1298,23 +1474,47 @@ function renderThreadList() {
         const initial = name.charAt(0).toUpperCase();
         const hasUnread = (t.unread_admin > 0);
         const unreadBadge = hasUnread ? `<span class="wa-unread-count">${t.unread_admin}</span>` : '';
+        const rawStatus = (t.status || 'active').toLowerCase();
+        const statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+        const phone = t.customer_phone || '+880 1712 345678';
+        const snippet = t.last_message || 'Customer requested live support';
+        const timeStr = formatTime(t.last_message_at || t.updated_at);
+        const avatarStyle = getAvatarStyle(name);
 
         html += `
-            <div onclick="selectThread(${t.id})" class="wa-chat-item ${isSelected ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}">
-                <div class="wa-avatar" style="${getAvatarStyle(name)}">
-                    ${initial}
-                    <div class="wa-online-dot"></div>
-                </div>
-                <div class="wa-chat-content">
-                    <div class="wa-chat-header-row">
-                        <span class="wa-chat-title">${escapeHtml(name)}</span>
-                        <span class="wa-chat-time">${formatTime(t.last_message_at || t.updated_at)}</span>
+            <div onclick="selectThread(${t.id})" class="sup-chat-card wa-chat-item ${isSelected ? 'active selected' : ''} ${hasUnread ? 'has-unread' : ''}">
+                <div class="sup-avatar-col">
+                    <div class="sup-avatar wa-avatar" style="${avatarStyle}">
+                        ${initial}
                     </div>
-                    <div class="wa-chat-msg-row">
-                        <span class="wa-chat-snippet">${escapeHtml(t.last_message || 'Customer requested live support')}</span>
-                        <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                    <span class="sup-online-dot wa-online-dot"></span>
+                </div>
+                <div class="sup-info-col wa-chat-content">
+                    <div class="sup-row-top wa-chat-header-row">
+                        <span class="sup-cust-name wa-chat-title">${escapeHtml(name)}</span>
+                        <div class="sup-meta-right">
+                            <span class="sup-time wa-chat-time">${timeStr}</span>
+                            <button type="button" class="sup-card-dots-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Status & Options">
+                                <i class="fa fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sup-row-mid">
+                        <div class="sup-phone-tag">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
+                            <span>${escapeHtml(phone)}</span>
+                        </div>
+                        <span class="sup-status-pill status-${rawStatus}">
+                            ${statusLabel}
+                        </span>
+                    </div>
+                    <div class="sup-row-bot wa-chat-msg-row">
+                        <p class="sup-snippet wa-chat-snippet">${escapeHtml(snippet)}</p>
+                        <div style="display:flex; align-items:center; gap:6px;">
                             ${unreadBadge}
-                            <span class="wa-live-badge">LIVE</span>
+                            <button type="button" class="sup-card-edit-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Edit status">
+                                <i class="fa fa-pencil"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1331,12 +1531,21 @@ function renderThreadList() {
 async function selectThread(id) {
     currentThreadId = id;
     lastMessageCount = 0;
-    document.getElementById('emptyThreadState').style.display = 'none';
+
+    // Activate mobile conversation view
+    document.body.classList.add('mobile-chat-active');
+
+    const empty = document.getElementById('emptyThreadState');
+    if (empty) empty.style.display = 'none';
     const panel = document.getElementById('activeThreadPanel');
-    panel.style.display = 'flex';
+    if (panel) panel.style.display = 'flex';
 
     await refreshActiveThread();
     renderThreadList();
+}
+
+function backToThreadList() {
+    document.body.classList.remove('mobile-chat-active');
 }
 
 async function refreshActiveThread(silent = false) {
@@ -1351,16 +1560,33 @@ async function refreshActiveThread(silent = false) {
 
             // Update thread header
             const name = currentCustomerData.customer_name || `Customer #${currentThreadId}`;
-            document.getElementById('activeCustomerName').textContent = name;
-            
-            const avatarEl = document.getElementById('activeAvatar');
-            avatarEl.textContent = name.charAt(0).toUpperCase();
-            avatarEl.setAttribute('style', getAvatarStyle(name));
+            const initial = name.charAt(0).toUpperCase();
 
+            // Desktop header
+            const dName = document.getElementById('activeCustomerName');
+            if (dName) dName.textContent = name;
+            const dAvatar = document.getElementById('activeAvatar');
+            if (dAvatar) {
+                dAvatar.textContent = initial;
+                dAvatar.setAttribute('style', getAvatarStyle(name));
+            }
             const details = [];
             if (currentCustomerData.customer_phone) details.push(currentCustomerData.customer_phone);
             if (currentCustomerData.customer_email) details.push(currentCustomerData.customer_email);
-            document.getElementById('activeCustomerDetails').textContent = details.length > 0 ? details.join(' • ') : 'online • storefront visitor';
+            const dDetails = document.getElementById('activeCustomerDetails');
+            if (dDetails) dDetails.textContent = details.length > 0 ? details.join(' • ') : 'online • storefront visitor';
+
+            // Mobile header (Matches View 2)
+            const mName = document.getElementById('supHdrName');
+            if (mName) mName.textContent = name;
+            const mAvatar = document.getElementById('supHdrAvatar');
+            if (mAvatar) {
+                mAvatar.textContent = initial;
+                mAvatar.setAttribute('style', getAvatarStyle(name));
+            }
+
+            // Populate Pinned Top Context Order Card
+            populatePinnedOrderCard(currentCustomerData, data.orders || []);
 
             // Detect new incoming messages for audio chime
             const newCount = (data.messages || []).length;
@@ -1372,7 +1598,7 @@ async function refreshActiveThread(silent = false) {
             }
             lastMessageCount = newCount;
 
-            // Render Messages (Live human chat only, AI messages suppressed)
+            // Render Messages
             renderMessages(data.messages || []);
 
             // Render Context Sidebar (Customer Orders & Info)
@@ -1386,8 +1612,97 @@ async function refreshActiveThread(silent = false) {
     }
 }
 
+function populatePinnedOrderCard(customer, orders) {
+    const card = document.getElementById('supPinnedOrderCard');
+    if (!card) return;
+
+    if (orders && orders.length > 0) {
+        const ord = orders[0];
+        const item = ord.item || {};
+
+        // Product thumbnail image
+        const imgEl = document.getElementById('supCardProdImg');
+        if (imgEl) {
+            let pPhoto = item.p_featured_photo || '';
+            if (pPhoto && !pPhoto.startsWith('http') && !pPhoto.startsWith('/') && !pPhoto.startsWith('../')) {
+                pPhoto = '../assets/uploads/' + pPhoto;
+            }
+            imgEl.src = pPhoto || '../assets/uploads/no-photo.jpg';
+        }
+
+        // Order ID
+        const idEl = document.getElementById('supCardOrderId');
+        if (idEl) idEl.textContent = `Order #ORD-${ord.payment_id}`;
+
+        // Status Badge
+        const statusEl = document.getElementById('supCardOrderStatus');
+        if (statusEl) {
+            const shipStatus = (ord.shipping_status || 'Delivered').trim();
+            const isDelivered = shipStatus.toLowerCase() === 'delivered' || shipStatus.toLowerCase() === 'completed';
+            statusEl.className = `sup-order-status-badge ${isDelivered ? 'status-delivered' : 'status-pending'}`;
+            statusEl.innerHTML = `${isDelivered ? '<i class="fa fa-check-circle"></i> ' : '<i class="fa fa-clock-o"></i> '}${escapeHtml(shipStatus)}`;
+        }
+
+        // Product Name & Variant
+        const pNameEl = document.getElementById('supCardProdName');
+        if (pNameEl) {
+            let pText = item.product_name || 'Nike Hoodie';
+            const variants = [];
+            if (item.color) variants.push(item.color);
+            if (item.size) variants.push(`Size ${item.size}`);
+            if (variants.length > 0) {
+                pText += ` (${variants.join(' - ')})`;
+            }
+            pNameEl.textContent = pText;
+        }
+
+        // Price
+        const priceEl = document.getElementById('supCardProdPrice');
+        if (priceEl) {
+            const amt = parseFloat(ord.paid_amount || item.unit_price || 0);
+            priceEl.textContent = `৳ ${amt.toLocaleString()}`;
+        }
+
+        // Address
+        const addrEl = document.getElementById('supCardAddress');
+        if (addrEl) {
+            const addrParts = [];
+            if (ord.shipping_address) addrParts.push(ord.shipping_address);
+            if (ord.shipping_city) addrParts.push(ord.shipping_city);
+            addrEl.textContent = addrParts.length > 0 ? addrParts.slice(0, 2).join(', ') : 'Dhanmondi, Dhaka';
+        }
+
+        // Invoice No
+        const invEl = document.getElementById('supCardInvoice');
+        if (invEl) {
+            invEl.textContent = `INV-${ord.payment_id}`;
+        }
+
+        // Payment Status
+        const payEl = document.getElementById('supCardPayment');
+        if (payEl) {
+            const isPaid = (ord.payment_status === 'Completed');
+            payEl.innerHTML = isPaid 
+                ? '<span class="sup-pay-pill"><i class="fa fa-check-circle"></i> Paid</span>'
+                : '<span style="color: #D97706; font-weight: 800;"><i class="fa fa-clock-o"></i> Pending</span>';
+        }
+    } else {
+        // Fallback placeholder data matching the Nike Hoodie design
+        document.getElementById('supCardProdImg').src = '../assets/uploads/no-photo.jpg';
+        document.getElementById('supCardOrderId').textContent = 'Order #ORD-10024';
+        document.getElementById('supCardOrderStatus').className = 'sup-order-status-badge status-delivered';
+        document.getElementById('supCardOrderStatus').innerHTML = '<i class="fa fa-check-circle"></i> Delivered';
+        document.getElementById('supCardProdName').textContent = 'Nike Hoodie (Black) - Size L';
+        document.getElementById('supCardProdPrice').textContent = '৳ 3,450';
+        document.getElementById('supCardAddress').textContent = customer.customer_address || 'Dhanmondi, Dhaka';
+        document.getElementById('supCardInvoice').textContent = 'INV-98214';
+        document.getElementById('supCardPayment').innerHTML = '<span class="sup-pay-pill"><i class="fa fa-check-circle"></i> Paid</span>';
+    }
+}
+
 function renderMessages(messages) {
     const container = document.getElementById('adminMessagesContainer');
+    if (!container) return;
     
     // Check if user was already at the bottom before re-rendering
     const isAtBottom = (container.scrollHeight - container.scrollTop <= container.clientHeight + 80);
@@ -1395,7 +1710,7 @@ function renderMessages(messages) {
 
     // Date header pill
     container.innerHTML += `
-        <div class="wa-date-divider">
+        <div class="sup-date-divider wa-date-divider">
             <span class="wa-date-pill">Today</span>
         </div>
     `;
@@ -1420,9 +1735,8 @@ function renderMessages(messages) {
             return;
         }
 
-        const alignClass = isMe ? 'outgoing' : 'incoming';
-        const bubbleClass = isMe ? 'outgoing' : 'incoming';
-        const ticksHtml = isMe ? '<span class="wa-ticks">✓✓</span>' : '';
+        const ticksHtml = isMe ? '' : '<span class="sup-msg-ticks wa-ticks">✓✓</span>';
+        const timeStr = formatTime(m.created_at);
 
         // Product inquiry card attachment
         let productCardHtml = '';
@@ -1462,23 +1776,126 @@ function renderMessages(messages) {
             }
         }
 
-        container.innerHTML += `
-            <div class="wa-bubble-wrap ${alignClass}">
-                <div class="wa-bubble ${bubbleClass}">
-                    <div style="white-space: pre-wrap;">${escapeHtml(m.message)}</div>
-                    ${productCardHtml}
-                    ${attach}
-                    <div class="wa-meta-row">
-                        <span class="wa-bubble-time">${formatTime(m.created_at)}</span>
-                        ${ticksHtml}
+        // Format links in message
+        let formattedMsg = escapeHtml(m.message);
+        formattedMsg = formattedMsg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">🔗 $1</a>');
+
+        if (isMe) {
+            // Admin Message: Left side with Agent Avatar and clean White Bubble
+            container.innerHTML += `
+                <div class="sup-msg-row admin wa-bubble-wrap outgoing">
+                    <img src="${currentAdminAvatar}" class="sup-agent-avatar" alt="Joy Saha" title="Support Agent">
+                    <div class="sup-bubble admin wa-bubble outgoing">
+                        <div class="sup-msg-text" style="white-space: pre-wrap;">${formattedMsg}</div>
+                        ${productCardHtml}
+                        ${attach}
+                        <div class="sup-msg-footer wa-meta-row">
+                            <span class="sup-msg-time wa-bubble-time">${timeStr}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // Customer Message: Right side with Warm Yellow (#FEDB65) Bubble and checkmarks
+            container.innerHTML += `
+                <div class="sup-msg-row customer wa-bubble-wrap incoming">
+                    <div class="sup-bubble customer wa-bubble incoming">
+                        <div class="sup-msg-text" style="white-space: pre-wrap;">${formattedMsg}</div>
+                        ${productCardHtml}
+                        ${attach}
+                        <div class="sup-msg-footer wa-meta-row">
+                            <span class="sup-msg-time wa-bubble-time">${timeStr}</span>
+                            ${ticksHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     });
 
     if (isAtBottom) {
         container.scrollTop = container.scrollHeight;
+    }
+}
+
+// Mobile Send Reply & Input Handlers
+function handleMobileSendReply() {
+    const input = document.getElementById('supMobReplyInput');
+    if (!input) return;
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    const dInput = document.getElementById('adminReplyInput');
+    if (dInput) dInput.value = '';
+
+    sendAdminMessagePayload(msg);
+}
+
+function handleMobileKeyPress(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleMobileSendReply();
+    }
+}
+
+async function sendAdminMessagePayload(msg) {
+    if (!currentThreadId) return;
+
+    try {
+        const fd = new FormData();
+        fd.append('thread_id', currentThreadId);
+        fd.append('message', msg);
+
+        const res = await fetch('../live_chat_api.php?action=admin_send_reply', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.status === 'success') {
+            await refreshActiveThread();
+            loadThreads(true);
+        }
+    } catch (e) {
+        alert('Could not send reply.');
+    }
+}
+
+function openThreadStatusModal(event, threadId) {
+    if (event) event.stopPropagation();
+    activeStatusModalThreadId = threadId;
+    const modal = document.getElementById('supStatusModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function openThreadStatusForCurrent() {
+    if (!currentThreadId) return;
+    openThreadStatusModal(null, currentThreadId);
+}
+
+function closeStatusModal() {
+    const modal = document.getElementById('supStatusModal');
+    if (modal) modal.style.display = 'none';
+    activeStatusModalThreadId = null;
+}
+
+async function updateThreadStatus(status) {
+    if (!activeStatusModalThreadId) return;
+    const tid = activeStatusModalThreadId;
+    closeStatusModal();
+
+    try {
+        const fd = new FormData();
+        fd.append('thread_id', tid);
+        fd.append('status', status);
+
+        const res = await fetch('../live_chat_api.php?action=admin_update_status', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.status === 'success') {
+            const thread = allThreads.find(t => t.id === tid);
+            if (thread) thread.status = status;
+            renderThreadList();
+            updateCounts();
+        }
+    } catch (e) {
+        alert('Could not update status.');
     }
 }
 
