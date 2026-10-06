@@ -3870,10 +3870,10 @@ $lang_sections = [
                                                 <div class="form-group" style="margin-bottom:0;">
                                                     <label style="font-weight:600; color:#334155;">Display Frequency</label>
                                                     <select name="popup_show_again" class="form-control" style="border-radius:6px;">
-                                                        <option value="always" <?php if($popup_show_again == 'always') echo 'selected'; ?>>Always (Every Visit - Best for Testing)</option>
-                                                        <option value="session" <?php if($popup_show_again == 'session') echo 'selected'; ?>>Once Per Browser Session</option>
-                                                        <option value="24hours" <?php if($popup_show_again == '24hours') echo 'selected'; ?>>Once Every 24 Hours</option>
-                                                        <option value="once" <?php if($popup_show_again == 'once') echo 'selected'; ?>>Once Ever Per Device</option>
+                                                        <option value="session" <?php if($popup_show_again == 'session' || empty($popup_show_again)) echo 'selected'; ?>>Show Once Per Browser Session (Recommended)</option>
+                                                        <option value="once" <?php if($popup_show_again == 'once') echo 'selected'; ?>>Show Once Ever Per Device</option>
+                                                        <option value="24hours" <?php if($popup_show_again == '24hours') echo 'selected'; ?>>Show Once Every 24 Hours</option>
+                                                        <option value="always" <?php if($popup_show_again == 'always') echo 'selected'; ?>>Show On Every Page Reload (Testing Only)</option>
                                                     </select>
                                                 </div>
                                             </div>

@@ -57,38 +57,91 @@ foreach ($result as $row) {
 <script src="js/jquery-2.2.4.min.js"></script>
 </head>
 
-<body class="hold-transition fixed skin-blue sidebar-mini">
+<body class="hold-transition fixed skin-blue sidebar-mini sn-shopmart-theme">
 
 	<div class="wrapper">
 
 		<header class="main-header">
 
+			<!-- Logo Area (Clean White matching Sidebar) -->
 			<a href="index.php" class="logo">
-				<span class="logo-lg">eCommerce PHP</span>
+				<span class="logo-mini">
+					<div class="sn-logo-badge-mini">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+							<line x1="3" y1="6" x2="21" y2="6"></line>
+							<path d="M16 10a4 4 0 0 1-8 0"></path>
+						</svg>
+					</div>
+				</span>
+				<span class="logo-lg">
+					<div class="sn-logo-wrap">
+						<div class="sn-logo-badge">
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+								<line x1="3" y1="6" x2="21" y2="6"></line>
+								<path d="M16 10a4 4 0 0 1-8 0"></path>
+							</svg>
+						</div>
+						<div class="sn-logo-info">
+							<span class="sn-logo-title">ShopMart</span>
+							<span class="sn-logo-sub">Admin Panel</span>
+						</div>
+					</div>
+				</span>
 			</a>
 
+			<!-- Top Navbar (Warm Yellow Bar) -->
 			<nav class="navbar navbar-static-top">
 				
-				<a href="#" class="sidebar-toggle" data-toggle="offcanvas" role="button">
-					<span class="sr-only">Toggle navigation</span>
-				</a>
+				<div class="sn-topbar-left">
+					<a href="#" class="sidebar-toggle" data-toggle="offcanvas" role="button">
+						<span class="sr-only">Toggle navigation</span>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.4" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+					</a>
+					<div class="sn-topbar-divider"></div>
+					<span class="sn-topbar-title">Admin Panel</span>
+				</div>
 
-				<span style="float:left;line-height:50px;color:#fff;padding-left:15px;font-size:18px;">Admin Panel</span>
-    <!-- Top Bar ... User Inforamtion .. Login/Log out Area -->
 				<div class="navbar-custom-menu">
-					<ul class="nav navbar-nav">
-						<li class="dropdown user user-menu">
-							<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-								<img src="../assets/uploads/<?php echo $_SESSION['user']['photo']; ?>" class="user-image" alt="User Image">
-								<span class="hidden-xs"><?php echo $_SESSION['user']['full_name']; ?></span>
+					<ul class="nav navbar-nav sn-nav-items">
+						<!-- Notification Bell -->
+						<li class="sn-bell-li">
+							<a href="notifications.php" class="sn-bell-link" title="Notifications">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+									<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+								</svg>
+								<span class="sn-bell-badge">3</span>
 							</a>
-							<ul class="dropdown-menu">
-								<li class="user-footer">
-									<div>
-										<a href="profile-edit.php" class="btn btn-default btn-flat">Edit Profile</a>
+						</li>
+
+						<!-- User Profile Dropdown -->
+						<li class="dropdown user user-menu sn-user-li">
+							<a href="#" class="dropdown-toggle sn-user-link" data-toggle="dropdown">
+								<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="user-image sn-user-avatar" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
+								<div class="sn-user-meta hidden-xs">
+									<span class="sn-user-name"><?php echo htmlspecialchars(!empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : 'Joy Saha'); ?></span>
+									<span class="sn-user-role"><?php echo htmlspecialchars(!empty($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'Administrator'); ?></span>
+								</div>
+								<svg class="sn-user-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+									<polyline points="6 9 12 15 18 9"></polyline>
+								</svg>
+							</a>
+							<ul class="dropdown-menu sn-user-dropdown-menu">
+								<li class="user-header" style="background:#FFFDF0; padding:18px; text-align:center;">
+									<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="img-circle" style="width:60px; height:60px; object-fit:cover; border:2px solid #FEDB65;" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
+									<p style="color:#0F172A; font-weight:700; margin-top:8px;">
+										<?php echo htmlspecialchars($_SESSION['user']['full_name'] ?? 'Joy Saha'); ?>
+										<small style="color:#64748B; font-weight:500; display:block;"><?php echo htmlspecialchars($_SESSION['user']['role'] ?? 'Administrator'); ?></small>
+									</p>
+								</li>
+								<li class="user-footer" style="padding:12px; background:#F8FAFC;">
+									<div class="pull-left">
+										<a href="profile-edit.php" class="btn btn-default btn-sm" style="border-radius:8px; font-weight:600;">Edit Profile</a>
 									</div>
-									<div>
-										<a href="logout.php" class="btn btn-default btn-flat">Log out</a>
+									<div class="pull-right">
+										<a href="logout.php" class="btn btn-default btn-sm" style="border-radius:8px; font-weight:600; color:#EF4444;">Log out</a>
 									</div>
 								</li>
 							</ul>
@@ -108,7 +161,7 @@ foreach ($result as $row) {
 
 			        <li class="treeview <?php if($cur_page == 'index.php') {echo 'active';} ?>">
 			          <a href="index.php">
-			            <i class="fa fa-dashboard"></i> <span>Dashboard</span>
+			            <i class="fa fa-home"></i> <span>Dashboard</span>
 			          </a>
 			        </li>
 
@@ -121,7 +174,7 @@ foreach ($result as $row) {
 
 			        <li class="treeview <?php if( ($cur_page == 'homepage-banners.php') ) {echo 'active';} ?>">
 			          <a href="homepage-banners.php">
-			            <i class="fa fa-television"></i> <span>Homepage Customizer</span>
+			            <i class="fa fa-desktop"></i> <span>Homepage Customizer</span>
 			          </a>
 			        </li>
 
@@ -129,7 +182,7 @@ foreach ($result as $row) {
 			          <a href="#">
 			            <i class="fa fa-comments"></i> <span>Messenger & WhatsApp</span>
 			            <span class="pull-right-container">
-			              <i class="fa fa-angle-left pull-right"></i>
+			              <i class="fa fa-angle-right pull-right"></i>
 			            </span>
 			          </a>
 			          <ul class="treeview-menu">
@@ -140,7 +193,7 @@ foreach ($result as $row) {
 
 			        <li class="treeview <?php if( ($cur_page == 'live-chat.php') ) {echo 'active';} ?>">
 			          <a href="live-chat.php">
-			            <i class="fa fa-comments-o"></i> <span>Live Support Chat</span>
+			            <i class="fa fa-commenting-o"></i> <span>Live Support Chat</span>
 			          </a>
 			        </li>
 
@@ -156,7 +209,7 @@ foreach ($result as $row) {
                             <i class="fa fa-cogs"></i>
                             <span>Shop Settings</span>
                             <span class="pull-right-container">
-								<i class="fa fa-angle-left pull-right"></i>
+								<i class="fa fa-angle-right pull-right"></i>
 							</span>
                         </a>
                         <ul class="treeview-menu">
@@ -188,7 +241,7 @@ foreach ($result as $row) {
 
                     <li class="treeview <?php if( ($cur_page == 'order.php') ) {echo 'active';} ?>">
                         <a href="order.php">
-                            <i class="fa fa-sticky-note"></i> <span>Order Management</span>
+                            <i class="fa fa-cube"></i> <span>Order Management</span>
                         </a>
                     </li>
 
@@ -196,7 +249,7 @@ foreach ($result as $row) {
                     <!-- Icons to be displayed on Shop -->
 			        <li class="treeview <?php if( ($cur_page == 'service.php') ) {echo 'active';} ?>">
 			          <a href="service.php">
-			            <i class="fa fa-list-ol"></i> <span>Services</span>
+			            <i class="fa fa-list"></i> <span>Services</span>
 			          </a>
 			        </li>
 

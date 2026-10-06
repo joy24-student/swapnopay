@@ -1508,11 +1508,68 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+    visibility: hidden;
 }
 .custom-popup.sn-popup-active {
     display: flex !important;
-    opacity: 1;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+.custom-popup.sn-popup-closing {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+body.sn-popup-open {
+    overflow: hidden !important;
+}
+.sn-popup-dismiss-link {
+    display: inline-block;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.2s ease;
+    padding: 4px 10px;
+}
+.sn-popup-dismiss-link:hover {
+    color: #475569;
+}
+@media (max-width: 600px) {
+    .custom-popup {
+        padding: 12px;
+    }
+    .custom-popup-content {
+        max-width: 100%;
+        max-height: 88vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 16px;
+    }
+    .sn-popup-banner-img {
+        max-height: 170px;
+    }
+    .sn-popup-body {
+        padding: 16px 18px 20px 18px;
+    }
+    .sn-popup-title {
+        font-size: 18px;
+    }
+    .sn-popup-desc {
+        font-size: 13px;
+        margin-bottom: 12px;
+    }
+    .close-popup {
+        top: 10px;
+        right: 10px;
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+    }
 }
 .custom-popup-content {
     background: #ffffff;
@@ -2743,31 +2800,96 @@ function topFunction() {
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
+<?php
+// Determine if promotional welcome popup is allowed on the current page
+$currentScript = basename($_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? ''));
+$nonPromoPages = [
+    'checkout.php', 'cart.php', 'login.php', 'registration.php',
+    'order-tracking.php', 'dashboard.php', 'customer-profile-update.php',
+    'customer-billing-shipping-update.php', 'customer-password-update.php',
+    'customer-order.php', 'customer-wishlist.php', 'reset-password.php', 'forget-password.php'
+];
+$allowPopupOnThisPage = !in_array($currentScript, $nonPromoPages, true);
+?>
+
 // --- Welcome Animated Popup Logic & Urgency Countdown ---
 document.addEventListener("DOMContentLoaded", function(){
-    <?php if(($settings['popup_on_off']??0) == 1): ?>
+    <?php if(($settings['popup_on_off']??0) == 1 && $allowPopupOnThisPage): ?>
     var popupFreq = '<?php echo htmlspecialchars($settings['popup_show_again'] ?? 'session'); ?>';
     var shouldShow = false;
 
-    if (popupFreq === 'always') {
-        shouldShow = true;
-    } else if (popupFreq === 'session') {
-        shouldShow = !sessionStorage.getItem('sn_popup_shown_session');
-    } else if (popupFreq === '24hours') {
-        var lastShown = localStorage.getItem('sn_popup_shown_24h');
-        if (!lastShown || (Date.now() - parseInt(lastShown, 10)) > 24 * 60 * 60 * 1000) {
-            shouldShow = true;
+    var shownSession = false;
+    var shown24h = false;
+    var shownForever = false;
+
+    try {
+        shownSession = !!sessionStorage.getItem('sn_popup_shown_session');
+        var last24h = localStorage.getItem('sn_popup_shown_24h');
+        if (last24h && (Date.now() - parseInt(last24h, 10)) < 24 * 60 * 60 * 1000) {
+            shown24h = true;
         }
+        shownForever = !!localStorage.getItem('sn_popup_shown_forever');
+    } catch (e) {}
+
+    // Show ONE TIME per session by default; never pester the customer on every page click
+    if (shownForever) {
+        shouldShow = false;
     } else if (popupFreq === 'once') {
-        shouldShow = !localStorage.getItem('sn_popup_shown_forever');
+        shouldShow = !shownForever;
+    } else if (popupFreq === '24hours') {
+        shouldShow = !shown24h;
+    } else if (popupFreq === 'always') {
+        // In dev test mode, ?test_popup=1 will force display, otherwise only once per session
+        var isTestMode = window.location.search.indexOf('test_popup=1') !== -1;
+        shouldShow = isTestMode || !shownSession;
+    } else {
+        // Standard 'session' - exactly 1 time per browser session / visit
+        shouldShow = !shownSession;
     }
+
+    function markPopupShown(neverAgain) {
+        try {
+            sessionStorage.setItem('sn_popup_shown_session', 'true');
+            sessionStorage.setItem('sn_popup_shown_time', String(Date.now()));
+            localStorage.setItem('sn_popup_shown_24h', String(Date.now()));
+            if (neverAgain || popupFreq === 'once') {
+                localStorage.setItem('sn_popup_shown_forever', 'true');
+            }
+        } catch(e) {}
+    }
+
+    window.closeWelcomePopup = function(neverAgain) {
+        var popup = document.getElementById('promoPopup');
+        if (popup) {
+            popup.classList.add('sn-popup-closing');
+            popup.classList.remove('sn-popup-active');
+            document.body.classList.remove('sn-popup-open');
+            setTimeout(function(){
+                popup.style.display = "none";
+                popup.classList.remove('sn-popup-closing');
+            }, 280);
+        }
+        markPopupShown(neverAgain);
+    };
 
     if (shouldShow) {
         var delayMs = <?php echo max(0, (int)($settings['popup_delay'] ?? 2)) * 1000; ?>;
         setTimeout(function(){
+            try {
+                if (sessionStorage.getItem('sn_popup_shown_session') && window.location.search.indexOf('test_popup=1') === -1) {
+                    return;
+                }
+            } catch(e) {}
+
             var popup = document.getElementById('promoPopup');
             if (popup) {
-                popup.classList.add('sn-popup-active');
+                popup.style.display = "flex";
+                requestAnimationFrame(function(){
+                    popup.classList.add('sn-popup-active');
+                    document.body.classList.add('sn-popup-open');
+                });
+                // Crucial fix: Mark as shown immediately so navigating to another page will NEVER re-trigger it
+                markPopupShown(false);
             }
         }, delayMs);
     }
@@ -2814,39 +2936,60 @@ document.addEventListener("DOMContentLoaded", function(){
         setInterval(updateTimer, 1000);
     })();
     <?php endif; ?>
-    <?php endif; ?>
 
-    // Popup Close Handlers
-    function closeWelcomePopup() {
-        var popup = document.getElementById('promoPopup');
-        if (popup) {
-            popup.classList.remove('sn-popup-active');
-            popup.style.display = "none";
-        }
-        var popupFreq = '<?php echo htmlspecialchars($settings['popup_show_again'] ?? 'session'); ?>';
-        if (popupFreq === 'session') sessionStorage.setItem('sn_popup_shown_session', 'true');
-        if (popupFreq === '24hours') localStorage.setItem('sn_popup_shown_24h', String(Date.now()));
-        if (popupFreq === 'once') localStorage.setItem('sn_popup_shown_forever', 'true');
-    }
-
+    // Popup Close and Interaction Handlers
     var closeBtn = document.querySelector(".close-popup");
     if (closeBtn) {
         closeBtn.onclick = function(e) {
             e.preventDefault();
-            closeWelcomePopup();
+            e.stopPropagation();
+            if (typeof window.closeWelcomePopup === 'function') {
+                window.closeWelcomePopup(false);
+            }
         };
     }
     var popupOverlay = document.getElementById('promoPopup');
     if (popupOverlay) {
         popupOverlay.addEventListener('click', function(e) {
             if (e.target === popupOverlay) {
-                closeWelcomePopup();
+                if (typeof window.closeWelcomePopup === 'function') {
+                    window.closeWelcomePopup(false);
+                }
             }
         });
     }
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeWelcomePopup();
+        if (e.key === 'Escape' && typeof window.closeWelcomePopup === 'function') {
+            window.closeWelcomePopup(false);
+        }
     });
+
+    var popupCta = document.querySelector('.sn-popup-cta-btn');
+    if (popupCta) {
+        popupCta.addEventListener('click', function() {
+            if (typeof markPopupShown === 'function') markPopupShown(false);
+            var popup = document.getElementById('promoPopup');
+            if (popup) {
+                popup.classList.remove('sn-popup-active');
+                popup.style.display = 'none';
+                document.body.classList.remove('sn-popup-open');
+            }
+        });
+    }
+
+    var popupBannerLink = document.querySelector('.sn-popup-banner-link');
+    if (popupBannerLink) {
+        popupBannerLink.addEventListener('click', function() {
+            if (typeof markPopupShown === 'function') markPopupShown(false);
+            var popup = document.getElementById('promoPopup');
+            if (popup) {
+                popup.classList.remove('sn-popup-active');
+                popup.style.display = 'none';
+                document.body.classList.remove('sn-popup-open');
+            }
+        });
+    }
+    <?php endif; ?>
 });
 // Global AI Assistant Modal Logic
 window.openShopAiModal = function() {
@@ -2927,7 +3070,7 @@ window.sendShopAiMessage = function() {
     <button onclick="topFunction()" id="scrollTopBtn" title="Go to top"><i class="fas fa-arrow-up"></i></button>
 <?php endif; ?>
 
-<?php if(($settings['popup_on_off']??0) == 1): 
+<?php if(($settings['popup_on_off']??0) == 1 && $allowPopupOnThisPage): 
     $popup_photo_src = '';
     $raw_photo = $settings['popup_photo'] ?? '';
     if (!empty($raw_photo)) {
@@ -2952,7 +3095,7 @@ window.sendShopAiMessage = function() {
 ?>
 <div id="promoPopup" class="custom-popup" role="dialog" aria-modal="true">
   <div class="custom-popup-content <?php echo $anim_class; ?>">
-    <button type="button" class="close-popup" aria-label="Close dialog">&times;</button>
+    <button type="button" class="close-popup" aria-label="Close dialog" onclick="if(typeof window.closeWelcomePopup==='function'){window.closeWelcomePopup(false);}">&times;</button>
     
     <?php if(!empty($popup_photo_src)): ?>
         <a href="<?php echo htmlspecialchars($popup_target_link); ?>" class="sn-popup-banner-link">
@@ -2992,6 +3135,8 @@ window.sendShopAiMessage = function() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </a>
         <?php endif; ?>
+
+        <button type="button" class="sn-popup-dismiss-link" onclick="if(typeof window.closeWelcomePopup==='function'){window.closeWelcomePopup(true);}">Don't show this offer again</button>
     </div>
   </div>
 </div>

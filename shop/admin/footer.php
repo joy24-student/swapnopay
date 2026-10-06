@@ -128,7 +128,9 @@
 
 
 
-	    $("#example1").DataTable();
+	    if (!$.fn.DataTable.isDataTable('#example1')) {
+	        $("#example1").DataTable();
+	    }
 	    $('#example2').DataTable({
 	      "paging": true,
 	      "lengthChange": false,

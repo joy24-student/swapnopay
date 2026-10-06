@@ -351,6 +351,19 @@
             window.__snHeroTimer = null;
         }
 
+        // Dismiss any active promo welcome popup on page transition
+        if (typeof window.closeWelcomePopup === 'function') {
+            window.closeWelcomePopup(false);
+        } else {
+            const activePopup = document.getElementById('promoPopup');
+            if (activePopup) {
+                activePopup.classList.remove('sn-popup-active');
+                activePopup.style.display = 'none';
+                document.body.classList.remove('sn-popup-open');
+            }
+        }
+        try { sessionStorage.setItem('sn_popup_shown_session', 'true'); } catch (e) {}
+
         let skeletonTimeout = null;
 
         // Check in-memory cache
