@@ -642,10 +642,10 @@ try {
 
     <!-- Bottom Action Dock -->
     <div class="sn-mobile-dock-row">
-        <label class="sn-mobile-all-check">
+        <label class="sn-checkbox-label sn-mobile-all-check">
             <input type="checkbox" id="mobileSelectAll" checked onchange="toggleSelectAllFromMobile(this)">
             <span class="sn-custom-check"></span>
-            <span>All</span>
+            <span style="font-size:13px; font-weight:700;">All</span>
         </label>
 
         <div class="sn-mobile-totals-col">
@@ -696,6 +696,14 @@ body.shopnext-theme {
     color: var(--sn-dark);
 }
 
+.sn-container {
+    max-width: 1240px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 16px;
+    box-sizing: border-box;
+}
+
 /* Sticky Right Summary Column on Desktop */
 @media (min-width: 1025px) {
     .sn-cart-right-col {
@@ -706,7 +714,9 @@ body.shopnext-theme {
 }
 
 .sn-cart-page-wrapper {
-    padding: 24px 0 60px 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 20px 0 60px 0;
 }
 
 /* 1. TOP TITLE BAR (MATCHING DEALS SCREEN) */
@@ -1745,59 +1755,344 @@ body.shopnext-theme {
 }
 
 @media (max-width: 768px) {
+    .sn-container {
+        padding: 0 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
     .sn-cart-page-wrapper {
-        padding-top: 14px;
-        padding-bottom: 150px !important;
-    }
-    .sn-cart-page-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-    .sn-page-title {
-        font-size: 22px;
-    }
-    .sn-auto-saved-badge {
-        width: 100%;
-        border-radius: 12px;
+        padding-top: 10px !important;
+        padding-bottom: 165px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
-    /* Product row becomes mobile card layout */
+    /* Top Title Bar */
+    .sn-deals-title-bar {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        margin-bottom: 12px !important;
+        padding: 0 2px !important;
+    }
+    .sn-deals-back-btn {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    }
+    .sn-deals-title {
+        font-size: 19px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+    }
+    .sn-deals-subtitle {
+        font-size: 11.5px !important;
+        color: #64748b !important;
+        margin: 2px 0 0 0 !important;
+    }
+
+    /* Main Cart Card */
+    .sn-cart-card {
+        border-radius: 14px !important;
+        border: 1px solid #f1f5f9 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+        background: #ffffff !important;
+        overflow: hidden !important;
+        margin-bottom: 14px !important;
+    }
+    .sn-cart-toolbar {
+        padding: 12px 14px !important;
+        border-bottom: 1px solid #f8fafc !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+    .sn-toolbar-text {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+    }
+    .sn-toolbar-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+    .sn-tool-btn {
+        font-size: 11.5px !important;
+        gap: 4px !important;
+        color: #64748b !important;
+    }
+    .sn-tool-btn svg {
+        width: 13px !important;
+        height: 13px !important;
+    }
+
+    /* Product Row - Modern Mobile App Card Layout */
     .sn-cart-item-row {
-        grid-template-columns: 24px 85px 1fr;
-        grid-template-areas: 
-            "check img details"
-            "check img pricing"
-            "check img total";
-        gap: 12px;
-        padding: 16px;
+        display: grid !important;
+        grid-template-columns: 22px 82px minmax(0, 1fr) !important;
+        grid-template-rows: auto auto !important;
+        column-gap: 10px !important;
+        row-gap: 8px !important;
+        padding: 14px 12px !important;
+        align-items: start !important;
+        position: relative !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f8fafc !important;
     }
-    .sn-item-checkbox-cell { grid-area: check; }
-    .sn-item-image-cell { grid-area: img; }
-    .sn-img-container { width: 85px; height: 85px; }
-    .sn-item-details-cell { grid-area: details; }
-    .sn-item-pricing-cell { grid-area: pricing; }
-    .sn-item-total-cell { grid-area: total; text-align: left; margin-top: -6px; }
+    .sn-cart-item-row:last-child {
+        border-bottom: none !important;
+    }
 
-    /* Hide Order Summary Card on Mobile as requested */
+    /* Checkbox Cell */
+    .sn-item-checkbox-cell {
+        grid-column: 1 !important;
+        grid-row: 1 / span 2 !important;
+        align-self: center !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Thumbnail Cell */
+    .sn-item-image-cell {
+        grid-column: 2 !important;
+        grid-row: 1 / span 2 !important;
+        align-self: start !important;
+    }
+    .sn-img-container {
+        width: 82px !important;
+        height: 82px !important;
+        border-radius: 10px !important;
+        background: #f8fafc !important;
+        border: 1px solid #f1f5f9 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .sn-img-container img {
+        max-width: 90% !important;
+        max-height: 90% !important;
+        object-fit: contain !important;
+    }
+    .sn-top-rated-tag {
+        font-size: 8px !important;
+        padding: 1px 4px !important;
+        top: 3px !important;
+        left: 3px !important;
+    }
+
+    /* Product Details */
+    .sn-item-details-cell {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+    }
+    .sn-item-name {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        line-height: 1.35 !important;
+        margin: 0 0 3px 0 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        color: #0f172a !important;
+    }
+    .sn-item-name a {
+        color: #0f172a !important;
+        text-decoration: none !important;
+    }
+    .sn-item-specs {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-bottom: 3px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .sn-item-variant-swatches {
+        margin-bottom: 3px !important;
+        font-size: 11px !important;
+    }
+    .sn-stock-status {
+        display: inline-block !important;
+        margin-bottom: 4px !important;
+    }
+    .sn-stock-pill {
+        font-size: 9.5px !important;
+        padding: 1px 6px !important;
+        border-radius: 4px !important;
+    }
+
+    /* Actions Links */
+    .sn-item-action-links {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        margin-top: 3px !important;
+    }
+    .sn-item-link-btn {
+        font-size: 11px !important;
+        color: #64748b !important;
+        gap: 4px !important;
+    }
+    .sn-item-link-btn svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+
+    /* Pricing & Stepper Row */
+    .sn-item-pricing-cell {
+        grid-column: 3 !important;
+        grid-row: 2 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-top: 2px !important;
+        padding-top: 6px !important;
+        border-top: 1px dashed #f1f5f9 !important;
+        width: 100% !important;
+    }
+    .sn-price-stack {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 5px !important;
+        margin-bottom: 0 !important;
+        flex-wrap: wrap !important;
+    }
+    .sn-curr-price {
+        font-size: 15px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        line-height: 1 !important;
+    }
+    .sn-old-price {
+        font-size: 11px !important;
+        color: #94a3b8 !important;
+        margin-top: 0 !important;
+    }
+    .sn-discount-badge {
+        font-size: 9.5px !important;
+        font-weight: 700 !important;
+        padding: 1px 4px !important;
+        margin-top: 0 !important;
+        border-radius: 4px !important;
+    }
+
+    .sn-stepper-control {
+        padding: 2px 4px !important;
+        gap: 3px !important;
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 9999px !important;
+    }
+    .sn-step-btn {
+        width: 22px !important;
+        height: 22px !important;
+        font-size: 14px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .sn-qty-input {
+        width: 22px !important;
+        font-size: 12.5px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Hide redundant duplicate total on mobile */
+    .sn-item-total-cell {
+        display: none !important;
+    }
+
+    /* Hide Desktop Order Summary Column on Mobile */
     .sn-cart-right-col {
         display: none !important;
     }
     .sn-cart-layout-grid {
-        margin-bottom: 20px !important;
+        margin-bottom: 16px !important;
+        display: block !important;
+    }
+
+    /* Shop with Confidence Banner */
+    .sn-confidence-banner {
+        border-radius: 14px !important;
+        padding: 12px 14px !important;
+        margin-top: 14px !important;
+        background: #eff6ff !important;
+        border: 1px solid #dbeafe !important;
+        gap: 10px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+    .sn-conf-left {
+        gap: 10px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .sn-conf-shield {
+        width: 34px !important;
+        height: 34px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+    }
+    .sn-conf-shield svg {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    .sn-conf-title {
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        color: #1e3a8a !important;
+        margin: 0 !important;
+    }
+    .sn-conf-desc {
+        font-size: 11px !important;
+        color: #3b82f6 !important;
+        line-height: 1.3 !important;
+        margin: 1px 0 0 0 !important;
+    }
+    .sn-conf-learn-more {
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        color: #2563eb !important;
+        white-space: nowrap !important;
     }
 
     /* "You Might Also Like" section: 2 columns on mobile */
     .sn-recommendations-section {
-        margin-top: 16px !important;
-        margin-bottom: 24px !important;
+        margin-top: 18px !important;
+        margin-bottom: 18px !important;
     }
     .sn-recom-head {
-        margin-bottom: 12px !important;
+        margin-bottom: 10px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
     .sn-recom-title {
-        font-size: 16.5px !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
     }
     .sn-recom-grid {
         grid-template-columns: repeat(2, 1fr) !important;
@@ -1807,7 +2102,7 @@ body.shopnext-theme {
         flex-direction: column !important;
         align-items: stretch !important;
         padding: 10px 10px 12px 10px !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         position: relative !important;
         gap: 0 !important;
         background: #ffffff !important;
@@ -1818,7 +2113,7 @@ body.shopnext-theme {
         width: 100% !important;
         height: 120px !important;
         background: #f8fafc !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -1850,7 +2145,7 @@ body.shopnext-theme {
         display: -webkit-box !important;
         -webkit-line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
-        color: var(--sn-dark) !important;
+        color: #0f172a !important;
     }
     .sn-recom-item-name a {
         color: inherit !important;
@@ -1858,7 +2153,7 @@ body.shopnext-theme {
     }
     .sn-recom-item-sub {
         font-size: 10px !important;
-        color: var(--sn-muted) !important;
+        color: #64748b !important;
         margin-bottom: 4px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
@@ -1874,7 +2169,7 @@ body.shopnext-theme {
     .sn-recom-price {
         font-size: 13.5px !important;
         font-weight: 800 !important;
-        color: var(--sn-dark) !important;
+        color: #0f172a !important;
     }
     .sn-recom-old-price {
         font-size: 10.5px !important;
@@ -1889,8 +2184,8 @@ body.shopnext-theme {
     }
     .sn-recom-add-btn {
         position: absolute !important;
-        right: 8px !important;
-        bottom: 8px !important;
+        right: 0 !important;
+        bottom: 2px !important;
         width: 28px !important;
         height: 28px !important;
         border-radius: 50% !important;
@@ -1907,9 +2202,47 @@ body.shopnext-theme {
         width: 14px !important;
         height: 14px !important;
     }
+
+    /* Bottom Trust Assurance Bar - Clean 2x2 Grid */
     .sn-trust-assurance-bar {
-        grid-template-columns: 1fr;
-        padding: 20px;
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        padding: 14px 12px !important;
+        border-radius: 14px !important;
+        background: #ffffff !important;
+        border: 1px solid #f1f5f9 !important;
+        margin-top: 16px !important;
+    }
+    .sn-trust-cell {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    .sn-trust-icon {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        background: #f8fafc !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+    }
+    .sn-trust-icon svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+    .sn-trust-info h4 {
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        color: #0f172a !important;
+    }
+    .sn-trust-info p {
+        font-size: 10px !important;
+        color: #64748b !important;
+        margin: 1px 0 0 0 !important;
     }
 
     /* Mobile Sticky Bottom Checkout & Voucher Dock */
@@ -1927,73 +2260,111 @@ body.shopnext-theme {
         box-shadow: 0 -4px 16px rgba(0,0,0,0.06) !important;
     }
     .sn-mobile-voucher-bar {
-        background: #fff1f2;
-        border-bottom: 1px solid #ffe4e6;
-        padding: 8px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 700;
-        color: #e11d48;
+        background: #fff1f2 !important;
+        border-bottom: 1px solid #ffe4e6 !important;
+        padding: 7px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        color: #e11d48 !important;
     }
     .sn-mv-left {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
     }
     .sn-mv-add-btn {
-        background: #ffffff;
-        border: 1px solid #fda4af;
-        color: #e11d48;
-        font-size: 11px;
-        font-weight: 800;
-        padding: 2px 10px;
-        border-radius: 9999px;
-        cursor: pointer;
+        background: #ffffff !important;
+        border: 1px solid #fda4af !important;
+        color: #e11d48 !important;
+        font-size: 10.5px !important;
+        font-weight: 800 !important;
+        padding: 2px 8px !important;
+        border-radius: 9999px !important;
+        cursor: pointer !important;
     }
     .sn-mobile-dock-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 16px;
-        gap: 12px;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 8px 12px !important;
+        gap: 8px !important;
     }
     .sn-mobile-all-check {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--sn-dark);
-        margin: 0;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        position: relative !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+    }
+    .sn-mobile-all-check input {
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+    }
+    .sn-mobile-all-check input:checked ~ .sn-custom-check {
+        background-color: #fab802 !important;
+        border-color: #fab802 !important;
+    }
+    .sn-mobile-all-check input:checked ~ .sn-custom-check:after {
+        content: "" !important;
+        display: block !important;
+        width: 5px !important;
+        height: 9px !important;
+        border: solid white !important;
+        border-width: 0 2px 2px 0 !important;
+        transform: rotate(45deg) !important;
+        margin-bottom: 2px !important;
     }
     .sn-mobile-totals-col {
-        text-align: right;
-        flex: 1;
+        text-align: right !important;
+        flex: 1 !important;
     }
     .sn-mob-subtotal {
-        font-size: 13.5px;
-        font-weight: 700;
-        color: var(--sn-dark);
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        line-height: 1.2 !important;
     }
     .sn-mob-subtotal strong {
-        color: #b45309;
+        color: #b45309 !important;
+        font-weight: 800 !important;
     }
     .sn-mob-shipping {
-        font-size: 11px;
-        color: var(--sn-muted);
+        font-size: 10.5px !important;
+        color: #64748b !important;
     }
     .sn-mobile-checkout-btn {
-        background: #fab802;
-        border: none;
-        color: #111827;
-        font-size: 14px;
-        font-weight: 800;
-        padding: 10px 18px;
-        border-radius: 10px;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(250, 184, 2, 0.3);
+        background: #fab802 !important;
+        border: none !important;
+        color: #111827 !important;
+        font-size: 13.5px !important;
+        font-weight: 800 !important;
+        padding: 10px 16px !important;
+        border-radius: 10px !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 8px rgba(250, 184, 2, 0.3) !important;
+        white-space: nowrap !important;
+    }
+    .sn-empty-cart-stage {
+        padding: 40px 16px !important;
+        margin: 20px 0 !important;
+        border-radius: 14px !important;
+    }
+    .sn-empty-icon-ring {
+        width: 80px !important;
+        height: 80px !important;
+        margin-bottom: 16px !important;
+    }
+    .sn-empty-icon-ring svg {
+        width: 40px !important;
+        height: 40px !important;
     }
 }
 </style>
