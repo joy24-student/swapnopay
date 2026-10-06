@@ -53,6 +53,7 @@ foreach ($result as $row) {
 	<link rel="stylesheet" href="style.css">
 
 <link rel="stylesheet" href="css/enterprise.css?v=<?php echo filemtime(__DIR__ . '/css/enterprise.css'); ?>">
+<link rel="stylesheet" href="css/admin-notifications.css?v=<?php echo filemtime(__DIR__ . '/css/admin-notifications.css'); ?>">
 <meta name="csrf-token" content="<?php echo $csrf->getToken(); ?>">
 <script src="js/jquery-2.2.4.min.js"></script>
 </head>
@@ -119,12 +120,12 @@ foreach ($result as $row) {
 
 						<!-- Notification Bell -->
 						<li class="sn-bell-li">
-							<a href="notifications.php" class="sn-bell-link" title="Notifications">
+							<a href="javascript:void(0)" class="sn-bell-link" id="snAdminNotificationTrigger" onclick="window.snAdminNotifications && window.snAdminNotifications.toggleModal(event)" title="Store Notifications" role="button" aria-haspopup="dialog">
 								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 									<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
 									<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
 								</svg>
-								<span class="sn-bell-badge">3</span>
+								<span class="sn-bell-badge" id="snAdminBellBadge" style="display:none;">0</span>
 							</a>
 						</li>
 

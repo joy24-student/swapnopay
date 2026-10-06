@@ -791,7 +791,9 @@
         
     </script>
 
+<?php require_once __DIR__ . '/inc/admin_notification_modal.php'; ?>
 <script src="enterprise.js"></script>
 <script src="js/ai-global-voice.js?v=<?php echo time(); ?>"></script>
+<script src="js/admin-notifications.js?v=<?php echo filemtime(__DIR__ . '/js/admin-notifications.js'); ?>"></script>
 </body>
 </html>

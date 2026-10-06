@@ -58,29 +58,122 @@ try {
 ?>
 
 <?php
-$dash_revenue = 0;
+// Store Currency Symbol
+$currency_symbol = (defined('LANG_VALUE_1') && !empty(LANG_VALUE_1) && LANG_VALUE_1 !== '$') ? LANG_VALUE_1 : '৳';
+
+// Real KPI Metrics from Database
+$dash_revenue = 0.0;
 $dash_total_orders = 0;
 $dash_pending_orders = 0;
-$dash_online_pm_pct = 86.7;
-$dash_cod_pm_pct = 13.5;
+$dash_online_pm_pct = 0.0;
+$dash_cod_pm_pct = 0.0;
+$cod_count = 0;
+$online_count = 0;
+
+// Date boundaries for real week-over-week trends & chart
+$sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-6 days'));
+$fourteenDaysAgo = date('Y-m-d 00:00:00', strtotime('-13 days'));
+$sevenDaysEnd = date('Y-m-d 23:59:59', strtotime('-7 days'));
+
+$sales_growth = 0.0;
+$orders_growth = 0.0;
+$cust_growth = 0.0;
+$pending_growth = 0.0;
+
 try {
+    // 1. Total Completed Revenue
     $dash_revenue = (float)$pdo->query("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed'")->fetchColumn();
+    
+    // 2. Total Orders
     $dash_total_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment")->fetchColumn();
+    
+    // 3. Total Pending / In-Fulfillment Orders
     $dash_pending_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled'")->fetchColumn();
     
+    // 4. Real Payment Breakdown
     $total_pm = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IS NOT NULL AND payment_method != ''")->fetchColumn();
     if ($total_pm > 0) {
         $cod_count = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IN ('COD', 'Cash on Delivery', 'Cash')")->fetchColumn();
+        $online_count = max(0, $total_pm - $cod_count);
         $dash_cod_pm_pct = round(($cod_count / $total_pm) * 100, 1);
         $dash_online_pm_pct = round(100 - $dash_cod_pm_pct, 1);
     }
+
+    // 5. Week-over-Week Calculations
+    // Sales: Last 7 Days vs Previous 7 Days
+    $s7Stmt = $pdo->prepare("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed' AND payment_date >= ?");
+    $s7Stmt->execute([$sevenDaysAgo]);
+    $sales_last_7 = (float)$s7Stmt->fetchColumn();
+
+    $sp7Stmt = $pdo->prepare("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed' AND payment_date >= ? AND payment_date <= ?");
+    $sp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
+    $sales_prev_7 = (float)$sp7Stmt->fetchColumn();
+
+    if ($sales_prev_7 > 0) {
+        $sales_growth = round((($sales_last_7 - $sales_prev_7) / $sales_prev_7) * 100, 1);
+    } elseif ($sales_last_7 > 0) {
+        $sales_growth = 100.0;
+    } else {
+        $sales_growth = 0.0;
+    }
+
+    // Orders: Last 7 Days vs Previous 7 Days
+    $o7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE payment_date >= ?");
+    $o7Stmt->execute([$sevenDaysAgo]);
+    $orders_last_7 = (int)$o7Stmt->fetchColumn();
+
+    $op7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE payment_date >= ? AND payment_date <= ?");
+    $op7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
+    $orders_prev_7 = (int)$op7Stmt->fetchColumn();
+
+    if ($orders_prev_7 > 0) {
+        $orders_growth = round((($orders_last_7 - $orders_prev_7) / $orders_prev_7) * 100, 1);
+    } elseif ($orders_last_7 > 0) {
+        $orders_growth = 100.0;
+    } else {
+        $orders_growth = 0.0;
+    }
+
+    // Customers: Last 7 Days vs Previous 7 Days
+    $c7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_customer WHERE cust_datetime >= ?");
+    $c7Stmt->execute([$sevenDaysAgo]);
+    $cust_last_7 = (int)$c7Stmt->fetchColumn();
+
+    $cp7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_customer WHERE cust_datetime >= ? AND cust_datetime <= ?");
+    $cp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
+    $cust_prev_7 = (int)$cp7Stmt->fetchColumn();
+
+    if ($cust_prev_7 > 0) {
+        $cust_growth = round((($cust_last_7 - $cust_prev_7) / $cust_prev_7) * 100, 1);
+    } elseif ($cust_last_7 > 0) {
+        $cust_growth = 100.0;
+    } else {
+        $cust_growth = 0.0;
+    }
+
+    // Pending Orders: Last 7 Days vs Previous 7 Days
+    $p7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= ?");
+    $p7Stmt->execute([$sevenDaysAgo]);
+    $pending_last_7 = (int)$p7Stmt->fetchColumn();
+
+    $pp7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= ? AND payment_date <= ?");
+    $pp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
+    $pending_prev_7 = (int)$pp7Stmt->fetchColumn();
+
+    if ($pending_prev_7 > 0) {
+        $pending_growth = round((($pending_last_7 - $pending_prev_7) / $pending_prev_7) * 100, 1);
+    } elseif ($pending_last_7 > 0) {
+        $pending_growth = 100.0;
+    } else {
+        $pending_growth = 0.0;
+    }
 } catch (Throwable $e) {}
 
-// Fallbacks if store has demo/zero data so design matches screenshot
-$disp_sales = ($dash_revenue > 0) ? '$' . number_format($dash_revenue) : '$12,486';
-$disp_orders = ($dash_total_orders > 0) ? number_format($dash_total_orders) : '482';
-$disp_customers = ($total_customers > 0) ? number_format($total_customers) : '1,248';
-$disp_pending = ($dash_pending_orders > 0) ? number_format($dash_pending_orders) : '76';
+// Real Formatted Strings (Zero Fallback to Fake Numbers)
+$disp_sales = $currency_symbol . ' ' . number_format($dash_revenue, 2);
+$disp_orders = number_format($dash_total_orders);
+$disp_customers = number_format($total_customers);
+$disp_pending = number_format($dash_pending_orders);
 
 $hour = (int)date('H');
 $timeGreeting = ($hour < 12) ? 'Good Morning' : (($hour < 17) ? 'Good Afternoon' : 'Good Evening');
@@ -92,55 +185,120 @@ if (stripos($rawUserName, 'Self') !== false || strtolower($rawUserName) === 'adm
     $adminFirst = $parts[0];
 }
 
-// Query recent orders
-$db_recent_orders = [];
+// 6. Real Daily Sales Data for Last 7 Days Chart
+$chart_dates = [];
+$chart_daily_sales = [];
+for ($d = 6; $d >= 0; $d--) {
+    $dayKey = date('Y-m-d', strtotime("-$d days"));
+    $chart_dates[] = date('M d', strtotime("-$d days"));
+    $chart_daily_sales[$dayKey] = 0.0;
+}
+
 try {
-    $rStmt = $pdo->query("
-        SELECT p.payment_id, p.customer_name, p.paid_amount, p.shipping_status, p.payment_status, p.payment_date,
-               o.product_name, o.unit_price, prod.p_featured_photo
-        FROM tbl_payment p
-        LEFT JOIN tbl_order o ON p.payment_id = o.payment_id
-        LEFT JOIN tbl_product prod ON o.product_id = prod.p_id
-        ORDER BY p.id DESC
-        LIMIT 4
+    $chartStmt = $pdo->prepare("
+        SELECT payment_date, paid_amount 
+        FROM tbl_payment 
+        WHERE payment_status = 'Completed' AND payment_date >= ?
     ");
-    $db_recent_orders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+    $chartStmt->execute([$sevenDaysAgo]);
+    $chartRows = $chartStmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($chartRows as $cr) {
+        $pDate = date('Y-m-d', strtotime($cr['payment_date']));
+        if (isset($chart_daily_sales[$pDate])) {
+            $chart_daily_sales[$pDate] += (float)$cr['paid_amount'];
+        }
+    }
 } catch (Throwable $e) {}
 
-$sample_orders = [
-    [
-        'payment_id' => 'ORD00124',
-        'customer_name' => 'Rahim Ahmed',
-        'product_name' => 'Wireless Headphones',
-        'paid_amount' => 59.99,
-        'status' => 'Pending',
-        'time' => '2h ago'
-    ],
-    [
-        'payment_id' => 'ORD00123',
-        'customer_name' => 'Nusrat Jahan',
-        'product_name' => 'Smart Watch',
-        'paid_amount' => 89.99,
-        'status' => 'Delivered',
-        'time' => '4h ago'
-    ],
-    [
-        'payment_id' => 'ORD00122',
-        'customer_name' => 'Tariq Islam',
-        'product_name' => 'Backpack',
-        'paid_amount' => 39.99,
-        'status' => 'Processing',
-        'time' => '6h ago'
-    ],
-    [
-        'payment_id' => 'ORD00121',
-        'customer_name' => 'Sadia Afrin',
-        'product_name' => 'Running Shoes',
-        'paid_amount' => 74.99,
-        'status' => 'Shipped',
-        'time' => '8h ago'
-    ]
-];
+$chartVals = array_values($chart_daily_sales);
+$maxDailyVal = max($chartVals);
+if ($maxDailyVal <= 0) {
+    $chartCeil = 100;
+} else {
+    $pow10 = pow(10, max(0, floor(log10($maxDailyVal))));
+    $chartCeil = ceil(($maxDailyVal * 1.15) / $pow10) * $pow10;
+    if ($chartCeil < 10) $chartCeil = 10;
+}
+
+$xCoords = [40, 90, 140, 190, 240, 290, 340];
+$points = [];
+for ($i = 0; $i < 7; $i++) {
+    $v = $chartVals[$i];
+    $norm = ($chartCeil > 0) ? ($v / $chartCeil) : 0;
+    $norm = max(0, min(1, $norm));
+    $y = round(120 - ($norm * 96), 1);
+    $points[] = ['x' => $xCoords[$i], 'y' => $y, 'val' => $v];
+}
+
+$linePath = "M {$points[0]['x']},{$points[0]['y']}";
+for ($i = 0; $i < 6; $i++) {
+    $p0 = $points[$i];
+    $p1 = $points[$i + 1];
+    $cx1 = $p0['x'] + 25;
+    $cy1 = $p0['y'];
+    $cx2 = $p1['x'] - 25;
+    $cy2 = $p1['y'];
+    $linePath .= " C $cx1,$cy1 $cx2,$cy2 {$p1['x']},{$p1['y']}";
+}
+$areaPath = $linePath . " L 340,120 L 40,120 Z";
+
+function fmtChartAxis($num) {
+    if ($num >= 1000000) return round($num / 1000000, 1) . 'M';
+    if ($num >= 1000) return round($num / 1000, 1) . 'K';
+    return (string)round($num);
+}
+
+// 7. Query Real Recent Orders (Limit 5)
+$db_recent_orders = [];
+$recentOrderItems = [];
+try {
+    $rStmt = $pdo->query("
+        SELECT id, payment_id, customer_name, customer_email, paid_amount, shipping_status, payment_status, payment_date
+        FROM tbl_payment
+        ORDER BY id DESC
+        LIMIT 5
+    ");
+    $db_recent_orders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!empty($db_recent_orders)) {
+        $pIds = array_filter(array_column($db_recent_orders, 'payment_id'));
+        if (!empty($pIds)) {
+            $inQuery = implode(',', array_fill(0, count($pIds), '?'));
+            $iStmt = $pdo->prepare("
+                SELECT o.payment_id, o.product_name, o.quantity, o.unit_price, p.p_featured_photo
+                FROM tbl_order o
+                LEFT JOIN tbl_product p ON o.product_id = p.p_id
+                WHERE o.payment_id IN ($inQuery)
+                ORDER BY o.id ASC
+            ");
+            $iStmt->execute(array_values($pIds));
+            $iRows = $iStmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($iRows as $ir) {
+                $recentOrderItems[$ir['payment_id']][] = $ir;
+            }
+        }
+    }
+} catch (Throwable $e) {}
+
+function dashFormatRelativeTime($dateStr) {
+    if (empty($dateStr)) return '-';
+    $time = strtotime($dateStr);
+    if (!$time) return htmlspecialchars($dateStr, ENT_QUOTES, 'UTF-8');
+    $diff = time() - $time;
+    if ($diff < 60) return 'Just now';
+    if ($diff < 3600) return floor($diff / 60) . 'm ago';
+    if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+    if ($diff < 604800) return floor($diff / 86400) . 'd ago';
+    return date('M d, Y', $time);
+}
+
+function renderTrendBadge($growth) {
+    $isUp = $growth >= 0;
+    $class = $isUp ? 'up' : 'down';
+    $arrow = $isUp ? '&uarr;' : '&darr;';
+    $formatted = abs($growth);
+    return "<div class=\"dash-kpi-trend {$class}\">{$arrow} {$formatted}% <span class=\"dash-kpi-subtext\">vs. last week</span></div>";
+}
 ?>
 
 <section class="content">
@@ -226,7 +384,7 @@ $sample_orders = [
         </svg>
     </div>
 
-    <!-- 2. 4 KPI Metric Cards (Single-row 4 columns matching screenshot) -->
+    <!-- 2. 4 KPI Metric Cards (Single-row 4 columns with Real Data) -->
     <div class="dash-kpi-grid">
         <!-- Total Sales -->
         <div class="dash-kpi-card kpi-yellow">
@@ -240,9 +398,7 @@ $sample_orders = [
             <div>
                 <div class="dash-kpi-label">Total Sales</div>
                 <div class="dash-kpi-val"><?= $disp_sales ?></div>
-                <div class="dash-kpi-trend up">
-                    &uarr; 12.5% <span class="dash-kpi-subtext">vs. last week</span>
-                </div>
+                <?= renderTrendBadge($sales_growth) ?>
             </div>
         </div>
 
@@ -257,9 +413,7 @@ $sample_orders = [
             <div>
                 <div class="dash-kpi-label">Total Orders</div>
                 <div class="dash-kpi-val"><?= $disp_orders ?></div>
-                <div class="dash-kpi-trend up">
-                    &uarr; 8.3% <span class="dash-kpi-subtext">vs. last week</span>
-                </div>
+                <?= renderTrendBadge($orders_growth) ?>
             </div>
         </div>
 
@@ -274,9 +428,7 @@ $sample_orders = [
             <div>
                 <div class="dash-kpi-label">Total Customers</div>
                 <div class="dash-kpi-val"><?= $disp_customers ?></div>
-                <div class="dash-kpi-trend up">
-                    &uarr; 10.2% <span class="dash-kpi-subtext">vs. last week</span>
-                </div>
+                <?= renderTrendBadge($cust_growth) ?>
             </div>
         </div>
 
@@ -292,14 +444,12 @@ $sample_orders = [
             <div>
                 <div class="dash-kpi-label">Pending Orders</div>
                 <div class="dash-kpi-val"><?= $disp_pending ?></div>
-                <div class="dash-kpi-trend down">
-                    &uarr; 5.6% <span class="dash-kpi-subtext">vs. last week</span>
-                </div>
+                <?= renderTrendBadge($pending_growth) ?>
             </div>
         </div>
     </div>
 
-    <!-- 3. Sales Overview Section (with Responsive Trend Line Chart) -->
+    <!-- 3. Sales Overview Section (with Dynamic Real 7-Day Trend Line Chart) -->
     <div class="dash-sales-overview-card">
         <div class="dash-card-header">
             <h3 class="dash-card-title">Sales Overview</h3>
@@ -309,7 +459,7 @@ $sample_orders = [
             </div>
         </div>
 
-        <!-- Trend Line Chart SVG -->
+        <!-- Real Trend Line Chart SVG -->
         <div style="position: relative; width: 100%; margin: 8px 0 14px;">
             <svg class="dash-chart-svg" viewBox="0 0 360 140" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
@@ -320,43 +470,34 @@ $sample_orders = [
                 </defs>
 
                 <!-- Horizontal Faint Grid Lines -->
-                <line x1="32" y1="20" x2="350" y2="20" stroke="#F1F5F9" stroke-width="1"/>
-                <line x1="32" y1="45" x2="350" y2="45" stroke="#F1F5F9" stroke-width="1"/>
-                <line x1="32" y1="70" x2="350" y2="70" stroke="#F1F5F9" stroke-width="1"/>
-                <line x1="32" y1="95" x2="350" y2="95" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="24" x2="350" y2="24" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="48" x2="350" y2="48" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="72" x2="350" y2="72" stroke="#F1F5F9" stroke-width="1"/>
+                <line x1="32" y1="96" x2="350" y2="96" stroke="#F1F5F9" stroke-width="1"/>
                 <line x1="32" y1="120" x2="350" y2="120" stroke="#F1F5F9" stroke-width="1"/>
 
-                <!-- Y-Axis Labels -->
-                <text x="8" y="24" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">20K</text>
-                <text x="8" y="49" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">15K</text>
-                <text x="8" y="74" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">10K</text>
-                <text x="12" y="99" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">5K</text>
-                <text x="16" y="124" fill="#94A3B8" font-size="9" font-family="sans-serif" font-weight="600">0</text>
+                <!-- Dynamic Y-Axis Labels based on Real Peak Sales -->
+                <text x="8" y="28" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600"><?= fmtChartAxis($chartCeil) ?></text>
+                <text x="8" y="52" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600"><?= fmtChartAxis($chartCeil * 0.75) ?></text>
+                <text x="8" y="76" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600"><?= fmtChartAxis($chartCeil * 0.5) ?></text>
+                <text x="8" y="100" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600"><?= fmtChartAxis($chartCeil * 0.25) ?></text>
+                <text x="14" y="124" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600">0</text>
 
-                <!-- Area Fill Path -->
-                <path d="M 40,118 Q 65,108 90,98 T 140,94 T 190,82 T 240,58 T 290,56 T 340,24 L 340,120 L 40,120 Z" fill="url(#dashAreaGrad)"/>
+                <!-- Real Area Fill Path -->
+                <path d="<?= $areaPath ?>" fill="url(#dashAreaGrad)"/>
 
-                <!-- Curve Line Path -->
-                <path d="M 40,118 Q 65,108 90,98 T 140,94 T 190,82 T 240,58 T 290,56 T 340,24" stroke="#EAB308" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <!-- Real Curve Line Path -->
+                <path d="<?= $linePath ?>" stroke="#EAB308" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 
-                <!-- Points on curve -->
-                <circle cx="40" cy="118" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="90" cy="98" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="140" cy="94" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="190" cy="82" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="240" cy="58" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="290" cy="56" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8"/>
-                <circle cx="340" cy="24" r="4.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="2"/>
+                <!-- Real Points on curve -->
+                <?php foreach ($points as $pt): ?>
+                    <circle cx="<?= $pt['x'] ?>" cy="<?= $pt['y'] ?>" r="3.5" fill="#EAB308" stroke="#FFFFFF" stroke-width="1.8">
+                        <title><?= $currency_symbol ?> <?= number_format($pt['val'], 2) ?></title>
+                    </circle>
+                <?php endforeach; ?>
 
-                <!-- X-Axis Labels (Dates) -->
-                <?php
-                $dates = [];
-                for ($d = 6; $d >= 0; $d--) {
-                    $dates[] = date('M d', strtotime("-$d days"));
-                }
-                $xCoords = [40, 90, 140, 190, 240, 290, 340];
-                foreach ($dates as $idx => $dStr):
-                ?>
+                <!-- X-Axis Labels (Real Dates) -->
+                <?php foreach ($chart_dates as $idx => $dStr): ?>
                     <text x="<?= $xCoords[$idx] ?>" y="136" fill="#94A3B8" font-size="8.5" font-family="sans-serif" font-weight="600" text-anchor="middle"><?= $dStr ?></text>
                 <?php endforeach; ?>
             </svg>
@@ -371,8 +512,8 @@ $sample_orders = [
                 </div>
                 <div class="dash-subcard-rev-label">Total Revenue</div>
                 <div class="dash-subcard-rev-val"><?= $disp_sales ?></div>
-                <div class="dash-kpi-trend up" style="font-size:10.5px;">
-                    &uarr; 12.5% <span class="dash-kpi-subtext">vs. last week</span>
+                <div style="margin-top: 3px;">
+                    <?= renderTrendBadge($sales_growth) ?>
                 </div>
             </div>
 
@@ -384,7 +525,7 @@ $sample_orders = [
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
                             Online Payment
                         </span>
-                        <span><?= $dash_online_pm_pct ?>%</span>
+                        <span><?= $dash_online_pm_pct ?>% <small style="color:#94a3b8; font-weight:500;">(<?= $online_count ?>)</small></span>
                     </div>
                     <div class="dash-pm-bar-wrap">
                         <div class="dash-pm-bar-fill" style="width: <?= $dash_online_pm_pct ?>%;"></div>
@@ -397,7 +538,7 @@ $sample_orders = [
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
                             Cash on Delivery
                         </span>
-                        <span><?= $dash_cod_pm_pct ?>%</span>
+                        <span><?= $dash_cod_pm_pct ?>% <small style="color:#94a3b8; font-weight:500;">(<?= $cod_count ?>)</small></span>
                     </div>
                     <div class="dash-pm-bar-wrap">
                         <div class="dash-pm-bar-fill" style="width: <?= $dash_cod_pm_pct ?>%;"></div>
@@ -407,7 +548,7 @@ $sample_orders = [
         </div>
     </div>
 
-    <!-- 4. Recent Orders Section (Matching Screenshot) -->
+    <!-- 4. Recent Orders Section (100% Real Customer Transactions) -->
     <div class="dash-orders-card">
         <div class="dash-card-header">
             <h3 class="dash-card-title">Recent Orders</h3>
@@ -417,57 +558,71 @@ $sample_orders = [
         </div>
 
         <div class="dash-orders-list">
-            <?php
-            $display_orders_list = !empty($db_recent_orders) ? $db_recent_orders : $sample_orders;
-            $idx = 0;
-            foreach ($display_orders_list as $oRow):
-                $ref = $oRow['payment_id'] ?? ('ORD0012' . (4 - $idx));
-                $cName = $oRow['customer_name'] ?? 'Customer';
-                $pName = !empty($oRow['product_name']) ? $oRow['product_name'] : ($sample_orders[$idx]['product_name'] ?? 'Store Product');
-                $amt = (float)($oRow['paid_amount'] ?? ($sample_orders[$idx]['paid_amount'] ?? 59.99));
-                $st = $oRow['shipping_status'] ?? ($oRow['status'] ?? 'Pending');
-                if (empty($st) || $st === 'Completed') $st = ($idx % 2 === 0) ? 'Delivered' : 'Pending';
-                
-                $stClass = 'status-' . strtolower($st);
-                $timeText = !empty($oRow['payment_date']) ? date('M d', strtotime($oRow['payment_date'])) : ($sample_orders[$idx]['time'] ?? '2h ago');
-                $photo = !empty($oRow['p_featured_photo']) ? '../assets/uploads/' . htmlspecialchars($oRow['p_featured_photo']) : '';
-                $idx++;
-            ?>
-                <a href="order.php" class="dash-order-row">
-                    <div class="dash-order-item-left">
-                        <div class="dash-order-thumb">
-                            <?php if ($photo): ?>
-                                <img src="<?= $photo ?>" alt="<?= htmlspecialchars($pName) ?>" onerror="this.onerror=null; this.src='../assets/uploads/placeholder.svg';">
-                            <?php elseif (stripos($pName, 'headphone') !== false || $idx === 1): ?>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-                            <?php elseif (stripos($pName, 'watch') !== false || $idx === 2): ?>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="7" y="4" width="10" height="16" rx="3"/><path d="M10 2h4M10 22h4"/><circle cx="12" cy="12" r="2" fill="#F59E0B"/></svg>
-                            <?php elseif (stripos($pName, 'pack') !== false || stripos($pName, 'bag') !== false || $idx === 3): ?>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
-                            <?php else: ?>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M2 17l3-6 4 2 3-5 5 2 4 4v3H2z"/><path d="M2 17h20"/></svg>
-                            <?php endif; ?>
+            <?php if (!empty($db_recent_orders)): ?>
+                <?php foreach ($db_recent_orders as $oRow):
+                    $ref = (string)($oRow['payment_id'] ?: $oRow['id']);
+                    $cName = (string)($oRow['customer_name'] ?: 'Guest Customer');
+                    $orderItems = $recentOrderItems[$oRow['payment_id']] ?? [];
+                    
+                    if (!empty($orderItems[0]['product_name'])) {
+                        $pName = $orderItems[0]['product_name'];
+                        if (count($orderItems) > 1) {
+                            $pName .= ' (+' . (count($orderItems) - 1) . ' more)';
+                        }
+                    } else {
+                        $pName = 'Order #' . $ref;
+                    }
+                    
+                    $amt = (float)($oRow['paid_amount'] ?? 0);
+                    $st = !empty($oRow['shipping_status']) ? $oRow['shipping_status'] : (!empty($oRow['payment_status']) ? $oRow['payment_status'] : 'Pending');
+                    $stClass = 'status-' . strtolower($st);
+                    $timeText = dashFormatRelativeTime($oRow['payment_date'] ?? '');
+                    $photo = !empty($orderItems[0]['p_featured_photo']) ? '../assets/uploads/' . htmlspecialchars($orderItems[0]['p_featured_photo']) : '';
+                ?>
+                    <a href="order.php" class="dash-order-row">
+                        <div class="dash-order-item-left">
+                            <div class="dash-order-thumb">
+                                <?php if ($photo): ?>
+                                    <img src="<?= $photo ?>" alt="<?= htmlspecialchars($pName) ?>" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <span style="display:none;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                    </span>
+                                <?php else: ?>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                <?php endif; ?>
+                            </div>
+                            <div class="dash-order-meta">
+                                <span class="dash-order-id">#<?= htmlspecialchars($ref) ?></span>
+                                <span class="dash-order-cust"><?= htmlspecialchars($cName) ?></span>
+                            </div>
                         </div>
-                        <div class="dash-order-meta">
-                            <span class="dash-order-id">#<?= htmlspecialchars($ref) ?></span>
-                            <span class="dash-order-cust"><?= htmlspecialchars($cName) ?></span>
-                        </div>
-                    </div>
 
-                    <div class="dash-order-item-mid">
-                        <span class="dash-order-pname"><?= htmlspecialchars($pName) ?></span>
-                        <span class="dash-order-price">$<?= number_format($amt, 2) ?></span>
-                    </div>
-
-                    <div class="dash-order-item-right">
-                        <div class="dash-order-status-col">
-                            <span class="dash-status-pill <?= $stClass ?>"><?= htmlspecialchars($st) ?></span>
-                            <span class="dash-order-time"><?= $timeText ?></span>
+                        <div class="dash-order-item-mid">
+                            <span class="dash-order-pname" title="<?= htmlspecialchars($pName) ?>"><?= htmlspecialchars($pName) ?></span>
+                            <span class="dash-order-price"><?= $currency_symbol ?> <?= number_format($amt, 2) ?></span>
                         </div>
-                        <svg class="dash-order-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </div>
-                </a>
-            <?php endforeach; ?>
+
+                        <div class="dash-order-item-right">
+                            <div class="dash-order-status-col">
+                                <span class="dash-status-pill <?= $stClass ?>"><?= htmlspecialchars($st) ?></span>
+                                <span class="dash-order-time"><?= htmlspecialchars($timeText) ?></span>
+                            </div>
+                            <svg class="dash-order-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                        </div>
+                    </a>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div style="text-align: center; padding: 36px 16px; color: #64748B;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2" style="margin-bottom: 8px; display: inline-block;">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <div style="font-weight: 700; color: #0F172A; font-size: 14px;">No orders recorded yet</div>
+                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">Customer transactions will appear here automatically in real time.</div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
