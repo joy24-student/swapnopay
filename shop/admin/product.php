@@ -341,8 +341,20 @@ $sample_products = [
 				<div class="sn-mpc-thumb">
 					<?php if ($photo): ?>
 						<img src="../assets/uploads/<?= $photo ?>" alt="<?= htmlspecialchars($pname) ?>" onerror="this.onerror=null; this.src='../assets/uploads/placeholder.svg';">
+					<?php elseif (stripos($pname, 'headphone') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+					<?php elseif (stripos($pname, 'watch') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="7" y="4" width="10" height="16" rx="3"/><path d="M10 2h4M10 22h4"/><circle cx="12" cy="12" r="2" fill="#F59E0B"/></svg>
+					<?php elseif (stripos($pname, 'pack') !== false || stripos($pname, 'bag') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+					<?php elseif (stripos($pname, 'shoe') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M2 17l3-6 4 2 3-5 5 2 4 4v3H2z"/><path d="M2 17h20"/></svg>
+					<?php elseif (stripos($pname, 'speaker') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="3"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/></svg>
+					<?php elseif (stripos($pname, 'shirt') !== false): ?>
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
 					<?php else: ?>
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
 							<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
 						</svg>
 					<?php endif; ?>

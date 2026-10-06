@@ -420,7 +420,7 @@ require_once('header.php');
 <div class="sn-checkout-page-wrapper">
     <div class="sn-checkout-container">
 
-        <!-- Mobile App Bar (Image 2) -->
+        <!-- Mobile Header Bar (Unified compact app bar) -->
         <div class="sn-mobile-header-bar">
             <a href="cart.php" class="sn-mob-back-btn" aria-label="Back to Cart">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -428,17 +428,17 @@ require_once('header.php');
                     <polyline points="12 19 5 12 12 5"></polyline>
                 </svg>
             </a>
-            <div class="sn-mob-brand">
-                <img src="assets/uploads/swapnopay-logo.png" alt="SwapnoPay" class="sn-mob-brand-logo" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
+            <div class="sn-mob-title-wrap">
+                <h1 class="sn-mob-main-title">Checkout <span class="sn-mob-badge-lock">🔒</span></h1>
+                <p class="sn-mob-sub-title">Complete your order & fast delivery</p>
             </div>
             <div class="sn-mob-badge-safe">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                     <polyline points="9 12 11 14 15 10"></polyline>
                 </svg>
                 <div class="sn-mob-badge-text">
-                    <span class="t1">Secure Checkout</span>
-                    <span class="t2">SwapnoPay Encrypted</span>
+                    <span class="t1">100% Secure</span>
                 </div>
             </div>
         </div>
@@ -454,11 +454,10 @@ require_once('header.php');
             </a>
         </div>
 
-        <!-- Checkout Header -->
+        <!-- Checkout Header (Desktop) -->
         <div class="sn-checkout-header">
             <h1 class="sn-checkout-title">Checkout</h1>
             <p class="sn-checkout-subtitle sn-desktop-sub">Complete your order in just a few simple steps</p>
-            <p class="sn-checkout-subtitle sn-mobile-sub">Complete your order and get your favorite products.</p>
         </div>
 
         <!-- Stepper Wizard (Desktop: 1 Shipping -> 2 Payment -> 3 Review & Place Order) -->
@@ -2434,58 +2433,95 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     }
 
     .sn-checkout-container {
-        padding: 0 10px;
-        max-width: 100%;
+        padding: 0 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 
-    /* Mobile Header Bar */
+    #mainCheckoutForm {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: block !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Mobile Header Bar - Unified 1-Row Native App Bar */
     .sn-mobile-header-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 6px 0 8px 0;
-        margin-bottom: 4px;
-        gap: 6px;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        padding: 6px 0 10px 0 !important;
+        margin-bottom: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .sn-mob-back-btn {
-        width: 34px;
-        height: 34px;
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 50% !important;
+        background: #FFFFFF !important;
+        border: 1px solid var(--sn-border) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        color: var(--sn-dark) !important;
+        text-decoration: none !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
     }
 
-    .sn-mob-brand-logo {
-        height: 26px;
+    .sn-mob-title-wrap {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .sn-mob-main-title {
+        font-size: 19px !important;
+        font-weight: 800 !important;
+        color: var(--sn-dark) !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        letter-spacing: -0.3px !important;
+    }
+
+    .sn-mob-badge-lock {
+        font-size: 14px !important;
+    }
+
+    .sn-mob-sub-title {
+        font-size: 11.5px !important;
+        color: var(--sn-muted) !important;
+        margin: 2px 0 0 0 !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     .sn-mob-badge-safe {
-        padding: 2px 7px;
-        max-width: 135px;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        background: #EFF6FF !important;
+        border: 1px solid #BFDBFE !important;
+        border-radius: 9999px !important;
+        padding: 3px 8px !important;
+        flex-shrink: 0 !important;
     }
 
     .sn-mob-badge-text .t1 {
-        font-size: 9.5px;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        color: #1E3A8A !important;
+        line-height: 1 !important;
     }
 
-    .sn-mob-badge-text .t2 {
-        font-size: 8px;
-    }
-
-    /* Checkout Header */
+    /* Hide desktop checkout header on mobile since integrated above */
     .sn-checkout-header {
-        margin-bottom: 8px;
-    }
-
-    .sn-checkout-title {
-        font-size: 20px;
-        font-weight: 800;
-        letter-spacing: -0.4px;
-        margin-bottom: 2px;
-    }
-
-    .sn-checkout-subtitle {
-        font-size: 11.5px;
-        line-height: 1.3;
-        margin-bottom: 6px;
+        display: none !important;
     }
 
     /* Hide desktop-only elements */
@@ -2529,23 +2565,44 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
         display: inline;
     }
 
-    /* Flatten columns so direct children can be cleanly reordered */
+    /* Flatten columns so direct children stretch to 100% full width */
     .sn-checkout-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 0 !important;
+        box-sizing: border-box !important;
     }
 
     .sn-checkout-left-col,
     .sn-checkout-right-col {
-        display: contents;
+        display: contents !important;
+        width: 100% !important;
     }
 
-    /* Ultra-Compact Card Shell */
+    /* Ultra-Compact Card Shell - 100% Full Width Edge-to-Edge */
     .sn-checkout-card {
-        padding: 10px 12px;
-        border-radius: 12px;
-        margin-bottom: 8px;
+        padding: 10px 12px !important;
+        border-radius: 12px !important;
+        margin-bottom: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .sn-mobile-address-card,
+    .sn-mobile-promo-card,
+    #shippingInfoCard,
+    #deliveryMethodCard,
+    #paymentMethodCard,
+    #orderSummaryCard,
+    #freeShippingBannerCard,
+    #securePaymentBadgeCard {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .sn-card-header {
@@ -2686,29 +2743,34 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     }
 
     .sn-shipping-options-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .sn-ship-card {
-        position: relative;
-        min-height: unset;
-        padding: 8px 12px;
-        border-radius: 10px;
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+        position: relative !important;
+        min-height: unset !important;
+        padding: 8px 12px !important;
+        border-radius: 10px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .sn-ship-card-top {
-        margin-bottom: 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
+        margin-bottom: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-shrink: 0 !important;
+        position: static !important; /* CRITICAL: Must be static so .sn-badge-popular anchors to .sn-ship-card */
     }
 
     .sn-radio-indicator {
@@ -2757,18 +2819,20 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     }
 
     .sn-badge-popular {
-        position: absolute;
-        top: -6px;
-        right: 10px;
-        margin-left: 0;
-        font-size: 9px;
-        padding: 1px 6px;
-        border-radius: 9999px;
-        background: #FEF3C7;
-        color: #B45309;
-        font-weight: 700;
-        border: 1px solid #FDE68A;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        position: absolute !important;
+        top: -7px !important;
+        right: 12px !important;
+        left: auto !important;
+        margin-left: 0 !important;
+        font-size: 9px !important;
+        padding: 1px 7px !important;
+        border-radius: 9999px !important;
+        background: #FEF3C7 !important;
+        color: #B45309 !important;
+        font-weight: 700 !important;
+        border: 1px solid #FDE68A !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important;
+        z-index: 2 !important;
     }
 
     /* 4. Have a coupon code? (Compact single row) */
@@ -3129,9 +3193,9 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 360px) {
     .sn-mob-badge-safe {
-        display: none; /* Keep top bar clean on narrow 320px screens */
+        display: none !important; /* Keep top bar clean on ultra narrow 320px screens */
     }
 }
 </style>

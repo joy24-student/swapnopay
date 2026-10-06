@@ -1744,7 +1744,15 @@ body.shopnext-theme {
    ============================================================ */
 @media (max-width: 1024px) {
     .sn-cart-layout-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .sn-cart-left-col,
+    .sn-cart-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-recom-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -1766,6 +1774,24 @@ body.shopnext-theme {
         padding-top: 10px !important;
         padding-bottom: 165px !important;
         width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Layout Grid & Columns - Enforce 100% Mobile Width */
+    .sn-cart-layout-grid {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 16px !important;
+        box-sizing: border-box !important;
+    }
+
+    .sn-cart-left-col {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         box-sizing: border-box !important;
     }
 
@@ -1810,6 +1836,13 @@ body.shopnext-theme {
         background: #ffffff !important;
         overflow: hidden !important;
         margin-bottom: 14px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .sn-cart-items-list {
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-cart-toolbar {
         padding: 12px 14px !important;
@@ -2026,6 +2059,9 @@ body.shopnext-theme {
     .sn-cart-layout-grid {
         margin-bottom: 16px !important;
         display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     /* Shop with Confidence Banner */
@@ -2039,6 +2075,9 @@ body.shopnext-theme {
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .sn-conf-left {
         gap: 10px !important;

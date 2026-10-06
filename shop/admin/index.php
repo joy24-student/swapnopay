@@ -1,10 +1,6 @@
 <?php require_once __DIR__ . '/inc/guard.php'; ?>
 <?php require_once('header.php'); ?>
 
-<section class="content-header">
-	<h1>Dashboard</h1>
-</section>
-
 <?php
 $statement = $pdo->prepare("SELECT * FROM tbl_top_category");
 $statement->execute();
@@ -88,7 +84,13 @@ $disp_pending = ($dash_pending_orders > 0) ? number_format($dash_pending_orders)
 
 $hour = (int)date('H');
 $timeGreeting = ($hour < 12) ? 'Good Morning' : (($hour < 17) ? 'Good Afternoon' : 'Good Evening');
-$adminFirst = !empty($_SESSION['user']['full_name']) ? explode(' ', trim($_SESSION['user']['full_name']))[0] : 'Admin';
+$rawUserName = !empty($_SESSION['user']['full_name']) ? trim($_SESSION['user']['full_name']) : 'Admin';
+if (stripos($rawUserName, 'Self') !== false || strtolower($rawUserName) === 'admin' || empty($rawUserName)) {
+    $adminFirst = 'Admin';
+} else {
+    $parts = explode(' ', $rawUserName);
+    $adminFirst = $parts[0];
+}
 
 // Query recent orders
 $db_recent_orders = [];
@@ -149,9 +151,14 @@ $sample_orders = [
         <div class="dash-welcome-header">
             <h2 class="dash-welcome-title"><?= $timeGreeting ?>, <?= htmlspecialchars($adminFirst) ?>! 👋</h2>
             <div class="dash-date-pill">
-                <span>📅</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
                 <span><?= date('M d, Y') ?></span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
         </div>
         <p class="dash-welcome-sub">Here's a quick overview of your store today.</p>
@@ -482,7 +489,7 @@ $sample_orders = [
 </div>
 
 <!-- Broadcast Push Notification Center (Main Dashboard Section) -->
-<div class="row" style="margin-top: 20px;">
+<div class="row hidden-xs" style="margin-top: 20px;">
     <!-- Broadcast Form -->
     <div class="col-md-7">
         <div class="box box-warning" style="border-top: 3px solid #f39c12; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
