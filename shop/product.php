@@ -492,12 +492,66 @@ require_once('header.php');
         display: contents !important;
     }
 
-    /* 1. Showcase Gallery at Top */
+    /* 1. Showcase Gallery at Top - OCCUPY FULL PRODUCT SPACE */
     .sn-gallery-container {
         order: 1 !important;
         width: 100% !important;
-        margin: 0 0 10px 0 !important;
+        margin: 0 0 12px 0 !important;
         display: block !important;
+        padding: 0 !important;
+    }
+
+    .sn-gallery-main-card {
+        width: 100% !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+        min-height: 350px !important;
+        max-height: 440px !important;
+        border-radius: 20px !important;
+        background: #ffffff !important;
+        border: 1px solid #f1f5f9 !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+        padding: 0 !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    .sn-gallery-viewport {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .sn-gallery-main-img {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        object-position: center !important;
+        margin: 0 auto !important;
+        display: block !important;
+        background: #ffffff !important;
+    }
+
+    .sn-gallery-main-frame,
+    .sn-gallery-main-video {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        border: none !important;
+        object-fit: cover !important;
     }
 
     /* 2. Mobile Thumbnails */
@@ -945,6 +999,47 @@ require_once('header.php');
         height: 100%;
         border: none;
         display: block;
+    }
+}
+
+/* Desktop Showcase Gallery - Full Space Occupancy */
+@media (min-width: 769px) {
+    .sn-gallery-main-card {
+        position: relative;
+        flex: 1;
+        background: #ffffff;
+        border-radius: 20px;
+        border: 1px solid #f1f5f9;
+        padding: 0;
+        aspect-ratio: 1 / 1;
+        min-height: 460px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    .sn-gallery-viewport {
+        width: 100%;
+        height: 100%;
+        min-height: 460px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .sn-gallery-main-img {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        object-position: center;
     }
 }
 </style>

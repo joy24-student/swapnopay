@@ -23,6 +23,7 @@ if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?page/([0-9]+)/?$#', $path, $m)) {
     $_GET['page'] = (int)$m[1];
 }
 
+$cur_page = 'index.php';
 require_once(__DIR__ . '/header.php'); 
 if (file_exists(__DIR__ . '/inc_feed_card.php')) {
     require_once(__DIR__ . '/inc_feed_card.php');
@@ -1744,7 +1745,7 @@ body {
 
 .sn-product-img-box {
     width: 100%;
-    height: 145px;
+    height: 155px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1755,9 +1756,12 @@ body {
 }
 
 .sn-product-img-box img {
-    max-height: 130px;
-    max-width: 85%;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
+    object-position: center;
     transition: transform 0.25s ease;
 }
 
@@ -2260,17 +2264,27 @@ body {
     .sn-product-img-box {
         width: 100% !important;
         max-width: 100% !important;
-        height: 125px !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+        min-height: 140px !important;
+        max-height: 180px !important;
         border-radius: 10px !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #f8fafc !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
     }
     .sn-product-img-box img {
-        max-height: 110px !important;
+        width: 100% !important;
+        height: 100% !important;
         max-width: 100% !important;
-        width: auto !important;
+        max-height: 100% !important;
         object-fit: contain !important;
+        object-position: center !important;
+        display: block !important;
     }
     .sn-product-title {
         font-size: 11.5px !important;
@@ -2364,43 +2378,16 @@ body {
         padding: 2px 6px !important;
     }
     .sn-feed-tabs-wrap {
-        position: -webkit-sticky !important;
-        position: sticky !important;
-        top: 0px !important;
+        position: relative !important;
         margin: 0 -14px 12px -14px !important;
         padding: 8px 14px !important;
         width: calc(100% + 28px) !important;
         gap: 6px !important;
         border-radius: 0 !important;
         box-sizing: border-box !important;
-        transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
-    }
-    body.shopnext-theme.sn-feed-sticky-active .sn-header-wrap {
-        transform: translateY(-100%) !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-    body.shopnext-theme.sn-feed-sticky-active .sn-feed-tabs-wrap {
-        top: 0px !important;
-        z-index: 1001 !important;
-        background: rgba(255, 255, 255, 0.98) !important;
-        backdrop-filter: blur(14px) !important;
-        -webkit-backdrop-filter: blur(14px) !important;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
-        border-bottom: 1.5px solid #e2e8f0 !important;
     }
     .sn-feed-search-chip {
         display: none !important;
-    }
-    body.shopnext-theme.sn-feed-sticky-active .sn-feed-search-chip {
-        display: inline-flex !important;
-        background: #f8fafc !important;
-        border-color: #cbd5e1 !important;
-        color: #334155 !important;
-    }
-    body.shopnext-theme.sn-feed-sticky-active .sn-feed-search-chip:active {
-        background: #e2e8f0 !important;
-        transform: scale(0.95) !important;
     }
     .sn-feed-tab {
         padding: 6px 13px !important;
@@ -2970,10 +2957,6 @@ body {
             <!-- AliExpress Style Category & Feed Tabs (Sticky Filter Bar) -->
             <div id="snFeedTabsAnchor" class="sn-feed-tabs-anchor"></div>
             <div class="sn-feed-tabs-wrap" id="snFeedTabs">
-                <button type="button" class="sn-feed-tab sn-feed-search-chip" onclick="snOpenMobileSearch(event)" title="Search Store">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <span>Search</span>
-                </button>
                 <button type="button" class="sn-feed-tab active" data-tab="for_you">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     <span>For You</span>
@@ -3479,35 +3462,70 @@ function bindFeedCardNavigation() {
 function initAliFeed() {
     bindFeedCardNavigation();
 
-    // Tab buttons (only data-tab chips, excluding search trigger)
+    // Unified tab switch function syncing in-page feed tabs & mobile header chips
+    window.snSwitchFeedTab = function(newTab) {
+        if (snFeedLoading) return;
+        if (newTab === snFeedTab) return;
+
+        // Sync in-page tabs
+        const pageTabs = document.querySelectorAll('#snFeedTabs .sn-feed-tab[data-tab]');
+        pageTabs.forEach(t => {
+            if (t.getAttribute('data-tab') === newTab) {
+                t.classList.add('active');
+            } else {
+                t.classList.remove('active');
+            }
+        });
+
+        // Sync mobile header sticky chips
+        const headerChips = document.querySelectorAll('#snMobileHeaderChips .sn-mchip[data-tab]');
+        headerChips.forEach(t => {
+            if (t.getAttribute('data-tab') === newTab) {
+                t.classList.add('active');
+                try {
+                    t.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                } catch(e) {}
+            } else {
+                t.classList.remove('active');
+            }
+        });
+
+        snFeedTab = newTab;
+        snFeedPage = 1;
+        snFeedHasMore = true;
+        snLoadedIds = new Set();
+
+        const grid = document.getElementById('snProductsFeedGrid');
+        if (grid) grid.innerHTML = '';
+
+        // If user was deep down in the feed grid, smoothly anchor to feed top
+        var anchor = document.getElementById('snFeedTabsAnchor');
+        if (anchor && anchor.getBoundingClientRect().top < 0) {
+            var offsetPosition = anchor.getBoundingClientRect().top + window.pageYOffset - 50;
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+
+        fetchNextFeedBatch(true);
+    };
+
+    // Tab buttons (only data-tab chips)
     const tabs = document.querySelectorAll('#snFeedTabs .sn-feed-tab[data-tab]');
     tabs.forEach(tabBtn => {
         tabBtn.addEventListener('click', function() {
-            if (snFeedLoading) return;
             const newTab = this.getAttribute('data-tab');
-            if (newTab === snFeedTab) return;
+            if (window.snSwitchFeedTab) window.snSwitchFeedTab(newTab);
+        });
+    });
 
-            tabs.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-
-            snFeedTab = newTab;
-            snFeedPage = 1;
-            snFeedHasMore = true;
-            snLoadedIds = new Set();
-
-            const grid = document.getElementById('snProductsFeedGrid');
-            if (grid) grid.innerHTML = '';
-
-            // If user was deep down in the feed grid, smoothly anchor to feed top
-            var anchor = document.getElementById('snFeedTabsAnchor');
-            if (anchor && anchor.getBoundingClientRect().top < 0) {
-                var feedSection = document.getElementById('snHomeFeedSection');
-                if (feedSection) {
-                    feedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
-
-            fetchNextFeedBatch(true);
+    // Mobile sticky header chips
+    const headerChips = document.querySelectorAll('#snMobileHeaderChips .sn-mchip[data-tab]');
+    headerChips.forEach(chipBtn => {
+        chipBtn.addEventListener('click', function() {
+            const newTab = this.getAttribute('data-tab');
+            if (window.snSwitchFeedTab) window.snSwitchFeedTab(newTab);
         });
     });
 
@@ -3562,15 +3580,13 @@ function initFeedStickyChips() {
         }
 
         var rect = anchor.getBoundingClientRect();
-        // The mobile header searchbar is ~48-52px tall.
-        // When the anchor scrolls past 52px from the viewport top,
-        // the user has reached/passed this section: filter chips replace the searchbar.
-        var passedSection = rect.top <= 52;
-
-        if (passedSection && !isSticky) {
+        // The mobile header is ~48px tall.
+        // When the anchor scrolls past 50px from top, user has reached/passed this section.
+        // A slight hysteresis buffer (50px to activate, 54px to deactivate) ensures rock-solid stability.
+        if (!isSticky && rect.top <= 50) {
             document.body.classList.add('sn-feed-sticky-active');
             isSticky = true;
-        } else if (!passedSection && isSticky) {
+        } else if (isSticky && rect.top > 54) {
             document.body.classList.remove('sn-feed-sticky-active');
             isSticky = false;
         }
