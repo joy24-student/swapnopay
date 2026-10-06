@@ -46,6 +46,30 @@ $size_name = trim($_POST['size_name'] ?? '');
 $color_id = (int)($_POST['color_id'] ?? 0);
 $color_name = trim($_POST['color_name'] ?? '');
 
+// Server-side duplicate rapid click protection (debounce within 450ms)
+$nowMicro = microtime(true);
+$reqSig = md5($p_id . '_' . $size_id . '_' . $color_id . '_' . $p_qty_added);
+if (isset($_SESSION['sn_last_cart_add_time']) && isset($_SESSION['sn_last_cart_add_sig'])) {
+    if ($_SESSION['sn_last_cart_add_sig'] === $reqSig && ($nowMicro - (float)$_SESSION['sn_last_cart_add_time']) < 0.45) {
+        $total_cart_count = 0;
+        if (isset($_SESSION['cart_p_qty']) && is_array($_SESSION['cart_p_qty'])) {
+            foreach ($_SESSION['cart_p_qty'] as $q) {
+                $total_cart_count += (int)$q;
+            }
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => htmlspecialchars($product['p_name']) . ' added to cart!',
+            'cart_count' => $total_cart_count,
+            'product_name' => $product['p_name'],
+            'product_price' => $product['p_current_price']
+        ]);
+        exit;
+    }
+}
+$_SESSION['sn_last_cart_add_time'] = $nowMicro;
+$_SESSION['sn_last_cart_add_sig'] = $reqSig;
+
 $item_found = false;
 $found_index = -1;
 

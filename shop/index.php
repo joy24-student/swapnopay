@@ -1498,6 +1498,10 @@ body {
     font-weight: 800;
 }
 
+.sn-feed-search-chip {
+    display: none !important;
+}
+
 .sn-products-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2342,7 +2346,16 @@ body {
         left: 8px !important;
     }
 
-    /* AliExpress Feed Mobile Layout */
+    /* AliExpress Feed Mobile Layout - Sticky Chips Replacing Search Bar */
+    .sn-feed-tabs-anchor {
+        position: relative;
+        height: 1px;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
     .sn-feed-section {
         margin-bottom: 24px !important;
     }
@@ -2351,15 +2364,49 @@ body {
         padding: 2px 6px !important;
     }
     .sn-feed-tabs-wrap {
-        --sn-feed-sticky-top: var(--sn-mobile-header-height, 50px);
-        padding: 8px 4px !important;
-        margin: 0 0 12px 0 !important;
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 0px !important;
+        margin: 0 -14px 12px -14px !important;
+        padding: 8px 14px !important;
+        width: calc(100% + 28px) !important;
         gap: 6px !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+        transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+    }
+    body.shopnext-theme.sn-feed-sticky-active .sn-header-wrap {
+        transform: translateY(-100%) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    body.shopnext-theme.sn-feed-sticky-active .sn-feed-tabs-wrap {
+        top: 0px !important;
+        z-index: 1001 !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+        border-bottom: 1.5px solid #e2e8f0 !important;
+    }
+    .sn-feed-search-chip {
+        display: none !important;
+    }
+    body.shopnext-theme.sn-feed-sticky-active .sn-feed-search-chip {
+        display: inline-flex !important;
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+        color: #334155 !important;
+    }
+    body.shopnext-theme.sn-feed-sticky-active .sn-feed-search-chip:active {
+        background: #e2e8f0 !important;
+        transform: scale(0.95) !important;
     }
     .sn-feed-tab {
         padding: 6px 13px !important;
         font-size: 11.5px !important;
         gap: 5px !important;
+        flex-shrink: 0 !important;
     }
     .sn-card-wishlist {
         width: 26px !important;
@@ -2921,7 +2968,12 @@ body {
             </div>
             
             <!-- AliExpress Style Category & Feed Tabs (Sticky Filter Bar) -->
+            <div id="snFeedTabsAnchor" class="sn-feed-tabs-anchor"></div>
             <div class="sn-feed-tabs-wrap" id="snFeedTabs">
+                <button type="button" class="sn-feed-tab sn-feed-search-chip" onclick="snOpenMobileSearch(event)" title="Search Store">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <span>Search</span>
+                </button>
                 <button type="button" class="sn-feed-tab active" data-tab="for_you">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     <span>For You</span>
@@ -3420,8 +3472,8 @@ function bindFeedCardNavigation() {
 function initAliFeed() {
     bindFeedCardNavigation();
 
-    // Tab buttons
-    const tabs = document.querySelectorAll('#snFeedTabs .sn-feed-tab');
+    // Tab buttons (only data-tab chips, excluding search trigger)
+    const tabs = document.querySelectorAll('#snFeedTabs .sn-feed-tab[data-tab]');
     tabs.forEach(tabBtn => {
         tabBtn.addEventListener('click', function() {
             if (snFeedLoading) return;
@@ -3438,6 +3490,15 @@ function initAliFeed() {
 
             const grid = document.getElementById('snProductsFeedGrid');
             if (grid) grid.innerHTML = '';
+
+            // If user was deep down in the feed grid, smoothly anchor to feed top
+            var anchor = document.getElementById('snFeedTabsAnchor');
+            if (anchor && anchor.getBoundingClientRect().top < 0) {
+                var feedSection = document.getElementById('snHomeFeedSection');
+                if (feedSection) {
+                    feedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
 
             fetchNextFeedBatch(true);
         });
@@ -3475,8 +3536,70 @@ function initAliFeed() {
     }, { passive: true });
 }
 
+function initFeedStickyChips() {
+    var anchor = document.getElementById('snFeedTabsAnchor');
+    var feedTabs = document.getElementById('snFeedTabs');
+    if (!anchor || !feedTabs) return;
+
+    var isSticky = false;
+    var ticking = false;
+
+    function evaluateFeedSticky() {
+        if (window.innerWidth > 768) {
+            if (isSticky) {
+                document.body.classList.remove('sn-feed-sticky-active');
+                isSticky = false;
+            }
+            ticking = false;
+            return;
+        }
+
+        var rect = anchor.getBoundingClientRect();
+        // The mobile header searchbar is ~48-52px tall.
+        // When the anchor scrolls past 52px from the viewport top,
+        // the user has reached/passed this section: filter chips replace the searchbar.
+        var passedSection = rect.top <= 52;
+
+        if (passedSection && !isSticky) {
+            document.body.classList.add('sn-feed-sticky-active');
+            isSticky = true;
+        } else if (!passedSection && isSticky) {
+            document.body.classList.remove('sn-feed-sticky-active');
+            isSticky = false;
+        }
+        ticking = false;
+    }
+
+    function onScrollOrResize() {
+        if (!ticking) {
+            window.requestAnimationFrame(evaluateFeedSticky);
+            ticking = true;
+        }
+    }
+
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+    evaluateFeedSticky();
+}
+
+window.snOpenMobileSearch = function(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(function() {
+        var inp = document.querySelector('.sn-search-input');
+        if (inp) {
+            inp.focus();
+            if (typeof inp.select === 'function') inp.select();
+        }
+    }, 380);
+};
+
 function initHomePage() {
     initAliFeed();
+    initFeedStickyChips();
     initHomeCarousels();
 }
 

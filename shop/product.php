@@ -1488,7 +1488,7 @@ require_once('header.php');
             </div>
 
             <!-- Purchase Form (Preserves All Backend Inputs & Token) -->
-            <form action="" method="post" id="snAddToCartForm" onsubmit="event.preventDefault(); handleProductAddToCart(); return false;">
+            <form action="" method="post" id="snAddToCartForm">
                 <?php $csrf->echoInputField(); ?>
                 <input type="hidden" name="p_name" value="<?php echo htmlspecialchars($p_name); ?>">
                 <input type="hidden" name="p_current_price" value="<?php echo htmlspecialchars($p_current_price); ?>">
@@ -1523,7 +1523,7 @@ require_once('header.php');
 
                 <!-- Dual Action Buttons: Add to Cart (Yellow) + Buy Now (Cream) -->
                 <div class="sn-mob-dual-actions">
-                    <button type="button" class="sn-btn-mob-cart" id="btnAddToCart" onclick="handleProductAddToCart(this)">
+                    <button type="button" class="sn-btn-mob-cart" id="btnAddToCart">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="9" cy="21" r="1"></circle>
                             <circle cx="20" cy="21" r="1"></circle>
@@ -1531,7 +1531,7 @@ require_once('header.php');
                         </svg>
                         <span>Add to Cart</span>
                     </button>
-                    <button type="button" class="sn-btn-mob-buy" id="btnBuyNow" onclick="handleProductBuyNow(this)">
+                    <button type="button" class="sn-btn-mob-buy" id="btnBuyNow">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                         </svg>
@@ -1681,7 +1681,7 @@ require_once('header.php');
     </button>
 
     <!-- Add to Cart Button (Solid Yellow) -->
-    <button type="button" class="sn-sticky-btn-cart" id="snStickyCartBtn" onclick="handleProductAddToCart(this)">
+    <button type="button" class="sn-sticky-btn-cart" id="snStickyCartBtn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="21" r="1"></circle>
             <circle cx="20" cy="21" r="1"></circle>
@@ -1691,7 +1691,7 @@ require_once('header.php');
     </button>
 
     <!-- Buy Now Button (Warm Cream) -->
-    <button type="button" class="sn-sticky-btn-buy" id="snStickyBuyBtn" onclick="handleProductBuyNow(this)">
+    <button type="button" class="sn-sticky-btn-buy" id="snStickyBuyBtn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
@@ -1765,11 +1765,17 @@ function updateAllCartBadges(count) {
     });
 }
 
+let isProductCartSubmitting = false;
 window.handleProductAddToCart = function(triggerBtn) {
+    if (isProductCartSubmitting) {
+        return;
+    }
+    isProductCartSubmitting = true;
+
     const mainBtn = document.getElementById('btnAddToCart');
     const stickyBtn = document.getElementById('snStickyCartBtn');
     const qtyInput = document.getElementById('snQtyInput');
-    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    const qty = Math.max(1, parseInt(qtyInput ? qtyInput.value : '1', 10) || 1);
 
     const sizeInput = document.getElementById('hiddenSizeId');
     const sizeNameInput = document.getElementById('hiddenSizeName');
@@ -1802,9 +1808,6 @@ window.handleProductAddToCart = function(triggerBtn) {
     })
     .then(r => r.json())
     .then(data => {
-        if (mainBtn) mainBtn.disabled = false;
-        if (stickyBtn) stickyBtn.disabled = false;
-
         if (data.success) {
             if (mainBtn) {
                 mainBtn.style.background = '#10b981';
@@ -1824,20 +1827,30 @@ window.handleProductAddToCart = function(triggerBtn) {
 
             setTimeout(() => {
                 if (mainBtn) {
+                    mainBtn.disabled = false;
                     mainBtn.innerHTML = origMainHtml;
                     mainBtn.style.background = '';
                     mainBtn.style.color = '';
                 }
                 if (stickyBtn) {
+                    stickyBtn.disabled = false;
                     stickyBtn.innerHTML = origStickyHtml;
                     stickyBtn.style.background = '';
                     stickyBtn.style.color = '';
                 }
-            }, 1800);
+                isProductCartSubmitting = false;
+            }, 800);
 
         } else {
-            if (mainBtn) mainBtn.innerHTML = origMainHtml;
-            if (stickyBtn) stickyBtn.innerHTML = origStickyHtml;
+            if (mainBtn) {
+                mainBtn.disabled = false;
+                mainBtn.innerHTML = origMainHtml;
+            }
+            if (stickyBtn) {
+                stickyBtn.disabled = false;
+                stickyBtn.innerHTML = origStickyHtml;
+            }
+            isProductCartSubmitting = false;
             alert(data.message || 'Unable to add item to cart.');
         }
     })
@@ -1851,13 +1864,25 @@ window.handleProductAddToCart = function(triggerBtn) {
             stickyBtn.disabled = false;
             stickyBtn.innerHTML = origStickyHtml;
         }
+        isProductCartSubmitting = false;
         alert('Could not add item to cart. Please check your connection.');
     });
 };
 
+let isBuyNowSubmitting = false;
 window.handleProductBuyNow = function(triggerBtn) {
+    if (isBuyNowSubmitting) {
+        return;
+    }
+    isBuyNowSubmitting = true;
+
+    const mainBuyBtn = document.getElementById('btnBuyNow');
+    const stickyBuyBtn = document.getElementById('snStickyBuyBtn');
+    if (mainBuyBtn) mainBuyBtn.disabled = true;
+    if (stickyBuyBtn) stickyBuyBtn.disabled = true;
+
     const qtyInput = document.getElementById('snQtyInput');
-    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    const qty = Math.max(1, parseInt(qtyInput ? qtyInput.value : '1', 10) || 1);
 
     const sizeInput = document.getElementById('hiddenSizeId');
     const sizeNameInput = document.getElementById('hiddenSizeName');
@@ -1888,11 +1913,17 @@ window.handleProductBuyNow = function(triggerBtn) {
                 window.location.href = '<?php echo BASE_URL; ?>cart.php';
             }
         } else {
+            if (mainBuyBtn) mainBuyBtn.disabled = false;
+            if (stickyBuyBtn) stickyBuyBtn.disabled = false;
+            isBuyNowSubmitting = false;
             alert(data.message || 'Unable to proceed to cart.');
         }
     })
     .catch(err => {
         console.error('[Buy Now Error]', err);
+        if (mainBuyBtn) mainBuyBtn.disabled = false;
+        if (stickyBuyBtn) stickyBuyBtn.disabled = false;
+        isBuyNowSubmitting = false;
         window.location.href = '<?php echo BASE_URL; ?>cart.php';
     });
 };
@@ -2288,58 +2319,51 @@ function initProductPage() {
         });
     });
 
-    // Buy Now Handler
-    document.getElementById('btnBuyNow')?.addEventListener('click', function(e) {
-        e.preventDefault();
-        const form = document.getElementById('snAddToCartForm');
-        let buyInput = document.getElementById('hiddenBuyNow');
-        if (!buyInput) {
-            buyInput = document.createElement('input');
-            buyInput.type = 'hidden';
-            buyInput.name = 'form_buy_now';
-            buyInput.id = 'hiddenBuyNow';
-            buyInput.value = '1';
-            form.appendChild(buyInput);
-        }
-        form.submit();
-    });
-
     // 4. Quantity Controls
     const qtyInput = document.getElementById('snQtyInput');
     const qtyMinus = document.getElementById('qtyMinus');
     const qtyPlus = document.getElementById('qtyPlus');
 
-    qtyMinus?.addEventListener('click', () => {
-        let val = parseInt(qtyInput.value) || 1;
-        if (val > 1) qtyInput.value = val - 1;
-    });
+    if (qtyMinus && !qtyMinus.dataset.bound) {
+        qtyMinus.dataset.bound = 'true';
+        qtyMinus.addEventListener('click', () => {
+            let val = parseInt(qtyInput.value) || 1;
+            if (val > 1) qtyInput.value = val - 1;
+        });
+    }
 
-    qtyPlus?.addEventListener('click', () => {
-        let val = parseInt(qtyInput.value) || 1;
-        const max = parseInt(qtyInput.max) || 999;
-        if (val < max) qtyInput.value = val + 1;
-    });
+    if (qtyPlus && !qtyPlus.dataset.bound) {
+        qtyPlus.dataset.bound = 'true';
+        qtyPlus.addEventListener('click', () => {
+            let val = parseInt(qtyInput.value) || 1;
+            const max = parseInt(qtyInput.max) || 999;
+            if (val < max) qtyInput.value = val + 1;
+        });
+    }
 
     // 5. Copy Coupon Code
     const copyBtn = document.getElementById('btnCopyCoupon');
     const couponCode = document.getElementById('couponCodeText')?.textContent.trim();
-    copyBtn?.addEventListener('click', () => {
-        if (couponCode && navigator.clipboard) {
-            navigator.clipboard.writeText(couponCode).then(() => {
-                const orig = copyBtn.textContent;
-                copyBtn.textContent = 'Copied! ✓';
-                copyBtn.style.background = '#86efac';
-                copyBtn.style.borderColor = '#4ade80';
-                copyBtn.style.color = '#14532d';
-                setTimeout(() => {
-                    copyBtn.textContent = orig;
-                    copyBtn.style.background = '';
-                    copyBtn.style.borderColor = '';
-                    copyBtn.style.color = '';
-                }, 2000);
-            });
-        }
-    });
+    if (copyBtn && !copyBtn.dataset.bound) {
+        copyBtn.dataset.bound = 'true';
+        copyBtn.addEventListener('click', () => {
+            if (couponCode && navigator.clipboard) {
+                navigator.clipboard.writeText(couponCode).then(() => {
+                    const orig = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied! ✓';
+                    copyBtn.style.background = '#86efac';
+                    copyBtn.style.borderColor = '#4ade80';
+                    copyBtn.style.color = '#14532d';
+                    setTimeout(() => {
+                        copyBtn.textContent = orig;
+                        copyBtn.style.background = '';
+                        copyBtn.style.borderColor = '';
+                        copyBtn.style.color = '';
+                    }, 2000);
+                });
+            }
+        });
+    }
 
     // 5.5 Action Buttons Handlers (Add to Cart, Buy Now, Sticky Bar)
     const addCartBtn = document.getElementById('btnAddToCart');
@@ -2349,35 +2373,53 @@ function initProductPage() {
     const addToCartForm = document.getElementById('snAddToCartForm');
     const stickyMsgBtn = document.getElementById('snStickyMsgBtn');
 
-    addToCartForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleProductAddToCart(addCartBtn);
-    });
+    if (addToCartForm && !addToCartForm.dataset.bound) {
+        addToCartForm.dataset.bound = 'true';
+        addToCartForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleProductAddToCart(addCartBtn);
+        });
+    }
 
-    addCartBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleProductAddToCart(this);
-    });
+    if (addCartBtn && !addCartBtn.dataset.bound) {
+        addCartBtn.dataset.bound = 'true';
+        addCartBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleProductAddToCart(this);
+        });
+    }
 
-    stickyCartBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleProductAddToCart(this);
-    });
+    if (stickyCartBtn && !stickyCartBtn.dataset.bound) {
+        stickyCartBtn.dataset.bound = 'true';
+        stickyCartBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleProductAddToCart(this);
+        });
+    }
 
-    buyNowBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleProductBuyNow(this);
-    });
+    if (buyNowBtn && !buyNowBtn.dataset.bound) {
+        buyNowBtn.dataset.bound = 'true';
+        buyNowBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleProductBuyNow(this);
+        });
+    }
 
-    stickyBuyBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleProductBuyNow(this);
-    });
+    if (stickyBuyBtn && !stickyBuyBtn.dataset.bound) {
+        stickyBuyBtn.dataset.bound = 'true';
+        stickyBuyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleProductBuyNow(this);
+        });
+    }
 
-    stickyMsgBtn?.addEventListener('click', function(e) {
-        e.preventDefault();
-        openProductChatSheet();
-    });
+    if (stickyMsgBtn && !stickyMsgBtn.dataset.bound) {
+        stickyMsgBtn.dataset.bound = 'true';
+        stickyMsgBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openProductChatSheet();
+        });
+    }
 
     // 6. Wishlist Button Toggle
     const wishlistBtn = document.getElementById('btnWishlistToggle');

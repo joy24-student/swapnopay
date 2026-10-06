@@ -1291,7 +1291,13 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
                 z-index: 1000 !important;
                 padding: 0 !important;
-                transition: box-shadow 0.25s ease !important;
+                transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, box-shadow 0.25s ease !important;
+            }
+            /* When home screen feed chips become sticky, smoothly slide out the mobile search header */
+            body.shopnext-theme.sn-feed-sticky-active .sn-header-wrap {
+                transform: translateY(-100%) !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
             }
             /* When scrolled: collapse logo + actions, keep only search bar visible */
             .sn-header-wrap.sn-mobile-header-hidden .sn-brand-logo {

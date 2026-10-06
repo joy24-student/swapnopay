@@ -363,6 +363,7 @@
             }
         }
         try { sessionStorage.setItem('sn_popup_shown_session', 'true'); } catch (e) {}
+        document.body.classList.remove('sn-feed-sticky-active');
 
         let skeletonTimeout = null;
 
