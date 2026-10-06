@@ -117,14 +117,27 @@ foreach ($result as $row) {
 						</li>
 
 						<!-- User Profile Dropdown -->
+						<?php
+						$raw_name = !empty($_SESSION['user']['full_name']) ? trim($_SESSION['user']['full_name']) : 'Joy Saha';
+						$display_name = $raw_name;
+						if (mb_strlen($display_name) > 20) {
+							$words = explode(' ', $display_name);
+							if (count($words) >= 2) {
+								$display_name = $words[0] . ' ' . $words[1];
+							} else {
+								$display_name = mb_substr($display_name, 0, 18) . '...';
+							}
+						}
+						$display_role = !empty($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'Administrator';
+						?>
 						<li class="dropdown user user-menu sn-user-li">
-							<a href="#" class="dropdown-toggle sn-user-link" data-toggle="dropdown">
+							<a href="#" class="dropdown-toggle sn-user-link" data-toggle="dropdown" title="<?php echo htmlspecialchars($raw_name); ?>">
 								<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="user-image sn-user-avatar" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
 								<div class="sn-user-meta hidden-xs">
-									<span class="sn-user-name"><?php echo htmlspecialchars(!empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : 'Joy Saha'); ?></span>
-									<span class="sn-user-role"><?php echo htmlspecialchars(!empty($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'Administrator'); ?></span>
+									<span class="sn-user-name"><?php echo htmlspecialchars($display_name); ?></span>
+									<span class="sn-user-role"><?php echo htmlspecialchars($display_role); ?></span>
 								</div>
-								<svg class="sn-user-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+								<svg class="sn-user-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
 									<polyline points="6 9 12 15 18 9"></polyline>
 								</svg>
 							</a>

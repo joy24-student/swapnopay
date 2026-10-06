@@ -42,24 +42,39 @@ body, .hold-transition {
     top: 0;
     left: 0;
     right: 0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    display: flex !important;
+    align-items: stretch !important;
+    background: var(--sn-yellow) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 /* Logo Area (Left Column - Matches Sidebar Width) */
 .main-header .logo {
     width: 250px !important;
+    min-width: 250px !important;
+    max-width: 250px !important;
+    flex: 0 0 250px !important;
     height: 64px !important;
     line-height: 64px !important;
     background: #FFFFFF !important;
     color: var(--sn-dark) !important;
-    border-right: 1px solid var(--sn-border-light);
-    border-bottom: 1px solid var(--sn-border-light);
+    border-right: 1px solid var(--sn-border-light) !important;
+    border-bottom: 1px solid var(--sn-border-light) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: flex-start !important;
     padding: 0 20px !important;
     text-align: left !important;
-    transition: width 0.3s ease;
+    float: none !important;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.main-header .logo .logo-mini {
+    display: none !important;
+}
+
+.main-header .logo .logo-lg {
+    display: block !important;
 }
 
 .sn-logo-wrap {
@@ -88,7 +103,7 @@ body, .hold-transition {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    line-height: 1.25;
+    line-height: 1.2;
 }
 
 .sn-logo-title {
@@ -105,68 +120,88 @@ body, .hold-transition {
 }
 
 .sn-logo-badge-mini {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     background: var(--sn-yellow);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 14px auto;
+    box-shadow: 0 2px 6px rgba(254, 219, 101, 0.4);
+    margin: 0 auto;
 }
 
-/* Top Navbar (Warm Yellow Bar) */
+/* Top Navbar (Warm Yellow Bar - Seamlessly fills remaining header width) */
 .main-header .navbar {
-    margin-left: 250px !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
     background: var(--sn-yellow) !important;
     height: 64px !important;
     min-height: 64px !important;
     border: none !important;
+    border-radius: 0 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 0 28px !important;
-    transition: margin-left 0.3s ease;
+    padding: 0 24px !important;
+    float: none !important;
+}
+
+.main-header .navbar:before,
+.main-header .navbar:after {
+    display: none !important;
+    content: none !important;
 }
 
 .sn-topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    height: 100% !important;
+    float: none !important;
 }
 
 .main-header .sidebar-toggle {
     color: var(--sn-dark) !important;
     padding: 8px !important;
-    border-radius: 8px;
+    margin: 0 !important;
+    border-radius: 8px !important;
     background: transparent !important;
-    height: auto !important;
+    height: 38px !important;
+    width: 38px !important;
     line-height: 1 !important;
     display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s ease;
+    align-items: center !important;
+    justify-content: center !important;
+    float: none !important;
+    transition: background 0.15s ease !important;
 }
 
 .main-header .sidebar-toggle:hover {
-    background: rgba(0, 0, 0, 0.06) !important;
+    background: rgba(0, 0, 0, 0.08) !important;
 }
 
 .main-header .sidebar-toggle:before {
-    content: "" !important; /* Hide FontAwesome bars in favor of SVG or clean icon */
+    display: none !important;
+    content: "" !important;
 }
 
 .sn-topbar-divider {
-    width: 1px;
-    height: 22px;
-    background: rgba(15, 23, 42, 0.18);
+    width: 1px !important;
+    height: 22px !important;
+    background: rgba(15, 23, 42, 0.18) !important;
+    margin: 0 2px !important;
+    display: block !important;
 }
 
 .sn-topbar-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--sn-dark);
-    letter-spacing: -0.2px;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: var(--sn-dark) !important;
+    letter-spacing: -0.2px !important;
+    white-space: nowrap !important;
 }
 
 /* Navbar Right Controls */
@@ -175,64 +210,69 @@ body, .hold-transition {
 }
 
 .sn-nav-items {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
 }
 
+/* Notification Bell - Clean stand-alone dark bell matching reference screenshot */
 .sn-bell-link {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.35);
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: transparent !important;
     color: var(--sn-dark) !important;
-    transition: background 0.2s;
+    transition: background 0.15s ease !important;
     text-decoration: none !important;
+    padding: 0 !important;
 }
 
 .sn-bell-link:hover {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.06) !important;
 }
 
 .sn-bell-badge {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: var(--sn-red);
-    color: #FFFFFF;
-    font-size: 10px;
-    font-weight: 800;
-    min-width: 17px;
-    height: 17px;
-    line-height: 14px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--sn-yellow);
+    position: absolute !important;
+    top: 3px !important;
+    right: 3px !important;
+    background: var(--sn-red) !important;
+    color: #FFFFFF !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    min-width: 17px !important;
+    height: 17px !important;
+    line-height: 13px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 2px solid var(--sn-yellow) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
 }
 
+/* User Profile Pill */
 .sn-user-link {
     display: flex !important;
     align-items: center !important;
     gap: 10px !important;
-    padding: 5px 12px 5px 6px !important;
+    padding: 4px 14px 4px 6px !important;
     border-radius: 30px !important;
-    background: rgba(255, 255, 255, 0.3) !important;
-    border: 1px solid rgba(255, 255, 255, 0.5) !important;
-    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    transition: all 0.2s ease !important;
     text-decoration: none !important;
+    height: 46px !important;
 }
 
 .sn-user-link:hover, .sn-user-link:focus {
-    background: rgba(255, 255, 255, 0.6) !important;
+    background: rgba(255, 255, 255, 0.7) !important;
 }
 
 .sn-user-avatar {
@@ -243,30 +283,42 @@ body, .hold-transition {
     border: 2px solid #FFFFFF !important;
     margin: 0 !important;
     float: none !important;
+    flex-shrink: 0;
 }
 
 .sn-user-meta {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-    line-height: 1.25;
+    display: flex !important;
+    flex-direction: column !important;
+    text-align: left !important;
+    line-height: 1.2 !important;
+    max-width: 150px;
+    overflow: hidden;
 }
 
 .sn-user-name {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--sn-dark);
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: var(--sn-dark) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
 }
 
 .sn-user-role {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--sn-slate-600);
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: var(--sn-slate-600) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
 }
 
 .sn-user-chevron {
-    stroke: var(--sn-slate-600);
-    margin-left: 2px;
+    stroke: var(--sn-slate-600) !important;
+    margin-left: 2px !important;
+    flex-shrink: 0;
 }
 
 .sn-user-dropdown-menu {
@@ -279,8 +331,39 @@ body, .hold-transition {
 }
 
 /* ==========================================================================
-   2. SIDEBAR NAVIGATION (PURE WHITE WITH WARM YELLOW PILL ACTIVE STATE)
+   2. SIDEBAR NAVIGATION & COLLAPSE STATES
    ========================================================================== */
+
+/* Default Expanded Sidebar */
+body:not(.sidebar-collapse) .main-sidebar,
+body:not(.sidebar-collapse) .left-side {
+    width: 250px !important;
+    transform: translate(0, 0) !important;
+    -webkit-transform: translate(0, 0) !important;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body:not(.sidebar-collapse) .content-wrapper,
+body:not(.sidebar-collapse) .right-side {
+    margin-left: 250px !important;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body:not(.sidebar-collapse) .main-header .logo {
+    width: 250px !important;
+    min-width: 250px !important;
+    max-width: 250px !important;
+    flex: 0 0 250px !important;
+}
+
+body:not(.sidebar-collapse) .main-header .logo .logo-lg {
+    display: block !important;
+}
+
+body:not(.sidebar-collapse) .main-header .logo .logo-mini {
+    display: none !important;
+}
+
 .main-sidebar, .left-side {
     width: 250px !important;
     background: #FFFFFF !important;
@@ -292,7 +375,6 @@ body, .hold-transition {
     top: 0;
     bottom: 0;
     left: 0;
-    transition: transform 0.3s ease, width 0.3s ease;
 }
 
 .sidebar-menu {
@@ -390,14 +472,74 @@ body, .hold-transition {
 }
 
 /* ==========================================================================
+   SIDEBAR COLLAPSED STATE (MINI SIDEBAR ON HAMBURGER CLICK)
+   ========================================================================== */
+body.sidebar-collapse .main-header .logo {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+    flex: 0 0 60px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+}
+
+body.sidebar-collapse .main-header .logo .logo-lg {
+    display: none !important;
+}
+
+body.sidebar-collapse .main-header .logo .logo-mini {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin: 0 !important;
+}
+
+body.sidebar-collapse .main-header .navbar {
+    margin-left: 0 !important;
+}
+
+body.sidebar-collapse .main-sidebar,
+body.sidebar-collapse .left-side {
+    width: 60px !important;
+    transform: translate(0, 0) !important;
+    -webkit-transform: translate(0, 0) !important;
+    z-index: 850 !important;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.sidebar-collapse .content-wrapper,
+body.sidebar-collapse .right-side {
+    margin-left: 60px !important;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.sidebar-collapse .sidebar-menu > li > a {
+    margin: 3px 6px !important;
+    padding: 12px 0 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    border-radius: 10px !important;
+}
+
+body.sidebar-collapse .sidebar-menu > li > a > i {
+    margin-right: 0 !important;
+    font-size: 18px !important;
+    width: auto !important;
+}
+
+body.sidebar-collapse .sidebar-menu > li > a > span,
+body.sidebar-collapse .sidebar-menu > li > a > .pull-right-container {
+    display: none !important;
+}
+
+/* ==========================================================================
    3. CONTENT LAYOUT & PAGE HEADERS
    ========================================================================== */
 .content-wrapper, .right-side {
     background: var(--sn-bg) !important;
-    margin-left: 250px !important;
     padding-top: 64px !important;
     min-height: 100vh !important;
-    transition: margin-left 0.3s ease;
 }
 
 .content-header {
