@@ -1,6 +1,4 @@
 <?php require_once __DIR__ . '/inc/guard.php'; ?>
-<?php require_once('header.php'); ?>
-
 <?php
 if(!isset($_REQUEST['id'])) {
 	header('location: logout.php');
@@ -36,5 +34,14 @@ if(!isset($_REQUEST['id'])) {
 	$statement = $pdo->prepare("DELETE FROM tbl_slider WHERE id=?");
 	$statement->execute(array($_REQUEST['id']));
 
+	$isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+	    || isset($_POST['ajax']) || isset($_GET['ajax']);
+	if ($isAjax) {
+	    header('Content-Type: application/json; charset=UTF-8');
+	    echo json_encode(['success' => true, 'message' => 'Slider deleted successfully.']);
+	    exit;
+	}
+
 	header('location: slider.php');
+	exit;
 ?>

@@ -580,7 +580,7 @@ function getInitials($name) {
                     if ($country !== '' && $country !== 'N/A') $locationParts[] = $country;
                     $locationStr = !empty($locationParts) ? implode(', ', $locationParts) : 'Not provided';
                 ?>
-                    <tr>
+                    <tr id="customer-row-<?= $custId ?>">
                         <!-- Customer Name & Avatar -->
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
@@ -631,7 +631,7 @@ function getInitials($name) {
                         </td>
 
                         <!-- Status Badge -->
-                        <td>
+                        <td class="cell-cust-status" id="cust-status-cell-<?= $custId ?>">
                             <?php if ($isActive): ?>
                                 <span class="status-pill status-pill-active">
                                     <i class="fa fa-check-circle"></i> Active
@@ -645,9 +645,9 @@ function getInitials($name) {
 
                         <!-- Formal Actions Menu -->
                         <td style="text-align: right; white-space: nowrap;">
-                            <a href="customer-change-status.php?id=<?= $custId ?>" class="btn-formal-update" title="Click to toggle status (Active/Inactive)">
+                            <a href="customer-change-status.php?id=<?= $custId ?>" class="btn-formal-update js-cust-toggle-status" data-id="<?= $custId ?>" title="Click to toggle status (Active/Inactive)">
                                 <i class="fa fa-power-off" style="color: <?= $isActive ? '#dc2626' : '#059669' ?>;"></i>
-                                <?= $isActive ? 'Deactivate' : 'Activate' ?>
+                                <span><?= $isActive ? 'Deactivate' : 'Activate' ?></span>
                             </a>
 
                             <div class="dropdown" style="display: inline-block;">

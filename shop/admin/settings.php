@@ -1400,6 +1400,25 @@ elseif (isset($_POST['form_email']) || isset($_POST['form_email_template']) || i
 elseif (isset($_POST['form_footer_settings'])) $active_tab = '#tab_footer';
 elseif (isset($_POST['form_popup_settings'])) $active_tab = '#tab_ads';
 elseif (isset($_POST['form_general_settings'])) $active_tab = '#tab_general';
+
+$isAjaxSettings = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+    || !empty($_POST['is_ajax']) || isset($_POST['ajax']);
+
+if ($isAjaxSettings && !empty($_POST)) {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!empty($error_message)) {
+        echo json_encode(['success' => false, 'message' => $error_message]);
+    } else {
+        $msg = !empty($success_message) ? $success_message : 'Settings saved successfully!';
+        echo json_encode([
+            'success' => true,
+            'message' => $msg,
+            'active_tab' => $active_tab
+        ]);
+    }
+    exit;
+}
+
 // Re-fetch settings after any update to ensure displayed values are current
 $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $statement->execute();
@@ -4356,3 +4375,5 @@ if (window.jQuery) {
     });
 }
 </script>
+
+<?php require_once('footer.php'); ?>

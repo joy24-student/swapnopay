@@ -644,7 +644,7 @@ function orderEsc($value) {
                     $orderDate = !empty($order['payment_date']) ? date('d M Y, h:i A', strtotime($order['payment_date'])) : '-';
                     $city = (string)($order['shipping_city'] ?: $order['billing_city'] ?: '');
                 ?>
-                    <tr>
+                    <tr id="order-row-<?= htmlspecialchars($reference, ENT_QUOTES) ?>">
                         <!-- Customer & Order Reference -->
                         <td>
                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -675,7 +675,7 @@ function orderEsc($value) {
                         </td>
 
                         <!-- Payment Status -->
-                        <td>
+                        <td class="cell-pay-status" id="pay-status-<?= htmlspecialchars($reference, ENT_QUOTES) ?>">
                             <?php if ($payStatus === 'Completed'): ?>
                                 <span class="status-pill status-pill-paid">
                                     <i class="fa fa-check-circle"></i> Paid
@@ -692,7 +692,7 @@ function orderEsc($value) {
                         </td>
 
                         <!-- Fulfillment Status -->
-                        <td>
+                        <td class="cell-ship-status" id="ship-status-<?= htmlspecialchars($reference, ENT_QUOTES) ?>">
                             <?php if ($shipStatus === 'Delivered'): ?>
                                 <span class="status-pill status-pill-delivered">
                                     <i class="fa fa-check"></i> Delivered
@@ -719,7 +719,8 @@ function orderEsc($value) {
                         <!-- Formal Actions (Update Status + Actions Menu) -->
                         <td style="text-align: right; white-space: nowrap;">
                             <!-- Prominent Status Updater Button -->
-                            <button type="button" class="btn-formal-update" 
+                            <button type="button" class="btn-formal-update btn-status-trigger" id="btn-status-<?= htmlspecialchars($reference, ENT_QUOTES) ?>" 
+                                data-cust="<?= htmlspecialchars($custName, ENT_QUOTES) ?>"
                                 onclick="openUpdateStatusModal('<?= htmlspecialchars($reference, ENT_QUOTES) ?>', '<?= htmlspecialchars($custName, ENT_QUOTES) ?>', '<?= htmlspecialchars($shipStatus, ENT_QUOTES) ?>', '<?= htmlspecialchars($payStatus, ENT_QUOTES) ?>')"
                                 title="Update Order Fulfillment & Payment Status">
                                 <i class="fa fa-sliders"></i> Update Status
@@ -762,29 +763,23 @@ function orderEsc($value) {
 
                                     <li class="divider"></li>
 
-                                    <?php if ($payStatus !== 'Completed'): ?>
-                                        <li>
-                                            <a href="javascript:void(0)" onclick="quickSetStatus('<?= htmlspecialchars($reference, ENT_QUOTES) ?>', '<?= htmlspecialchars($shipStatus, ENT_QUOTES) ?>', 'Completed')">
-                                                <i class="fa fa-check" style="color: #059669;"></i> Mark as Paid
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
+                                    <li>
+                                        <a href="javascript:void(0)" onclick="quickSetStatus('<?= htmlspecialchars($reference, ENT_QUOTES) ?>', 'Shipped', 'Completed')">
+                                            <i class="fa fa-truck" style="color: #0284c7;"></i> Mark as Shipped
+                                        </a>
+                                    </li>
 
-                                    <?php if ($shipStatus !== 'Delivered' && $shipStatus !== 'Cancelled'): ?>
-                                        <li>
-                                            <a href="javascript:void(0)" onclick="quickSetStatus('<?= htmlspecialchars($reference, ENT_QUOTES) ?>', 'Delivered', '<?= htmlspecialchars($payStatus, ENT_QUOTES) ?>')">
-                                                <i class="fa fa-check-circle" style="color: #16a34a;"></i> Mark as Delivered
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
+                                    <li>
+                                        <a href="javascript:void(0)" onclick="quickSetStatus('<?= htmlspecialchars($reference, ENT_QUOTES) ?>', 'Delivered', 'Completed')">
+                                            <i class="fa fa-check-circle" style="color: #16a34a;"></i> Mark as Delivered
+                                        </a>
+                                    </li>
 
-                                    <?php if ($payStatus !== 'Cancelled' && $shipStatus !== 'Cancelled'): ?>
-                                        <li>
-                                            <a href="order-delete.php?id=<?= rawurlencode($reference) ?>" onclick="return confirm('Are you sure you want to cancel this order? Stock will be restored.');" style="color: #dc2626;">
-                                                <i class="fa fa-ban" style="color: #dc2626;"></i> Cancel Order
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
+                                    <li>
+                                        <a href="javascript:void(0)" onclick="quickCancelOrder('<?= htmlspecialchars($reference, ENT_QUOTES) ?>')" style="color: #dc2626;">
+                                            <i class="fa fa-ban" style="color: #dc2626;"></i> Cancel Order
+                                        </a>
+                                    </li>
                                 </ul>
                             </div>
                         </td>
@@ -980,49 +975,152 @@ function openUpdateStatusModal(orderId, custName, currentShipping, currentPaymen
     $('#modal-update-order-status').modal('show');
 }
 
-// 1-Click Quick Status Change (from dropdown)
-function quickSetStatus(orderId, shippingStatus, paymentStatus) {
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'order-change-status.php';
+// UI Status Syncer without reloading
+function updateOrderRowUI(orderId, shippingStatus, paymentStatus) {
+    var $payCell = $('#pay-status-' + CSS.escape(orderId));
+    var $shipCell = $('#ship-status-' + CSS.escape(orderId));
+    var $btn = $('#btn-status-' + CSS.escape(orderId));
+    var $row = $('#order-row-' + CSS.escape(orderId));
 
-    var idInput = document.createElement('input');
-    idInput.type = 'hidden';
-    idInput.name = 'id';
-    idInput.value = orderId;
-    form.appendChild(idInput);
-
-    var shipInput = document.createElement('input');
-    shipInput.type = 'hidden';
-    shipInput.name = 'shipping_status';
-    shipInput.value = shippingStatus;
-    form.appendChild(shipInput);
-
-    var payInput = document.createElement('input');
-    payInput.type = 'hidden';
-    payInput.name = 'payment_status';
-    payInput.value = paymentStatus;
-    form.appendChild(payInput);
-
-    var redirInput = document.createElement('input');
-    redirInput.type = 'hidden';
-    redirInput.name = 'redirect';
-    redirInput.value = window.location.href;
-    form.appendChild(redirInput);
-
-    // CSRF Token if present in meta tag
-    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta) {
-        var csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_csrf';
-        csrfInput.value = csrfMeta.getAttribute('content');
-        form.appendChild(csrfInput);
+    if (paymentStatus && $payCell.length) {
+        if (paymentStatus === 'Completed') {
+            $payCell.html('<span class="status-pill status-pill-paid"><i class="fa fa-check-circle"></i> Paid</span>');
+        } else if (paymentStatus === 'Cancelled') {
+            $payCell.html('<span class="status-pill status-pill-cancelled"><i class="fa fa-times-circle"></i> Cancelled</span>');
+        } else {
+            $payCell.html('<span class="status-pill status-pill-pending"><i class="fa fa-clock-o"></i> Pending</span>');
+        }
     }
 
-    document.body.appendChild(form);
-    form.submit();
+    if (shippingStatus && $shipCell.length) {
+        if (shippingStatus === 'Delivered') {
+            $shipCell.html('<span class="status-pill status-pill-delivered"><i class="fa fa-check"></i> Delivered</span>');
+        } else if (shippingStatus === 'Shipped') {
+            $shipCell.html('<span class="status-pill status-pill-shipped"><i class="fa fa-truck"></i> Shipped</span>');
+        } else if (shippingStatus === 'Processing') {
+            $shipCell.html('<span class="status-pill status-pill-processing"><i class="fa fa-refresh"></i> Processing</span>');
+        } else if (shippingStatus === 'Cancelled') {
+            $shipCell.html('<span class="status-pill status-pill-cancelled"><i class="fa fa-ban"></i> Cancelled</span>');
+        } else {
+            $shipCell.html('<span class="status-pill status-pill-muted"><i class="fa fa-inbox"></i> Pending</span>');
+        }
+    }
+
+    if ($btn.length) {
+        var custName = $btn.attr('data-cust') || '';
+        $btn.attr('onclick', "openUpdateStatusModal('" + orderId + "', '" + custName.replace(/'/g, "\\'") + "', '" + shippingStatus + "', '" + paymentStatus + "')");
+    }
+
+    if ($row.length) {
+        $row.css('transition', 'background-color 0.4s ease').css('background-color', '#ecfdf5');
+        setTimeout(function() {
+            $row.css('background-color', '');
+        }, 1800);
+    }
 }
+
+// 1-Click Quick Status Change (Zero reload AJAX)
+function quickSetStatus(orderId, shippingStatus, paymentStatus) {
+    var csrfToken = $('meta[name="csrf-token"]').attr('content') || '<?= isset($csrf) ? $csrf->getToken() : "" ?>';
+
+    $.ajax({
+        url: 'order-change-status.php',
+        type: 'POST',
+        data: {
+            id: orderId,
+            shipping_status: shippingStatus,
+            payment_status: paymentStatus,
+            ajax: 1,
+            _csrf: csrfToken
+        },
+        dataType: 'json'
+    }).done(function(res) {
+        if (res && res.success) {
+            updateOrderRowUI(orderId, shippingStatus, paymentStatus);
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(res.message || ('Order #' + orderId + ' updated successfully.'), 'success');
+            }
+        } else {
+            var msg = (res && res.message) ? res.message : 'Failed to update order status.';
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(msg, 'error');
+            } else {
+                alert(msg);
+            }
+        }
+    }).fail(function(xhr) {
+        var msg = 'Failed to update order status. Please try again.';
+        try {
+            var j = JSON.parse(xhr.responseText);
+            if (j.message) msg = j.message;
+        } catch(e) {}
+        if (typeof showAdminToast === 'function') {
+            showAdminToast(msg, 'error');
+        } else {
+            alert(msg);
+        }
+    });
+}
+
+// 1-Click Quick Cancel Order
+function quickCancelOrder(orderId) {
+    if (confirm('Are you sure you want to cancel order #' + orderId + '? Product stock will be restored automatically.')) {
+        quickSetStatus(orderId, 'Cancelled', 'Cancelled');
+    }
+}
+
+// Handle Modal Form Submit via AJAX
+$(document).ready(function() {
+    $('#form-update-order-status').on('submit', function(e) {
+        e.preventDefault();
+        var $form = $(this);
+        var orderId = $('#status_modal_order_id').val();
+        var shipStatus = $('#modal_shipping_status').val();
+        var payStatus = $('#modal_payment_status').val();
+        var $submitBtn = $form.find('button[type="submit"]');
+        var originalBtnHtml = $submitBtn.html();
+
+        $submitBtn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+
+        var formData = $form.serializeArray();
+        formData.push({ name: 'ajax', value: 1 });
+
+        $.ajax({
+            url: $form.attr('action') || 'order-change-status.php',
+            type: 'POST',
+            data: formData,
+            dataType: 'json'
+        }).done(function(res) {
+            $submitBtn.prop('disabled', false).html(originalBtnHtml);
+            if (res && res.success) {
+                $('#modal-update-order-status').modal('hide');
+                updateOrderRowUI(orderId, shipStatus, payStatus);
+                if (typeof showAdminToast === 'function') {
+                    showAdminToast(res.message || 'Order status updated successfully.', 'success');
+                }
+            } else {
+                var msg = (res && res.message) ? res.message : 'Error updating order status.';
+                if (typeof showAdminToast === 'function') {
+                    showAdminToast(msg, 'error');
+                } else {
+                    alert(msg);
+                }
+            }
+        }).fail(function(xhr) {
+            $submitBtn.prop('disabled', false).html(originalBtnHtml);
+            var msg = 'Failed to save changes. Please try again.';
+            try {
+                var j = JSON.parse(xhr.responseText);
+                if (j.message) msg = j.message;
+            } catch(e) {}
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(msg, 'error');
+            } else {
+                alert(msg);
+            }
+        });
+    });
+});
 
 // Open SMS / Email Modal
 function openOrderMsgModal(type, recipient, name, orderId) {

@@ -1747,7 +1747,7 @@ body.shopnext-theme {
 @media (max-width: 768px) {
     .sn-cart-page-wrapper {
         padding-top: 14px;
-        padding-bottom: 120px;
+        padding-bottom: 150px !important;
     }
     .sn-cart-page-header {
         flex-direction: column;
@@ -1914,16 +1914,17 @@ body.shopnext-theme {
 
     /* Mobile Sticky Bottom Checkout & Voucher Dock */
     .sn-mobile-sticky-dock {
-        display: flex;
-        flex-direction: column;
-        position: fixed;
-        bottom: 56px; /* Sits directly above bottom nav */
-        left: 0;
-        right: 0;
-        z-index: 999;
-        background: #ffffff;
-        border-top: 1px solid #f1f5f9;
-        box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        bottom: 56px !important; /* Sits directly above bottom nav */
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        z-index: 999 !important;
+        background: #ffffff !important;
+        border-top: 1px solid #f1f5f9 !important;
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.06) !important;
     }
     .sn-mobile-voucher-bar {
         background: #fff1f2;
@@ -2366,7 +2367,11 @@ function applyPromo(code) {
 }
 
 // 9. QUICK ADD RECOMMENDATION TO CART
+let isQuickCartSubmitting = false;
 function quickAddToCart(productId, productName, price, image, subtitle) {
+    if (isQuickCartSubmitting) return;
+    isQuickCartSubmitting = true;
+
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('quantity', 1);

@@ -2,6 +2,81 @@
 
 	</div>
 
+	<style>
+	#admin-toast-container {
+		position: fixed;
+		top: 24px;
+		right: 24px;
+		z-index: 9999999;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		pointer-events: none;
+		max-width: 420px;
+		width: calc(100vw - 48px);
+	}
+	.admin-toast-card {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		background: #ffffff;
+		border-radius: 8px;
+		padding: 12px 16px;
+		box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+		border: 1px solid #e2e8f0;
+		pointer-events: auto;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 1.4;
+		color: #1e293b;
+		transform: translateX(120%);
+		opacity: 0;
+		transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+	}
+	.admin-toast-card.show {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	.admin-toast-card.toast-success {
+		border-left: 4px solid #10b981;
+	}
+	.admin-toast-card.toast-error {
+		border-left: 4px solid #ef4444;
+	}
+	.admin-toast-card.toast-warning {
+		border-left: 4px solid #f59e0b;
+	}
+	.admin-toast-card.toast-info {
+		border-left: 4px solid #3b82f6;
+	}
+	.admin-toast-icon {
+		font-size: 18px;
+		flex-shrink: 0;
+	}
+	.toast-success .admin-toast-icon { color: #10b981; }
+	.toast-error .admin-toast-icon { color: #ef4444; }
+	.toast-warning .admin-toast-icon { color: #f59e0b; }
+	.toast-info .admin-toast-icon { color: #3b82f6; }
+	.admin-toast-body {
+		flex: 1;
+		word-break: break-word;
+	}
+	.admin-toast-close {
+		background: none;
+		border: none;
+		color: #94a3b8;
+		cursor: pointer;
+		font-size: 16px;
+		padding: 0;
+		margin-left: 4px;
+		line-height: 1;
+	}
+	.admin-toast-close:hover {
+		color: #475569;
+	}
+	</style>
+
 	<script src="js/jquery-2.2.4.min.js"></script>
 	<script src="js/bootstrap.min.js"></script>
 	<script src="js/jquery.dataTables.min.js"></script>
@@ -140,14 +215,285 @@
 	      "autoWidth": false
 	    });
 
-	    $('#confirm-delete').on('show.bs.modal', function(e) {
-	      $(this).find('.btn-ok').attr('href', $(e.relatedTarget).data('href'));
+	    // Universal Floating Toast Notification
+	    window.showAdminToast = function(message, type) {
+	        type = type || 'success';
+	        var $container = $('#admin-toast-container');
+	        if (!$container.length) {
+	            $container = $('<div id="admin-toast-container"></div>').appendTo('body');
+	        }
+
+	        var iconMap = {
+	            success: 'fa-check-circle',
+	            error: 'fa-exclamation-circle',
+	            warning: 'fa-exclamation-triangle',
+	            info: 'fa-info-circle'
+	        };
+	        var icon = iconMap[type] || 'fa-info-circle';
+
+	        var $toast = $(
+	            '<div class="admin-toast-card toast-' + type + '">' +
+	            '  <i class="fa ' + icon + ' admin-toast-icon"></i>' +
+	            '  <div class="admin-toast-body">' + $('<div>').text(message).html() + '</div>' +
+	            '  <button type="button" class="admin-toast-close">&times;</button>' +
+	            '</div>'
+	        );
+
+	        $container.append($toast);
+	        setTimeout(function() { $toast.addClass('show'); }, 15);
+
+	        var timer = setTimeout(function() {
+	            dismissToast();
+	        }, 4000);
+
+	        $toast.find('.admin-toast-close').on('click', function() {
+	            clearTimeout(timer);
+	            dismissToast();
+	        });
+
+	        function dismissToast() {
+	            $toast.removeClass('show');
+	            setTimeout(function() { $toast.remove(); }, 350);
+	        }
+	    };
+
+	    // Fallback confirmation modal if current page lacks one
+	    if (!$('#confirm-delete').length) {
+	        $('body').append(
+	            '<div class="modal fade" id="confirm-delete" tabindex="-1" role="dialog">' +
+	            '  <div class="modal-dialog">' +
+	            '    <div class="modal-content">' +
+	            '      <div class="modal-header">' +
+	            '        <button type="button" class="close" data-dismiss="modal">&times;</button>' +
+	            '        <h4 class="modal-title">Delete Confirmation</h4>' +
+	            '      </div>' +
+	            '      <div class="modal-body">' +
+	            '        <p>Are you sure you want to delete this record?</p>' +
+	            '      </div>' +
+	            '      <div class="modal-footer">' +
+	            '        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>' +
+	            '        <a class="btn btn-danger btn-ok">Delete</a>' +
+	            '      </div>' +
+	            '    </div>' +
+	            '  </div>' +
+	            '</div>'
+	        );
+	    }
+
+	    // Capture triggering element on confirm-delete modal open
+	    $(document).on('show.bs.modal', '#confirm-delete', function(e) {
+	        var $trigger = $(e.relatedTarget);
+	        $(this).data('trigger-el', $trigger);
+	        $(this).find('.btn-ok').attr('href', $trigger.data('href') || $trigger.attr('href') || '#');
 	    });
-		
-		$('#confirm-approve').on('show.bs.modal', function(e) {
-	      $(this).find('.btn-ok').attr('href', $(e.relatedTarget).data('href'));
+
+	    // Universal Zero-Reload AJAX Delete Handler
+	    $(document).on('click', '#confirm-delete .btn-ok', function(e) {
+	        var $btn = $(this);
+	        var url = $btn.attr('href');
+	        if (!url || url === '#' || url.indexOf('javascript:') === 0) return;
+
+	        e.preventDefault();
+	        var $modal = $('#confirm-delete');
+	        var $trigger = $modal.data('trigger-el');
+	        var $row = $trigger ? $trigger.closest('tr') : null;
+	        var originalHtml = $btn.html();
+
+	        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Deleting...');
+
+	        var csrfToken = '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>';
+
+	        $.ajax({
+	            url: url,
+	            type: 'POST',
+	            data: {
+	                ajax: 1,
+	                _csrf: csrfToken
+	            },
+	            dataType: 'json'
+	        }).done(function(res) {
+	            $btn.prop('disabled', false).html(originalHtml);
+	            $modal.modal('hide');
+	            if (res && res.success) {
+	                showAdminToast(res.message || 'Deleted successfully.', 'success');
+	                if ($row && $row.length) {
+	                    var $table = $row.closest('table');
+	                    if ($.fn.DataTable && $.fn.DataTable.isDataTable($table)) {
+	                        $table.DataTable().row($row).remove().draw(false);
+	                    } else {
+	                        $row.fadeOut(350, function() { $(this).remove(); });
+	                    }
+	                }
+	            } else {
+	                var errMsg = (res && res.message) ? res.message : 'Error deleting item.';
+	                showAdminToast(errMsg, 'error');
+	            }
+	        }).fail(function(xhr) {
+	            $btn.prop('disabled', false).html(originalHtml);
+	            $modal.modal('hide');
+	            var errMsg = 'Unable to delete item. Please try again.';
+	            try {
+	                var j = JSON.parse(xhr.responseText);
+	                if (j.message) errMsg = j.message;
+	            } catch(ex) {}
+	            showAdminToast(errMsg, 'error');
+	        });
 	    });
- 
+
+	    // Capture triggering element on confirm-approve modal open
+	    $(document).on('show.bs.modal', '#confirm-approve', function(e) {
+	        var $trigger = $(e.relatedTarget);
+	        $(this).data('trigger-el', $trigger);
+	        $(this).find('.btn-ok').attr('href', $trigger.data('href') || $trigger.attr('href') || '#');
+	    });
+
+	    // Customer Status Toggle (Zero Reload)
+	    $(document).on('click', '.js-cust-toggle-status', function(e) {
+	        e.preventDefault();
+	        var $btn = $(this);
+	        var url = $btn.attr('href');
+	        var custId = $btn.data('id');
+	        var $row = $btn.closest('tr');
+	        var $statusCell = $row.find('.cell-cust-status');
+	        var csrfToken = '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>';
+
+	        $btn.css('pointer-events', 'none').fadeTo(200, 0.6);
+
+	        $.ajax({
+	            url: url,
+	            type: 'POST',
+	            data: {
+	                id: custId,
+	                ajax: 1,
+	                _csrf: csrfToken
+	            },
+	            dataType: 'json'
+	        }).done(function(res) {
+	            $btn.css('pointer-events', '').fadeTo(200, 1);
+	            if (res && res.success) {
+	                var isActive = (parseInt(res.new_status, 10) === 1);
+	                if (isActive) {
+	                    $statusCell.html('<span class="status-pill status-pill-active"><i class="fa fa-check-circle"></i> Active</span>');
+	                    $btn.html('<i class="fa fa-power-off" style="color:#dc2626;"></i> <span>Deactivate</span>');
+	                } else {
+	                    $statusCell.html('<span class="status-pill status-pill-inactive"><i class="fa fa-ban"></i> Inactive</span>');
+	                    $btn.html('<i class="fa fa-power-off" style="color:#059669;"></i> <span>Activate</span>');
+	                }
+	                showAdminToast(res.message || 'Status updated.', 'success');
+	            } else {
+	                showAdminToast((res && res.message) ? res.message : 'Error toggling status.', 'error');
+	            }
+	        }).fail(function() {
+	            $btn.css('pointer-events', '').fadeTo(200, 1);
+	            showAdminToast('Network error while toggling customer status.', 'error');
+	        });
+	    });
+
+	    // Review Status Toggle (Zero Reload)
+	    $(document).on('click', '.js-review-toggle-status', function(e) {
+	        e.preventDefault();
+	        var $btn = $(this);
+	        var url = $btn.attr('href');
+	        var reviewId = $btn.data('id');
+	        var $row = $('#review-row-' + reviewId);
+	        var $badge = $('#review-status-cell-' + reviewId).find('.badge');
+	        var csrfToken = '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>';
+
+	        $btn.prop('disabled', true);
+
+	        $.ajax({
+	            url: url,
+	            type: 'POST',
+	            data: {
+	                id: reviewId,
+	                ajax: 1,
+	                _csrf: csrfToken
+	            },
+	            dataType: 'json'
+	        }).done(function(res) {
+	            $btn.prop('disabled', false);
+	            if (res && res.success) {
+	                var isAppr = (res.new_status === 'Approved');
+	                if (isAppr) {
+	                    $badge.removeClass('badge-warning').addClass('badge-success').text('Approved');
+	                    $('.js-review-toggle-status[data-id="' + reviewId + '"]')
+	                        .removeClass('btn-success').addClass('btn-warning').text('Unapprove');
+	                } else {
+	                    $badge.removeClass('badge-success').addClass('badge-warning').text('Pending');
+	                    $('.js-review-toggle-status[data-id="' + reviewId + '"]')
+	                        .removeClass('btn-warning').addClass('btn-success').text('Approve');
+	                }
+	                showAdminToast(res.message || 'Review status updated.', 'success');
+	            } else {
+	                showAdminToast((res && res.message) ? res.message : 'Error updating review status.', 'error');
+	            }
+	        }).fail(function() {
+	            $btn.prop('disabled', false);
+	            showAdminToast('Network error while updating review status.', 'error');
+	        });
+	    });
+
+	    // Settings Tabs AJAX Submissions (Preserves active tab and scroll position)
+	    if (window.location.pathname.indexOf('settings.php') !== -1) {
+	        $('.tab-content form').on('submit', function(e) {
+	            var $form = $(this);
+	            var $submitBtn = $form.find('button[type="submit"], input[type="submit"]').first();
+	            if ($submitBtn.data('submitting')) return false;
+
+	            e.preventDefault();
+	            $submitBtn.data('submitting', true);
+	            var originalVal = $submitBtn.is('input') ? $submitBtn.val() : $submitBtn.html();
+	            if ($submitBtn.is('input')) {
+	                $submitBtn.val('Saving changes...');
+	            } else {
+	                $submitBtn.html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+	            }
+	            $submitBtn.prop('disabled', true);
+
+	            var formData = new FormData(this);
+	            formData.append('is_ajax', '1');
+	            var csrfToken = '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>';
+	            if (csrfToken && !formData.has('_csrf')) {
+	                formData.append('_csrf', csrfToken);
+	            }
+
+	            $.ajax({
+	                url: $form.attr('action') || 'settings.php',
+	                type: 'POST',
+	                data: formData,
+	                processData: false,
+	                contentType: false,
+	                dataType: 'json'
+	            }).done(function(res) {
+	                $submitBtn.prop('disabled', false).data('submitting', false);
+	                if ($submitBtn.is('input')) {
+	                    $submitBtn.val(originalVal);
+	                } else {
+	                    $submitBtn.html(originalVal);
+	                }
+
+	                if (res && res.success) {
+	                    showAdminToast(res.message || 'Settings saved successfully!', 'success');
+	                } else {
+	                    var errMsg = (res && res.message) ? res.message : 'Failed to save settings.';
+	                    showAdminToast(errMsg, 'error');
+	                }
+	            }).fail(function(xhr) {
+	                $submitBtn.prop('disabled', false).data('submitting', false);
+	                if ($submitBtn.is('input')) {
+	                    $submitBtn.val(originalVal);
+	                } else {
+	                    $submitBtn.html(originalVal);
+	                }
+	                var errMsg = 'Error saving settings. Please try again.';
+	                try {
+	                    var j = JSON.parse(xhr.responseText);
+	                    if (j.message) errMsg = j.message;
+	                } catch(ex) {}
+	                showAdminToast(errMsg, 'error');
+	            });
+	        });
+	    }
 	  });
 
 		function confirmDelete()

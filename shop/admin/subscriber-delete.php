@@ -1,6 +1,4 @@
 <?php require_once __DIR__ . '/inc/guard.php'; ?>
-<?php require_once('header.php'); ?>
-
 <?php
 // Preventing the direct access of this page.
 if(!isset($_REQUEST['id'])) {
@@ -24,5 +22,14 @@ if(!isset($_REQUEST['id'])) {
 	$statement = $pdo->prepare("DELETE FROM tbl_subscriber WHERE subs_id=?");
 	$statement->execute(array($_REQUEST['id']));
 
+	$isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+	    || isset($_POST['ajax']) || isset($_GET['ajax']);
+	if ($isAjax) {
+	    header('Content-Type: application/json; charset=UTF-8');
+	    echo json_encode(['success' => true, 'message' => 'Subscriber deleted successfully.']);
+	    exit;
+	}
+
 	header('location: subscriber.php');
+	exit;
 ?>

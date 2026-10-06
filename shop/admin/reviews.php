@@ -49,7 +49,7 @@
                             foreach ($result as $row) {
                                 $i++;
                                 ?>
-                                <tr>
+                                <tr id="review-row-<?php echo $row['id']; ?>">
                                     <td><?php echo $i; ?></td>
                                     <td><?php echo htmlspecialchars($row['p_name']); ?></td>
                                     <td><?php echo htmlspecialchars($row['cust_name']); ?></td>
@@ -67,7 +67,7 @@
                                     <td><?php echo htmlspecialchars($row['review_title']); ?></td>
                                     <td><?php echo nl2br(htmlspecialchars(substr($row['comment'], 0, 100))); ?>...</td> <!-- Show snippet -->
                                     <td><?php echo date('Y-m-d H:i:s', strtotime($row['created_at'])); ?></td>
-                                    <td>
+                                    <td class="cell-review-status" id="review-status-cell-<?php echo $row['id']; ?>">
                                         <span class="badge <?php echo ($row['status'] == 'Approved') ? 'badge-success' : 'badge-warning'; ?>">
                                             <?php echo htmlspecialchars($row['status']); ?>
                                         </span>
@@ -77,8 +77,8 @@
                                             View
                                         </button>
                                         <a href="review-approve.php?id=<?php echo $row['id']; ?>"
-                                           class="btn btn-<?php echo ($row['status'] == 'Approved') ? 'warning' : 'success'; ?> btn-xs"
-                                           onclick="return confirm('Are you sure you want to <?php echo ($row['status'] == 'Approved') ? 'unapprove' : 'approve'; ?> this review?');">
+                                           class="btn btn-<?php echo ($row['status'] == 'Approved') ? 'warning' : 'success'; ?> btn-xs js-review-toggle-status"
+                                           data-id="<?php echo $row['id']; ?>">
                                             <?php echo ($row['status'] == 'Approved') ? 'Unapprove' : 'Approve'; ?>
                                         </a>
                                         <a href="#" class="btn btn-danger btn-xs"
@@ -116,7 +116,8 @@
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                                 <a href="review-approve.php?id=<?php echo $row['id']; ?>"
-                                                   class="btn btn-<?php echo ($row['status'] == 'Approved') ? 'warning' : 'success'; ?>">
+                                                   class="btn btn-<?php echo ($row['status'] == 'Approved') ? 'warning' : 'success'; ?> js-review-toggle-status"
+                                                   data-id="<?php echo $row['id']; ?>">
                                                     <?php echo ($row['status'] == 'Approved') ? 'Unapprove' : 'Approve'; ?>
                                                 </a>
                                             </div>
