@@ -783,8 +783,91 @@
     </script>
 
 <?php require_once __DIR__ . '/inc/admin_notification_modal.php'; ?>
+
+<!-- Admin PWA WebApp Install & Chrome Side Bar Modal -->
+<div id="adminPwaInstallModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15, 23, 42, 0.75); backdrop-filter:blur(6px); z-index:999999; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+    <div style="background:#ffffff; border-radius:18px; max-width:480px; width:100%; box-shadow:0 25px 50px -12px rgba(15, 23, 42, 0.35); border:1px solid #E2E8F0; overflow:hidden; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; animation:adminPwaPop 0.22s ease-out;">
+        <!-- Modal Top Bar -->
+        <div style="background:linear-gradient(135deg, #FFFDF0 0%, #FEF9C3 100%); padding:20px 24px; border-bottom:1px solid #FEF08A; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:44px; height:44px; border-radius:12px; background:#0F172A; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(15, 23, 42, 0.2);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FEDB65" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:17px; font-weight:800; color:#0F172A; letter-spacing:-0.3px;">Install Admin WebApp</h3>
+                    <p style="margin:2px 0 0; font-size:12.5px; color:#B45309; font-weight:600;">Fast access & Chrome Side Bar experience</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAdminPwaModal()" style="background:transparent; border:none; color:#64748B; font-size:24px; cursor:pointer; line-height:1; padding:4px;" title="Close">&times;</button>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div style="padding:22px 24px;">
+            <p style="margin:0 0 16px; font-size:13.5px; color:#475569; line-height:1.5;">
+                Install the Admin Panel as a standalone desktop app or run it alongside your tabs using Chrome's Side Bar feature.
+            </p>
+
+            <!-- Action 1: Direct Prompt / Native Install -->
+            <button type="button" onclick="window.triggerAdminPwaInstall()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#FEDB65; color:#0F172A; border:1px solid #FDD835; border-radius:12px; padding:12px 18px; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 3px 8px rgba(254, 219, 101, 0.4); margin-bottom:10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Install Admin App (Instant)</span>
+            </button>
+
+            <!-- Action 2: Open in Chrome Side Panel / Sidebar -->
+            <button type="button" onclick="window.launchAdminSidePanel()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#F8FAFC; color:#0F172A; border:1.5px solid #E2E8F0; border-radius:12px; padding:11px 18px; font-weight:700; font-size:13.5px; cursor:pointer; margin-bottom:18px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                </svg>
+                <span>Launch in Chrome Side Bar / Compact Window</span>
+            </button>
+
+            <!-- Guide Steps for Chrome -->
+            <div style="background:#F8FAFC; border-radius:12px; padding:14px 16px; border:1px solid #E2E8F0;">
+                <div style="font-size:12px; font-weight:700; color:#0F172A; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+                    <i class="fa fa-chrome" style="color:#2563EB;"></i> How to install in Google Chrome:
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">1</span>
+                    <span>Look at the right side of Chrome's address bar (Omnibox) for the <strong>Install</strong> icon <code>(⤓)</code>.</span>
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">2</span>
+                    <span>Or click Chrome <strong>Menu (⋮) &gt; 'Cast, save, and share' &gt; 'Install ShopMart Admin...'</strong></span>
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">3</span>
+                    <span>Chrome Side Panel: Click Chrome Side Panel icon next to address bar to pin the app in the side panel.</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="background:#F8FAFC; padding:12px 24px; border-top:1px solid #E2E8F0; text-align:right;">
+            <button type="button" onclick="closeAdminPwaModal()" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:7px 16px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Close</button>
+        </div>
+    </div>
+</div>
+<style>
+@keyframes adminPwaPop {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+.sn-pwa-header-btn:hover svg {
+    transform: translateY(1px);
+}
+</style>
+
 <script src="enterprise.js"></script>
 <script src="js/ai-global-voice.js?v=<?php echo time(); ?>"></script>
 <script src="js/admin-notifications.js?v=<?php echo filemtime(__DIR__ . '/js/admin-notifications.js'); ?>"></script>
+<script src="js/admin-pwa.js?v=<?php echo filemtime(__DIR__ . '/js/admin-pwa.js'); ?>"></script>
 </body>
 </html>

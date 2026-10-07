@@ -143,6 +143,15 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
     <link rel="icon" type="image/png" href="assets/uploads/<?php echo htmlspecialchars($favicon); ?>">
 
+    <!-- Progressive Web App (PWA) Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FEDB65">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ShopMart">
+    <link rel="apple-touch-icon" href="assets/img/pwa-icon-192.png">
+
     <!-- Resource Hints & Fast Connection Preconnects -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -237,6 +246,48 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
 
     <style>
         /* General Reset & Body */
+        /* PWA Install Button */
+        .sn-pwa-install-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            height: 38px;
+            padding: 0 12px;
+            border-radius: 9999px;
+            background: #FFFDF0;
+            border: 1.5px solid #FEF08A;
+            color: #0F172A;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            white-space: nowrap;
+        }
+        .sn-pwa-install-btn:hover {
+            background: #FEDB65;
+            border-color: #FDD835;
+            color: #B45309;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(254, 219, 101, 0.4);
+        }
+        .sn-pwa-install-btn svg {
+            color: #B45309;
+            flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+            .sn-pwa-install-btn {
+                height: 32px;
+                padding: 0 9px;
+                font-size: 11.5px;
+                gap: 4px;
+            }
+            .sn-pwa-install-btn svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
+
         *, *::before, *::after {
             margin: 0;
             padding: 0;
@@ -1921,8 +1972,18 @@ body.sn-popup-open {
                 <div class="sn-search-suggestions" id="sn-search-suggestions"></div>
             </form>
 
-            <!-- Actions: Bell (Mobile) + Account (Desktop) + Cart -->
+            <!-- Actions: PWA App + Bell (Mobile) + Account (Desktop) + Cart -->
             <div class="sn-header-actions">
+                <!-- PWA Download / Install App Button -->
+                <button type="button" onclick="window.triggerShopPwaInstall && window.triggerShopPwaInstall(event)" class="sn-pwa-install-btn" id="btnShopPwaInstall" title="Download & Install WebApp (Chrome & Mobile)">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span class="sn-pwa-btn-label">App</span>
+                </button>
+
                 <!-- Notifications Bell -->
                 <a href="<?php echo BASE_URL; ?>notifications.php" class="sn-bell-btn" id="sn-header-notif-btn" title="Notifications" style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
                     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2011,6 +2072,9 @@ body.sn-popup-open {
             <a href="<?php echo BASE_URL; ?>product-category.php?id=2&type=top-category" class="sn-nav-link">New Arrivals</a>
             <a href="<?php echo BASE_URL; ?>product-category.php?id=3&type=top-category" class="sn-nav-link">Brands</a>
             <a href="<?php echo BASE_URL; ?>contact.php" class="sn-nav-link <?php echo ($cur_page == 'contact.php') ? 'active' : ''; ?>">Contact</a>
+            <a href="javascript:void(0)" onclick="window.triggerShopPwaInstall && window.triggerShopPwaInstall(event)" class="sn-nav-link sn-nav-pwa-link" style="margin-left:auto; display:inline-flex; align-items:center; gap:6px; color:#B45309; font-weight:700;" title="Download WebApp from Chrome Side Bar">
+                <i class="fa fa-download" style="color:#F59E0B;"></i> <span>Download App</span>
+            </a>
         </nav>
     </div>
 </header>

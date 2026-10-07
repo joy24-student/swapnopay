@@ -54,6 +54,13 @@ foreach ($result as $row) {
 
 <link rel="stylesheet" href="css/enterprise.css?v=<?php echo filemtime(__DIR__ . '/css/enterprise.css'); ?>">
 <link rel="stylesheet" href="css/admin-notifications.css?v=<?php echo filemtime(__DIR__ . '/css/admin-notifications.css'); ?>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FEDB65">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ShopAdmin">
+<link rel="apple-touch-icon" href="img/admin-pwa-icon-192.png">
 <meta name="csrf-token" content="<?php echo $csrf->getToken(); ?>">
 <script src="js/jquery-2.2.4.min.js"></script>
 </head>
@@ -116,6 +123,20 @@ foreach ($result as $row) {
 								</span>
 								<span class="sn-ai-btn-title hidden-xs">AI Copilot</span>
 								<span class="sn-ai-voice-dot" title="Voice & Vision Active"><i class="fa fa-microphone"></i></span>
+							</a>
+						</li>
+
+						<!-- Dedicated PWA WebApp Install Button (Chrome Side Bar & Desktop) -->
+						<li class="sn-pwa-li" style="list-style: none !important;">
+							<a href="javascript:void(0)" onclick="window.triggerAdminPwaInstall && window.triggerAdminPwaInstall(event)" class="sn-ai-header-btn sn-pwa-header-btn" id="btnAdminPwaInstallHeader" title="Download & Install WebApp (Chrome Side Bar / Desktop)">
+								<span class="sn-pwa-btn-icon" style="display:flex; align-items:center; color:#B45309;">
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+										<polyline points="7 10 12 15 17 10"></polyline>
+										<line x1="12" y1="15" x2="12" y2="3"></line>
+									</svg>
+								</span>
+								<span class="hidden-xs" style="font-weight:700;">Install App</span>
 							</a>
 						</li>
 
@@ -204,6 +225,16 @@ foreach ($result as $row) {
 			        <li class="treeview <?php if($cur_page == 'index.php') {echo 'active';} ?>">
 			          <a href="index.php">
 			            <i class="fa fa-home"></i> <span>Dashboard</span>
+			          </a>
+			        </li>
+
+			        <!-- Download WebApp / Install PWA Menu Item -->
+			        <li class="treeview sn-sidebar-pwa-item">
+			          <a href="javascript:void(0)" onclick="window.triggerAdminPwaInstall && window.triggerAdminPwaInstall(event)" title="Download Admin WebApp from Chrome Side Bar">
+			            <i class="fa fa-download" style="color: #F59E0B;"></i> <span>Download WebApp</span>
+			            <span class="pull-right-container">
+			              <small class="label pull-right" style="background:#FEDB65; color:#0F172A; font-weight:700; border-radius:4px; padding:2px 6px;">App</small>
+			            </span>
 			          </a>
 			        </li>
 

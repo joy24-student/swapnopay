@@ -1,0 +1,74 @@
+{
+  "name": "ShopMart Admin Panel",
+  "short_name": "ShopAdmin",
+  "description": "Enterprise Store Administration, Real-Time Orders, Live Support & AI Voice Copilot",
+  "start_url": "index.php",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "minimal-ui",
+    "standalone"
+  ],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#fedb65",
+  "categories": [
+    "business",
+    "productivity",
+    "management"
+  ],
+  "side_panel": {
+    "preferred_width": 420
+  },
+  "icons": [
+    {
+      "src": "img/admin-pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/admin-pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/admin-pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Orders Management",
+      "short_name": "Orders",
+      "description": "View and update customer orders",
+      "url": "order.php",
+      "icons": [{ "src": "img/admin-pwa-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Support Chat",
+      "short_name": "Live Chat",
+      "description": "Live customer support and voice/video calling",
+      "url": "live-chat.php",
+      "icons": [{ "src": "img/admin-pwa-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Voice Copilot",
+      "short_name": "AI Copilot",
+      "description": "Voice command copilot and autonomous store operations",
+      "url": "ai-copilot.php",
+      "icons": [{ "src": "img/admin-pwa-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Product Catalog",
+      "short_name": "Products",
+      "description": "Manage products, inventory and pricing",
+      "url": "product.php",
+      "icons": [{ "src": "img/admin-pwa-icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -283,6 +283,85 @@ window.SHOP_FIREBASE_CONFIG = {
 };
 </script>
 <script src="assets/js/firebase-notifications.js?v=<?php echo file_exists(__DIR__ . '/assets/js/firebase-notifications.js') ? filemtime(__DIR__ . '/assets/js/firebase-notifications.js') : time(); ?>"></script>
+<script src="assets/js/shop-pwa.js?v=<?php echo file_exists(__DIR__ . '/assets/js/shop-pwa.js') ? filemtime(__DIR__ . '/assets/js/shop-pwa.js') : '1'; ?>"></script>
+
+<!-- ShopMart Storefront PWA Install & Chrome Side Bar Modal -->
+<div id="shopPwaInstallModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(6px); z-index:9999999; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+    <div style="background:#ffffff; border-radius:20px; max-width:460px; width:100%; box-shadow:0 25px 50px -12px rgba(15, 23, 42, 0.35); border:1px solid #E2E8F0; overflow:hidden; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; animation:shopPwaPop 0.22s ease-out;">
+        <!-- Modal Top Bar -->
+        <div style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); padding:20px 24px; border-bottom:1px solid #FDE68A; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:46px; height:46px; border-radius:14px; background:#FEDB65; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(254, 219, 101, 0.4); border:1.5px solid #FDD835;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:17px; font-weight:800; color:#0F172A; letter-spacing:-0.3px;">Install ShopMart App</h3>
+                    <p style="margin:2px 0 0; font-size:12.5px; color:#B45309; font-weight:600;">Fast, native shopping & Chrome Side Bar</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeShopPwaModal()" style="background:transparent; border:none; color:#64748B; font-size:24px; cursor:pointer; line-height:1; padding:4px;" title="Close">&times;</button>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div style="padding:22px 24px;">
+            <p style="margin:0 0 16px; font-size:13.5px; color:#475569; line-height:1.5;">
+                Enjoy lightning-fast product browsing, instant cart access, and order tracking right from your home screen or Chrome Side Bar.
+            </p>
+
+            <!-- Action 1: Direct Prompt / Native Install -->
+            <button type="button" onclick="window.triggerShopPwaInstall()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#FEDB65; color:#0F172A; border:1px solid #FDD835; border-radius:12px; padding:12px 18px; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 3px 8px rgba(254, 219, 101, 0.4); margin-bottom:10px; transition:all 0.15s ease;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Install ShopMart App (Instant)</span>
+            </button>
+
+            <!-- Action 2: Open in Chrome Side Panel / Sidebar -->
+            <button type="button" onclick="window.launchShopSidePanel()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#F8FAFC; color:#0F172A; border:1.5px solid #E2E8F0; border-radius:12px; padding:11px 18px; font-weight:700; font-size:13.5px; cursor:pointer; margin-bottom:18px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                </svg>
+                <span>Launch in Chrome Side Bar / Compact Window</span>
+            </button>
+
+            <!-- Guide Steps for Chrome -->
+            <div style="background:#F8FAFC; border-radius:12px; padding:14px 16px; border:1px solid #E2E8F0;">
+                <div style="font-size:12px; font-weight:700; color:#0F172A; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+                    <i class="fab fa-chrome" style="color:#2563EB;"></i> How to install in Google Chrome:
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">1</span>
+                    <span>Click the <strong>Install</strong> icon <code>(⤓)</code> on the right side of Chrome's address bar.</span>
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">2</span>
+                    <span>Or click Chrome <strong>Menu (⋮) &gt; 'Cast, save, and share' &gt; 'Install ShopMart...'</strong></span>
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:#475569;">
+                    <span style="background:#FEDB65; color:#0F172A; font-weight:800; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;">3</span>
+                    <span>On Mobile: Tap <strong>Menu (⋮) &gt; 'Add to Home screen'</strong> or 'Install app'.</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="background:#F8FAFC; padding:12px 24px; border-top:1px solid #E2E8F0; text-align:right;">
+            <button type="button" onclick="closeShopPwaModal()" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:7px 16px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Close</button>
+        </div>
+    </div>
+</div>
+<style>
+@keyframes shopPwaPop {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+</style>
 
 <?php echo $before_body; ?>
 </body>
