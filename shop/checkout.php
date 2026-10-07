@@ -245,16 +245,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
                 cust_password, cust_token, cust_datetime, cust_timestamp, cust_status
             ) VALUES (
                 ?, '', ?, ?, ?,
-                ?, ?, ?, '5500',
-                ?, '', ?, ?, ?, ?, ?, '5500',
-                ?, '', ?, ?, ?, ?, ?, '5500',
+                ?, ?, ?, ?,
+                ?, '', ?, ?, ?, ?, ?, ?,
+                ?, '', ?, ?, ?, ?, ?, ?,
                 ?, '', ?, ?, 1
             )");
+            $zip_val = !empty($def_zip) ? $def_zip : '';
             $stmt_new->execute([
                 $full_name, $email, $phone, $country_id,
-                $full_delivery_address, $district, $division,
-                $full_name, $phone, $country_id, $full_delivery_address, $district, $division,
-                $full_name, $phone, $country_id, $full_delivery_address, $district, $division,
+                $full_delivery_address, $district, $division, $zip_val,
+                $full_name, $phone, $country_id, $full_delivery_address, $district, $division, $zip_val,
+                $full_name, $phone, $country_id, $full_delivery_address, $district, $division, $zip_val,
                 $temp_password, $now, time()
             ]);
             $new_cust_id = $pdo->lastInsertId();

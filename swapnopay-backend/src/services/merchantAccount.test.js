@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { lookupMerchantInAdminDb, requirePlatformUser } from './merchantAccount.js'
+import { inMemoryMerchantGatewaySettings } from './adminSupabase.js'
 
 const uid = '11111111-1111-4111-8111-111111111111'
 const mid = '22222222-2222-4222-8222-222222222222'
@@ -24,6 +25,8 @@ function fakeAdmin(tables, failure) {
 }
 
 test('existing merchant keeps canonical ID and is onboarded without a dedicated DB', async () => {
+  inMemoryMerchantGatewaySettings.delete(uid)
+  inMemoryMerchantGatewaySettings.delete(mid)
   const result = await lookupMerchantInAdminDb('owner@example.com', uid, fakeAdmin({
     merchants: [{ id: mid, user_id: uid, business_name: 'Merchant Supplies', phone: '01700000000' }],
   }))

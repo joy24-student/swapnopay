@@ -17,7 +17,7 @@ $error_message1 = '';
 $success_message1 = '';
 
 // Getting all language variables (cached for performance)
-$langCacheFile = __DIR__ . '/admin/inc/cache_lang.json';
+$langCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('lang') : __DIR__ . '/admin/inc/cache_lang.json';
 $langValues = null;
 if (file_exists($langCacheFile) && (time() - filemtime($langCacheFile) < 86400)) {
     $langValues = json_decode(file_get_contents($langCacheFile), true);
@@ -37,7 +37,7 @@ foreach ($langValues as $lv) {
 // Fetch general website settings (cached for 300 seconds)
 $settings = $GLOBALS['STORE_SETTINGS'] ?? null;
 if (!$settings) {
-    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    $settingsCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('settings') : __DIR__ . '/admin/inc/cache_settings.json';
     if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 300)) {
         $settings = json_decode(file_get_contents($settingsCacheFile), true);
     }
@@ -2033,7 +2033,7 @@ body.sn-popup-open {
             <a href="<?php echo BASE_URL; ?>" class="sn-nav-link <?php echo ($cur_page == 'index.php' || $cur_page == '') ? 'active' : ''; ?>">Home</a>
 
             <?php
-            $menuCacheFile = __DIR__ . '/admin/inc/cache_menu.json';
+            $menuCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('menu') : __DIR__ . '/admin/inc/cache_menu.json';
             $menuData = null;
             if (file_exists($menuCacheFile) && (time() - filemtime($menuCacheFile) < 300)) {
                 $menuData = json_decode(file_get_contents($menuCacheFile), true);

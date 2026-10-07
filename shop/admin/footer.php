@@ -40,7 +40,9 @@
 	                <line x1="9" y1="11" x2="15" y2="11"></line>
 	                <line x1="9" y1="15" x2="13" y2="15"></line>
 	            </svg>
-	            <span class="sn-dock-count"><?= $dockPendingOrders > 0 ? $dockPendingOrders : 24 ?></span>
+	            <?php if ($dockPendingOrders > 0): ?>
+	                <span class="sn-dock-count"><?= $dockPendingOrders ?></span>
+	            <?php endif; ?>
 	        </div>
 	        <span class="sn-dock-text">Orders</span>
 	    </a>

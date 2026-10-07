@@ -53,7 +53,7 @@ if (!function_exists('renderAliProductCard')) {
 // -------------------------------------------------------------------------
 $s = $GLOBALS['STORE_SETTINGS'] ?? null;
 if (!$s) {
-    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    $settingsCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('settings') : __DIR__ . '/admin/inc/cache_settings.json';
     if (file_exists($settingsCacheFile) && (time() - filemtime($settingsCacheFile) < 300)) {
         $s = json_decode(file_get_contents($settingsCacheFile), true);
     }
@@ -82,7 +82,7 @@ $hero_slider_autoplay = isset($s['hero_slider_autoplay']) ? (int)$s['hero_slider
 $hero_slider_interval = !empty($s['hero_slider_interval']) ? (int)$s['hero_slider_interval'] : 4500;
 
 // Query Hero Slides from Supabase (Microcached 120s)
-$slidesCacheFile = __DIR__ . '/admin/inc/cache_slides.json';
+$slidesCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('slides') : __DIR__ . '/admin/inc/cache_slides.json';
 $heroSlides = null;
 if (file_exists($slidesCacheFile) && (time() - filemtime($slidesCacheFile) < 120)) {
     $heroSlides = json_decode(file_get_contents($slidesCacheFile), true);
@@ -176,7 +176,7 @@ if (!empty($_SESSION['customer']['cust_id'])) {
 $ssrSignalIds = array_values(array_unique(array_filter($ssrSignalIds)));
 
 $homeFeedKey = 'sn_feed_' . (!empty($ssrSignalIds) ? md5(implode(',', array_slice($ssrSignalIds, 0, 10))) : 'def');
-$feedCacheFile = __DIR__ . '/admin/inc/cache_home_feed.json';
+$feedCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('home_feed') : __DIR__ . '/admin/inc/cache_home_feed.json';
 $featuredProducts = null;
 
 if (!empty($_SESSION[$homeFeedKey]) && is_array($_SESSION[$homeFeedKey]) && !empty($_SESSION[$homeFeedKey]['_t']) && (time() - $_SESSION[$homeFeedKey]['_t'] < 120)) {
@@ -2612,7 +2612,7 @@ body {
                 <!-- 1. All Categories -->
                 <a href="<?php echo BASE_URL; ?>categories.php" class="sn-category-scroll-item">
                     <div class="sn-category-scroll-box" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a;">
-                        <img src="assets/uploads/cat_all.jpg" alt="All Categories" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/cat_mockup/sub_matching_sets.png';">
+                        <img src="assets/uploads/cat_all.jpg" alt="All Categories" loading="lazy" onerror="this.onerror=null; this.src='assets/uploads/cat_all.jpg';">
                     </div>
                     <span class="sn-category-scroll-name">All Categories</span>
                 </a>

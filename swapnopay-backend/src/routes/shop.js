@@ -10,7 +10,11 @@ export function createShopRouter({ service = getShopService, authenticate = requ
   const wrap = handler => async (req, res) => {
     try { await handler(req, res) } catch (error) {
       console.error('[shop/api]', error.code || 'STORE_REQUEST_FAILED', error.message, error.stack)
-      res.status(503).json({ ok: false, code: 'STORE_REQUEST_FAILED', error: 'The storefront service is unavailable: ' + error.message })
+      if (error instanceof ShopError) {
+        res.status(error.status || 400).json({ ok: false, code: error.code || 'STORE_REQUEST_FAILED', error: error.message })
+      } else {
+        res.status(503).json({ ok: false, code: 'STORE_REQUEST_FAILED', error: 'The storefront service is unavailable: request failed.' })
+      }
     }
   }
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next() })

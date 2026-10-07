@@ -120,27 +120,27 @@ $stmt_cust->execute([$cust_id]);
 $cust = $stmt_cust->fetch(PDO::FETCH_ASSOC) ?: $_SESSION['customer'];
 
 // Primary / Default Address Data
-$def_name    = !empty($cust['cust_name']) ? $cust['cust_name'] : 'Joy Saha';
-$def_phone   = !empty($cust['cust_phone']) ? $cust['cust_phone'] : '+880 1XXXXXXXXX';
-$def_address = !empty($cust['cust_address']) ? $cust['cust_address'] : 'Kazi Hall, AAUB, Lalmonirhat';
-$def_city    = !empty($cust['cust_city']) ? $cust['cust_city'] : 'Lalmonirhat';
-$def_zip     = !empty($cust['cust_zip']) ? $cust['cust_zip'] : '5500';
+$def_name    = !empty($cust['cust_name']) ? $cust['cust_name'] : '';
+$def_phone   = !empty($cust['cust_phone']) ? $cust['cust_phone'] : '';
+$def_address = !empty($cust['cust_address']) ? $cust['cust_address'] : '';
+$def_city    = !empty($cust['cust_city']) ? $cust['cust_city'] : '';
+$def_zip     = !empty($cust['cust_zip']) ? $cust['cust_zip'] : '';
 $def_country = !empty($cust['cust_country']) ? $cust['cust_country'] : 'Bangladesh';
 
 // Home / Billing Address Data
-$home_name    = !empty($cust['cust_b_name']) ? $cust['cust_b_name'] : 'Home';
-$home_phone   = !empty($cust['cust_b_phone']) ? $cust['cust_b_phone'] : '+880 1XXXXXXXXX';
-$home_address = !empty($cust['cust_b_address']) ? $cust['cust_b_address'] : 'Somserabad, Lakshmipur Sadar';
-$home_city    = !empty($cust['cust_b_city']) ? $cust['cust_b_city'] : 'Lakshmipur';
-$home_zip     = !empty($cust['cust_b_zip']) ? $cust['cust_b_zip'] : '3700';
+$home_name    = !empty($cust['cust_b_name']) ? $cust['cust_b_name'] : '';
+$home_phone   = !empty($cust['cust_b_phone']) ? $cust['cust_b_phone'] : '';
+$home_address = !empty($cust['cust_b_address']) ? $cust['cust_b_address'] : '';
+$home_city    = !empty($cust['cust_b_city']) ? $cust['cust_b_city'] : '';
+$home_zip     = !empty($cust['cust_b_zip']) ? $cust['cust_b_zip'] : '';
 $home_country = !empty($cust['cust_b_country']) ? $cust['cust_b_country'] : 'Bangladesh';
 
 // Office / Shipping Address Data
-$off_name    = !empty($cust['cust_s_name']) ? $cust['cust_s_name'] : 'Parhat';
-$off_phone   = !empty($cust['cust_s_phone']) ? $cust['cust_s_phone'] : '+880 1XXXXXXXXX';
-$off_address = !empty($cust['cust_s_address']) ? $cust['cust_s_address'] : 'Parhat, Lakshmipur Sadar';
-$off_city    = !empty($cust['cust_s_city']) ? $cust['cust_s_city'] : 'Lakshmipur';
-$off_zip     = !empty($cust['cust_s_zip']) ? $cust['cust_s_zip'] : '3700';
+$off_name    = !empty($cust['cust_s_name']) ? $cust['cust_s_name'] : '';
+$off_phone   = !empty($cust['cust_s_phone']) ? $cust['cust_s_phone'] : '';
+$off_address = !empty($cust['cust_s_address']) ? $cust['cust_s_address'] : '';
+$off_city    = !empty($cust['cust_s_city']) ? $cust['cust_s_city'] : '';
+$off_zip     = !empty($cust['cust_s_zip']) ? $cust['cust_s_zip'] : '';
 $off_country = !empty($cust['cust_s_country']) ? $cust['cust_s_country'] : 'Bangladesh';
 
 // Bangladesh prominent districts
@@ -407,17 +407,25 @@ $bd_districts = [
                                     <i class="fa-solid fa-house"></i>
                                 </div>
                                 <div style="flex: 1;">
-                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($def_name) ?></h4>
-                                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
-                                        <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
-                                        <?= htmlspecialchars($def_address) ?><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($def_city) ?><?= !empty($def_zip) ? ', ' . htmlspecialchars($def_zip) : '' ?></span><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($def_country) ?></span>
-                                    </p>
-                                    <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
-                                        <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
-                                        <?= htmlspecialchars($def_phone) ?>
-                                    </p>
+                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($def_name ?: 'Default Address') ?></h4>
+                                    <?php if (!empty($def_address)): ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
+                                            <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
+                                            <?= htmlspecialchars($def_address) ?><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($def_city) ?><?= !empty($def_zip) ? ', ' . htmlspecialchars($def_zip) : '' ?></span><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($def_country) ?></span>
+                                        </p>
+                                        <?php if (!empty($def_phone)): ?>
+                                            <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
+                                                <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
+                                                <?= htmlspecialchars($def_phone) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #94a3b8; font-style: italic;">
+                                            No default address saved yet. Click Edit to add.
+                                        </p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -443,22 +451,30 @@ $bd_districts = [
                                     <i class="fa-solid fa-house"></i>
                                 </div>
                                 <div style="flex: 1;">
-                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($home_name) ?></h4>
-                                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
-                                        <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
-                                        <?= htmlspecialchars($home_address) ?><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($home_city) ?><?= !empty($home_zip) ? ', ' . htmlspecialchars($home_zip) : '' ?></span><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($home_country) ?></span>
-                                    </p>
-                                    <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
-                                        <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
-                                        <?= htmlspecialchars($home_phone) ?>
-                                    </p>
+                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($home_name ?: 'Home Address') ?></h4>
+                                    <?php if (!empty($home_address)): ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
+                                            <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
+                                            <?= htmlspecialchars($home_address) ?><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($home_city) ?><?= !empty($home_zip) ? ', ' . htmlspecialchars($home_zip) : '' ?></span><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($home_country) ?></span>
+                                        </p>
+                                        <?php if (!empty($home_phone)): ?>
+                                            <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
+                                                <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
+                                                <?= htmlspecialchars($home_phone) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #94a3b8; font-style: italic;">
+                                            No home/billing address saved yet. Click Edit to add.
+                                        </p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Card 3: Parhat / Office Address (Purple Icon) -->
+                        <!-- Card 3: Office Address (Purple Icon) -->
                         <div class="sn-addr-card-standard" id="card-office">
                             <div class="sn-addr-card-top-row">
                                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -478,18 +494,28 @@ $bd_districts = [
                                     <i class="fa-solid fa-building"></i>
                                 </div>
                                 <div style="flex: 1;">
-                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($off_name) ?></h4>
-                                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
-                                        <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
-                                        <?= htmlspecialchars($off_address) ?><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($off_city) ?><?= !empty($off_zip) ? ', ' . htmlspecialchars($off_zip) : '' ?></span><br>
-                                        <span style="padding-left: 18px;"><?= htmlspecialchars($off_country) ?></span>
-                                    </p>
-                                    <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
-                                        <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
-                                        <?= htmlspecialchars($off_phone) ?>
-                                    </p>
+                                    <h4 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($off_name ?: 'Office Address') ?></h4>
+                                    <?php if (!empty($off_address)): ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #475569; line-height: 1.5;">
+                                            <i class="fa-solid fa-location-dot" style="color: #2563eb; margin-right: 6px; font-size: 12px;"></i>
+                                            <?= htmlspecialchars($off_address) ?><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($off_city) ?><?= !empty($off_zip) ? ', ' . htmlspecialchars($off_zip) : '' ?></span><br>
+                                            <span style="padding-left: 18px;"><?= htmlspecialchars($off_country) ?></span>
+                                        </p>
+                                        <?php if (!empty($off_phone)): ?>
+                                            <p style="margin: 0; font-size: 12.5px; color: #64748b; padding-left: 18px;">
+                                                <i class="fa-solid fa-phone" style="margin-right: 4px; font-size: 11px;"></i>
+                                                <?= htmlspecialchars($off_phone) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #94a3b8; font-style: italic;">
+                                            No office/shipping address saved yet. Click Edit to add.
+                                        </p>
+                                    <?php endif; ?>
                                 </div>
+                            </div>
+                        </div>
                             </div>
                         </div>
                     </div>
@@ -533,7 +559,7 @@ $bd_districts = [
                                         name="addr_phone" 
                                         id="addrPhone" 
                                         class="sn-form-input-styled" 
-                                        placeholder="+880 1XXXXXXXXX" 
+                                        placeholder="e.g. +880 1712 345678" 
                                         required
                                     >
                                 </div>

@@ -60,7 +60,7 @@ if (isset($_REQUEST['slug'])) {
 
 // Session & Microcache Product Bundle
 $prodCacheKey = 'sn_pc_' . $p_id;
-$prodCacheFile = __DIR__ . '/admin/inc/cache_prod_' . $p_id . '.json';
+$prodCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('prod_' . $p_id) : __DIR__ . '/admin/inc/cache_prod_' . $p_id . '.json';
 $prodBundle = null;
 
 if (!empty($_SESSION[$prodCacheKey]) && is_array($_SESSION[$prodCacheKey]) && (!empty($_SESSION[$prodCacheKey]['_time'])) && (time() - $_SESSION[$prodCacheKey]['_time'] < 180)) {
@@ -345,7 +345,7 @@ if (!isset($product_colors)) {
 // Fetch Settings from Global Microcache (0 SQL queries)
 $settings_data = $GLOBALS['STORE_SETTINGS'] ?? null;
 if (!$settings_data) {
-    $settingsCacheFile = __DIR__ . '/admin/inc/cache_settings.json';
+    $settingsCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('settings') : __DIR__ . '/admin/inc/cache_settings.json';
     if (file_exists($settingsCacheFile)) {
         $settings_data = json_decode(file_get_contents($settingsCacheFile), true);
     }

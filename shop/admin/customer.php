@@ -498,99 +498,6 @@ if (!function_exists('renderCustAvatarHtml')) {
     }
 }
 
-$sample_mobile_customers = [
-    [
-        'cust_id' => 1,
-        'cust_name' => 'Rahim Ahmed',
-        'cust_email' => 'rahim@gmail.com',
-        'cust_phone' => '+880 1712 345678',
-        'cust_code' => '#CUST-0001',
-        'location' => 'Dhaka, Bangladesh',
-        'cust_city' => 'Dhaka',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 1,
-        'status_label' => 'Active',
-        'status_slug' => 'active',
-        'order_count' => 12,
-        'total_spent' => 24560
-    ],
-    [
-        'cust_id' => 2,
-        'cust_name' => 'Faria Islam',
-        'cust_email' => 'faria@gmail.com',
-        'cust_phone' => '+880 1711 987654',
-        'cust_code' => '#CUST-0002',
-        'location' => 'Chittagong, Bangladesh',
-        'cust_city' => 'Chittagong',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 1,
-        'status_label' => 'Active',
-        'status_slug' => 'active',
-        'order_count' => 5,
-        'total_spent' => 12340
-    ],
-    [
-        'cust_id' => 3,
-        'cust_name' => 'Sakib Hossain',
-        'cust_email' => 'sakib@example.com',
-        'cust_phone' => '+880 1819 876543',
-        'cust_code' => '#CUST-0003',
-        'location' => 'Sylhet, Bangladesh',
-        'cust_city' => 'Sylhet',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 1,
-        'status_label' => 'Active',
-        'status_slug' => 'active',
-        'order_count' => 8,
-        'total_spent' => 18750
-    ],
-    [
-        'cust_id' => 4,
-        'cust_name' => 'Nusrat Jahan',
-        'cust_email' => 'nusrat@gmail.com',
-        'cust_phone' => '+880 1708 654321',
-        'cust_code' => '#CUST-0004',
-        'location' => 'Rajshahi, Bangladesh',
-        'cust_city' => 'Rajshahi',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 0,
-        'status_label' => 'Inactive',
-        'status_slug' => 'inactive',
-        'order_count' => 0,
-        'total_spent' => 0
-    ],
-    [
-        'cust_id' => 5,
-        'cust_name' => 'Imran Khan',
-        'cust_email' => 'imran@gmail.com',
-        'cust_phone' => '+880 1312 345678',
-        'cust_code' => '#CUST-0005',
-        'location' => 'Khulna, Bangladesh',
-        'cust_city' => 'Khulna',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 1,
-        'status_label' => 'Active',
-        'status_slug' => 'active',
-        'order_count' => 6,
-        'total_spent' => 15980
-    ],
-    [
-        'cust_id' => 6,
-        'cust_name' => 'Tania Akter',
-        'cust_email' => 'tania@example.com',
-        'cust_phone' => '+880 1611 223344',
-        'cust_code' => '#CUST-0006',
-        'location' => 'Barishal, Bangladesh',
-        'cust_city' => 'Barishal',
-        'cust_state' => 'Bangladesh',
-        'cust_status' => 2,
-        'status_label' => 'Pending',
-        'status_slug' => 'pending',
-        'order_count' => 2,
-        'total_spent' => 5120
-    ]
-];
-
 $mob_customers = [];
 if (!empty($customers)) {
     foreach ($customers as $c) {
@@ -623,34 +530,6 @@ if (!empty($customers)) {
         ];
     }
 }
-
-// Blend or append sample mockups to reach at least 6 rich cards matching reference screenshot
-if (count($mob_customers) < 6) {
-    $existingEmails = array_map(function($x) { return strtolower($x['cust_email']); }, $mob_customers);
-    foreach ($sample_mobile_customers as $smc) {
-        if (!in_array(strtolower($smc['cust_email']), $existingEmails, true)) {
-            if ($tab !== 'all' && $smc['status_slug'] !== $tab) {
-                if (!($tab === 'blocked' && in_array($smc['status_slug'], ['blocked', 'pending'], true))) {
-                    continue;
-                }
-            }
-            if ($search !== '') {
-                $sLower = strtolower($search);
-                if (
-                    strpos(strtolower($smc['cust_name']), $sLower) === false &&
-                    strpos(strtolower($smc['cust_email']), $sLower) === false &&
-                    strpos(strtolower($smc['cust_phone']), $sLower) === false &&
-                    strpos(strtolower($smc['cust_code']), $sLower) === false &&
-                    strpos(strtolower($smc['location']), $sLower) === false
-                ) {
-                    continue;
-                }
-            }
-            $mob_customers[] = $smc;
-            if (count($mob_customers) >= 6) break;
-        }
-    }
-}
 ?>
 
 <!-- =============================================================
@@ -680,90 +559,108 @@ if (count($mob_customers) < 6) {
     <!-- 3. Horizontal Filter Chips -->
     <div class="sn-mobile-cust-chips">
         <a href="customer.php?tab=all<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-cust-chip <?= ($tab === 'all') ? 'active' : '' ?>" data-tab="all">
-            All Customers <span class="sn-cust-chip-count"><?= $tabCounts['all'] ?: 248 ?></span>
+            All Customers <span class="sn-cust-chip-count"><?= (int)($tabCounts['all'] ?? 0) ?></span>
         </a>
         <a href="customer.php?tab=active<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-cust-chip <?= ($tab === 'active') ? 'active' : '' ?>" data-tab="active">
-            Active <span class="sn-cust-chip-count"><?= $tabCounts['active'] ?: 212 ?></span>
+            Active <span class="sn-cust-chip-count"><?= (int)($tabCounts['active'] ?? 0) ?></span>
         </a>
         <a href="customer.php?tab=inactive<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-cust-chip <?= ($tab === 'inactive') ? 'active' : '' ?>" data-tab="inactive">
-            Inactive <span class="sn-cust-chip-count"><?= $tabCounts['inactive'] ?: 24 ?></span>
+            Inactive <span class="sn-cust-chip-count"><?= (int)($tabCounts['inactive'] ?? 0) ?></span>
         </a>
         <a href="customer.php?tab=blocked<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-cust-chip <?= ($tab === 'blocked') ? 'active' : '' ?>" data-tab="blocked">
-            Blocked <span class="sn-cust-chip-count"><?= $tabCounts['blocked'] ?: 12 ?></span>
+            Blocked <span class="sn-cust-chip-count"><?= (int)($tabCounts['blocked'] ?? 0) ?></span>
         </a>
     </div>
 
     <!-- 4. Customer Cards List -->
     <div class="sn-mobile-cust-list" id="snMobileCustList">
-        <?php foreach ($mob_customers as $mc): ?>
-            <div class="sn-mcust-card"
-                 id="sn-mcust-card-<?= $mc['cust_id'] ?>"
-                 data-id="<?= $mc['cust_id'] ?>"
-                 data-code="<?= htmlspecialchars(strtolower($mc['cust_code'])) ?>"
-                 data-name="<?= htmlspecialchars(strtolower($mc['cust_name'])) ?>"
-                 data-email="<?= htmlspecialchars(strtolower($mc['cust_email'])) ?>"
-                 data-phone="<?= htmlspecialchars(strtolower($mc['cust_phone'])) ?>"
-                 data-location="<?= htmlspecialchars(strtolower($mc['location'])) ?>"
-                 data-status="<?= htmlspecialchars($mc['status_slug']) ?>">
-                 
-                <!-- Left: Avatar + Info -->
-                <div class="sn-mcust-left">
-                    <div class="sn-mcust-avatar-wrap">
-                        <?= renderCustAvatarHtml($mc['cust_name'], 52) ?>
-                    </div>
-                    <div class="sn-mcust-info">
-                        <h3 class="sn-mcust-name" id="sn-mcust-name-<?= $mc['cust_id'] ?>"><?= htmlspecialchars($mc['cust_name']) ?></h3>
-                        
-                        <a href="mailto:<?= htmlspecialchars($mc['cust_email']) ?>" class="sn-mcust-row" id="sn-mcust-email-row-<?= $mc['cust_id'] ?>" title="Email <?= htmlspecialchars($mc['cust_name']) ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                            <span class="sn-mcust-email-text"><?= htmlspecialchars($mc['cust_email']) ?></span>
-                        </a>
-
-                        <a href="tel:<?= htmlspecialchars($mc['cust_phone']) ?>" class="sn-mcust-row" id="sn-mcust-phone-row-<?= $mc['cust_id'] ?>" title="Call <?= htmlspecialchars($mc['cust_name']) ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                            <span class="sn-mcust-phone-text"><?= htmlspecialchars($mc['cust_phone']) ?></span>
-                        </a>
-
-                        <div class="sn-mcust-row">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                            <span class="sn-mcust-row-id"><?= htmlspecialchars($mc['cust_code']) ?></span>
-                        </div>
-
-                        <div class="sn-mcust-row" id="sn-mcust-loc-row-<?= $mc['cust_id'] ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                            <span class="sn-mcust-loc-text"><?= htmlspecialchars($mc['location']) ?></span>
-                        </div>
-                    </div>
+        <?php if (empty($mob_customers)): ?>
+            <div class="sn-mobile-empty-state">
+                <div class="sn-empty-icon-box">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
                 </div>
-
-                <!-- Right: Stats + Actions -->
-                <div class="sn-mcust-right">
-                    <div class="sn-mcust-stats">
-                        <div class="sn-mcust-badge <?= htmlspecialchars($mc['status_slug']) ?>" id="sn-mcust-badge-<?= $mc['cust_id'] ?>">
-                            <span class="sn-mcust-dot"></span>
-                            <span class="sn-mcust-badge-label"><?= htmlspecialchars($mc['status_label']) ?></span>
-                        </div>
-                        <div class="sn-mcust-orders">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                            <span><?= $mc['order_count'] ?> Orders</span>
-                        </div>
-                        <div class="sn-mcust-spent">
-                            <div class="sn-mcust-spent-val">৳ <?= number_format($mc['total_spent']) ?></div>
-                            <div class="sn-mcust-spent-lbl">Total Spent</div>
-                        </div>
-                    </div>
-
-                    <div class="sn-mcust-actions">
-                        <button type="button" class="sn-mcust-btn-action" onclick="openCustActionSheet(<?= htmlspecialchars(json_encode($mc), ENT_QUOTES, 'UTF-8') ?>)" title="More options">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="#0F172A"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
-                        </button>
-                        <button type="button" class="sn-mcust-btn-action" onclick="openCustEditModal(<?= htmlspecialchars(json_encode($mc), ENT_QUOTES, 'UTF-8') ?>)" title="Edit customer">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                        </button>
-                    </div>
-                </div>
+                <h4 class="sn-empty-title"><?= $search ? 'No matching customers' : 'No customers yet' ?></h4>
+                <p class="sn-empty-desc"><?= $search ? 'Try clearing your search query or adjusting your filters.' : 'Customers who register or place orders on your store will appear here.' ?></p>
+                <?php if ($search || $tab !== 'all'): ?>
+                    <a href="customer.php" class="sn-empty-action-btn">Reset Filters</a>
+                <?php endif; ?>
             </div>
-        <?php endforeach; ?>
+        <?php else: ?>
+            <?php foreach ($mob_customers as $mc): ?>
+                <div class="sn-mcust-card"
+                     id="sn-mcust-card-<?= $mc['cust_id'] ?>"
+                     data-id="<?= $mc['cust_id'] ?>"
+                     data-code="<?= htmlspecialchars(strtolower($mc['cust_code'])) ?>"
+                     data-name="<?= htmlspecialchars(strtolower($mc['cust_name'])) ?>"
+                     data-email="<?= htmlspecialchars(strtolower($mc['cust_email'])) ?>"
+                     data-phone="<?= htmlspecialchars(strtolower($mc['cust_phone'])) ?>"
+                     data-location="<?= htmlspecialchars(strtolower($mc['location'])) ?>"
+                     data-status="<?= htmlspecialchars($mc['status_slug']) ?>">
+                     
+                    <!-- Left: Avatar + Info -->
+                    <div class="sn-mcust-left">
+                        <div class="sn-mcust-avatar-wrap">
+                            <?= renderCustAvatarHtml($mc['cust_name'], 52) ?>
+                        </div>
+                        <div class="sn-mcust-info">
+                            <h3 class="sn-mcust-name" id="sn-mcust-name-<?= $mc['cust_id'] ?>"><?= htmlspecialchars($mc['cust_name']) ?></h3>
+                            
+                            <a href="mailto:<?= htmlspecialchars($mc['cust_email']) ?>" class="sn-mcust-row" id="sn-mcust-email-row-<?= $mc['cust_id'] ?>" title="Email <?= htmlspecialchars($mc['cust_name']) ?>">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                <span class="sn-mcust-email-text"><?= htmlspecialchars($mc['cust_email']) ?></span>
+                            </a>
+
+                            <a href="tel:<?= htmlspecialchars($mc['cust_phone']) ?>" class="sn-mcust-row" id="sn-mcust-phone-row-<?= $mc['cust_id'] ?>" title="Call <?= htmlspecialchars($mc['cust_name']) ?>">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                <span class="sn-mcust-phone-text"><?= htmlspecialchars($mc['cust_phone']) ?></span>
+                            </a>
+
+                            <div class="sn-mcust-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                <span class="sn-mcust-row-id"><?= htmlspecialchars($mc['cust_code']) ?></span>
+                            </div>
+
+                            <div class="sn-mcust-row" id="sn-mcust-loc-row-<?= $mc['cust_id'] ?>">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span class="sn-mcust-loc-text"><?= htmlspecialchars($mc['location']) ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Stats + Actions -->
+                    <div class="sn-mcust-right">
+                        <div class="sn-mcust-stats">
+                            <div class="sn-mcust-badge <?= htmlspecialchars($mc['status_slug']) ?>" id="sn-mcust-badge-<?= $mc['cust_id'] ?>">
+                                <span class="sn-mcust-dot"></span>
+                                <span class="sn-mcust-badge-label"><?= htmlspecialchars($mc['status_label']) ?></span>
+                            </div>
+                            <div class="sn-mcust-orders">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                                <span><?= $mc['order_count'] ?> Orders</span>
+                            </div>
+                            <div class="sn-mcust-spent">
+                                <div class="sn-mcust-spent-val">৳ <?= number_format($mc['total_spent']) ?></div>
+                                <div class="sn-mcust-spent-lbl">Total Spent</div>
+                            </div>
+                        </div>
+
+                        <div class="sn-mcust-actions">
+                            <button type="button" class="sn-mcust-btn-action" onclick="openCustActionSheet(<?= htmlspecialchars(json_encode($mc), ENT_QUOTES, 'UTF-8') ?>)" title="More options">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="#0F172A"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+                            </button>
+                            <button type="button" class="sn-mcust-btn-action" onclick="openCustEditModal(<?= htmlspecialchars(json_encode($mc), ENT_QUOTES, 'UTF-8') ?>)" title="Edit customer">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </div>
 

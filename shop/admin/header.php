@@ -153,7 +153,7 @@ foreach ($result as $row) {
 
 						<!-- User Profile Dropdown -->
 						<?php
-						$raw_name = !empty($_SESSION['user']['full_name']) ? trim($_SESSION['user']['full_name']) : 'Joy Saha';
+						$raw_name = !empty($_SESSION['user']['full_name']) ? trim($_SESSION['user']['full_name']) : (!empty($_SESSION['user']['email']) ? trim($_SESSION['user']['email']) : 'Admin');
 						$display_name = $raw_name;
 						if (mb_strlen($display_name) > 20) {
 							$words = explode(' ', $display_name);
@@ -180,7 +180,7 @@ foreach ($result as $row) {
 								<li class="user-header" style="background:#FFFDF0; padding:18px; text-align:center;">
 									<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="img-circle" style="width:60px; height:60px; object-fit:cover; border:2px solid #FEDB65;" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
 									<p style="color:#0F172A; font-weight:700; margin-top:8px;">
-										<?php echo htmlspecialchars($_SESSION['user']['full_name'] ?? 'Joy Saha'); ?>
+										<?php echo htmlspecialchars(!empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : (!empty($_SESSION['user']['email']) ? $_SESSION['user']['email'] : 'Admin')); ?>
 										<small style="color:#64748B; font-weight:500; display:block;"><?php echo htmlspecialchars($_SESSION['user']['role'] ?? 'Administrator'); ?></small>
 									</p>
 								</li>

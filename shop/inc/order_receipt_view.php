@@ -67,12 +67,12 @@ if ($shipStatusRaw === 'delivered' || $shipStatusRaw === 'completed') {
 }
 
 // Customer & Addresses
-$custName = (string)($order['customer_name'] ?? ($order['billing_name'] ?? ($customer['cust_name'] ?? 'Joy Saha')));
-$custEmail = (string)($order['customer_email'] ?? ($order['billing_email'] ?? ($customer['cust_email'] ?? 'joy.saha@example.com')));
-$custPhone = (string)($order['billing_phone'] ?? ($order['shipping_phone'] ?? ($customer['cust_phone'] ?? '+880 1712 345678')));
+$custName = (string)($order['customer_name'] ?? ($order['billing_name'] ?? ($customer['cust_name'] ?? 'Customer')));
+$custEmail = (string)($order['customer_email'] ?? ($order['billing_email'] ?? ($customer['cust_email'] ?? '')));
+$custPhone = (string)($order['billing_phone'] ?? ($order['shipping_phone'] ?? ($customer['cust_phone'] ?? '')));
 
-$billStreet = (string)($order['billing_street'] ?? ($order['billing_address'] ?? ($order['shipping_street'] ?? 'Aviation and Aerospace University Bangladesh, Jigatola')));
-$billCity = (string)($order['billing_city'] ?? 'Dhaka-1209');
+$billStreet = (string)($order['billing_street'] ?? ($order['billing_address'] ?? ($order['shipping_street'] ?? '')));
+$billCity = (string)($order['billing_city'] ?? '');
 $billCountry = (string)($order['billing_country'] ?? 'Bangladesh');
 
 $shipName = (string)($order['shipping_name'] ?? $custName);
@@ -82,10 +82,10 @@ $shipCountry = (string)($order['shipping_country'] ?? $billCountry);
 $shipPhone = (string)($order['shipping_phone'] ?? $custPhone);
 
 // Payment details
-$paymentMethod = (string)($order['payment_method'] ?? 'bKash');
+$paymentMethod = (string)($order['payment_method'] ?? 'Cash on Delivery');
 $txnid = (string)($order['txnid'] ?? $paymentId);
 if (empty($txnid)) {
-    $txnid = '9F7A3B2C4D5E6F7';
+    $txnid = 'N/A';
 }
 
 // Calculations

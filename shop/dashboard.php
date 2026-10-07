@@ -3,17 +3,8 @@ require_once('header.php');
 
 // Check customer login status
 if (!isset($_SESSION['customer'])) {
-    if (isset($_GET['preview'])) {
-        $_SESSION['customer'] = [
-            'cust_id' => 30,
-            'cust_name' => 'Popy Saha',
-            'cust_email' => 'popysaha@gmail.com',
-            'cust_phone' => '+880 1XXXXXXXXX'
-        ];
-    } else {
-        header('location: ' . BASE_URL . 'logout.php');
-        exit;
-    }
+    header('location: ' . BASE_URL . 'logout.php');
+    exit;
 } else {
     // Force logout if customer is inactive
     $statement = $pdo->prepare("SELECT cust_status FROM tbl_customer WHERE cust_id = ? AND cust_status = ?");
@@ -25,7 +16,7 @@ if (!isset($_SESSION['customer'])) {
 }
 
 $cust_id = (int)$_SESSION['customer']['cust_id'];
-$cust_name = $_SESSION['customer']['cust_name'] ?? 'Popy Saha';
+$cust_name = $_SESSION['customer']['cust_name'] ?? 'Customer';
 $cust_email = $_SESSION['customer']['cust_email'] ?? '';
 
 // --- 1. Fetch Customer Data for Addresses Count & Last Login ---
@@ -663,7 +654,7 @@ try {
             <div class="sn-mob-user-avatar">
                 <img src="<?= BASE_URL ?>assets/uploads/mob_avatar_default.png" alt="<?= htmlspecialchars($cust_name) ?>">
             </div>
-            <h1 class="sn-mob-user-name"><?= htmlspecialchars($cust_name ?: 'Popy Saha') ?></h1>
+            <h1 class="sn-mob-user-name"><?= htmlspecialchars($cust_name ?: 'Customer') ?></h1>
         </div>
         <a href="customer-password-update.php" class="sn-mob-settings-btn" title="Settings">
             <i class="fa-solid fa-gear"></i>
@@ -686,6 +677,9 @@ try {
             <a href="customer-order.php?status=pending" class="sn-mob-order-btn">
                 <div class="sn-mob-order-icon-box">
                     <i class="fa-solid fa-wallet"></i>
+                    <?php if ($count_to_pay > 0): ?>
+                        <span class="sn-mob-order-badge"><?= $count_to_pay ?></span>
+                    <?php endif; ?>
                 </div>
                 <span class="sn-mob-order-label">To Pay</span>
             </a>
@@ -694,7 +688,9 @@ try {
             <a href="customer-order.php?status=processing" class="sn-mob-order-btn">
                 <div class="sn-mob-order-icon-box">
                     <i class="fa-solid fa-box-open"></i>
-                    <span class="sn-mob-order-badge"><?= $count_to_ship ?></span>
+                    <?php if ($count_to_ship > 0): ?>
+                        <span class="sn-mob-order-badge"><?= $count_to_ship ?></span>
+                    <?php endif; ?>
                 </div>
                 <span class="sn-mob-order-label">To Ship</span>
             </a>
@@ -703,6 +699,9 @@ try {
             <a href="customer-order.php?status=shipped" class="sn-mob-order-btn">
                 <div class="sn-mob-order-icon-box">
                     <i class="fa-solid fa-truck-fast"></i>
+                    <?php if ($count_to_receive > 0): ?>
+                        <span class="sn-mob-order-badge"><?= $count_to_receive ?></span>
+                    <?php endif; ?>
                 </div>
                 <span class="sn-mob-order-label">To Receive</span>
             </a>
@@ -719,6 +718,9 @@ try {
             <a href="customer-returns.php" class="sn-mob-order-btn">
                 <div class="sn-mob-order-icon-box">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <?php if ($count_returns > 0): ?>
+                        <span class="sn-mob-order-badge"><?= $count_returns ?></span>
+                    <?php endif; ?>
                 </div>
                 <span class="sn-mob-order-label">Returns&<br>Cancellations</span>
             </a>
@@ -922,7 +924,7 @@ try {
                             </div>
                             <div class="sn-stat-info">
                                 <div class="sn-stat-label">Saved Addresses</div>
-                                <div class="sn-stat-value"><?= max(1, $saved_addresses_count) ?></div>
+                                <div class="sn-stat-value"><?= $saved_addresses_count ?></div>
                                 <div class="sn-stat-sub neutral">
                                     <a href="customer-billing-shipping-update.php" style="color: inherit; text-decoration: none;">Manage addresses</a>
                                 </div>
@@ -1055,12 +1057,11 @@ try {
 
                                 <div class="sn-recent-viewed-list">
                                     <?php 
-                                    $times = ['2 hours ago', '3 hours ago', '5 hours ago', '1 day ago', '1 day ago'];
-                                    foreach ($recent_products as $idx => $rp): 
+                                    foreach ($recent_products as $rp): 
                                         $rp_photo = !empty($rp['p_featured_photo']) 
                                             ? BASE_URL . 'assets/uploads/' . $rp['p_featured_photo'] 
                                             : BASE_URL . 'assets/uploads/no-photo.jpg';
-                                        $time_label = $times[$idx % count($times)];
+                                        $in_stock = (!empty($rp['p_qty']) && (int)$rp['p_qty'] > 0);
                                     ?>
                                         <div class="sn-recent-viewed-item">
                                             <div class="sn-recent-thumb">
@@ -1070,7 +1071,9 @@ try {
                                                 <h4><?= htmlspecialchars($rp['p_name']) ?></h4>
                                                 <div class="sn-recent-price-row">
                                                     <span class="sn-recent-price">৳ <?= number_format($rp['p_current_price'], 0) ?></span>
-                                                    <span class="sn-recent-time">&bull; <?= $time_label ?></span>
+                                                    <?php if ($in_stock): ?>
+                                                        <span class="sn-recent-time" style="color: #16a34a; font-weight: 600;">&bull; In Stock</span>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                             <a href="<?= BASE_URL ?>product.php?id=<?= $rp['p_id'] ?>" class="sn-btn-view-outline">

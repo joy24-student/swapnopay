@@ -98,6 +98,29 @@ function getMerchantSelfProvisioningSql() {
   return null
 }
 
+function getStorefrontSchemaSql() {
+  const candidates = [
+    path.resolve(__dirname, '../../sql/storefront.sql'),
+    path.resolve(__dirname, '../sql/storefront.sql'),
+    path.resolve(process.cwd(), 'sql/storefront.sql'),
+    path.resolve(process.cwd(), 'swapnopay-backend/sql/storefront.sql'),
+    path.resolve(__dirname, '../../../sql/storefront.sql'),
+    path.resolve(__dirname, '../../../../swapnopay-backend/sql/storefront.sql'),
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        console.log('[provision-schema] Loaded storefront SQL from:', candidate)
+        return fs.readFileSync(candidate, 'utf-8')
+      }
+    } catch (_) {}
+  }
+
+  console.warn('[provision-schema] Storefront SQL file not found on disk.')
+  return null
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helper: Execute Master SQL in Robust Phases (Fast single-shot with chunked fallback)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -743,6 +766,17 @@ export async function provisionProject({ projectRef, accessToken, userId, dbPass
     summary.selfProvisioning = false
   }
 
+  // 2b. Execute Storefront PHP Schema (tbl_product, tbl_settings, tbl_order, etc.)
+  const storefrontSql = getStorefrontSchemaSql()
+  if (storefrontSql) {
+    console.log(`[provision] 2b/5 Executing storefront database schema DDL...`)
+    const storefrontResult = await executeSchemaInPhases(projectRef, accessToken, storefrontSql)
+    summary.storefrontTables = storefrontResult.ok
+    console.log(`[provision] Storefront database schema executed: ${storefrontResult.ok ? 'SUCCESS' : 'NOTICE'}`)
+  } else {
+    summary.storefrontTables = false
+  }
+
   // 3. Ensure Storage Buckets & Policies
   console.log(`[provision] 3/5 Configuring storage buckets & access policies...`)
   const storageRes = await executeSqlQuery(projectRef, accessToken, STORAGE_BUCKETS_SQL)
@@ -844,11 +878,11 @@ export async function provisionProject({ projectRef, accessToken, userId, dbPass
     const verifyRes = await executeSqlQuery(
       projectRef,
       accessToken,
-      `SELECT count(*) as count FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('merchants', 'orders', 'payments', 'customers', 'products', 'pos_sales');`
+      `SELECT count(*) as count FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('merchants', 'orders', 'payments', 'customers', 'products', 'pos_sales', 'tbl_product', 'tbl_settings', 'tbl_order');`
     )
     if (verifyRes.ok && Array.isArray(verifyRes.data) && verifyRes.data[0]?.count != null) {
       summary.tableCount = Number(verifyRes.data[0].count)
-      console.log(`[provision] Verification check: ${summary.tableCount} core tables found in public schema!`)
+      console.log(`[provision] Verification check: ${summary.tableCount} core & storefront tables found in public schema!`)
       if (summary.tableCount >= 3) {
         summary.databaseTables = true
       }

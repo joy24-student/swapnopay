@@ -99,84 +99,6 @@ if (!empty($paymentIds)) {
     } catch (Throwable $e) {}
 }
 
-$sample_mobile_orders = [
-    [
-        'payment_id' => 'ORD-10024',
-        'invoice_id' => 'INV-000245',
-        'customer_name' => 'Rahim Ahmed',
-        'customer_phone' => '+880 1712 345678',
-        'shipping_status' => 'Delivered',
-        'payment_status' => 'Completed',
-        'payment_label' => 'Paid',
-        'order_date' => '12 Apr 2025, 10:24 AM',
-        'amount' => 3450,
-        'item_count' => 3,
-        'main_thumb' => 'hoodie',
-        'mini_thumbs' => ['hoodie', 'shoes', 'cap'],
-        'address' => '123/A, Green Road, Dhanmondi, Dhaka-1209'
-    ],
-    [
-        'payment_id' => 'ORD-10023',
-        'invoice_id' => 'INV-000244',
-        'customer_name' => 'Nusrat Jahan',
-        'customer_phone' => '+880 1819 876543',
-        'shipping_status' => 'Processing',
-        'payment_status' => 'Pending',
-        'payment_label' => 'Pending',
-        'order_date' => '11 Apr 2025, 03:17 PM',
-        'amount' => 2890,
-        'item_count' => 1,
-        'main_thumb' => 'watch',
-        'mini_thumbs' => ['watch'],
-        'address' => '456/B, Gulshan Avenue, Gulshan-1, Dhaka-1212'
-    ],
-    [
-        'payment_id' => 'ORD-10022',
-        'invoice_id' => 'INV-000243',
-        'customer_name' => 'Fahim Hasan',
-        'customer_phone' => '+880 1705 556677',
-        'shipping_status' => 'Pending',
-        'payment_status' => 'Pending',
-        'payment_label' => 'Unpaid',
-        'order_date' => '10 Apr 2025, 09:45 AM',
-        'amount' => 4250,
-        'item_count' => 2,
-        'main_thumb' => 'earbuds',
-        'mini_thumbs' => ['earbuds'],
-        'address' => '789/C, Banani, Dhaka-1213'
-    ],
-    [
-        'payment_id' => 'ORD-10021',
-        'invoice_id' => 'INV-000242',
-        'customer_name' => 'Ayesha Siddika',
-        'customer_phone' => '+880 1611 223344',
-        'shipping_status' => 'Shipped',
-        'payment_status' => 'Completed',
-        'payment_label' => 'Paid',
-        'order_date' => '09 Apr 2025, 06:32 PM',
-        'amount' => 1750,
-        'item_count' => 2,
-        'main_thumb' => 'headphones',
-        'mini_thumbs' => ['headphones', 'mouse'],
-        'address' => '321/D, Motijheel, Dhaka-1000'
-    ],
-    [
-        'payment_id' => 'ORD-10020',
-        'invoice_id' => 'INV-000241',
-        'customer_name' => 'Tariq Islam',
-        'customer_phone' => '+880 1714 998877',
-        'shipping_status' => 'Cancelled',
-        'payment_status' => 'Cancelled',
-        'payment_label' => 'Refunded',
-        'order_date' => '08 Apr 2025, 02:14 PM',
-        'amount' => 1210,
-        'item_count' => 1,
-        'main_thumb' => 'dress',
-        'mini_thumbs' => ['dress'],
-        'address' => '147/F, Uttara, Dhaka-1230'
-    ]
-];
-
 if (!function_exists('renderMobThumbSvg')) {
     function renderMobThumbSvg($type, $size = 32) {
         switch ($type) {
@@ -691,11 +613,11 @@ if (!function_exists('renderMobThumbSvg')) {
                 'payment_id' => $ref,
                 'invoice_id' => 'INV-' . str_pad($o['id'] ?? 1, 6, '0', STR_PAD_LEFT),
                 'customer_name' => $o['customer_name'] ?: 'Customer',
-                'customer_phone' => $o['shipping_phone'] ?: $o['billing_phone'] ?: $o['customer_phone'] ?: '+880 1712 345678',
+                'customer_phone' => $o['shipping_phone'] ?: $o['billing_phone'] ?: $o['customer_phone'] ?: '',
                 'shipping_status' => $sStatus,
                 'payment_status' => $pStatus,
                 'payment_label' => $pLabel,
-                'order_date' => !empty($o['payment_date']) ? date('d M Y, h:i A', strtotime($o['payment_date'])) : '12 Apr 2025, 10:24 AM',
+                'order_date' => !empty($o['payment_date']) ? date('d M Y, h:i A', strtotime($o['payment_date'])) : 'N/A',
                 'amount' => (float)$o['paid_amount'],
                 'item_count' => $iCount,
                 'main_photo' => $mainPhoto,
@@ -703,20 +625,6 @@ if (!function_exists('renderMobThumbSvg')) {
                 'mini_thumbs' => $miniThumbs,
                 'address' => $addrStr
             ];
-        }
-    } else {
-        foreach ($sample_mobile_orders as $smo) {
-            if ($tab !== 'all' && strtolower($smo['shipping_status']) !== $tab) {
-                continue;
-            }
-            $miniList = [];
-            foreach ($smo['mini_thumbs'] as $t) {
-                $miniList[] = ['photo' => '', 'type' => $t];
-            }
-            $smo['mini_thumbs'] = $miniList;
-            $smo['main_photo'] = '';
-            $smo['fallback_type'] = $smo['main_thumb'];
-            $mob_orders[] = $smo;
         }
     }
     ?>
@@ -746,27 +654,43 @@ if (!function_exists('renderMobThumbSvg')) {
         <!-- 3. Horizontal Filter Chips -->
         <div class="sn-mobile-order-chips">
             <a href="order.php?tab=all<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'all') ? 'active' : '' ?>">
-                All Orders <span class="sn-chip-count"><?= $tabCounts['all'] ?: 24 ?></span>
+                All Orders <span class="sn-chip-count"><?= (int)($tabCounts['all'] ?? 0) ?></span>
             </a>
             <a href="order.php?tab=pending<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'pending') ? 'active' : '' ?>">
-                Pending <span class="sn-chip-count"><?= $tabCounts['pending'] ?: 5 ?></span>
+                Pending <span class="sn-chip-count"><?= (int)($tabCounts['pending'] ?? 0) ?></span>
             </a>
             <a href="order.php?tab=processing<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'processing') ? 'active' : '' ?>">
-                Processing <span class="sn-chip-count"><?= $tabCounts['processing'] ?: 8 ?></span>
+                Processing <span class="sn-chip-count"><?= (int)($tabCounts['processing'] ?? 0) ?></span>
             </a>
             <a href="order.php?tab=shipped<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'shipped') ? 'active' : '' ?>">
-                Shipped <span class="sn-chip-count"><?= $tabCounts['shipped'] ?: 7 ?></span>
+                Shipped <span class="sn-chip-count"><?= (int)($tabCounts['shipped'] ?? 0) ?></span>
             </a>
             <a href="order.php?tab=delivered<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'delivered') ? 'active' : '' ?>">
-                Delivered <span class="sn-chip-count"><?= $tabCounts['delivered'] ?: 4 ?></span>
+                Delivered <span class="sn-chip-count"><?= (int)($tabCounts['delivered'] ?? 0) ?></span>
             </a>
             <a href="order.php?tab=cancelled<?= $search ? '&search='.rawurlencode($search) : '' ?>" class="sn-order-chip <?= ($tab === 'cancelled') ? 'active' : '' ?>">
-                Cancelled <span class="sn-chip-count"><?= $tabCounts['cancelled'] ?: 2 ?></span>
+                Cancelled <span class="sn-chip-count"><?= (int)($tabCounts['cancelled'] ?? 0) ?></span>
             </a>
         </div>
 
         <!-- 4. Mobile Order Cards List -->
         <div class="sn-mobile-order-list" id="snMobileOrderList">
+            <?php if (empty($mob_orders)): ?>
+                <div class="sn-mobile-empty-state">
+                    <div class="sn-empty-icon-box">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <h4 class="sn-empty-title"><?= $search ? 'No matching orders found' : 'No orders in this status' ?></h4>
+                    <p class="sn-empty-desc"><?= $search ? 'Try checking for typos or searching by phone / order ID.' : 'New orders placed by customers will automatically appear here.' ?></p>
+                    <?php if ($search || $tab !== 'all'): ?>
+                        <a href="order.php" class="sn-empty-action-btn">View All Orders</a>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
             <?php foreach ($mob_orders as $mo): 
                 $sStatus = $mo['shipping_status'];
                 $stLower = strtolower($sStatus);
@@ -906,6 +830,7 @@ if (!function_exists('renderMobThumbSvg')) {
                     </div>
                 </div>
             <?php endforeach; ?>
+        <?php endif; ?>
         </div>
 
         <?php $totalPages = max(1, (int)ceil($total / $limit)); ?>

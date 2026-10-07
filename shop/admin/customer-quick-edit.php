@@ -31,20 +31,7 @@ try {
     $chkStmt = $pdo->prepare("SELECT cust_id FROM tbl_customer WHERE cust_id = ?");
     $chkStmt->execute([$custId]);
     if ($chkStmt->rowCount() === 0) {
-        // If it's a sample/demo customer ID that isn't in db, we still report success for UI demo
-        echo json_encode([
-            'success' => true,
-            'message' => 'Customer updated successfully (Demo).',
-            'data' => [
-                'cust_id' => $custId,
-                'cust_name' => $name,
-                'cust_email' => $email,
-                'cust_phone' => $phone,
-                'cust_city' => $city,
-                'cust_state' => $state,
-                'cust_status' => $status
-            ]
-        ]);
+        echo json_encode(['success' => false, 'message' => 'Customer record not found.']);
         exit;
     }
 

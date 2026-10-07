@@ -1074,35 +1074,35 @@ body.live-chat-page-body {
                     </div>
                 </div>
 
-                <!-- Mobile Pinned Top Context Order Card (Matches View 2) -->
-                <div class="sup-order-card" id="supPinnedOrderCard">
+                <!-- Mobile Pinned Top Context Order Card (Shown only when customer has real order) -->
+                <div class="sup-order-card" id="supPinnedOrderCard" style="display: none;">
                     <div class="sup-order-card-top">
                         <div class="sup-order-thumb">
-                            <img id="supCardProdImg" src="../assets/uploads/nike-hoodie.png" alt="Nike Hoodie">
+                            <img id="supCardProdImg" src="../assets/uploads/placeholder.svg" alt="Product">
                         </div>
                         <div class="sup-order-meta">
                             <div class="sup-order-meta-head">
-                                <span class="sup-order-id" id="supCardOrderId">Order #ORD-10024</span>
+                                <span class="sup-order-id" id="supCardOrderId"></span>
                                 <span class="sup-order-status-badge status-delivered" id="supCardOrderStatus">
-                                    <i class="fa fa-check-circle"></i> Delivered
+                                    <i class="fa fa-check-circle"></i>
                                 </span>
                             </div>
-                            <div class="sup-order-pname" id="supCardProdName">Nike Hoodie (Black) - Size L</div>
-                            <div class="sup-order-price" id="supCardProdPrice">৳ 3,450</div>
+                            <div class="sup-order-pname" id="supCardProdName"></div>
+                            <div class="sup-order-price" id="supCardProdPrice"></div>
                         </div>
                     </div>
                     <div class="sup-order-card-grid">
                         <div class="sup-order-subcol">
                             <span class="sup-subcol-label"><span class="sup-sub-icon"><i class="fa fa-map-marker"></i></span> Address</span>
-                            <span class="sup-subcol-val" id="supCardAddress">123/A, Green Road, Dhanmondi, Dhaka-1209</span>
+                            <span class="sup-subcol-val" id="supCardAddress"></span>
                         </div>
                         <div class="sup-order-subcol">
                             <span class="sup-subcol-label"><span class="sup-sub-icon"><i class="fa fa-file-text-o"></i></span> Invoice No</span>
-                            <span class="sup-subcol-val" id="supCardInvoice">#INV-000245</span>
+                            <span class="sup-subcol-val" id="supCardInvoice"></span>
                         </div>
                         <div class="sup-order-subcol">
                             <span class="sup-subcol-label"><span class="sup-sub-icon"><i class="fa fa-credit-card"></i></span> Payment Status</span>
-                            <span class="sup-subcol-val" id="supCardPayment"><span class="sup-pay-pill"><i class="fa fa-check-circle"></i> Paid</span></span>
+                            <span class="sup-subcol-val" id="supCardPayment"></span>
                         </div>
                     </div>
                 </div>
@@ -1352,154 +1352,6 @@ let lastMessageCount = 0;
 let ringtoneInterval = null;
 let activeStatusModalThreadId = null;
 
-// Exact 8 Live Support Threads matching media_1791288649666_d25b5b6c.png
-const defaultDemoThreads = [
-    {
-        id: 101,
-        customer_name: 'Joy Saha',
-        customer_phone: '+880 1712 345678',
-        last_message: 'Hello, I need help with my order...',
-        last_message_at: '06:57 PM',
-        status: 'active',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'J',
-        avatar_bg: '#FEF3C7',
-        avatar_color: '#B45309'
-    },
-    {
-        id: 102,
-        customer_name: 'Customer',
-        customer_phone: '+880 1819 876543',
-        last_message: 'I want to know about delivery time.',
-        last_message_at: '06:42 PM',
-        status: 'pending',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'C',
-        avatar_bg: '#E0F2FE',
-        avatar_color: '#0369A1'
-    },
-    {
-        id: 103,
-        customer_name: 'Rahim Ahmed',
-        customer_phone: '+880 1715 556677',
-        last_message: 'Is the product available in stock?',
-        last_message_at: '05:58 PM',
-        status: 'processing',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'R',
-        avatar_bg: '#EDE9FE',
-        avatar_color: '#6D28D9'
-    },
-    {
-        id: 104,
-        customer_name: 'Sadia Islam',
-        customer_phone: '+880 1611 223344',
-        last_message: 'Thanks for your support!',
-        last_message_at: '04:26 PM',
-        status: 'active',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'S',
-        avatar_bg: '#FFE4E6',
-        avatar_color: '#BE123C'
-    },
-    {
-        id: 105,
-        customer_name: 'Mehedi Hasan',
-        customer_phone: '+880 1987 665544',
-        last_message: 'When will my order be delivered?',
-        last_message_at: '03:15 PM',
-        status: 'pending',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'M',
-        avatar_bg: '#DCFCE7',
-        avatar_color: '#15803D'
-    },
-    {
-        id: 106,
-        customer_name: 'Tania Akter',
-        customer_phone: '+880 1312 998877',
-        last_message: 'Can I get a discount?',
-        last_message_at: '01:40 PM',
-        status: 'blocked',
-        is_online: false,
-        unread_admin: 0,
-        avatar_letter: 'T',
-        avatar_bg: '#EDE9FE',
-        avatar_color: '#6D28D9'
-    },
-    {
-        id: 107,
-        customer_name: 'Fahim Rahman',
-        customer_phone: '+880 1822 445566',
-        last_message: 'Thank you for your service!',
-        last_message_at: '12:23 PM',
-        status: 'active',
-        is_online: true,
-        unread_admin: 0,
-        avatar_letter: 'F',
-        avatar_bg: '#E0F2FE',
-        avatar_color: '#0369A1'
-    },
-    {
-        id: 108,
-        customer_name: 'Ayesha Siddika',
-        customer_phone: '+880 1705 778899',
-        last_message: 'I have a problem with my order.',
-        last_message_at: '11:05 AM',
-        status: 'resolved',
-        is_online: false,
-        unread_admin: 0,
-        avatar_letter: 'A',
-        avatar_bg: '#FFEDD5',
-        avatar_color: '#C2410C'
-    }
-];
-
-// Exact 6 Joy Saha Messages matching media_1791288671343_2d8f9615.png
-const defaultJoyMessages = [
-    {
-        id: 'msg-1',
-        sender_type: 'customer',
-        message: 'Hello, I need help with my order. When will it be delivered?',
-        created_at: '06:57 PM'
-    },
-    {
-        id: 'msg-2',
-        sender_type: 'admin',
-        message: 'Hi Joy,\nYour order is already out for delivery. It will reach you tomorrow.',
-        created_at: '06:59 PM'
-    },
-    {
-        id: 'msg-3',
-        sender_type: 'customer',
-        message: 'Okay, thank you.\nCan you share the tracking link?',
-        created_at: '07:02 PM'
-    },
-    {
-        id: 'msg-4',
-        sender_type: 'admin',
-        message: 'Sure! Here is your tracking link:\n🔗 https://track.shopmart.com/12345',
-        created_at: '07:05 PM'
-    },
-    {
-        id: 'msg-5',
-        sender_type: 'customer',
-        message: 'Thank you so much! ❤️',
-        created_at: '07:06 PM'
-    },
-    {
-        id: 'msg-6',
-        sender_type: 'admin',
-        message: "You're welcome!\nIf you need any further help, feel free to message us anytime.",
-        created_at: '07:07 PM'
-    }
-];
-
 // Deterministic soft pastel avatars
 const avatarPalettes = [
     { bg: '#e0f2fe', text: '#0369a1' },
@@ -1706,29 +1558,14 @@ async function loadThreads(silent = false) {
             dbThreads = data.threads;
         }
 
-        // Merge DB threads with defaultDemoThreads
-        const merged = [...dbThreads];
-        defaultDemoThreads.forEach(demo => {
-            const exists = merged.some(t => 
-                (t.customer_phone && t.customer_phone === demo.customer_phone) || 
-                (t.customer_name && t.customer_name.toLowerCase() === demo.customer_name.toLowerCase()) ||
-                t.id === demo.id
-            );
-            if (!exists) {
-                merged.push(demo);
-            }
-        });
-
-        allThreads = merged;
+        allThreads = dbThreads;
         updateCounts();
         renderThreadList();
     } catch (e) {
         if (!silent) console.error('Failed to load threads:', e);
-        if (allThreads.length === 0) {
-            allThreads = [...defaultDemoThreads];
-            updateCounts();
-            renderThreadList();
-        }
+        allThreads = [];
+        updateCounts();
+        renderThreadList();
     } finally {
         if (!silent && icon) icon.classList.remove('fa-spin');
     }
@@ -1763,13 +1600,13 @@ function updateCounts() {
         }
     }
 
-    // Mobile Horizontal Strip (Matches media_1791288649666_d25b5b6c.png View 1)
+    // Mobile Horizontal Strip
     const mAll = document.getElementById('supCntAll');
-    if (mAll) mAll.textContent = (cntAll >= 8) ? 24 : cntAll;
+    if (mAll) mAll.textContent = cntAll;
     const mActive = document.getElementById('supCntActive');
-    if (mActive) mActive.textContent = (cntActive >= 4) ? 12 : cntActive;
+    if (mActive) mActive.textContent = cntActive;
     const mPending = document.getElementById('supCntPending');
-    if (mPending) mPending.textContent = (cntPending >= 2) ? 6 : cntPending;
+    if (mPending) mPending.textContent = cntPending;
 }
 
 function setThreadFilter(filter, btn) {
@@ -1822,7 +1659,7 @@ function renderThreadList() {
         const hasUnread = (t.unread_admin > 0);
         const rawStatus = (t.status || 'active').toLowerCase();
         const statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
-        const phone = t.customer_phone || '+880 1712 345678';
+        const phone = t.customer_phone || '';
         const snippet = t.last_message || 'Customer requested live support';
         const timeStr = formatTime(t.last_message_at || t.updated_at);
         const avatarStyle = t.avatar_bg ? `background-color: ${t.avatar_bg}; color: ${t.avatar_color};` : getAvatarStyle(name);
@@ -1838,10 +1675,11 @@ function renderThreadList() {
                 </div>
                 <div class="sup-info-col wa-chat-content">
                     <span class="sup-cust-name wa-chat-title">${escapeHtml(name)}</span>
+                    ${phone ? `
                     <div class="sup-phone-tag">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
                         <span>${escapeHtml(phone)}</span>
-                    </div>
+                    </div>` : ''}
                     <p class="sup-snippet wa-chat-snippet">${escapeHtml(snippet)}</p>
                 </div>
                 <div class="sup-meta-col">
@@ -1914,11 +1752,6 @@ async function refreshActiveThread(silent = false) {
 
         if (!threadData && matchedLocal) {
             threadData = matchedLocal;
-        }
-
-        // For Joy Saha (thread 101 or matching name) with empty messages, load the exact 6 messages from design
-        if ((!messages || messages.length === 0) && (currentThreadId === 101 || (threadData && threadData.customer_name === 'Joy Saha'))) {
-            messages = [...defaultJoyMessages];
         }
 
         currentCustomerData = threadData || {};
@@ -1996,6 +1829,7 @@ function populatePinnedOrderCard(customer, orders) {
     if (!card) return;
 
     if (orders && orders.length > 0) {
+        card.style.display = 'block';
         const ord = orders[0];
         const item = ord.item || {};
 
@@ -2006,17 +1840,18 @@ function populatePinnedOrderCard(customer, orders) {
             if (pPhoto && !pPhoto.startsWith('http') && !pPhoto.startsWith('/') && !pPhoto.startsWith('../')) {
                 pPhoto = '../assets/uploads/' + pPhoto;
             }
-            imgEl.src = pPhoto || '../assets/uploads/nike-hoodie.png';
+            imgEl.src = pPhoto || '../assets/uploads/placeholder.svg';
+            imgEl.alt = item.product_name || 'Order Item';
         }
 
         // Order ID
         const idEl = document.getElementById('supCardOrderId');
-        if (idEl) idEl.textContent = `Order #ORD-${ord.payment_id}`;
+        if (idEl) idEl.textContent = `Order #${ord.payment_id}`;
 
         // Status Badge
         const statusEl = document.getElementById('supCardOrderStatus');
         if (statusEl) {
-            const shipStatus = (ord.shipping_status || 'Delivered').trim();
+            const shipStatus = (ord.shipping_status || 'Pending').trim();
             const isDelivered = shipStatus.toLowerCase() === 'delivered' || shipStatus.toLowerCase() === 'completed';
             statusEl.className = `sup-order-status-badge ${isDelivered ? 'status-delivered' : 'status-pending'}`;
             statusEl.innerHTML = `${isDelivered ? '<i class="fa fa-check-circle"></i> ' : '<i class="fa fa-clock-o"></i> '}${escapeHtml(shipStatus)}`;
@@ -2025,7 +1860,7 @@ function populatePinnedOrderCard(customer, orders) {
         // Product Name & Variant
         const pNameEl = document.getElementById('supCardProdName');
         if (pNameEl) {
-            let pText = item.product_name || 'Nike Hoodie';
+            let pText = item.product_name || 'Store Order';
             const variants = [];
             if (item.color) variants.push(item.color);
             if (item.size) variants.push(`Size ${item.size}`);
@@ -2048,7 +1883,7 @@ function populatePinnedOrderCard(customer, orders) {
             const addrParts = [];
             if (ord.shipping_address) addrParts.push(ord.shipping_address);
             if (ord.shipping_city) addrParts.push(ord.shipping_city);
-            addrEl.textContent = addrParts.length > 0 ? addrParts.slice(0, 2).join(', ') : '123/A, Green Road, Dhanmondi, Dhaka-1209';
+            addrEl.textContent = addrParts.length > 0 ? addrParts.slice(0, 2).join(', ') : ((customer && customer.customer_address) ? customer.customer_address : 'Storefront Order');
         }
 
         // Invoice No
@@ -2066,16 +1901,7 @@ function populatePinnedOrderCard(customer, orders) {
                 : '<span style="color: #D97706; font-weight: 800;"><i class="fa fa-clock-o"></i> Pending</span>';
         }
     } else {
-        // Fallback placeholder data matching the Nike Hoodie design
-        document.getElementById('supCardProdImg').src = '../assets/uploads/nike-hoodie.png';
-        document.getElementById('supCardOrderId').textContent = 'Order #ORD-10024';
-        document.getElementById('supCardOrderStatus').className = 'sup-order-status-badge status-delivered';
-        document.getElementById('supCardOrderStatus').innerHTML = '<i class="fa fa-check-circle"></i> Delivered';
-        document.getElementById('supCardProdName').textContent = 'Nike Hoodie (Black) - Size L';
-        document.getElementById('supCardProdPrice').textContent = '৳ 3,450';
-        document.getElementById('supCardAddress').textContent = (customer && customer.customer_address) ? customer.customer_address : '123/A, Green Road, Dhanmondi, Dhaka-1209';
-        document.getElementById('supCardInvoice').textContent = '#INV-000245';
-        document.getElementById('supCardPayment').innerHTML = '<span class="sup-pay-pill"><i class="fa fa-check-circle"></i> Paid</span>';
+        card.style.display = 'none';
     }
 }
 
@@ -2088,9 +1914,10 @@ function renderMessages(messages) {
     container.innerHTML = '';
 
     // Date header pill
+    const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     container.innerHTML += `
         <div class="sup-date-divider wa-date-divider">
-            <span class="wa-date-pill">Apr 12, 2025</span>
+            <span class="wa-date-pill">${todayStr}</span>
         </div>
     `;
 
@@ -2177,7 +2004,7 @@ function renderMessages(messages) {
             // Admin Message: Left side with Agent Avatar and clean White Bubble
             container.innerHTML += `
                 <div class="sup-msg-row admin wa-bubble-wrap outgoing">
-                    <img src="${currentAdminAvatar}" class="sup-agent-avatar" alt="Joy Saha" title="Support Agent">
+                    <img src="${currentAdminAvatar}" class="sup-agent-avatar" alt="Support Agent" title="Support Agent">
                     <div class="sup-bubble admin wa-bubble outgoing">
                         <div class="sup-msg-text" style="white-space: pre-wrap;">${formattedMsg}</div>
                         ${productCardHtml}
@@ -2246,27 +2073,12 @@ async function sendAdminMessagePayload(msg) {
             await refreshActiveThread();
             loadThreads(true);
             return;
+        } else {
+            alert(data.message || 'Failed to send message.');
         }
-    } catch (e) {}
-
-    // Fallback for demo threads (e.g. Joy Saha #101)
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const newMsg = {
-        id: 'msg-' + Date.now(),
-        sender_type: 'admin',
-        message: msg,
-        created_at: timeStr
-    };
-    if (currentThreadId === 101) {
-        defaultJoyMessages.push(newMsg);
-        const joyThread = allThreads.find(t => t.id === 101);
-        if (joyThread) {
-            joyThread.last_message = msg;
-            joyThread.last_message_at = timeStr;
-        }
-        renderMessages(defaultJoyMessages);
-        renderThreadList();
+    } catch (e) {
+        console.error('Failed to send message:', e);
+        alert('Network error: Could not send reply. Please check connection.');
     }
 }
 

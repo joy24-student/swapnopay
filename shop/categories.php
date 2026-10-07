@@ -14,8 +14,13 @@ $settings = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FET
 $currencySymbol = !empty($settings['currency_symbol']) ? $settings['currency_symbol'] : 'BDT';
 $favicon = !empty($settings['favicon']) ? $settings['favicon'] : 'default_favicon.png';
 
-// Active Category selection (default to Men's Clothing ID 2 to match mockup)
-$active_cat_id = isset($_GET['cat_id']) ? trim($_GET['cat_id']) : '2';
+// Fetch all Top Categories for the Left Rail
+$tcatsStmt = $pdo->query("SELECT tcat_id, tcat_name FROM tbl_top_category ORDER BY tcat_order ASC, tcat_id ASC");
+$allTopCategories = $tcatsStmt ? $tcatsStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+$default_cat_id = !empty($allTopCategories) ? (string)$allTopCategories[0]['tcat_id'] : '1';
+
+// Active Category selection
+$active_cat_id = isset($_GET['cat_id']) ? trim($_GET['cat_id']) : $default_cat_id;
 
 // Desktop User-Agent check: redirect desktop browsers to full desktop category listing
 $userAgent = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
@@ -30,27 +35,38 @@ if (!$isMobileUA && !isset($_GET['mobile_mode'])) {
 // ── Helper to retrieve subcategories & products for a top category ────────────
 function getCategoryData($pdo, $tcat_id, $currencySymbol) {
     if ($tcat_id === 'foryou' || $tcat_id === '0') {
-        // "For you" smart mix
-        $subcategories = [
-            ['name' => 'Matching Sets', 'photo' => 'cat_mockup/sub_matching_sets.png', 'url' => 'product-category.php?id=2&type=mid-category'],
-            ['name' => 'Down Coats & Parkas', 'photo' => 'cat_mockup/sub_down_coats.png', 'url' => 'product-category.php?id=3&type=mid-category'],
-            ['name' => 'Jackets & Light Coats', 'photo' => 'cat_mockup/sub_jackets.png', 'url' => 'product-category.php?id=4&type=mid-category'],
-            ['name' => 'Underwear', 'photo' => 'cat_mockup/sub_underwear.png', 'url' => 'product-category.php?id=5&type=mid-category'],
-            ['name' => 'Hoodies & Sweatshirts', 'photo' => 'cat_mockup/sub_hoodies.png', 'url' => 'product-category.php?id=6&type=mid-category'],
-            ['name' => 'Jeans', 'photo' => 'cat_mockup/sub_jeans.png', 'url' => 'product-category.php?id=7&type=mid-category'],
-            ['name' => 'Suits & Separates', 'photo' => 'cat_mockup/sub_suits.png', 'url' => 'product-category.php?id=8&type=mid-category'],
-            ['name' => 'Wool & Trench Coats', 'photo' => 'cat_mockup/sub_trench_coats.png', 'url' => 'product-category.php?id=9&type=mid-category'],
-            ['name' => 'Polo Shirts', 'photo' => 'cat_mockup/sub_polo_shirts.png', 'url' => 'product-category.php?id=10&type=mid-category'],
-            ['name' => 'Denim Tops', 'photo' => 'cat_mockup/sub_denim_tops.png', 'url' => 'product-category.php?id=11&type=mid-category'],
-            ['name' => 'Shirts', 'photo' => 'cat_mockup/sub_shirts.png', 'url' => 'product-category.php?id=12&type=mid-category'],
-        ];
+        // "For you" smart mix from database
+        $subStmt = $pdo->query("
+            SELECT m.mcat_id, m.mcat_name, m.photo,
+                   (SELECT p.p_featured_photo 
+                    FROM tbl_end_category e 
+                    JOIN tbl_product p ON p.ecat_id = e.ecat_id 
+                    WHERE e.mcat_id = m.mcat_id AND p.p_is_active = 1 AND p.p_featured_photo IS NOT NULL AND p.p_featured_photo != ''
+                    LIMIT 1) as prod_photo
+            FROM tbl_mid_category m
+            ORDER BY m.mcat_id ASC
+            LIMIT 12
+        ");
+        $rawSubs = $subStmt ? $subStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $subcategories = [];
+        foreach ($rawSubs as $sub) {
+            $photo = !empty($sub['photo']) ? $sub['photo'] : (!empty($sub['prod_photo']) ? $sub['prod_photo'] : 'cat_all.jpg');
+            $subcategories[] = [
+                'id' => $sub['mcat_id'],
+                'name' => $sub['mcat_name'],
+                'photo' => $photo,
+                'url' => 'product-category.php?id=' . $sub['mcat_id'] . '&type=mid-category'
+            ];
+        }
 
         $stmtProd = $pdo->query("
-            SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_total_view, 1 as has_choice 
+            SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_total_view, p_is_featured as has_choice,
+                   COALESCE((SELECT AVG(r.rating) FROM tbl_rating r WHERE r.p_id = p.p_id), 5.0) as avg_rating,
+                   COALESCE((SELECT COUNT(*) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as rating_count
             FROM tbl_product 
             WHERE p_is_active = 1 
-            ORDER BY CASE WHEN p_name LIKE '%Shark Skin%' THEN 1 WHEN p_name LIKE '%Autumn/Winter%' THEN 2 ELSE 3 END, p_id DESC 
-            LIMIT 10
+            ORDER BY p_is_featured DESC, p_total_view DESC, p_id DESC 
+            LIMIT 12
         ");
         $products = $stmtProd ? $stmtProd->fetchAll(PDO::FETCH_ASSOC) : [];
         return ['subcategories' => $subcategories, 'products' => $products, 'title' => 'For you'];
@@ -89,24 +105,17 @@ function getCategoryData($pdo, $tcat_id, $currencySymbol) {
         ];
     }
 
-    // Products for this category (ensure Shark Skin and Polo tracksuit appear first for Men's clothing)
+    // Products for this category
     $prodStmt = $pdo->prepare("
         SELECT p.p_id, p.p_name, p.p_current_price, p.p_old_price, p.p_featured_photo, p.p_total_view, p.is_top_sale,
-               CASE WHEN p.p_name LIKE '%Autumn/Winter%' OR p.p_is_featured = 1 THEN 1 ELSE 0 END as has_choice,
+               p.p_is_featured as has_choice,
                COALESCE((SELECT AVG(r.rating) FROM tbl_rating r WHERE r.p_id = p.p_id), 5.0) as avg_rating,
                COALESCE((SELECT COUNT(*) FROM tbl_rating r WHERE r.p_id = p.p_id), 0) as rating_count
         FROM tbl_product p
         JOIN tbl_end_category e ON p.ecat_id = e.ecat_id
         JOIN tbl_mid_category m ON e.mcat_id = m.mcat_id
         WHERE m.tcat_id = ? AND p.p_is_active = 1
-        ORDER BY 
-            CASE 
-                WHEN p.p_name LIKE '%Shark Skin%' THEN 1 
-                WHEN p.p_name LIKE '%Autumn/Winter%' THEN 2 
-                ELSE 3 
-            END ASC,
-            p.p_is_featured DESC, 
-            p.p_id DESC
+        ORDER BY p.p_is_featured DESC, p.is_top_sale DESC, p.p_id DESC
         LIMIT 16
     ");
     $prodStmt->execute([$tcat_id_int]);
@@ -115,10 +124,10 @@ function getCategoryData($pdo, $tcat_id, $currencySymbol) {
     // Fallback if empty
     if (empty($products)) {
         $fallbackStmt = $pdo->query("
-            SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_total_view, is_top_sale, 1 as has_choice, 5.0 as avg_rating
+            SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_total_view, is_top_sale, p_is_featured as has_choice, 5.0 as avg_rating
             FROM tbl_product 
             WHERE p_is_active = 1 
-            ORDER BY p_id DESC 
+            ORDER BY p_is_featured DESC, p_id DESC 
             LIMIT 8
         ");
         $products = $fallbackStmt ? $fallbackStmt->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -130,7 +139,7 @@ function getCategoryData($pdo, $tcat_id, $currencySymbol) {
 // ── Handle AJAX Request ───────────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'get_category_data') {
     header('Content-Type: application/json; charset=utf-8');
-    $reqCatId = trim($_GET['tcat_id'] ?? '2');
+    $reqCatId = trim($_GET['tcat_id'] ?? $default_cat_id);
     $data = getCategoryData($pdo, $reqCatId, $currencySymbol);
     echo json_encode([
         'status' => 'success',
@@ -142,10 +151,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_category_data') {
     ]);
     exit;
 }
-
-// Fetch all Top Categories for the Left Rail
-$tcatsStmt = $pdo->query("SELECT tcat_id, tcat_name FROM tbl_top_category ORDER BY tcat_order ASC, tcat_id ASC");
-$allTopCategories = $tcatsStmt ? $tcatsStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Initial category data for Server-Side Rendering
 $initialData = getCategoryData($pdo, $active_cat_id, $currencySymbol);
@@ -1369,7 +1374,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
             const pPhoto = (p.p_featured_photo && typeof p.p_featured_photo === 'string') ? p.p_featured_photo : '';
             const photo = pPhoto.startsWith('http') ? pPhoto : (pPhoto ? 'assets/uploads/' + pPhoto : 'assets/uploads/cat_all.jpg');
             const rating = p.avg_rating ? parseFloat(p.avg_rating).toFixed(1) : '5.0';
-            const views = p.p_total_view || 31;
+            const views = p.p_total_view || 0;
             const price = parseFloat(p.p_current_price || 0).toFixed(2);
             const hasChoice = Boolean(p.has_choice);
 

@@ -76,7 +76,7 @@ $last_name = isset($name_parts[1]) ? implode(' ', array_slice($name_parts, 1)) :
 // Member since
 $member_since = !empty($cust['cust_datetime']) 
     ? date('F Y', strtotime($cust['cust_datetime'])) 
-    : 'September 2026';
+    : 'Recent';
 
 // Profile completion calculation
 $fields_to_check = [
@@ -156,7 +156,7 @@ try {
                 <div class="sn-profile-top-card">
                     <div class="sn-profile-user-left">
                         <div class="sn-profile-avatar-large">
-                            <?= htmlspecialchars(substr($first_name, 0, 1) . substr($last_name, 0, 1) ?: 'JS') ?>
+                            <?= htmlspecialchars(strtoupper(substr($first_name, 0, 1) . substr($last_name, 0, 1)) ?: 'CU') ?>
                         </div>
                         <div class="sn-profile-title-block">
                             <h3><?= htmlspecialchars($cust['cust_name'] ?: 'Customer') ?></h3>
@@ -229,7 +229,7 @@ try {
                                 <label class="sn-label" for="cust_phone">Phone Number</label>
                                 <div class="sn-input-wrap">
                                     <i class="fa-solid fa-phone prefix-icon"></i>
-                                    <input type="text" id="cust_phone" name="cust_phone" class="sn-input" value="<?= htmlspecialchars($cust['cust_phone'] ?: '+880 1XXXXXXXXX') ?>" style="padding-right: 80px;" required />
+                                    <input type="text" id="cust_phone" name="cust_phone" class="sn-input" value="<?= htmlspecialchars($cust['cust_phone'] ?: '') ?>" placeholder="e.g. +880 1712 345678" style="padding-right: 80px;" required />
                                     <span class="sn-input-action-inside" onclick="document.getElementById('cust_phone').focus();">
                                         <i class="fa-solid fa-pen"></i> Change
                                     </span>
@@ -241,7 +241,7 @@ try {
                                 <label class="sn-label" for="cust_dob">Date of Birth</label>
                                 <div class="sn-input-wrap">
                                     <i class="fa-regular fa-calendar prefix-icon"></i>
-                                    <input type="date" id="cust_dob" name="cust_dob" class="sn-input" value="<?= htmlspecialchars($cust['cust_dob'] ?: '2006-01-01') ?>" />
+                                    <input type="date" id="cust_dob" name="cust_dob" class="sn-input" value="<?= htmlspecialchars($cust['cust_dob'] ?: '') ?>" />
                                 </div>
                             </div>
 

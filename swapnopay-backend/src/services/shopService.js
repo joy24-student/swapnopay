@@ -197,24 +197,84 @@ export class ShopService {
   }
   async initialize() {
     if (!this.pool) return
-    if (!this.initialized) this.initialized = this.pool.query(`
-      CREATE SCHEMA IF NOT EXISTS shop_control;
-      REVOKE ALL ON SCHEMA shop_control FROM PUBLIC;
-      CREATE TABLE IF NOT EXISTS shop_control.launches (
-        merchant_id uuid PRIMARY KEY, store_name text NOT NULL, shop_slug text UNIQUE NOT NULL,
-        custom_domain text UNIQUE, currency text NOT NULL, theme_color text NOT NULL, admin_email text NOT NULL,
-        status text NOT NULL DEFAULT 'QUEUED', message text NOT NULL DEFAULT '',
-        job_id uuid NOT NULL, secret_config text NOT NULL, schema_ready boolean NOT NULL DEFAULT false,
-        tls_allowed boolean NOT NULL DEFAULT false, attempts integer NOT NULL DEFAULT 0,
-        next_attempt timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-      ); REVOKE ALL ON shop_control.launches FROM PUBLIC;
-      CREATE TABLE IF NOT EXISTS shop_control.domains (hostname text PRIMARY KEY, merchant_id uuid NOT NULL REFERENCES shop_control.launches(merchant_id));
-      REVOKE ALL ON shop_control.domains FROM PUBLIC;
-    `).catch(error => { this.initialized = null; throw error })
+    if (!this.initialized) this.initialized = (async () => {
+      await this.pool.query(`
+        CREATE SCHEMA IF NOT EXISTS shop_control;
+        REVOKE ALL ON SCHEMA shop_control FROM PUBLIC;
+        CREATE TABLE IF NOT EXISTS shop_control.launches (
+          id uuid DEFAULT gen_random_uuid(),
+          merchant_id uuid NOT NULL,
+          store_name text NOT NULL,
+          shop_slug text UNIQUE NOT NULL,
+          custom_domain text UNIQUE,
+          currency text NOT NULL,
+          theme_color text NOT NULL,
+          admin_email text NOT NULL,
+          status text NOT NULL DEFAULT 'QUEUED',
+          message text NOT NULL DEFAULT '',
+          job_id uuid NOT NULL,
+          secret_config text NOT NULL,
+          schema_ready boolean NOT NULL DEFAULT false,
+          tls_allowed boolean NOT NULL DEFAULT false,
+          attempts integer NOT NULL DEFAULT 0,
+          next_attempt timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          schema_name text NOT NULL DEFAULT '',
+          runtime_config text NOT NULL DEFAULT ''
+        );
+        REVOKE ALL ON shop_control.launches FROM PUBLIC;
+
+        CREATE TABLE IF NOT EXISTS shop_control.domains (
+          hostname text PRIMARY KEY,
+          merchant_id uuid NOT NULL,
+          shop_slug text NOT NULL DEFAULT ''
+        );
+        REVOKE ALL ON shop_control.domains FROM PUBLIC;
+      `)
+
+      try {
+        await this.pool.query(`
+          ALTER TABLE shop_control.launches ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
+          ALTER TABLE shop_control.launches ADD COLUMN IF NOT EXISTS schema_name text NOT NULL DEFAULT '';
+          ALTER TABLE shop_control.launches ADD COLUMN IF NOT EXISTS runtime_config text NOT NULL DEFAULT '';
+          ALTER TABLE shop_control.domains ADD COLUMN IF NOT EXISTS shop_slug text NOT NULL DEFAULT '';
+        `)
+      } catch (_) {}
+
+      try {
+        const pkCheck = await this.pool.query(`
+          SELECT a.attname
+          FROM pg_index i
+          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+          WHERE i.indrelid = 'shop_control.launches'::regclass AND i.indisprimary
+        `)
+        const pkCols = pkCheck.rows.map(r => r.attname)
+        if (pkCols.includes('merchant_id') && !pkCols.includes('id')) {
+          await this.pool.query(`
+            ALTER TABLE shop_control.domains DROP CONSTRAINT IF EXISTS domains_merchant_id_fkey;
+            UPDATE shop_control.domains d SET shop_slug = l.shop_slug FROM shop_control.launches l WHERE d.merchant_id = l.merchant_id AND (d.shop_slug = '' OR d.shop_slug IS NULL);
+            UPDATE shop_control.launches SET id = gen_random_uuid() WHERE id IS NULL;
+            ALTER TABLE shop_control.launches DROP CONSTRAINT IF EXISTS launches_pkey;
+            ALTER TABLE shop_control.launches ADD CONSTRAINT launches_pkey PRIMARY KEY (id);
+          `)
+        }
+      } catch (pkErr) {
+        console.warn('[shopService] Primary key migration notice:', pkErr.message)
+      }
+
+      try {
+        await this.pool.query(`
+          CREATE INDEX IF NOT EXISTS idx_launches_merchant_id ON shop_control.launches(merchant_id);
+          CREATE INDEX IF NOT EXISTS idx_launches_shop_slug ON shop_control.launches(shop_slug);
+          CREATE INDEX IF NOT EXISTS idx_launches_custom_domain ON shop_control.launches(custom_domain);
+          CREATE INDEX IF NOT EXISTS idx_domains_shop_slug ON shop_control.domains(shop_slug);
+        `)
+      } catch (_) {}
+    })().catch(error => { this.initialized = null; throw error })
     await this.initialized
   }
-  async resolveMerchantDbConfig(id, secrets = {}) {
-    const schema = schemaName(id)
+  async resolveMerchantDbConfig(id, secrets = {}, slug = '', explicitSchema = '') {
+    const schema = explicitSchema || schemaName(id, slug)
     let creds = null
     try { creds = await this.getMerchantCredentials(id) } catch (_) {}
 
@@ -286,10 +346,21 @@ export class ShopService {
     }
     return this.pool
   }
-  async row(id) {
+  async row(id, slug = null) {
     if (!this.pool) return null
     await this.initialize()
-    return (await this.pool.query(`SELECT * FROM shop_control.launches WHERE merchant_id=$1`, [merchantId(id)])).rows[0] || null
+    if (slug) {
+      const bySlug = await this.pool.query('SELECT * FROM shop_control.launches WHERE shop_slug=$1', [slug])
+      if (bySlug.rows.length) return bySlug.rows[0]
+    }
+    const cleanId = String(id || '').trim().toLowerCase()
+    if (cleanId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId)) {
+      const byHost = await this.pool.query('SELECT * FROM shop_control.launches WHERE shop_slug=$1 OR custom_domain=$1', [cleanId])
+      if (byHost.rows.length) return byHost.rows[0]
+    }
+    const mId = merchantId(id)
+    const byMerchant = await this.pool.query('SELECT * FROM shop_control.launches WHERE merchant_id=$1 ORDER BY updated_at DESC LIMIT 1', [mId])
+    return byMerchant.rows[0] || null
   }
   publicStatus(row, counts = {}) {
     if (!row) {
@@ -335,12 +406,12 @@ export class ShopService {
       const ready = await this.dns(host, this.config.addresses) && (await this.probe(host, this.config.addresses[0], id, checkPath)).ready
       row.status=ready ? 'LIVE' : 'DEGRADED'
       row.message=ready ? 'Your storefront and admin login are ready over HTTPS.' : 'The storefront could not be reached over HTTPS. Check your domain and hosting, then refresh.'
-      const saved=await this.pool.query("UPDATE shop_control.launches SET status=$2,message=$3,updated_at=now() WHERE merchant_id=$1 AND job_id=$4 AND status IN ('LIVE','DEGRADED') RETURNING updated_at",[id,row.status,row.message,row.job_id])
+      const saved=await this.pool.query("UPDATE shop_control.launches SET status=$2,message=$3,updated_at=now() WHERE shop_slug=$1 AND job_id=$4 AND status IN ('LIVE','DEGRADED') RETURNING updated_at",[row.shop_slug,row.status,row.message,row.job_id])
       if(!saved.rowCount) return this.status(id)
       row.updated_at=saved.rows[0].updated_at
     }
     if (!row?.schema_ready) return this.publicStatus(row)
-    const s = identifier(schemaName(id))
+    const s = identifier(row.schema_name || schemaName(id, row.shop_slug))
     const tenantPool = await this.getTenantPool(id)
     const { rows } = await tenantPool.query(`SELECT
       (SELECT count(*)::int FROM ${s}.tbl_product WHERE p_is_active=1) AS products_count,
@@ -373,7 +444,27 @@ export class ShopService {
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [id])
-      const existing = (await client.query('SELECT * FROM shop_control.launches WHERE merchant_id=$1 FOR UPDATE', [id])).rows[0]
+
+      const requestedSlug = body.shop_slug ? String(body.shop_slug).trim().toLowerCase() : ''
+      let existing = null
+      if (requestedSlug) {
+        const foundSlug = await client.query('SELECT * FROM shop_control.launches WHERE shop_slug=$1 FOR UPDATE', [requestedSlug])
+        if (foundSlug.rows.length) {
+          existing = foundSlug.rows[0]
+          if (existing.merchant_id !== id) {
+            throw new ShopError(409, 'ADDRESS_TAKEN', 'This store address already belongs to another store.')
+          }
+        }
+      }
+      if (!existing) {
+        const foundMerchant = await client.query('SELECT * FROM shop_control.launches WHERE merchant_id=$1 ORDER BY updated_at DESC LIMIT 1 FOR UPDATE', [id])
+        if (foundMerchant.rows.length) {
+          if (!requestedSlug || foundMerchant.rows[0].shop_slug === requestedSlug) {
+            existing = foundMerchant.rows[0]
+          }
+        }
+      }
+
       const input = launchInput(body, existing)
       const sameSettings = existing && ['store_name','shop_slug','custom_domain','currency','theme_color','admin_email'].every(key => existing[key] === input[key])
       if (existing && busyStates.includes(existing.status)) {
@@ -399,17 +490,38 @@ export class ShopService {
         configuration.adminHash = await bcrypt.hash(initialPassword, 12)
       }
       if (sameSettings && !input.password && existing.status === 'LIVE') { await client.query('COMMIT'); return this.publicStatus(existing) }
-      const values = [id,input.store_name,input.shop_slug,input.custom_domain,input.currency,input.theme_color,input.admin_email,crypto.randomUUID(),encryptConfig(configuration,this.config.key)]
-      const result = await client.query(`INSERT INTO shop_control.launches
-        (merchant_id,store_name,shop_slug,custom_domain,currency,theme_color,admin_email,job_id,secret_config)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        ON CONFLICT(merchant_id) DO UPDATE SET store_name=$2,shop_slug=$3,custom_domain=$4,currency=$5,theme_color=$6,admin_email=$7,
-          job_id=$8,secret_config=$9,status='QUEUED',message='Preparing your storefront.',tls_allowed=false,attempts=0,next_attempt=now(),updated_at=now()
-        RETURNING ${publicFields}`, values)
+
+      const targetSchema = existing?.schema_name || schemaName(id, input.shop_slug)
+      const jobId = crypto.randomUUID()
+      const encryptedConfig = encryptConfig(configuration, this.config.key)
+
+      let result
+      if (existing) {
+        result = await client.query(`UPDATE shop_control.launches
+          SET store_name=$2, shop_slug=$3, custom_domain=$4, currency=$5, theme_color=$6, admin_email=$7,
+              job_id=$8, secret_config=$9, status='QUEUED', message='Preparing your storefront.',
+              tls_allowed=false, attempts=0, next_attempt=now(), updated_at=now(), schema_name=$10
+          WHERE id=$1
+          RETURNING ${publicFields}`,
+          [existing.id, input.store_name, input.shop_slug, input.custom_domain, input.currency, input.theme_color, input.admin_email, jobId, encryptedConfig, targetSchema]
+        )
+      } else {
+        result = await client.query(`INSERT INTO shop_control.launches
+          (merchant_id, store_name, shop_slug, custom_domain, currency, theme_color, admin_email, job_id, secret_config, schema_name)
+          VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING ${publicFields}`,
+          [id, input.store_name, input.shop_slug, input.custom_domain, input.currency, input.theme_color, input.admin_email, jobId, encryptedConfig, targetSchema]
+        )
+      }
+
       for (const host of new Set([input.shop_slug, input.custom_domain].filter(Boolean))) {
-        await client.query('INSERT INTO shop_control.domains(hostname,merchant_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[host,id])
-        const owner=(await client.query('SELECT merchant_id FROM shop_control.domains WHERE hostname=$1',[host])).rows[0]
-        if(owner.merchant_id !== id) throw new ShopError(409,'ADDRESS_TAKEN','This domain already belongs to another store.')
+        await client.query(`INSERT INTO shop_control.domains(hostname, merchant_id, shop_slug)
+          VALUES($1, $2, $3)
+          ON CONFLICT(hostname) DO UPDATE SET merchant_id=$2, shop_slug=$3 WHERE shop_control.domains.merchant_id=$2`,
+          [host, id, input.shop_slug]
+        )
+        const owner = (await client.query('SELECT merchant_id FROM shop_control.domains WHERE hostname=$1', [host])).rows[0]
+        if (owner && owner.merchant_id !== id) throw new ShopError(409, 'ADDRESS_TAKEN', 'This domain already belongs to another store.')
       }
       await client.query('COMMIT')
       const status = this.publicStatus(result.rows[0])
@@ -444,7 +556,8 @@ export class ShopService {
     }
   }
   async publishFiles(row, secrets) {
-    const tenantDir = path.join(this.config.sites, 'stores', row.merchant_id)
+    const storeKey = row.shop_slug || row.merchant_id
+    const tenantDir = path.join(this.config.sites, 'stores', storeKey)
     const marker = path.join(tenantDir, '.swapnopay-ready')
     try { await fs.access(marker) } catch {
       const stage = `${tenantDir}.${row.job_id}.tmp`
@@ -479,12 +592,14 @@ export class ShopService {
     }
     const apiKey = keyRecord?.api_key || `sp_live_${crypto.createHash('md5').update(String(row.merchant_id)).digest('hex')}`
 
-    const resolvedDb = await this.resolveMerchantDbConfig(row.merchant_id, secrets)
+    const schemaToUse = row.schema_name || schemaName(row.merchant_id, row.shop_slug)
+    const resolvedDb = await this.resolveMerchantDbConfig(row.merchant_id, secrets, row.shop_slug, schemaToUse)
     const runtime = {
       merchant_id: row.merchant_id,
       gateway_api_key: apiKey,
       base_url: row.custom_domain ? `https://${row.custom_domain}/` : `https://${this.config.baseDomain}/${row.shop_slug}/`,
       store_name: row.store_name,
+      shop_slug: row.shop_slug,
       supabase_url: resolvedDb.supabaseUrl,
       supabase_anon_key: resolvedDb.supabaseAnonKey,
       db: {
@@ -516,8 +631,14 @@ export class ShopService {
 
     // 1. Path-based platform URL: shop.swapnopay.top/<slug>
     const pathRuntime = { ...runtime, base_url: `https://${this.config.baseDomain}/${row.shop_slug}/` }
-    await this.writePrivate(path.join(this.config.runtime, 'hosts', `${row.shop_slug}.json`), JSON.stringify(pathRuntime))
-    await this.writePrivate(path.join(this.config.runtime, 'slugs', `${row.shop_slug}.json`), JSON.stringify(pathRuntime))
+    const runtimeJson = JSON.stringify(pathRuntime)
+    await this.writePrivate(path.join(this.config.runtime, 'hosts', `${row.shop_slug}.json`), runtimeJson)
+    await this.writePrivate(path.join(this.config.runtime, 'slugs', `${row.shop_slug}.json`), runtimeJson)
+
+    // Save runtime config in shop_control.launches for DB fallback
+    try {
+      await this.pool.query('UPDATE shop_control.launches SET runtime_config=$2 WHERE shop_slug=$1', [row.shop_slug, runtimeJson])
+    } catch (_) {}
 
     const slugLink = path.join(this.config.sites, 'slugs', row.shop_slug)
     try { 
@@ -538,16 +659,16 @@ export class ShopService {
       }
     }
 
-    // Cleanup decommissioned host records
+    // Cleanup decommissioned host records FOR THIS STORE ONLY
     const activeHosts = new Set([row.shop_slug, row.custom_domain].filter(Boolean))
-    const priorHosts = (await this.pool.query('SELECT hostname FROM shop_control.domains WHERE merchant_id=$1', [row.merchant_id])).rows
+    const priorHosts = (await this.pool.query('SELECT hostname FROM shop_control.domains WHERE shop_slug=$1', [row.shop_slug])).rows
     for (const { hostname: host } of priorHosts) {
       if (!activeHosts.has(host)) {
         await fs.unlink(path.join(this.config.sites, 'hosts', host)).catch(error => { if (error.code !== 'ENOENT') throw error })
         await fs.unlink(path.join(this.config.runtime, 'hosts', `${host}.json`)).catch(error => { if (error.code !== 'ENOENT') throw error })
         await fs.unlink(path.join(this.config.sites, 'slugs', host)).catch(error => { if (error.code !== 'ENOENT') throw error })
         await fs.unlink(path.join(this.config.runtime, 'slugs', `${host}.json`)).catch(error => { if (error.code !== 'ENOENT') throw error })
-        await this.pool.query('DELETE FROM shop_control.domains WHERE hostname=$1 AND merchant_id=$2', [host, row.merchant_id]).catch(() => {})
+        await this.pool.query('DELETE FROM shop_control.domains WHERE hostname=$1 AND shop_slug=$2', [host, row.shop_slug]).catch(() => {})
       }
     }
   }
@@ -567,19 +688,23 @@ export class ShopService {
         }
       }
       try {
-        await client.query('UPDATE shop_control.launches SET secret_config=$2 WHERE merchant_id=$1', [row.merchant_id, encryptConfig(secrets, this.config.key)])
+        await client.query('UPDATE shop_control.launches SET secret_config=$2 WHERE shop_slug=$1', [row.shop_slug, encryptConfig(secrets, this.config.key)])
       } catch (_) {}
     }
-    const schema = schemaName(row.merchant_id)
+    const schema = row.schema_name || schemaName(row.merchant_id, row.shop_slug)
     const quoted = identifier(schema)
     const tenantPool = await this.getTenantPool(row.merchant_id)
     const useSeparateTenantDb = tenantPool && tenantPool !== this.pool
     const dbClient = useSeparateTenantDb ? await tenantPool.connect() : client
     await dbClient.query('BEGIN')
     try {
-      if (!row.schema_ready) {
-        await dbClient.query(`CREATE SCHEMA IF NOT EXISTS ${quoted}; REVOKE ALL ON SCHEMA ${quoted} FROM PUBLIC`)
-        await dbClient.query(`SET LOCAL search_path TO ${quoted},pg_catalog`)
+      await dbClient.query(`CREATE SCHEMA IF NOT EXISTS ${quoted}; REVOKE ALL ON SCHEMA ${quoted} FROM PUBLIC`)
+      await dbClient.query(`SET LOCAL search_path TO ${quoted},pg_catalog`)
+
+      // Guarantee storefront tables exist in the schema
+      const hasSettings = await dbClient.query("SELECT 1 FROM information_schema.tables WHERE table_schema=$1 AND table_name='tbl_settings'", [schema])
+      if (!hasSettings.rows?.length) {
+        console.log(`[shop/provision] Provisioning storefront SQL tables into schema ${schema}...`)
         await dbClient.query(await fs.readFile(schemaFile,'utf8'))
         try {
           await dbClient.query('SAVEPOINT role_sp')
@@ -597,14 +722,8 @@ export class ShopService {
           await dbClient.query('ROLLBACK TO SAVEPOINT role_sp').catch(() => {})
           console.warn('[shop/provision] Role creation notice:', roleErr.message)
         }
-      } else if (useSeparateTenantDb) {
-        await dbClient.query(`CREATE SCHEMA IF NOT EXISTS ${quoted}; REVOKE ALL ON SCHEMA ${quoted} FROM PUBLIC`)
-        await dbClient.query(`SET LOCAL search_path TO ${quoted},pg_catalog`)
-        const hasSettings = await dbClient.query("SELECT 1 FROM information_schema.tables WHERE table_schema=$1 AND table_name='tbl_settings'", [schema])
-        if (!hasSettings.rows?.length) {
-          await dbClient.query(await fs.readFile(schemaFile,'utf8'))
-        }
       }
+
       await dbClient.query(`SET LOCAL search_path TO ${quoted},pg_catalog`)
       const storeBaseUrl = row.custom_domain
         ? `https://${row.custom_domain}/`
@@ -615,11 +734,11 @@ export class ShopService {
         ON CONFLICT(id) DO UPDATE SET full_name=$1,email=$2,password=$3,role='Top Admin',status='Active'`,[`${row.store_name} Administrator`,row.admin_email,secrets.adminHash])
       else await dbClient.query('UPDATE tbl_user SET email=$1 WHERE id=1',[row.admin_email])
       if (!useSeparateTenantDb) {
-        await client.query(`UPDATE shop_control.launches SET schema_ready=true WHERE merchant_id=$1`,[row.merchant_id])
+        await client.query(`UPDATE shop_control.launches SET schema_ready=true, schema_name=$2 WHERE shop_slug=$1`, [row.shop_slug, schema])
       }
       await dbClient.query('COMMIT')
       if (useSeparateTenantDb) {
-        await client.query(`UPDATE shop_control.launches SET schema_ready=true WHERE merchant_id=$1`,[row.merchant_id])
+        await client.query(`UPDATE shop_control.launches SET schema_ready=true, schema_name=$2 WHERE shop_slug=$1`, [row.shop_slug, schema])
       }
     } catch(error) { await dbClient.query('ROLLBACK'); throw error } finally {
       if (useSeparateTenantDb) dbClient.release()
@@ -644,13 +763,14 @@ export class ShopService {
         WHERE status IN ('QUEUED','PROVISIONING','WAITING_DNS','WAITING_TLS') AND next_attempt<=now() ORDER BY next_attempt LIMIT 10`)).rows
       for (const candidate of candidates) {
         const row = candidate
-        const lock = await client.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[row.merchant_id])
+        const lockKey = row.shop_slug || row.merchant_id
+        const lock = await client.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[lockKey])
         if (!lock.rows[0].locked) continue
-        lockedId = row.merchant_id
-        const fresh=(await client.query("SELECT * FROM shop_control.launches WHERE merchant_id=$1 AND job_id=$2 AND status IN ('QUEUED','PROVISIONING','WAITING_DNS','WAITING_TLS') AND next_attempt<=now()",[row.merchant_id,row.job_id])).rows[0]
+        lockedId = lockKey
+        const fresh=(await client.query("SELECT * FROM shop_control.launches WHERE shop_slug=$1 AND job_id=$2 AND status IN ('QUEUED','PROVISIONING','WAITING_DNS','WAITING_TLS') AND next_attempt<=now()",[row.shop_slug,row.job_id])).rows[0]
         if (!fresh) { await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[lockedId]); lockedId=null; continue }
         Object.assign(row,fresh)
-        await client.query(`UPDATE shop_control.launches SET status='PROVISIONING',message='Preparing files and database.',next_attempt=now()+interval '30 seconds',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id])
+        await client.query(`UPDATE shop_control.launches SET status='PROVISIONING',message='Preparing files and database.',next_attempt=now()+interval '30 seconds',updated_at=now() WHERE shop_slug=$1`,[row.shop_slug])
         try {
           await this.provision(client,row)
           const isPlatform = !row.custom_domain || row.custom_domain === this.config.baseDomain || row.custom_domain.endsWith('.' + this.config.baseDomain) || row.custom_domain.endsWith('.swapnopay.top')
@@ -660,16 +780,16 @@ export class ShopService {
             ? `Store instance ready! Securing SSL certificate for https://${this.config.baseDomain}/${row.shop_slug}...`
             : `Point ${host} A-record to ${this.config.addresses[0]}. We will check again automatically.`
           const dnsReady = await this.dns(host,this.config.addresses)
-          await client.query('UPDATE shop_control.launches SET tls_allowed=$2 WHERE merchant_id=$1',[row.merchant_id, Boolean(dnsReady || isPlatform)])
+          await client.query('UPDATE shop_control.launches SET tls_allowed=$2 WHERE shop_slug=$1',[row.shop_slug, Boolean(dnsReady || isPlatform)])
           if (dnsReady) {
             const health = await this.probe(host,this.config.addresses[0],row.merchant_id,checkPath)
             status=health.ready ? 'LIVE' : 'WAITING_TLS'
             message=health.ready ? 'Your storefront and admin login are ready over HTTPS.' : (isPlatform ? `Storefront provisioned! Ready at https://${this.config.baseDomain}/${row.shop_slug}` : health.message)
           }
-          await client.query(`UPDATE shop_control.launches SET status=$2,message=$3,attempts=attempts+1,next_attempt=now()+interval '30 seconds',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id,status,message])
+          await client.query(`UPDATE shop_control.launches SET status=$2,message=$3,attempts=attempts+1,next_attempt=now()+interval '30 seconds',updated_at=now() WHERE shop_slug=$1`,[row.shop_slug,status,message])
         } catch (error) {
-          console.error('[shop/worker] Launch failed', { merchant: row.merchant_id, code: error.code || 'PROVISIONING_FAILED', err: error.message })
-          await client.query(`UPDATE shop_control.launches SET status='FAILED',message='Store preparation failed. Retry the launch or contact support with the launch ID.',updated_at=now() WHERE merchant_id=$1`,[row.merchant_id])
+          console.error('[shop/worker] Launch failed', { slug: row.shop_slug, merchant: row.merchant_id, code: error.code || 'PROVISIONING_FAILED', err: error.message })
+          await client.query(`UPDATE shop_control.launches SET status='FAILED',message='Store preparation failed. Retry the launch or contact support with the launch ID.',updated_at=now() WHERE shop_slug=$1`,[row.shop_slug])
         }
         break
       }
@@ -686,7 +806,8 @@ export class ShopService {
     const client = await tenantPool.connect()
     try {
       await client.query('BEGIN')
-      await client.query(`SET LOCAL search_path TO ${identifier(schemaName(id))},pg_catalog`)
+      const schema = row.schema_name || schemaName(id, row.shop_slug)
+      await client.query(`SET LOCAL search_path TO ${identifier(schema)},pg_catalog`)
       const result = await fn(client,row)
       await client.query('COMMIT')
       return result

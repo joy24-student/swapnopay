@@ -346,7 +346,7 @@ if (isset($_POST['submit_trx'])) {
 
         <form method="post" style="border-top: 1px solid #f1f5f9; padding-top: 16px;">
             <p style="font-size: 12px; color: #64748b; margin-bottom: 8px;">Already sent money? Enter TrxID to speed up verification:</p>
-            <input type="text" name="sender_number" class="form-control-custom" placeholder="Your Sender Phone (01XXXXXXXXX)" required>
+            <input type="text" name="sender_number" class="form-control-custom" placeholder="Your Sender Phone (e.g. 01712345678)" required>
             <input type="text" name="trx_id" class="form-control-custom" placeholder="Transaction ID (e.g. 9A8B7C6D)" required>
             <button type="submit" name="submit_trx" class="btn-verify">Submit Transaction ID</button>
         </form>

@@ -19,7 +19,7 @@ if (!empty($name_parts[1])) {
     $initials .= strtoupper(substr($name_parts[1], 0, 1));
 }
 if (empty($initials)) {
-    $initials = 'BS';
+    $initials = 'CU';
 }
 
 // Active page detection

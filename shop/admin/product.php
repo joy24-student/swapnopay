@@ -71,94 +71,12 @@ foreach ($result as $prow) {
     $prod_total_value += ((float)($prow['p_current_price'] ?? 0) * $pqty);
 }
 
-$display_prod_total = $prod_total > 0 ? number_format($prod_total) : '248';
-$display_prod_active = $prod_total > 0 ? number_format($prod_active) : '231';
-$display_prod_out = $prod_total > 0 ? number_format($prod_out_of_stock) : '17';
-$display_prod_val = ($prod_total > 0 && $prod_total_value > 0) ? '$' . number_format($prod_total_value) : '$48,732';
+$currency_symbol = (defined('LANG_VALUE_1') && !empty(LANG_VALUE_1) && LANG_VALUE_1 !== '$') ? LANG_VALUE_1 : '৳';
 
-// Fallback demo items if store has fewer than 4 items so screen matches mockup 100%
-$sample_products = [
-    [
-        'p_id' => 101,
-        'p_name' => 'Wireless Headphones',
-        'sku' => 'WH-001',
-        'cat_name' => 'Electronics',
-        'p_current_price' => 59.99,
-        'p_qty' => 124,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 102,
-        'p_name' => 'Smart Watch',
-        'sku' => 'SW-002',
-        'cat_name' => 'Electronics',
-        'p_current_price' => 89.99,
-        'p_qty' => 98,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 103,
-        'p_name' => 'Backpack',
-        'sku' => 'BP-003',
-        'cat_name' => 'Fashion',
-        'p_current_price' => 39.99,
-        'p_qty' => 76,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 104,
-        'p_name' => 'Running Shoes',
-        'sku' => 'RS-004',
-        'cat_name' => 'Fashion',
-        'p_current_price' => 74.99,
-        'p_qty' => 62,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 105,
-        'p_name' => 'Bluetooth Speaker',
-        'sku' => 'BS-005',
-        'cat_name' => 'Electronics',
-        'p_current_price' => 49.99,
-        'p_qty' => 78,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 106,
-        'p_name' => 'T-Shirt',
-        'sku' => 'TS-006',
-        'cat_name' => 'Fashion',
-        'p_current_price' => 19.99,
-        'p_qty' => 200,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 107,
-        'p_name' => 'Smart Watch Pro',
-        'sku' => 'SW-007',
-        'cat_name' => 'Electronics',
-        'p_current_price' => 129.99,
-        'p_qty' => 45,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ],
-    [
-        'p_id' => 108,
-        'p_name' => 'Handbag',
-        'sku' => 'HB-008',
-        'cat_name' => 'Fashion',
-        'p_current_price' => 59.99,
-        'p_qty' => 110,
-        'p_is_active' => 1,
-        'p_featured_photo' => ''
-    ]
-];
+$display_prod_total = number_format($prod_total);
+$display_prod_active = number_format($prod_active);
+$display_prod_out = number_format($prod_out_of_stock);
+$display_prod_val = ($prod_total > 0 && $prod_total_value > 0) ? ($currency_symbol . ' ' . number_format($prod_total_value, 2)) : ($currency_symbol . ' 0.00');
 ?>
 
 <section class="content-header">
@@ -191,9 +109,7 @@ $sample_products = [
 			<div>
 				<div class="dash-kpi-label">Total Products</div>
 				<div class="dash-kpi-val"><?= $display_prod_total ?></div>
-				<div class="dash-kpi-trend up">
-					&uarr; 12% <span class="dash-kpi-subtext">vs. last month</span>
-				</div>
+				<div class="dash-kpi-subtext" style="color: #64748b; font-size: 11px; margin-top: 3px;">Catalog items</div>
 			</div>
 		</div>
 
@@ -209,9 +125,7 @@ $sample_products = [
 			<div>
 				<div class="dash-kpi-label">Active Products</div>
 				<div class="dash-kpi-val"><?= $display_prod_active ?></div>
-				<div class="dash-kpi-trend up">
-					&uarr; 15% <span class="dash-kpi-subtext">vs. last month</span>
-				</div>
+				<div class="dash-kpi-subtext" style="color: #059669; font-size: 11px; margin-top: 3px;">Live in store</div>
 			</div>
 		</div>
 
@@ -227,9 +141,7 @@ $sample_products = [
 			<div>
 				<div class="dash-kpi-label">Out of Stock</div>
 				<div class="dash-kpi-val"><?= $display_prod_out ?></div>
-				<div class="dash-kpi-trend down">
-					&darr; 8% <span class="dash-kpi-subtext">vs. last month</span>
-				</div>
+				<div class="dash-kpi-subtext" style="color: <?= $prod_out_of_stock > 0 ? '#dc2626' : '#64748b' ?>; font-size: 11px; margin-top: 3px;"><?= $prod_out_of_stock > 0 ? 'Action required' : 'Inventory healthy' ?></div>
 			</div>
 		</div>
 
@@ -244,9 +156,7 @@ $sample_products = [
 			<div>
 				<div class="dash-kpi-label">Total Value</div>
 				<div class="dash-kpi-val"><?= $display_prod_val ?></div>
-				<div class="dash-kpi-trend up">
-					&uarr; 18% <span class="dash-kpi-subtext">vs. last month</span>
-				</div>
+				<div class="dash-kpi-subtext" style="color: #64748b; font-size: 11px; margin-top: 3px;">Estimated stock value</div>
 			</div>
 		</div>
 	</div>
@@ -310,79 +220,95 @@ $sample_products = [
 	<!-- Mobile Product Card List (visible-xs - Exactly Matching media_1791278546819_1d7a0830.png) -->
 	<div class="sn-mobile-product-list visible-xs" id="snMobileProdList">
 		<?php
-		$mob_display_list = !empty($result) ? $result : $sample_products;
-		foreach ($mob_display_list as $row):
-			$pid = (int)($row['p_id'] ?? 0);
-			$photo = !empty($row['p_featured_photo']) ? htmlspecialchars($row['p_featured_photo']) : '';
-			$isActive = ((int)($row['p_is_active'] ?? 1) === 1);
-			$qty = (int)($row['p_qty'] ?? 0);
-			$price = (float)($row['p_current_price'] ?? 0);
-			$pname = $row['p_name'] ?? 'Product';
-			$catName = !empty($row['tcat_name']) ? $row['tcat_name'] : (!empty($row['cat_name']) ? $row['cat_name'] : 'Electronics');
-			$catClass = (stripos($catName, 'elect') !== false) ? 'cat-electronics' : ((stripos($catName, 'fash') !== false) ? 'cat-fashion' : 'cat-general');
-			$sku = !empty($row['sku']) ? $row['sku'] : ('PRD-' . str_pad($pid, 3, '0', STR_PAD_LEFT));
-			
-			$statusLabel = $isActive ? ($qty <= 5 && $qty > 0 ? 'Low Stock' : ($qty <= 0 ? 'Out of Stock' : 'Active')) : 'Inactive';
-			$statusClass = ($statusLabel === 'Active') ? 'status-active' : (($statusLabel === 'Low Stock') ? 'status-low' : 'status-out');
+		$mob_display_list = $result;
+		if (empty($mob_display_list)):
 		?>
-			<div class="sn-mobile-product-card" data-category="<?= htmlspecialchars($catName) ?>" data-status="<?= $isActive ? 'Yes' : 'No' ?>" data-stock="<?= $qty > 0 ? 'instock' : 'outstock' ?>" data-title="<?= htmlspecialchars(strtolower($pname)) ?>" data-sku="<?= htmlspecialchars(strtolower($sku)) ?>">
-				<div class="sn-mpc-check">
-					<input type="checkbox" class="sn-checkbox sn-mobile-row-check" value="<?= $pid ?>">
+			<div class="sn-mobile-empty-state">
+				<div class="sn-empty-icon-box">
+					<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+						<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+						<line x1="12" y1="22.08" x2="12" y2="12"></line>
+					</svg>
 				</div>
-				<div class="sn-mpc-thumb">
-					<?php if ($photo): ?>
-						<img src="../assets/uploads/<?= $photo ?>" alt="<?= htmlspecialchars($pname) ?>" onerror="this.onerror=null; this.src='../assets/uploads/placeholder.svg';">
-					<?php elseif (stripos($pname, 'headphone') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-					<?php elseif (stripos($pname, 'watch') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="7" y="4" width="10" height="16" rx="3"/><path d="M10 2h4M10 22h4"/><circle cx="12" cy="12" r="2" fill="#F59E0B"/></svg>
-					<?php elseif (stripos($pname, 'pack') !== false || stripos($pname, 'bag') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
-					<?php elseif (stripos($pname, 'shoe') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M2 17l3-6 4 2 3-5 5 2 4 4v3H2z"/><path d="M2 17h20"/></svg>
-					<?php elseif (stripos($pname, 'speaker') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="3"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/></svg>
-					<?php elseif (stripos($pname, 'shirt') !== false): ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
-					<?php else: ?>
-						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
-							<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-						</svg>
-					<?php endif; ?>
-				</div>
-				<div class="sn-mpc-info">
-					<a href="product-edit.php?id=<?= $pid ?>" class="sn-mpc-title" style="text-decoration:none;">
-						<?= htmlspecialchars($pname) ?>
-					</a>
-					<div class="sn-mpc-sub">
-						<span class="sn-mpc-sku">SKU: <?= htmlspecialchars($sku) ?></span>
-						<span class="sn-mpc-cat-pill <?= $catClass ?>"><?= htmlspecialchars($catName) ?></span>
-					</div>
-				</div>
-				<div class="sn-mpc-pricing">
-					<div class="sn-mpc-price">$<?= number_format($price, 2) ?></div>
-					<div class="sn-mpc-stock">Stock <strong><?= $qty ?></strong></div>
-				</div>
-				<div class="sn-mpc-status-wrap">
-					<span class="sn-mpc-status-pill <?= $statusClass ?>"><?= $statusLabel ?></span>
-					<div class="dropdown">
-						<button class="sn-mpc-actions-btn dropdown-toggle" type="button" data-toggle="dropdown">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<circle cx="12" cy="5" r="2.2"/>
-								<circle cx="12" cy="12" r="2.2"/>
-								<circle cx="12" cy="19" r="2.2"/>
-							</svg>
-						</button>
-						<ul class="dropdown-menu dropdown-menu-right sn-mpc-dropdown-menu">
-							<li><a href="product-edit.php?id=<?= $pid ?>"><i class="fa fa-pencil"></i> Edit Product</a></li>
-							<li><a href="../product.php?id=<?= $pid ?>" target="_blank"><i class="fa fa-external-link"></i> View Store</a></li>
-							<li class="divider"></li>
-							<li><a href="#" class="text-danger" data-href="product-delete.php?id=<?= $pid ?>" data-toggle="modal" data-target="#confirm-delete"><i class="fa fa-trash"></i> Delete</a></li>
-						</ul>
-					</div>
-				</div>
+				<h4 class="sn-empty-title">No products found</h4>
+				<p class="sn-empty-desc">Your store catalog has no products listed yet. Add products to start selling to customers.</p>
+				<a href="product-add.php" class="sn-empty-action-btn">+ Add Product</a>
 			</div>
-		<?php endforeach; ?>
+		<?php else: ?>
+			<?php foreach ($mob_display_list as $row):
+				$pid = (int)($row['p_id'] ?? 0);
+				$photo = !empty($row['p_featured_photo']) ? htmlspecialchars($row['p_featured_photo']) : '';
+				$isActive = ((int)($row['p_is_active'] ?? 1) === 1);
+				$qty = (int)($row['p_qty'] ?? 0);
+				$price = (float)($row['p_current_price'] ?? 0);
+				$pname = $row['p_name'] ?? 'Product';
+				$catName = !empty($row['tcat_name']) ? $row['tcat_name'] : (!empty($row['cat_name']) ? $row['cat_name'] : 'General');
+				$catClass = (stripos($catName, 'elect') !== false) ? 'cat-electronics' : ((stripos($catName, 'fash') !== false) ? 'cat-fashion' : 'cat-general');
+				$sku = !empty($row['sku']) ? $row['sku'] : ('PRD-' . str_pad($pid, 3, '0', STR_PAD_LEFT));
+				
+				$statusLabel = $isActive ? ($qty <= 5 && $qty > 0 ? 'Low Stock' : ($qty <= 0 ? 'Out of Stock' : 'Active')) : 'Inactive';
+				$statusClass = ($statusLabel === 'Active') ? 'status-active' : (($statusLabel === 'Low Stock') ? 'status-low' : 'status-out');
+			?>
+				<div class="sn-mobile-product-card" data-category="<?= htmlspecialchars($catName) ?>" data-status="<?= $isActive ? 'Yes' : 'No' ?>" data-stock="<?= $qty > 0 ? 'instock' : 'outstock' ?>" data-title="<?= htmlspecialchars(strtolower($pname)) ?>" data-sku="<?= htmlspecialchars(strtolower($sku)) ?>">
+					<div class="sn-mpc-check">
+						<input type="checkbox" class="sn-checkbox sn-mobile-row-check" value="<?= $pid ?>">
+					</div>
+					<div class="sn-mpc-thumb">
+						<?php if ($photo): ?>
+							<img src="../assets/uploads/<?= $photo ?>" alt="<?= htmlspecialchars($pname) ?>" onerror="this.onerror=null; this.src='../assets/uploads/placeholder.svg';">
+						<?php elseif (stripos($pname, 'headphone') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+						<?php elseif (stripos($pname, 'watch') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="7" y="4" width="10" height="16" rx="3"/><path d="M10 2h4M10 22h4"/><circle cx="12" cy="12" r="2" fill="#F59E0B"/></svg>
+						<?php elseif (stripos($pname, 'pack') !== false || stripos($pname, 'bag') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+						<?php elseif (stripos($pname, 'shoe') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M2 17l3-6 4 2 3-5 5 2 4 4v3H2z"/><path d="M2 17h20"/></svg>
+						<?php elseif (stripos($pname, 'speaker') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="3"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/></svg>
+						<?php elseif (stripos($pname, 'shirt') !== false): ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
+						<?php else: ?>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+								<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+							</svg>
+						<?php endif; ?>
+					</div>
+					<div class="sn-mpc-info">
+						<a href="product-edit.php?id=<?= $pid ?>" class="sn-mpc-title" style="text-decoration:none;">
+							<?= htmlspecialchars($pname) ?>
+						</a>
+						<div class="sn-mpc-sub">
+							<span class="sn-mpc-sku">SKU: <?= htmlspecialchars($sku) ?></span>
+							<span class="sn-mpc-cat-pill <?= $catClass ?>"><?= htmlspecialchars($catName) ?></span>
+						</div>
+					</div>
+					<div class="sn-mpc-pricing">
+						<div class="sn-mpc-price"><?= $currency_symbol ?> <?= number_format($price, 2) ?></div>
+						<div class="sn-mpc-stock">Stock <strong><?= $qty ?></strong></div>
+					</div>
+					<div class="sn-mpc-status-wrap">
+						<span class="sn-mpc-status-pill <?= $statusClass ?>"><?= $statusLabel ?></span>
+						<div class="dropdown">
+							<button class="sn-mpc-actions-btn dropdown-toggle" type="button" data-toggle="dropdown">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+									<circle cx="12" cy="5" r="2.2"/>
+									<circle cx="12" cy="12" r="2.2"/>
+									<circle cx="12" cy="19" r="2.2"/>
+								</svg>
+							</button>
+							<ul class="dropdown-menu dropdown-menu-right sn-mpc-dropdown-menu">
+								<li><a href="product-edit.php?id=<?= $pid ?>"><i class="fa fa-pencil"></i> Edit Product</a></li>
+								<li><a href="../product.php?id=<?= $pid ?>" target="_blank"><i class="fa fa-external-link"></i> View Store</a></li>
+								<li class="divider"></li>
+								<li><a href="#" class="text-danger" data-href="product-delete.php?id=<?= $pid ?>" data-toggle="modal" data-target="#confirm-delete"><i class="fa fa-trash"></i> Delete</a></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			<?php endforeach; ?>
+		<?php endif; ?>
 	</div>
 
 	<!-- Desktop Filter & Search Toolbar (hidden-xs) -->

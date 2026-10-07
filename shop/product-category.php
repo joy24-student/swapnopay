@@ -176,7 +176,7 @@ try {
 } catch (Throwable $e) {}
 
 $sidebarCategories = $_SESSION['sn_sidebar_cats'] ?? null;
-$sbCacheFile = __DIR__ . '/admin/inc/cache_sidebar_cats.json';
+$sbCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('sidebar_cats') : __DIR__ . '/admin/inc/cache_sidebar_cats.json';
 if (!$sidebarCategories && file_exists($sbCacheFile) && (time() - filemtime($sbCacheFile) < 300)) {
     $sidebarCategories = json_decode(file_get_contents($sbCacheFile), true);
     $_SESSION['sn_sidebar_cats'] = $sidebarCategories;
