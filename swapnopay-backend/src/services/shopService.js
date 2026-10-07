@@ -43,6 +43,7 @@ export function shopConfiguration(env = process.env) {
 
   let connectionString = ''
   let dbHost = '127.0.0.1', dbPort = 5432, dbName = 'swapnopay_shop', dbUser = '', dbPass = ''
+  let parsedSslMode = ''
 
   if (rawDbUrl) {
     try {
@@ -54,6 +55,7 @@ export function shopConfiguration(env = process.env) {
         dbName = decodeURIComponent(url.pathname.slice(1)) || 'swapnopay_shop'
         dbUser = decodeURIComponent(url.username || '')
         dbPass = decodeURIComponent(url.password || '')
+        parsedSslMode = url.searchParams.get('sslmode') || ''
       } else {
         throw new ShopError(503, 'SHOP_NOT_CONFIGURED', 'Website hosting database is not configured: must be PostgreSQL')
       }
@@ -63,6 +65,8 @@ export function shopConfiguration(env = process.env) {
     }
   }
 
+  const effectiveSslMode = env.SHOP_DB_SSLMODE || parsedSslMode || (dbHost === '127.0.0.1' || dbHost === 'localhost' ? 'disable' : 'require')
+
   return {
     connectionString,
     useEmbedded: !rawDbUrl,
@@ -70,7 +74,7 @@ export function shopConfiguration(env = process.env) {
     baseDomain: hostname(env.SHOP_BASE_DOMAIN || 'shop.swapnopay.top'),
     runtime, sites, template,
     dbHost, dbPort, dbName, dbUser, dbPass,
-    sslmode: env.SHOP_DB_SSLMODE || 'require',
+    sslmode: effectiveSslMode,
     group: env.SHOP_RUNTIME_GID ? Number(env.SHOP_RUNTIME_GID) : (process.platform !== 'win32' ? 33 : undefined),
     backendUrl: env.SHOP_BACKEND_URL || 'https://api.swapnopay.top',
     vendor: env.SHOP_VENDOR_DIR || '',
