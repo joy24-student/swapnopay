@@ -376,6 +376,9 @@ switch ($action) {
             $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'ringing', active_call_type = ? WHERE id = ?")
                 ->execute([$callType, $threadId]);
+        } else if ($type === 'answer') {
+            $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'in_call' WHERE id = ?")
+                ->execute([$threadId]);
         } else if ($type === 'call_end') {
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'idle', active_call_type = 'none' WHERE id = ?")
                 ->execute([$threadId]);
@@ -396,39 +399,69 @@ switch ($action) {
         $receiver = $_GET['receiver'] ?? 'customer'; // 'customer' or 'admin'
         $threadId = (int)($_GET['thread_id'] ?? 0);
 
-        // If admin is polling globally (not focused on a thread), check for incoming calls across all threads
-        if ($receiver === 'admin' && $threadId === 0) {
-            $stmt = $pdo->prepare("
+        // Auto-purge stale signals older than 60 seconds
+        try {
+            $pdo->exec("DELETE FROM tbl_shop_chat_signals WHERE created_at < NOW() - INTERVAL '60 seconds'");
+        } catch (Throwable $e) {}
+
+        if ($receiver === 'admin') {
+            $signals = [];
+
+            // 1. Check for incoming calls across ALL customer threads
+            // If another customer is calling (call_start), admin needs to be notified regardless of focused thread!
+            $callStartStmt = $pdo->prepare("
                 SELECT s.*, t.customer_name, t.customer_phone 
                 FROM tbl_shop_chat_signals s
                 JOIN tbl_shop_chat_threads t ON t.id = s.thread_id
                 WHERE s.sender = 'customer' AND s.processed = 0 AND s.signal_type = 'call_start'
                 ORDER BY s.id ASC LIMIT 1
             ");
-            $stmt->execute();
-            $incoming = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if (!empty($incoming)) {
-                $ids = array_column($incoming, 'id');
+            $callStartStmt->execute();
+            $incomingCall = $callStartStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($incomingCall)) {
+                $signals = array_merge($signals, $incomingCall);
+            }
+
+            // 2. If admin is focused on a specific thread, fetch all remaining signals for that thread (offer, answer, candidate, call_end)
+            if ($threadId > 0) {
+                $activeStmt = $pdo->prepare("
+                    SELECT s.*, t.customer_name, t.customer_phone
+                    FROM tbl_shop_chat_signals s
+                    JOIN tbl_shop_chat_threads t ON t.id = s.thread_id
+                    WHERE s.thread_id = ? AND s.sender = 'customer' AND s.processed = 0 AND s.signal_type != 'call_start'
+                    ORDER BY s.id ASC
+                ");
+                $activeStmt->execute([$threadId]);
+                $threadSignals = $activeStmt->fetchAll(PDO::FETCH_ASSOC);
+                if (!empty($threadSignals)) {
+                    $signals = array_merge($signals, $threadSignals);
+                }
+            }
+
+            if (!empty($signals)) {
+                $ids = array_column($signals, 'id');
                 $inClause = implode(',', array_map('intval', $ids));
                 $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause)");
             }
-            echo json_encode(['status' => 'success', 'signals' => $incoming]);
+
+            echo json_encode(['status' => 'success', 'signals' => $signals]);
             exit;
         }
 
+        // Customer polling
         if ($threadId === 0) {
             $thread = get_or_create_thread($pdo);
             $threadId = $thread['id'];
         }
 
-        // Fetch signals sent by the OTHER peer that haven't been processed
-        $otherSender = ($receiver === 'customer') ? 'admin' : 'customer';
+        // Fetch signals sent by admin for this customer's thread
         $stmt = $pdo->prepare("
             SELECT * FROM tbl_shop_chat_signals 
-            WHERE thread_id = ? AND sender = ? AND processed = 0
+            WHERE thread_id = ? AND sender = 'admin' AND processed = 0
             ORDER BY id ASC
         ");
-        $stmt->execute([$threadId, $otherSender]);
+        $stmt->execute([$threadId]);
         $signals = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (!empty($signals)) {

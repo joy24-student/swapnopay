@@ -497,7 +497,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
     <?php endif; ?>
 
     <!-- WEBRTC BUFFERLESS CALL MODAL OVERLAY -->
-    <div id="callOverlay" class="hidden absolute inset-0 bg-slate-950/95 z-50 flex flex-col justify-between p-6 text-white backdrop-blur-md">
+    <div id="callOverlay" class="hidden fixed inset-0 bg-slate-950/95 z-[150] flex flex-col justify-between p-6 text-white backdrop-blur-md">
         <!-- Call Top Info -->
         <div class="text-center pt-8">
             <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20 mb-3 animate-pulse">
@@ -1326,14 +1326,18 @@ if (!empty($_SESSION['cart_p_qty'])) {
         pendingOfferSignal = null;
         queuedCandidates = [];
 
-        document.getElementById('callOverlay').classList.remove('hidden');
+        const overlay = document.getElementById('callOverlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
         document.getElementById('callDuration').textContent = 'Calling specialist...';
         document.getElementById('callTypeIcon').className = type === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
 
         if (type === 'video') {
             document.getElementById('videoContainer').classList.remove('hidden');
+            document.getElementById('videoContainer').classList.add('flex');
         } else {
             document.getElementById('videoContainer').classList.add('hidden');
+            document.getElementById('videoContainer').classList.remove('flex');
         }
 
         playCallRingtone();
@@ -1361,9 +1365,13 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
             peerConnection.ontrack = (event) => {
                 stopCallRingtone();
+                let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+                if (!stream) {
+                    stream = new MediaStream([event.track]);
+                }
                 const remoteAudio = document.getElementById('remoteAudio');
                 if (remoteAudio) {
-                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.srcObject = stream;
                     remoteAudio.muted = false;
                     remoteAudio.volume = 1.0;
                     remoteAudio.play().catch(e => console.warn('Audio play request:', e));
@@ -1372,7 +1380,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 if (type === 'video') {
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
-                        remoteVid.srcObject = event.streams[0];
+                        remoteVid.srcObject = stream;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }
@@ -1385,11 +1393,14 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 }
             };
 
-            // Create and send offer
+            // 1. Notify server call has started BEFORE setting local description
+            await sendSignal('call_start', '', type);
+
+            // 2. Create offer & set local description
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
 
-            await sendSignal('call_start', '', type);
+            // 3. Send offer payload
             await sendSignal('offer', JSON.stringify(offer), type);
 
         } catch (err) {
@@ -1403,7 +1414,8 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
     async function pollWebRtcSignals() {
         try {
-            const res = await fetch('live_chat_api.php?action=fetch_signals&receiver=customer');
+            const threadParam = (currentThread && currentThread.id) ? `&thread_id=${currentThread.id}` : '';
+            const res = await fetch(`live_chat_api.php?action=fetch_signals&receiver=customer${threadParam}`);
             const data = await res.json();
             if (data.status === 'success' && data.signals && data.signals.length > 0) {
                 for (const sig of data.signals) {
@@ -1480,14 +1492,18 @@ if (!empty($_SESSION['cart_p_qty'])) {
             incomingModal.classList.remove('flex');
         }
 
-        document.getElementById('callOverlay').classList.remove('hidden');
+        const overlay = document.getElementById('callOverlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
         document.getElementById('callTypeIcon').className = currentCallType === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
         document.getElementById('callDuration').textContent = 'Connecting...';
 
         if (currentCallType === 'video') {
             document.getElementById('videoContainer').classList.remove('hidden');
+            document.getElementById('videoContainer').classList.add('flex');
         } else {
             document.getElementById('videoContainer').classList.add('hidden');
+            document.getElementById('videoContainer').classList.remove('flex');
         }
 
         try {
@@ -1511,9 +1527,14 @@ if (!empty($_SESSION['cart_p_qty'])) {
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.ontrack = (event) => {
+                stopCallRingtone();
+                let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+                if (!stream) {
+                    stream = new MediaStream([event.track]);
+                }
                 const remoteAudio = document.getElementById('remoteAudio');
                 if (remoteAudio) {
-                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.srcObject = stream;
                     remoteAudio.muted = false;
                     remoteAudio.volume = 1.0;
                     remoteAudio.play().catch(e => console.warn('Audio play request:', e));
@@ -1522,7 +1543,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 if (currentCallType === 'video') {
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
-                        remoteVid.srcObject = event.streams[0];
+                        remoteVid.srcObject = stream;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }
@@ -1568,6 +1589,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
         try {
             const fd = new FormData();
             fd.append('sender', 'customer');
+            if (currentThread && currentThread.id) {
+                fd.append('thread_id', currentThread.id);
+            }
             fd.append('signal_type', type);
             fd.append('call_type', callType || currentCallType);
             fd.append('payload', payload || '');

@@ -35,6 +35,8 @@ body.live-chat-page-body {
     width: 100% !important;
     height: 100vh !important;
     overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .wrapper {
@@ -44,6 +46,19 @@ body.live-chat-page-body {
     overflow: hidden !important;
     background: #f0f2f5 !important;
     position: relative !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+body.live-chat-page-body .main-header {
+    height: 64px !important;
+    max-height: 64px !important;
+    min-height: 64px !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1030 !important;
 }
 
 .main-sidebar {
@@ -58,21 +73,63 @@ body.live-chat-page-body {
 }
 
 /* 2. Content Wrapper sits cleanly below the 64px fixed Admin Panel header */
+body.live-chat-page-body .content-wrapper,
+body.live-chat-page-body .right-side,
 .content-wrapper,
 .right-side {
-    position: relative !important;
-    margin-top: 64px !important;
+    position: fixed !important;
+    top: 64px !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
     height: calc(100vh - 64px) !important;
     max-height: calc(100vh - 64px) !important;
     min-height: calc(100vh - 64px) !important;
     overflow: hidden !important;
     background: #f0f2f5 !important;
     padding: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
     margin-bottom: 0 !important;
     border: none !important;
     display: flex !important;
     flex-direction: column !important;
     box-sizing: border-box !important;
+    z-index: 10 !important;
+}
+
+body.live-chat-page-body:not(.sidebar-collapse) .content-wrapper {
+    left: 250px !important;
+    width: calc(100vw - 250px) !important;
+}
+
+body.live-chat-page-body.sidebar-collapse .content-wrapper {
+    left: 50px !important;
+    width: calc(100vw - 50px) !important;
+}
+
+@media (max-width: 767px) {
+    body.live-chat-page-body .main-header {
+        height: 60px !important;
+        max-height: 60px !important;
+        min-height: 60px !important;
+    }
+    body.live-chat-page-body .content-wrapper,
+    body.live-chat-page-body:not(.sidebar-collapse) .content-wrapper,
+    body.live-chat-page-body.sidebar-collapse .content-wrapper {
+        top: 60px !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: calc(100vh - 60px) !important;
+        max-height: calc(100vh - 60px) !important;
+        min-height: calc(100vh - 60px) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
 }
 
 /* Hide duplicate top app bar; all actions live inside wa-main-header and wa-sidebar-header */
@@ -1065,6 +1122,9 @@ body.live-chat-page-body {
                         </div>
                     </div>
                     <div class="sup-hdr-actions">
+                        <button type="button" class="sup-hdr-action-btn" onclick="triggerTopVideoCall()" title="Video call">
+                            <i class="fa fa-video-camera" style="font-size: 16px;"></i>
+                        </button>
                         <button type="button" class="sup-hdr-action-btn" onclick="triggerTopVoiceCall()" title="Voice call">
                             <i class="fa fa-phone" style="font-size: 16px;"></i>
                         </button>
@@ -2038,18 +2098,9 @@ function renderMessages(messages) {
     }
 }
 
-// Mobile Send Reply & Input Handlers
+// Mobile & Desktop Send Reply Handlers (Unified)
 function handleMobileSendReply() {
-    const input = document.getElementById('supMobReplyInput');
-    if (!input) return;
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    input.value = '';
-    const dInput = document.getElementById('adminReplyInput');
-    if (dInput) dInput.value = '';
-
-    sendAdminMessagePayload(msg);
+    handleAdminSendReply();
 }
 
 function handleMobileKeyPress(e) {
@@ -2207,25 +2258,14 @@ async function handleAdminSendReply() {
     if (!currentThreadId) return;
 
     const input = document.getElementById('adminReplyInput');
-    const msg = input.value.trim();
+    const mobInput = document.getElementById('supMobReplyInput');
+    const msg = ((input && input.value) || (mobInput && mobInput.value) || '').trim();
     if (!msg) return;
 
-    input.value = '';
+    if (input) input.value = '';
+    if (mobInput) mobInput.value = '';
 
-    try {
-        const fd = new FormData();
-        fd.append('thread_id', currentThreadId);
-        fd.append('message', msg);
-
-        const res = await fetch('../live_chat_api.php?action=admin_send_reply', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (data.status === 'success') {
-            await refreshActiveThread();
-            loadThreads(true);
-        }
-    } catch (e) {
-        alert('Could not send reply.');
-    }
+    await sendAdminMessagePayload(msg);
 }
 
 function handleKeyPress(e) {
@@ -2509,9 +2549,13 @@ async function startAdminWebRtcCall(type) {
 
         adminPeer.ontrack = (event) => {
             stopAdminRingtone();
+            let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+            if (!stream) {
+                stream = new MediaStream([event.track]);
+            }
             const remoteAudio = document.getElementById('adminRemoteAudio');
             if (remoteAudio) {
-                remoteAudio.srcObject = event.streams[0];
+                remoteAudio.srcObject = stream;
                 remoteAudio.muted = false;
                 remoteAudio.volume = 1.0;
                 remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
@@ -2520,7 +2564,7 @@ async function startAdminWebRtcCall(type) {
             if (type === 'video') {
                 const remoteVid = document.getElementById('adminRemoteVideo');
                 if (remoteVid) {
-                    remoteVid.srcObject = event.streams[0];
+                    remoteVid.srcObject = stream;
                     remoteVid.play().catch(e => console.warn('Admin video play error:', e));
                 }
             }
@@ -2533,13 +2577,18 @@ async function startAdminWebRtcCall(type) {
             }
         };
 
+        // 1. Notify peer of call_start BEFORE setting local description
+        await sendWebRtcSignal('call_start', type);
+
+        // 2. Create offer & set local description
         const offer = await adminPeer.createOffer();
         await adminPeer.setLocalDescription(offer);
 
-        await sendWebRtcSignal('call_start', type);
+        // 3. Send offer to peer
         await sendWebRtcSignal('offer', JSON.stringify(offer));
 
     } catch (e) {
+        console.error('Call media error:', e);
         stopAdminRingtone();
         stopFastAdminSignalPolling();
         alert('Microphone/Camera permission required for calls.');
@@ -2672,9 +2721,14 @@ async function acceptAdminIncomingCall() {
         adminLocalStream.getTracks().forEach(track => adminPeer.addTrack(track, adminLocalStream));
 
         adminPeer.ontrack = (event) => {
+            stopAdminRingtone();
+            let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+            if (!stream) {
+                stream = new MediaStream([event.track]);
+            }
             const remoteAudio = document.getElementById('adminRemoteAudio');
             if (remoteAudio) {
-                remoteAudio.srcObject = event.streams[0];
+                remoteAudio.srcObject = stream;
                 remoteAudio.muted = false;
                 remoteAudio.volume = 1.0;
                 remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
@@ -2683,7 +2737,7 @@ async function acceptAdminIncomingCall() {
             if (adminCallType === 'video') {
                 const remoteVid = document.getElementById('adminRemoteVideo');
                 if (remoteVid) {
-                    remoteVid.srcObject = event.streams[0];
+                    remoteVid.srcObject = stream;
                     remoteVid.play().catch(e => console.warn('Admin video play error:', e));
                 }
             }
