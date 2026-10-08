@@ -280,14 +280,17 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
     }
 
     // Retrieve settings
-    $settings = $GLOBALS['STORE_SETTINGS'] ?? null;
-    if (!$settings && isset($pdo) && $pdo instanceof PDO) {
+    $settings = null;
+    if (isset($pdo) && $pdo instanceof PDO) {
         try {
             $stmt = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1 LIMIT 1");
             $settings = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
         } catch (Throwable $e) {
             error_log("[sendSMS] Failed to read tbl_settings: " . $e->getMessage());
         }
+    }
+    if (!$settings && !empty($GLOBALS['STORE_SETTINGS'])) {
+        $settings = $GLOBALS['STORE_SETTINGS'];
     }
 
     $activeProvider = $provider ?: (!empty($settings['sms_provider']) ? $settings['sms_provider'] : 'swapnopay');
