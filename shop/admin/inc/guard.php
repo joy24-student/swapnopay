@@ -17,7 +17,7 @@ if(isset($_SESSION['shop_admin_version']) && !hash_equals($_SESSION['shop_admin_
 $_SESSION['shop_admin_version']=$passwordVersion;
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $adminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
-$ajaxReadOnly = in_array($adminPage, ['get-mid-category.php', 'get-end-category.php', 'fetch_sorted_products.php', 'ai-product-writer.php'], true);
+$ajaxReadOnly = in_array($adminPage, ['get-mid-category.php', 'get-end-category.php', 'fetch_sorted_products.php', 'ai-product-writer.php', 'broadcast-ajax.php'], true);
 if($method === 'POST' && !$ajaxReadOnly && !$csrf->checkToken() && !$csrf->isTokenValid($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
     http_response_code(403);
     exit('Your form session expired. Refresh the page and try again.');

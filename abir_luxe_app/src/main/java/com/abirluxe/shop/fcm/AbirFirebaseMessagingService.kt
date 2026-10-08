@@ -86,20 +86,24 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun triggerInstantIncomingCall(callerName: String, callNote: String) {
-        // Wake the phone up even if locked or user is not using the phone
+        // Wake the screen up even if phone is locked, asleep, or in pocket
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            @Suppress("DEPRECATION")
             val wakeLock = powerManager?.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "abirluxe:IncomingCallWakeLock"
             )
-            wakeLock?.acquire(15000L) // 15 seconds wake lock
+            wakeLock?.acquire(30000L) // 30 seconds wake lock to cover call ringing duration
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
         val callIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("caller_name", callerName)
             putExtra("call_note", callNote)
         }
@@ -108,6 +112,16 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             this,
             1001,
             callIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val declineIntent = Intent(this, CallActionReceiver::class.java).apply {
+            action = CallActionReceiver.ACTION_DECLINE_CALL
+        }
+        val declinePendingIntent = PendingIntent.getBroadcast(
+            this,
+            1002,
+            declineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -120,18 +134,21 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
             .setSound(soundUri)
             .setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000))
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
             .setAutoCancel(true)
             .setColor(ContextCompat.getColor(this, R.color.brand_gold))
+            .addAction(R.drawable.ic_call, "Answer", fullScreenPendingIntent)
+            .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
             .build()
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(9999, callNotification)
 
-        // Directly launch the activity to ensure it surfaces immediately
+        // Directly launch the activity (succeeds if on lockscreen, or if SYSTEM_ALERT_WINDOW / overlay permission is granted)
         try {
             startActivity(callIntent)
         } catch (e: Exception) {

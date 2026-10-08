@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/inc/guard.php';
+require_once __DIR__ . '/inc/notifications.php';
 require_once('header.php');
-require_once('inc/notifications.php');
 
 $merchantId = defined('MERCHANT_ID') && MERCHANT_ID ? MERCHANT_ID : 'local-merchant-001';
 
@@ -52,11 +52,18 @@ if (isset($_POST['save_firebase_settings'])) {
     }
 }
 
-// Fetch current settings
-$stmtSettings = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1");
-$currentSettings = $stmtSettings ? ($stmtSettings->fetch(PDO::FETCH_ASSOC) ?: []) : [];
+// Fetch current settings safely
+$currentSettings = [];
+try {
+    $stmtSettings = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1");
+    if ($stmtSettings) {
+        $currentSettings = $stmtSettings->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+} catch (Throwable $e) {
+    error_log("Failed to fetch settings: " . $e->getMessage());
+}
 
-// Fetch statistics
+// Fetch statistics safely
 $totalNotifications = 0;
 $totalDevices = 0;
 $totalCustomers = 0;
@@ -64,17 +71,24 @@ try {
     $totalNotifications = (int)$pdo->query("SELECT COUNT(*) FROM tbl_notifications WHERE merchant_id = " . $pdo->quote($merchantId))->fetchColumn();
     $totalDevices = (int)$pdo->query("SELECT COUNT(*) FROM tbl_fcm_tokens WHERE merchant_id = " . $pdo->quote($merchantId))->fetchColumn();
     $totalCustomers = (int)$pdo->query("SELECT COUNT(*) FROM tbl_customer WHERE cust_status = '1'")->fetchColumn();
-} catch (Throwable $e) {}
+} catch (Throwable $e) {
+    error_log("Failed to fetch notification stats: " . $e->getMessage());
+}
 
-// Fetch notifications list
-$stmtList = $pdo->prepare("
-    SELECT * FROM tbl_notifications 
-    WHERE merchant_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 100
-");
-$stmtList->execute([$merchantId]);
-$notificationList = $stmtList->fetchAll(PDO::FETCH_ASSOC) ?: [];
+// Fetch notifications list safely
+$notificationList = [];
+try {
+    $stmtList = $pdo->prepare("
+        SELECT * FROM tbl_notifications 
+        WHERE merchant_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT 100
+    ");
+    $stmtList->execute([$merchantId]);
+    $notificationList = $stmtList->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    error_log("Failed to fetch notification list: " . $e->getMessage());
+}
 ?>
 
 <section class="content-header">
@@ -471,8 +485,12 @@ function submitFullBroadcast() {
 
     fetch('broadcast-ajax.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>'
+        },
         body: JSON.stringify({
+            _csrf: '<?php echo isset($csrf) ? $csrf->getToken() : ""; ?>',
             title: title,
             body: body,
             type: type,

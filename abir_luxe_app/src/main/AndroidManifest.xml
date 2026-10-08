@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Optional Media & Call Permissions for File Upload & Dialing -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -66,12 +67,18 @@
         <activity
             android:name=".IncomingCallActivity"
             android:exported="false"
-            android:showOnLockScreen="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
             android:turnScreenOn="true"
             android:showWhenLocked="true"
             android:launchMode="singleTask"
             android:theme="@style/Theme.AbirLuxe.Call"
             android:screenOrientation="portrait" />
+
+        <!-- BroadcastReceiver for Incoming Call Actions (Answer / Decline) -->
+        <receiver
+            android:name=".fcm.CallActionReceiver"
+            android:exported="false" />
 
         <!-- Firebase Push Notification & Instant Call Service -->
         <service

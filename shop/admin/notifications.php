@@ -3,7 +3,7 @@ require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/header.php';
 ?>
 
-<div class="content-wrapper" style="margin-left: 0; background: #f8fafc; padding: 24px;">
+<div style="background: #f8fafc; padding: 24px; min-height: 90vh;">
     <section class="content-header" style="padding: 0 0 20px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
             <div>
@@ -206,6 +206,6 @@ function renderPageList() {
 
 document.addEventListener('DOMContentLoaded', loadPageNotifications);
 </script>
-
+</div>
 <?php require_once __DIR__ . '/footer.php'; ?>
 

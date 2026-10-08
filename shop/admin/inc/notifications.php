@@ -10,6 +10,104 @@ if (!defined('BASE_URL')) {
 }
 
 /**
+ * Ensures required notification tables and settings columns exist in the active database
+ */
+function initNotificationTables(PDO $pdo): void {
+    static $done = false;
+    if ($done) return;
+
+    try {
+        $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+
+        if ($driver === 'pgsql') {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS tbl_notifications (
+                    id SERIAL PRIMARY KEY,
+                    merchant_id VARCHAR(100) NOT NULL DEFAULT 'local-merchant-001',
+                    customer_id INTEGER,
+                    title VARCHAR(255) NOT NULL,
+                    body TEXT NOT NULL,
+                    type VARCHAR(50) DEFAULT 'general',
+                    order_id INTEGER,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    icon_url VARCHAR(500),
+                    action_url VARCHAR(500),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ");
+            try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_notif_merchant ON tbl_notifications(merchant_id);"); } catch (Throwable $e) {}
+            try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_notif_customer ON tbl_notifications(customer_id);"); } catch (Throwable $e) {}
+
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS tbl_fcm_tokens (
+                    id SERIAL PRIMARY KEY,
+                    merchant_id VARCHAR(100) NOT NULL DEFAULT 'local-merchant-001',
+                    customer_id INTEGER,
+                    fcm_token TEXT NOT NULL UNIQUE,
+                    device_type VARCHAR(50) DEFAULT 'android',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ");
+            try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_fcm_tokens_merchant ON tbl_fcm_tokens(merchant_id);"); } catch (Throwable $e) {}
+
+            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key'];
+            foreach ($cols as $col) {
+                try {
+                    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS {$col} TEXT");
+                } catch (Throwable $e) {}
+            }
+        } else {
+            // MySQL / MariaDB fallback
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS tbl_notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    merchant_id VARCHAR(100) NOT NULL DEFAULT 'local-merchant-001',
+                    customer_id INT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    body TEXT NOT NULL,
+                    type VARCHAR(50) DEFAULT 'general',
+                    order_id INT NULL,
+                    is_read TINYINT(1) DEFAULT 0,
+                    icon_url VARCHAR(500) NULL,
+                    action_url VARCHAR(500) NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_notif_merchant (merchant_id),
+                    INDEX idx_notif_customer (customer_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ");
+
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS tbl_fcm_tokens (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    merchant_id VARCHAR(100) NOT NULL DEFAULT 'local-merchant-001',
+                    customer_id INT NULL,
+                    fcm_token VARCHAR(500) NOT NULL UNIQUE,
+                    device_type VARCHAR(50) DEFAULT 'android',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_fcm_tokens_merchant (merchant_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ");
+
+            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key'];
+            foreach ($cols as $col) {
+                try {
+                    $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN {$col} TEXT NULL");
+                } catch (Throwable $e) {}
+            }
+        }
+        $done = true;
+    } catch (Throwable $e) {
+        error_log("initNotificationTables error: " . $e->getMessage());
+    }
+}
+
+if (isset($pdo) && $pdo instanceof PDO) {
+    initNotificationTables($pdo);
+}
+
+/**
  * Creates an in-app notification record in tbl_notifications
  */
 function createNotification(
@@ -24,24 +122,44 @@ function createNotification(
     ?string $iconUrl = null
 ): int {
     try {
-        $stmt = $pdo->prepare("
-            INSERT INTO tbl_notifications 
-            (merchant_id, customer_id, title, body, type, order_id, is_read, icon_url, action_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, false, ?, ?, NOW())
-            RETURNING id
-        ");
-        $stmt->execute([
-            $merchantId ?: 'local-merchant-001',
-            $customerId ?: null,
-            trim($title),
-            trim($body),
-            $type ?: 'general',
-            $orderId ?: null,
-            $iconUrl ?: null,
-            $actionUrl ?: null
-        ]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return (int)($row['id'] ?? $pdo->lastInsertId());
+        $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        if ($driver === 'pgsql') {
+            $stmt = $pdo->prepare("
+                INSERT INTO tbl_notifications 
+                (merchant_id, customer_id, title, body, type, order_id, is_read, icon_url, action_url, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, false, ?, ?, NOW())
+                RETURNING id
+            ");
+            $stmt->execute([
+                $merchantId ?: 'local-merchant-001',
+                $customerId ?: null,
+                trim($title),
+                trim($body),
+                $type ?: 'general',
+                $orderId ?: null,
+                $iconUrl ?: null,
+                $actionUrl ?: null
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)($row['id'] ?? 0);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO tbl_notifications 
+                (merchant_id, customer_id, title, body, type, order_id, is_read, icon_url, action_url, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $merchantId ?: 'local-merchant-001',
+                $customerId ?: null,
+                trim($title),
+                trim($body),
+                $type ?: 'general',
+                $orderId ?: null,
+                $iconUrl ?: null,
+                $actionUrl ?: null
+            ]);
+            return (int)$pdo->lastInsertId();
+        }
     } catch (Throwable $e) {
         error_log("createNotification error: " . $e->getMessage());
         return 0;
@@ -98,28 +216,61 @@ function sendFCMPushNotification(
     // Split tokens into batches of 500 for FCM limits
     $batches = array_chunk($tokens, 500);
 
+    $isCallType = (isset($extraData['type']) && strtolower((string)$extraData['type']) === 'call');
+
     foreach ($batches as $batchTokens) {
-        $payload = [
-            'registration_ids' => array_values($batchTokens),
-            'notification' => [
-                'title' => $title,
-                'body' => $body,
-                'icon' => $finalIcon,
-                'click_action' => $finalUrl,
-                'sound' => 'default',
-                'badge' => '1',
-                'vibrate' => [200, 100, 200]
-            ],
-            'data' => array_merge([
-                'title' => $title,
-                'body' => $body,
-                'url' => $finalUrl,
-                'click_action' => $finalUrl,
-                'icon' => $finalIcon,
-                'timestamp' => time()
-            ], $extraData),
-            'priority' => 'high'
-        ];
+        if ($isCallType) {
+            // For Instant Call Alerts: Must be pure high-priority DATA payload WITHOUT top-level "notification" key.
+            // If "notification" is present, Android OS intercepts it in the background and NEVER invokes
+            // onMessageReceived(), preventing the IncomingCallActivity from waking the phone and ringing!
+            $payload = [
+                'registration_ids' => array_values($batchTokens),
+                'data' => array_merge([
+                    'title' => $title,
+                    'body' => $body,
+                    'caller_name' => $title,
+                    'call_note' => $body,
+                    'type' => 'call',
+                    'action' => 'call',
+                    'incoming_call' => 'true',
+                    'url' => $finalUrl,
+                    'click_action' => $finalUrl,
+                    'icon' => $finalIcon,
+                    'timestamp' => (string)time()
+                ], $extraData),
+                'priority' => 'high',
+                'content_available' => true,
+                'android' => [
+                    'priority' => 'high'
+                ]
+            ];
+        } else {
+            $payload = [
+                'registration_ids' => array_values($batchTokens),
+                'notification' => [
+                    'title' => $title,
+                    'body' => $body,
+                    'icon' => $finalIcon,
+                    'click_action' => $finalUrl,
+                    'sound' => 'default',
+                    'badge' => '1',
+                    'vibrate' => [200, 100, 200]
+                ],
+                'data' => array_merge([
+                    'title' => $title,
+                    'body' => $body,
+                    'url' => $finalUrl,
+                    'click_action' => $finalUrl,
+                    'icon' => $finalIcon,
+                    'timestamp' => time()
+                ], $extraData),
+                'priority' => 'high',
+                'content_available' => true,
+                'android' => [
+                    'priority' => 'high'
+                ]
+            ];
+        }
 
         $headers = [
             'Authorization: key=' . $serverKey,

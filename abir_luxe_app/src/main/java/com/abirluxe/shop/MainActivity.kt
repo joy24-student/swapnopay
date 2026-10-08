@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         setupOfflineView()
         setupBackNavigation()
         monitorNetworkChanges()
+        checkFullScreenIntentPermission()
 
         // Load initial target URL or base store URL
         val initialUrl = intent?.getStringExtra("target_url")
@@ -328,6 +329,22 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         CookieManager.getInstance().flush()
+    }
+
+    private fun checkFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
+            if (notificationManager != null && !notificationManager.canUseFullScreenIntent()) {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     override fun onDestroy() {

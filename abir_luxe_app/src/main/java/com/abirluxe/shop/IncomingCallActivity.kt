@@ -39,7 +39,13 @@ class IncomingCallActivity : AppCompatActivity() {
         handler.postDelayed(timeoutRunnable, 35000)
     }
 
+    override fun onResume() {
+        super.onResume()
+        turnScreenOnAndUnlock()
+    }
+
     private fun turnScreenOnAndUnlock() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -50,8 +56,7 @@ class IncomingCallActivity : AppCompatActivity() {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                         WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
     }
