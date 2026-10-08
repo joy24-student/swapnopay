@@ -492,9 +492,6 @@ if ($p_old_price > $p_current_price && $p_current_price > 0) {
 }
 $emi_monthly = round($p_current_price / 12);
 
-$hp_logo_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_logo.jpg';
-$lifestyle_img_url = 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hp_lifestyle.jpg';
-
 // Fetch Related Products (same end category first, or active products in store)
 if (!isset($related_products) || empty($related_products)) {
     $related_products = [];

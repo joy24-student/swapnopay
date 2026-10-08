@@ -1,16 +1,25 @@
+import os
+import sys
+import urllib.parse
 import pg8000.native
 import ssl
 
+db_url = os.environ.get('DATABASE_URL') or (sys.argv[1] if len(sys.argv) > 1 else None)
+if not db_url:
+    print("Error: DATABASE_URL environment variable is required.")
+    sys.exit(1)
+
+parsed = urllib.parse.urlparse(db_url)
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
 
 conn = pg8000.native.Connection(
-    user='postgres.oaudxkhxwdrdsybyaheb',
-    password='BVlsJxoubjhsny9M',
-    host='aws-0-ap-southeast-1.pooler.supabase.com',
-    port=6543,
-    database='postgres',
+    user=urllib.parse.unquote(parsed.username or 'postgres'),
+    password=urllib.parse.unquote(parsed.password or ''),
+    host=parsed.hostname or '127.0.0.1',
+    port=parsed.port or 5432,
+    database=parsed.path.lstrip('/') or 'postgres',
     ssl_context=ctx
 )
 

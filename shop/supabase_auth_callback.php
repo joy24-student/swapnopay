@@ -101,11 +101,15 @@ require_once __DIR__ . '/admin/inc/config.php';
 </div>
 
 <script>
-    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://tldubojeokgyoclxnzkb.supabase.co"; ?>';
-    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0"; ?>';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = <?php echo json_encode(defined("SUPABASE_URL") ? SUPABASE_URL : ""); ?>;
+    const SUPABASE_ANON_KEY = <?php echo json_encode(defined("SUPABASE_ANON_KEY") ? SUPABASE_ANON_KEY : ""); ?>;
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
     async function checkAuthSession() {
+        if (!supabase) {
+            showError('Supabase authentication is not configured for this store.');
+            return;
+        }
         try {
             // 1. Check for errors returned in query params or hash
             const urlParams = new URLSearchParams(window.location.search);

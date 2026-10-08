@@ -102,7 +102,7 @@ if (!$heroSlides) {
     }
 }
 if (empty($heroSlides)) {
-    $fallbackImg = !empty($s['hero_image']) ? $s['hero_image'] : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/hero_products_collage.jpg';
+    $fallbackImg = !empty($s['hero_image']) ? $s['hero_image'] : 'hero_products_collage.jpg';
     $heroSlides = [['id' => 1, 'photo' => $fallbackImg]];
 }
 
@@ -134,14 +134,14 @@ $promo1_title = !empty($s['promo_banner1_title']) ? $s['promo_banner1_title'] : 
 $promo1_sub   = !empty($s['promo_banner1_subtitle']) ? $s['promo_banner1_subtitle'] : 'Laptops, Phones, Accessories & More';
 $promo1_btn   = !empty($s['promo_banner1_btn_text']) ? $s['promo_banner1_btn_text'] : 'Shop Now';
 $promo1_url   = !empty($s['promo_banner1_btn_url']) ? $s['promo_banner1_btn_url'] : 'product-category.php?id=4&type=top-category';
-$promo1_img   = !empty($s['promo_banner1_image']) ? $s['promo_banner1_image'] : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/promo_electronics.jpg';
+$promo1_img   = !empty($s['promo_banner1_image']) ? $s['promo_banner1_image'] : 'assets/uploads/promo_electronics.jpg';
 
 $promo2_tag   = !empty($s['promo_banner2_tag']) ? $s['promo_banner2_tag'] : 'Trending Deals';
 $promo2_title = !empty($s['promo_banner2_title']) ? $s['promo_banner2_title'] : 'Fresh Styles For You';
 $promo2_sub   = !empty($s['promo_banner2_subtitle']) ? $s['promo_banner2_subtitle'] : 'Fashion, Footwear & Accessories';
 $promo2_btn   = !empty($s['promo_banner2_btn_text']) ? $s['promo_banner2_btn_text'] : 'Shop Now';
 $promo2_url   = !empty($s['promo_banner2_btn_url']) ? $s['promo_banner2_btn_url'] : 'product-category.php?id=1&type=top-category';
-$promo2_img   = !empty($s['promo_banner2_image']) ? $s['promo_banner2_image'] : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/promo_fashion.jpg';
+$promo2_img   = !empty($s['promo_banner2_image']) ? $s['promo_banner2_image'] : 'assets/uploads/promo_fashion.jpg';
 
 // -------------------------------------------------------------------------
 // 2. PERSONALIZED HOME FEED (ALIEXPRESS STYLE) INITIAL BATCH

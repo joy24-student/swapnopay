@@ -72,8 +72,13 @@ if (!$runtime && ($candidateSlug !== '' || $rawHost !== '')) {
             }
         }
     }
-    if (!$dbUrl) {
-        $dbUrl = 'postgresql://postgres.your-tenant-id:swapnojoy25014024@127.0.0.1:5432/postgres?sslmode=disable';
+    if (!$dbUrl && getenv('DB_HOST') && getenv('DB_USER')) {
+        $envHost = getenv('DB_HOST');
+        $envPort = getenv('DB_PORT') ?: 5432;
+        $envUser = getenv('DB_USER');
+        $envPass = getenv('DB_PASS') ?: '';
+        $envName = getenv('DB_NAME') ?: 'postgres';
+        $dbUrl = "postgresql://{$envUser}:" . urlencode($envPass) . "@{$envHost}:{$envPort}/{$envName}";
     }
 
     if ($dbUrl) {
@@ -110,19 +115,52 @@ if (!$runtime && ($candidateSlug !== '' || $rawHost !== '')) {
                         ? "{$proto}://{$storeRow['custom_domain']}/"
                         : "{$proto}://shop.swapnopay.top/{$cleanSlug}/";
 
+                    // Retrieve merchant's own database and Supabase credentials if configured
+                    $merchantDbHost = $dbHost;
+                    $merchantDbPort = (int)$dbPort;
+                    $merchantDbName = $dbName;
+                    $merchantDbUser = $dbUser;
+                    $merchantDbPass = $dbPass;
+                    $merchantSsl = 'disable';
+                    $merchantSupabaseUrl = '';
+                    $merchantSupabaseAnon = '';
+
+                    try {
+                        $mStmt = $pdoControl->prepare('SELECT supabase_url, supabase_anon_key, database_url FROM merchants WHERE id = ? LIMIT 1');
+                        $mStmt->execute([$storeRow['merchant_id']]);
+                        $mRow = $mStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($mRow) {
+                            $merchantSupabaseUrl = $mRow['supabase_url'] ?? '';
+                            $merchantSupabaseAnon = $mRow['supabase_anon_key'] ?? '';
+                            if (!empty($mRow['database_url'])) {
+                                $parsedMdb = parse_url($mRow['database_url']);
+                                if (!empty($parsedMdb['host'])) {
+                                    $merchantDbHost = $parsedMdb['host'];
+                                    $merchantDbPort = (int)($parsedMdb['port'] ?? 5432);
+                                    $merchantDbName = ltrim($parsedMdb['path'] ?? '/postgres', '/');
+                                    $merchantDbUser = rawurldecode($parsedMdb['user'] ?? 'postgres');
+                                    $merchantDbPass = rawurldecode($parsedMdb['pass'] ?? '');
+                                    $merchantSsl = 'require';
+                                }
+                            }
+                        }
+                    } catch (Throwable $_) {}
+
                     $runtime = [
                         'merchant_id' => $storeRow['merchant_id'],
                         'base_url' => $storeBaseUrl,
                         'store_name' => $storeRow['store_name'],
                         'shop_slug' => $cleanSlug,
+                        'supabase_url' => $merchantSupabaseUrl,
+                        'supabase_anon_key' => $merchantSupabaseAnon,
                         'db' => [
-                            'host' => $dbHost,
-                            'port' => (int)$dbPort,
-                            'database' => $dbName,
-                            'user' => $dbUser,
-                            'password' => $dbPass,
+                            'host' => $merchantDbHost,
+                            'port' => $merchantDbPort,
+                            'database' => $merchantDbName,
+                            'user' => $merchantDbUser,
+                            'password' => $merchantDbPass,
                             'schema' => $schema,
-                            'sslmode' => 'disable',
+                            'sslmode' => $merchantSsl,
                         ],
                         'backend_url' => 'https://api.swapnopay.top',
                     ];
@@ -227,12 +265,31 @@ try {
 }
 define('DB_DRIVER_NAME',$db_driver);
 define('SQL_RAND',$db_driver === 'pgsql' ? 'RANDOM()' : 'RAND()');
-// Never expose platform service-role credentials to a hosted PHP storefront.
-$default_supabase_url = getenv('ADMIN_SUPABASE_URL') ?: getenv('SUPABASE_URL') ?: 'https://tldubojeokgyoclxnzkb.supabase.co';
-$default_supabase_anon = getenv('ADMIN_SUPABASE_ANON_KEY') ?: getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0';
-define('SUPABASE_URL',!empty($runtime['supabase_url']) ? $runtime['supabase_url'] : $default_supabase_url);
-define('SUPABASE_ANON_KEY',!empty($runtime['supabase_anon_key']) ? $runtime['supabase_anon_key'] : $default_supabase_anon);
-define('SUPABASE_SERVICE_KEY',$runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+// Dynamic Supabase configuration resolved automatically per merchant:
+// 1. Merchant's provisioned runtime configuration (from shop provisioning / launch)
+// 2. Or tenant-level database settings (tbl_settings configured by merchant)
+// 3. Or environment variables if explicitly set
+$resolved_supabase_url = !empty($runtime['supabase_url']) ? $runtime['supabase_url'] : '';
+$resolved_supabase_anon = !empty($runtime['supabase_anon_key']) ? $runtime['supabase_anon_key'] : '';
+
+if (empty($resolved_supabase_url)) {
+    try {
+        $settingSupa = $pdo->query("SELECT supabase_url, supabase_anon_key FROM tbl_settings WHERE id=1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if (!empty($settingSupa['supabase_url'])) {
+            $resolved_supabase_url = $settingSupa['supabase_url'];
+            $resolved_supabase_anon = $settingSupa['supabase_anon_key'] ?? '';
+        }
+    } catch (Throwable $_) {}
+}
+
+if (empty($resolved_supabase_url)) {
+    $resolved_supabase_url = getenv('SUPABASE_URL') ?: getenv('ADMIN_SUPABASE_URL') ?: '';
+    $resolved_supabase_anon = getenv('SUPABASE_ANON_KEY') ?: getenv('ADMIN_SUPABASE_ANON_KEY') ?: '';
+}
+
+define('SUPABASE_URL', rtrim((string)$resolved_supabase_url, '/'));
+define('SUPABASE_ANON_KEY', (string)$resolved_supabase_anon);
+define('SUPABASE_SERVICE_KEY', $runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
 define('MERCHANT_ID',$runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: ''));
 define('SWAPNOPAY_API_URL',rtrim($runtime['backend_url'] ?? $runtime['api_url'] ?? (getenv('SWAPNOPAY_API_URL') ?: 'https://api.swapnopay.top'),'/'));
 $BASE_URL = $runtime['base_url'] ?? (getenv('STORE_BASE_URL') ?: '');

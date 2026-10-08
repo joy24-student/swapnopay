@@ -5,10 +5,16 @@
  */
 
 if (!defined('SUPABASE_STORAGE_URL')) {
-    define('SUPABASE_STORAGE_URL', 'https://oaudxkhxwdrdsybyaheb.supabase.co');
+    $storageUrl = defined('SUPABASE_URL') && SUPABASE_URL 
+        ? SUPABASE_URL 
+        : (getenv('SUPABASE_STORAGE_URL') ?: getenv('SUPABASE_URL') ?: '');
+    define('SUPABASE_STORAGE_URL', rtrim((string)$storageUrl, '/'));
 }
 if (!defined('SUPABASE_STORAGE_ANON_KEY')) {
-    define('SUPABASE_STORAGE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hdWR4a2h4d2RyZHN5YnlhaGViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzOTY3NjAsImV4cCI6MjEwNDk3Mjc2MH0.bCvAIA-54s91_nN9jp_qz3aNDX622QMbBhGxpsLcfW0');
+    $storageKey = defined('SUPABASE_ANON_KEY') && SUPABASE_ANON_KEY 
+        ? SUPABASE_ANON_KEY 
+        : (getenv('SUPABASE_STORAGE_ANON_KEY') ?: getenv('SUPABASE_ANON_KEY') ?: '');
+    define('SUPABASE_STORAGE_ANON_KEY', (string)$storageKey);
 }
 if (!defined('SUPABASE_STOREFRONT_BUCKET')) {
     define('SUPABASE_STOREFRONT_BUCKET', 'storefront');
@@ -24,7 +30,7 @@ if (!defined('SUPABASE_STOREFRONT_BUCKET')) {
  * @return string|false Public URL on success, false on failure
  */
 function uploadFileToSupabase($localFilePath, $destinationFilename, $folder = 'assets', $bucket = SUPABASE_STOREFRONT_BUCKET) {
-    if (!file_exists($localFilePath)) {
+    if (!file_exists($localFilePath) || empty(SUPABASE_STORAGE_URL) || empty(SUPABASE_STORAGE_ANON_KEY)) {
         return false;
     }
     

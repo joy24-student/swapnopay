@@ -15,6 +15,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
 
 // Ensure required columns exist across all tenant schemas safely
 $settings_migrations = [
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS supabase_url text DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS supabase_anon_key text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_google_login smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_facebook_login smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS store_name varchar(255) DEFAULT ''",
@@ -365,6 +367,8 @@ $google_client_id = $settings_data['google_client_id'] ?? '';
 $google_client_secret = $settings_data['google_client_secret'] ?? '';
 $show_google_login = isset($settings_data['show_google_login']) ? (int)$settings_data['show_google_login'] : 1;
 $show_facebook_login = isset($settings_data['show_facebook_login']) ? (int)$settings_data['show_facebook_login'] : 1;
+$supabase_url = !empty($settings_data['supabase_url']) ? $settings_data['supabase_url'] : (defined('SUPABASE_URL') ? SUPABASE_URL : '');
+$supabase_anon_key = !empty($settings_data['supabase_anon_key']) ? $settings_data['supabase_anon_key'] : (defined('SUPABASE_ANON_KEY') ? SUPABASE_ANON_KEY : '');
 // Assuming Twilio API key and secret will also be added if needed
 $twilio_account_sid = $settings_data['twilio_account_sid'] ?? '';
 $twilio_auth_token = $settings_data['twilio_auth_token'] ?? '';
@@ -965,7 +969,8 @@ if(isset($_POST['form_api_integrations'])) {
                                 facebook_app_id=?, facebook_app_secret=?,
                                 google_client_id=?, google_client_secret=?,
                                 twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?,
-                                show_google_login=?, show_facebook_login=?
+                                show_google_login=?, show_facebook_login=?,
+                                supabase_url=?, supabase_anon_key=?
                                 WHERE id=1");
     $statement->execute(array(
         $_POST['gemini_api_key'] ?? '',
@@ -985,9 +990,11 @@ if(isset($_POST['form_api_integrations'])) {
         $_POST['twilio_auth_token'] ?? '',
         $_POST['twilio_phone_number'] ?? '',
         $show_google_login,
-        $show_facebook_login
+        $show_facebook_login,
+        trim($_POST['supabase_url'] ?? ''),
+        trim($_POST['supabase_anon_key'] ?? '')
     ));
-    $success_message = 'API Integration and Social Authentication Settings are updated successfully.';
+    $success_message = 'API Integration, Database, and Social Authentication Settings are updated successfully.';
 
     $gemini_api_key = $_POST['gemini_api_key'] ?? '';
     $openrouter_api_key = $_POST['openrouter_api_key'] ?? '';
@@ -1005,6 +1012,8 @@ if(isset($_POST['form_api_integrations'])) {
     $twilio_account_sid = $_POST['twilio_account_sid'] ?? '';
     $twilio_auth_token = $_POST['twilio_auth_token'] ?? '';
     $twilio_phone_number = $_POST['twilio_phone_number'] ?? '';
+    $supabase_url = trim($_POST['supabase_url'] ?? '');
+    $supabase_anon_key = trim($_POST['supabase_anon_key'] ?? '');
 }
 
 
@@ -1565,6 +1574,8 @@ $google_client_id = $settings_data['google_client_id'] ?? '';
 $google_client_secret = $settings_data['google_client_secret'] ?? '';
 $show_google_login = isset($settings_data['show_google_login']) ? (int)$settings_data['show_google_login'] : 1;
 $show_facebook_login = isset($settings_data['show_facebook_login']) ? (int)$settings_data['show_facebook_login'] : 1;
+$supabase_url = !empty($settings_data['supabase_url']) ? $settings_data['supabase_url'] : (defined('SUPABASE_URL') ? SUPABASE_URL : '');
+$supabase_anon_key = !empty($settings_data['supabase_anon_key']) ? $settings_data['supabase_anon_key'] : (defined('SUPABASE_ANON_KEY') ? SUPABASE_ANON_KEY : '');
 $twilio_account_sid = $settings_data['twilio_account_sid'] ?? '';
 $twilio_auth_token = $settings_data['twilio_auth_token'] ?? '';
 $twilio_phone_number = $settings_data['twilio_phone_number'] ?? '';
@@ -3329,6 +3340,22 @@ $lang_sections = [
                                         </div>
                                     </div>
 
+
+                                    <h3 class="seo-info mt-8"><i class="fa fa-database text-teal"></i> Supabase Database &amp; Auth Configuration</h3>
+                                    <div class="form-group">
+                                        <label for="supabase_url" class="col-sm-3 control-label">Supabase Project URL</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="supabase_url" id="supabase_url" class="form-control" value="<?php echo htmlspecialchars($supabase_url); ?>" placeholder="e.g. https://your-project-id.supabase.co">
+                                            <p class="help-block">Automatically provisioned when your shop is launched. You can customize or connect your merchant Supabase project here.</p>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supabase_anon_key" class="col-sm-3 control-label">Supabase Anon Key</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="supabase_anon_key" id="supabase_anon_key" class="form-control" value="<?php echo htmlspecialchars($supabase_anon_key); ?>" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                                            <p class="help-block">Your Supabase public anon key used for customer authentication and storage.</p>
+                                        </div>
+                                    </div>
 
                                     <h3 class="seo-info mt-8"><i class="fa fa-google text-danger"></i> Google Authentication &amp; OAuth</h3>
                                     <div class="form-group">

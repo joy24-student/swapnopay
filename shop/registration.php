@@ -26,16 +26,17 @@ $stmt = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $stmt->execute();
 $settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$show_google_login = isset($settings['show_google_login']) ? (int)$settings['show_google_login'] : 1;
-$show_facebook_login = isset($settings['show_facebook_login']) ? (int)$settings['show_facebook_login'] : 1;
+$is_supabase_ready = defined('SUPABASE_URL') && !empty(SUPABASE_URL) && defined('SUPABASE_ANON_KEY') && !empty(SUPABASE_ANON_KEY);
+$show_google_login = $is_supabase_ready && (isset($settings['show_google_login']) ? (int)$settings['show_google_login'] : 1);
+$show_facebook_login = $is_supabase_ready && (isset($settings['show_facebook_login']) ? (int)$settings['show_facebook_login'] : 1);
 $show_social_buttons = ($show_google_login || $show_facebook_login);
 
 $banner_registration = !empty($settings['banner_registration']) 
     ? $settings['banner_registration'] 
-    : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/auth_signup_side_banner.jpg';
+    : 'assets/uploads/banner_registration.jpg';
 
 if (!str_starts_with($banner_registration, 'http')) {
-    $banner_registration = 'assets/uploads/' . $banner_registration;
+    $banner_registration = 'assets/uploads/' . ltrim($banner_registration, '/');
 }
 
 $error_message = '';
@@ -1150,12 +1151,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_register']) || 
     bindPasswordToggle('mTogglePasswordBtn', 'm_cust_password', 'mEyeIcon');
 
     // Supabase Social OAuth integration
-    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://tldubojeokgyoclxnzkb.supabase.co"; ?>';
-    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0"; ?>';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = <?php echo json_encode(defined("SUPABASE_URL") ? SUPABASE_URL : ""); ?>;
+    const SUPABASE_ANON_KEY = <?php echo json_encode(defined("SUPABASE_ANON_KEY") ? SUPABASE_ANON_KEY : ""); ?>;
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
     document.querySelectorAll('.js-google-login').forEach(googleBtn => {
         googleBtn.addEventListener('click', async function() {
+            if (!supabase) {
+                alert('Social login is not configured for this store.');
+                return;
+            }
             const origHtml = googleBtn.innerHTML;
             try {
                 googleBtn.disabled = true;
@@ -1184,6 +1189,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_register']) || 
 
     document.querySelectorAll('.js-facebook-login').forEach(fbBtn => {
         fbBtn.addEventListener('click', async function() {
+            if (!supabase) {
+                alert('Social login is not configured for this store.');
+                return;
+            }
             const origHtml = fbBtn.innerHTML;
             try {
                 fbBtn.disabled = true;
