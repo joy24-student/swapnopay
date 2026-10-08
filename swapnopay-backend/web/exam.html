@@ -186,9 +186,114 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
   .passage-wrap{grid-template-columns:1fr}
   .match-row{grid-template-columns:1fr}
 }
+
+/* Browser Lockdown & Anti-Cheating Mode */
+.lockdown-active-strip {
+  background: #7F1D1D;
+  color: #F8FAFC;
+  padding: 7px 20px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #991B1B;
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+.lockdown-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(8px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.lockdown-modal-card {
+  background: #1E293B;
+  color: #F8FAFC;
+  border-radius: 16px;
+  padding: 26px;
+  max-width: 480px;
+  width: 100%;
+  border: 1.5px solid #DC2626;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lockdown-btn-primary {
+  background: #DC2626;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.lockdown-btn-primary:hover {
+  background: #B91C1C;
+}
+.lockdown-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1E293B;
+  color: #F8FAFC;
+  border: 1.5px solid #EF4444;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 100000;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lockdown-watermark {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  opacity: 0.045;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: #000;
+  transform: rotate(-25deg);
+  overflow: hidden;
+}
+body.lockdown-anti-copy {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
 </style>
 </head>
 <body>
+
+<!-- 0. BROWSER LOCKDOWN PROCTORED STRIP -->
+<div id="examLockdownStrip" class="lockdown-active-strip" style="display:none;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span>🛡️</span>
+    <span style="font-weight:700;">PROCTORED LOCKDOWN ACTIVE</span>
+    <span style="opacity:0.8;font-size:11px;">(Tab switching monitored • Full-screen required)</span>
+  </div>
+  <div id="examLockdownBadge" style="background:#991B1B;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">
+    Violations: 0 / 3
+  </div>
+</div>
 
 <!-- 1. ACTIVE EXAM HEADER -->
 <div class="header" id="examHeader" style="display:none;">
@@ -256,6 +361,10 @@ textarea.code:focus{outline:none;border-color:var(--accent)}
         <div class="val" id="metaFeeVal">Free</div>
         <div class="lbl">Exam Fee</div>
       </div>
+    </div>
+
+    <div id="gateLockdownNotice" style="display:none;background:#FEF2F2;border:1.5px solid #F87171;border-radius:10px;padding:12px;margin-bottom:14px;color:#991B1B;font-size:12.5px;line-height:1.5;">
+      🛡️ <strong>Strict Anti-Cheating Lockdown Enabled:</strong> This assessment enforces full-screen mode, monitors tab-switching, and locks clipboard copy/paste. Violations are logged and will result in disqualification.
     </div>
 
     <div id="candidateFormFields">
@@ -391,6 +500,250 @@ if (themeBtn) {
     const savedTheme = localStorage.getItem('swapnopay_exam_theme');
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
   } catch {}
+// ── Browser Lockdown & Anti-Cheating Engine for Exam Portal ─────────────────
+let isExamLockdownActive = false;
+let examLockdownViolations = 0;
+let maxExamLockdownViolations = 3;
+let lastExamViolationTime = 0;
+const examLockdownLogs = [];
+
+function setupExamLockdown(config, theme) {
+  maxExamLockdownViolations = Number(theme.lockdown_max_violations || theme.lockdownMaxViolations || 3);
+  const requireFullscreen = theme.lockdown_require_fullscreen !== false && theme.lockdownRequireFullscreen !== false;
+  const blockTabSwitch = theme.lockdown_block_tab_switch !== false && theme.lockdownBlockTabSwitch !== false;
+  const disableCopyPaste = theme.lockdown_disable_copy_paste !== false && theme.lockdownDisableCopyPaste !== false;
+  const enableWatermark = Boolean(theme.lockdown_watermark || theme.lockdownWatermark);
+
+  isExamLockdownActive = true;
+
+  // Show lockdown strip
+  const strip = document.getElementById("examLockdownStrip");
+  if (strip) {
+    strip.style.display = "flex";
+    const badge = document.getElementById("examLockdownBadge");
+    if (badge) badge.innerText = `Violations: 0 / ${maxExamLockdownViolations}`;
+  }
+
+  // Request fullscreen
+  if (requireFullscreen) {
+    const docEl = document.documentElement;
+    if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+    else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+
+    const onFullscreenChange = () => {
+      const inFullscreen = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!inFullscreen && isExamLockdownActive && !submitted) {
+        recordExamLockdownViolation("Exited full-screen mode during exam");
+        showExamFullscreenPrompt();
+      } else if (inFullscreen) {
+        const prompt = document.getElementById("exam-fs-prompt-overlay");
+        if (prompt) prompt.remove();
+      }
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+  }
+
+  // Tab switch & visibility monitoring
+  if (blockTabSwitch) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && isExamLockdownActive && !submitted) {
+        recordExamLockdownViolation("Tab switched or browser minimized");
+      }
+    });
+
+    window.addEventListener("blur", () => {
+      if (isExamLockdownActive && !submitted) {
+        recordExamLockdownViolation("Window lost focus / switched app");
+      }
+    });
+  }
+
+  // Watermark
+  if (enableWatermark) {
+    const watermarkEl = document.createElement("div");
+    watermarkEl.className = "lockdown-watermark";
+    const wmText = `${config.title || 'EXAM'} • ${candidateInfo.name || 'CANDIDATE'} • ${new Date().toISOString().substring(0, 10)}`;
+    for (let i = 0; i < 24; i++) {
+      const item = document.createElement("div");
+      item.innerText = wmText;
+      watermarkEl.appendChild(item);
+    }
+    document.body.appendChild(watermarkEl);
+  }
+
+  // Anti-Copy / Paste / DevTools blocking
+  if (disableCopyPaste) {
+    document.body.classList.add("lockdown-anti-copy");
+
+    document.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      showExamLockdownToast("🚫 Context menu disabled in proctored exam.");
+    });
+    document.addEventListener("copy", e => {
+      e.preventDefault();
+      showExamLockdownToast("🚫 Copying questions is prohibited.");
+    });
+    document.addEventListener("cut", e => {
+      e.preventDefault();
+      showExamLockdownToast("🚫 Cutting content is prohibited.");
+    });
+    document.addEventListener("paste", e => {
+      const target = e.target;
+      if (target && target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        showExamLockdownToast("🚫 Pasting is prohibited in proctored exam.");
+      }
+    });
+
+    document.addEventListener("keydown", e => {
+      const key = e.key;
+      const isDevTools = key === "F12" ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === "I" || key === "i" || key === "J" || key === "j" || key === "C" || key === "c")) ||
+        ((e.ctrlKey || e.metaKey) && (key === "u" || key === "U")) ||
+        ((e.ctrlKey || e.metaKey) && (key === "s" || key === "S"));
+
+      if (isDevTools) {
+        e.preventDefault();
+        e.stopPropagation();
+        showExamLockdownToast("🚫 Inspection tool shortcut blocked.");
+        if (isExamLockdownActive && !submitted) {
+          recordExamLockdownViolation("DevTools shortcut attempted");
+        }
+      }
+    });
+  }
+}
+
+function recordExamLockdownViolation(reason) {
+  if (!isExamLockdownActive || submitted) return;
+  const now = Date.now();
+  if (now - lastExamViolationTime < 1500) return;
+  lastExamViolationTime = now;
+
+  examLockdownViolations++;
+  examLockdownLogs.push({
+    timestamp: new Date().toISOString(),
+    reason: reason,
+    violation_number: examLockdownViolations
+  });
+
+  const badge = document.getElementById("examLockdownBadge");
+  if (badge) {
+    badge.innerText = `Violations: ${examLockdownViolations} / ${maxExamLockdownViolations}`;
+    badge.style.background = examLockdownViolations >= maxExamLockdownViolations ? '#DC2626' : '#991B1B';
+  }
+
+  if (examLockdownViolations >= maxExamLockdownViolations) {
+    showExamLockoutScreen();
+  } else {
+    showExamViolationAlert(reason);
+  }
+}
+
+function showExamViolationAlert(reason) {
+  if (document.getElementById("exam-violation-alert")) return;
+  const overlay = document.createElement("div");
+  overlay.className = "lockdown-overlay";
+  overlay.id = "exam-violation-alert";
+  overlay.innerHTML = `
+    <div class="lockdown-modal-card" style="border-color:#DC2626;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:42px; height:42px; border-radius:10px; background:#DC2626; color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px;">🚨</div>
+        <div>
+          <div style="font-size:16px; font-weight:800; color:#F8FAFC;">Security Alert: Tab Switch / Exit Detected!</div>
+          <div style="font-size:12px; color:#FCA5A5;">Violation ${examLockdownViolations} of ${maxExamLockdownViolations} Logged</div>
+        </div>
+      </div>
+      <div style="font-size:13px; color:#CBD5E1; line-height:1.6;">
+        Reason: <strong>${reason}</strong><br><br>
+        Navigating away or leaving this exam window is strictly forbidden. Exceeding ${maxExamLockdownViolations} violations will permanently lock your assessment.
+      </div>
+      <button type="button" class="lockdown-btn-primary" id="dismiss-exam-violation-btn">
+        I Understand • Return to Exam
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("dismiss-exam-violation-btn").addEventListener("click", () => {
+    overlay.remove();
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  });
+}
+
+function showExamFullscreenPrompt() {
+  if (document.getElementById("exam-fs-prompt-overlay")) return;
+  const overlay = document.createElement("div");
+  overlay.className = "lockdown-overlay";
+  overlay.id = "exam-fs-prompt-overlay";
+  overlay.innerHTML = `
+    <div class="lockdown-modal-card" style="border-color:#F59E0B;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:42px; height:42px; border-radius:10px; background:#F59E0B; color:#000; display:flex; align-items:center; justify-content:center; font-size:22px;">⚠️</div>
+        <div>
+          <div style="font-size:17px; font-weight:800; color:#F8FAFC;">Fullscreen Exited!</div>
+          <div style="font-size:12px; color:#FCD34D;">Action Logged as Security Violation</div>
+        </div>
+      </div>
+      <div style="font-size:13px; color:#CBD5E1; line-height:1.6;">
+        Full-screen mode is required to maintain proctoring integrity during this examination.
+      </div>
+      <button type="button" class="lockdown-btn-primary" style="background:#F59E0B; color:#000;" id="restore-exam-fs-btn">
+        Restore Fullscreen & Continue
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("restore-exam-fs-btn").addEventListener("click", () => {
+    const docEl = document.documentElement;
+    if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+    else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+    overlay.remove();
+  });
+}
+
+function showExamLockoutScreen() {
+  document.querySelectorAll(".lockdown-overlay").forEach(el => el.remove());
+  if (window._timerInt) clearInterval(window._timerInt);
+
+  const lockout = document.createElement("div");
+  lockout.className = "lockdown-overlay";
+  lockout.id = "exam-final-lockout";
+  lockout.innerHTML = `
+    <div class="lockdown-modal-card" style="border-color:#DC2626; text-align:center; align-items:center;">
+      <div style="width:54px; height:54px; border-radius:14px; background:#DC2626; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px;">⛔</div>
+      <div style="font-size:20px; font-weight:800; color:#F8FAFC;">Exam Locked: Violations Exceeded</div>
+      <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
+        You have exceeded the maximum allowed security violations (${maxExamLockdownViolations} strikes).
+        Your examination session has been terminated and locked for proctor evaluation.
+      </div>
+      <div style="font-size:11.5px; color:#EF4444; background:#450A0A; padding:8px 14px; border-radius:8px; border:1px solid #7F1D1D;">
+        Audit Log: ${examLockdownLogs.length} incident(s) recorded
+      </div>
+    </div>
+  `;
+  document.body.appendChild(lockout);
+
+  const subBtn = document.getElementById("submitExamBtn") || document.getElementById("actionSubmit");
+  if (subBtn) {
+    subBtn.disabled = true;
+    subBtn.innerText = "Locked: Security Violations Exceeded";
+  }
+}
+
+function showExamLockdownToast(msg) {
+  const existing = document.getElementById("exam-active-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "lockdown-toast";
+  toast.id = "exam-active-toast";
+  toast.innerHTML = `<span>🛡️</span><span>${msg}</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 2500);
 }
 
 // ── Autosave & Storage ──────────────────────────────────────────────────────
@@ -618,6 +971,8 @@ async function finishExam() {
   document.getElementById('actionBar').style.display = 'none';
   document.getElementById('examHeader').style.display = 'none';
   document.getElementById('candidateBar').style.display = 'none';
+  const strip = document.getElementById('examLockdownStrip');
+  if (strip) strip.style.display = 'none';
 
   const fb = document.getElementById('feedbackContainer');
   fb.style.display = 'block';
@@ -633,6 +988,10 @@ async function finishExam() {
   let paymentRedirectUrl = null;
   if (formIdentifier) {
     try {
+      if (isExamLockdownActive) {
+        answers.lockdown_violations = examLockdownViolations;
+        answers.lockdown_logs = examLockdownLogs;
+      }
       const payload = {
         answers,
         customer_name: candidateInfo.name,
@@ -643,7 +1002,9 @@ async function finishExam() {
         time_taken_seconds: timeSpentSec,
         reference_id: refId,
         selected_product_id: formConfig?.products?.[0]?.id || null,
-        quantity: 1
+        quantity: 1,
+        lockdown_violations: isExamLockdownActive ? examLockdownViolations : 0,
+        lockdown_logs: isExamLockdownActive ? examLockdownLogs : []
       };
 
       const res = await fetch(`/v1/forms/${encodeURIComponent(formIdentifier)}/submit`, {
@@ -836,6 +1197,16 @@ function initExamFromConfig(config) {
     feeVal.textContent = `৳${amount}`;
   }
 
+  // Browser Lockdown Notice on Gate
+  if (theme.enable_browser_lockdown === true || theme.enableBrowserLockdown === true) {
+    const notice = document.getElementById('gateLockdownNotice');
+    if (notice) {
+      notice.style.display = 'block';
+      const maxV = theme.lockdown_max_violations || theme.lockdownMaxViolations || 3;
+      notice.innerHTML = `🛡️ <strong>Strict Anti-Cheating Lockdown Enabled:</strong> This assessment enforces full-screen mode, monitors tab switching, and locks clipboard copy/paste. Exceeding ${maxV} violations will automatically terminate and lock your session.`;
+    }
+  }
+
   // Extract all fields from fields array and all pages
   let allFields = [];
   try {
@@ -1012,6 +1383,14 @@ document.getElementById('startExamBtn').addEventListener('click', () => {
   document.getElementById('candidateBar').style.display = 'flex';
   document.getElementById('examLayout').style.display = 'flex';
   document.getElementById('actionBar').style.display = 'flex';
+
+  const theme = (formConfig?.theme_config && typeof formConfig.theme_config === 'object')
+    ? formConfig.theme_config
+    : (formConfig?.theme && typeof formConfig.theme === 'object' ? formConfig.theme : {});
+
+  if (theme.enable_browser_lockdown === true || theme.enableBrowserLockdown === true) {
+    setupExamLockdown(formConfig, theme);
+  }
 
   window._timerInt = setInterval(tick, 1000);
   renderQuestion();

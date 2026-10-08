@@ -6,6 +6,9 @@
 // Helper to reliably clear tenant and legacy caches across all stores
 if (!function_exists('clearShopCaches')) {
     function clearShopCaches() {
+        if (function_exists('clearShopCache')) {
+            clearShopCache('all');
+        }
         $keys = ['settings', 'slides', 'home_feed', 'menu'];
         foreach ($keys as $k) {
             if (function_exists('getShopCacheFile')) {

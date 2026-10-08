@@ -2460,6 +2460,174 @@ private fun FormBuilderTab(
                                                     )
                                                 }
                                             }
+                                            FormFieldType.CUSTOM_AMOUNT -> {
+                                                val amtVal = currentVal.ifBlank { field.defaultValue.ifBlank { "500.00" } }
+                                                val baseAmt = amtVal.toDoubleOrNull() ?: 0.0
+                                                val couponAppliedCode = dynamicFieldValues["__applied_coupon"] ?: ""
+                                                val couponDiscountPct = dynamicFieldValues["__applied_discount_pct"]?.toDoubleOrNull() ?: 0.0
+                                                val couponDiscountFlat = dynamicFieldValues["__applied_discount_flat"]?.toDoubleOrNull() ?: 0.0
+                                                val discountAmt = if (couponDiscountPct > 0) (baseAmt * couponDiscountPct / 100.0) else couponDiscountFlat
+                                                val finalPayable = (baseAmt - discountAmt).coerceAtLeast(0.0)
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = if (isDark) Color(0xFF1E1A12) else Color(0xFFFBFBFD),
+                                                    border = BorderStroke(1.dp, if (fieldError != null) Color(0xFFEF4444) else cardBorder),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                field.label.ifBlank { "Payment Amount (BDT)" },
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = textPrimary
+                                                            )
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = if (field.isFixedPrice) goldPrimary.copy(alpha = 0.15f) else Color(0xFF3B82F6).copy(alpha = 0.15f)
+                                                            ) {
+                                                                Text(
+                                                                    if (field.isFixedPrice) "🔒 Fixed Price" else "✏️ Custom Amount",
+                                                                    fontSize = 10.5.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = if (field.isFixedPrice) goldText else Color(0xFF2563EB),
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                        }
+
+                                                        if (field.isFixedPrice) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                            ) {
+                                                                Text("৳", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = goldPrimary)
+                                                                Text(
+                                                                    "%,.2f".format(baseAmt),
+                                                                    fontSize = 22.sp,
+                                                                    fontWeight = FontWeight.ExtraBold,
+                                                                    color = textPrimary
+                                                                )
+                                                                Text("BDT", fontSize = 12.sp, color = textSecondary)
+                                                            }
+                                                        } else {
+                                                            OutlinedTextField(
+                                                                value = amtVal,
+                                                                onValueChange = { input ->
+                                                                    val clean = input.filter { it.isDigit() || it in ".-" }
+                                                                    dynamicFieldValues = dynamicFieldValues + (field.id to clean)
+                                                                    if (fieldError != null) formErrors = formErrors - field.id
+                                                                },
+                                                                leadingIcon = { Text("৳", fontWeight = FontWeight.Bold, color = goldPrimary) },
+                                                                label = { Text("Enter Amount") },
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                singleLine = true,
+                                                                shape = RoundedCornerShape(10.dp)
+                                                            )
+                                                        }
+
+                                                        if (couponAppliedCode.isNotBlank() && discountAmt > 0) {
+                                                            Surface(
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                color = Color(0xFF10B981).copy(alpha = 0.12f),
+                                                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Row(
+                                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    Text("🏷️ Promo ($couponAppliedCode): -৳${"%,.2f".format(discountAmt)}", fontSize = 11.5.sp, color = Color(0xFF059669), fontWeight = FontWeight.SemiBold)
+                                                                    Text("Payable: ৳${"%,.2f".format(finalPayable)}", fontSize = 12.sp, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            FormFieldType.COUPON -> {
+                                                var couponInput by remember { mutableStateOf("") }
+                                                val activeCoupon = dynamicFieldValues["__applied_coupon"] ?: ""
+                                                val configuredCoupons = field.options.ifEmpty { listOf("SAVE10:10%", "SAVE20:20%", "FLAT50:50") }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = if (isDark) Color(0xFF1E1A12) else Color(0xFFFBFBFD),
+                                                    border = BorderStroke(1.dp, if (fieldError != null) Color(0xFFEF4444) else cardBorder),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text(
+                                                            field.label.ifBlank { "Promo / Coupon Code" },
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = textPrimary
+                                                        )
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            OutlinedTextField(
+                                                                value = couponInput,
+                                                                onValueChange = { couponInput = it.uppercase() },
+                                                                placeholder = { Text(field.placeholder.ifBlank { "e.g. SAVE20" }, fontSize = 12.sp) },
+                                                                modifier = Modifier.weight(1f),
+                                                                singleLine = true,
+                                                                shape = RoundedCornerShape(10.dp)
+                                                            )
+                                                            Button(
+                                                                onClick = {
+                                                                    val entered = couponInput.trim().uppercase()
+                                                                    val match = configuredCoupons.find { it.split(':')[0].trim().equals(entered, ignoreCase = true) }
+                                                                        ?: "$entered:10%"
+                                                                    val discStr = match.split(':').getOrElse(1) { "10%" }.trim()
+                                                                    if (discStr.endsWith("%")) {
+                                                                        val pct = discStr.removeSuffix("%").toDoubleOrNull() ?: 10.0
+                                                                        dynamicFieldValues = dynamicFieldValues + mapOf(
+                                                                            "__applied_coupon" to entered,
+                                                                            "__applied_discount_pct" to pct.toString(),
+                                                                            "__applied_discount_flat" to "0"
+                                                                        )
+                                                                    } else {
+                                                                        val flat = discStr.toDoubleOrNull() ?: 50.0
+                                                                        dynamicFieldValues = dynamicFieldValues + mapOf(
+                                                                            "__applied_coupon" to entered,
+                                                                            "__applied_discount_pct" to "0",
+                                                                            "__applied_discount_flat" to flat.toString()
+                                                                        )
+                                                                    }
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = goldPrimary),
+                                                                shape = RoundedCornerShape(10.dp)
+                                                            ) {
+                                                                Text("Apply", color = Color(0xFF1F1A0E), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                            }
+                                                        }
+                                                        if (activeCoupon.isNotBlank()) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text("✓ Applied Code: $activeCoupon", fontSize = 11.5.sp, color = Color(0xFF059669), fontWeight = FontWeight.SemiBold)
+                                                                TextButton(onClick = {
+                                                                    dynamicFieldValues = dynamicFieldValues - setOf("__applied_coupon", "__applied_discount_pct", "__applied_discount_flat")
+                                                                    couponInput = ""
+                                                                }) {
+                                                                    Text("Remove", fontSize = 11.sp, color = Color(0xFFEF4444))
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             else -> {
                                                 OutlinedTextField(
                                                     value = currentVal,
@@ -5013,7 +5181,7 @@ private fun AdvancedFieldSettingsEditor(
                 )
             }
         }
-        if (field.type in listOf(FormFieldType.QUANTITY, FormFieldType.CUSTOM_AMOUNT)) {
+        if (field.type == FormFieldType.QUANTITY) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = field.minValue?.toString().orEmpty(),
@@ -5029,6 +5197,154 @@ private fun AdvancedFieldSettingsEditor(
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
+            }
+        }
+        if (field.type == FormFieldType.CUSTOM_AMOUNT) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = BorderStroke(1.dp, goldPrimary.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("💰 Amount & Pre-Price Settings", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                            Text("Configure fixed payable pre-price or customer entered amount", fontSize = 11.sp, color = textSecondary)
+                        }
+                    }
+
+                    // Lock Fixed Price Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "🔒 Lock as Fixed Price (নির্ধারিত মূল্য)",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textPrimary
+                            )
+                            Text(
+                                if (field.isFixedPrice) "Customer cannot edit or alter this price. Charged as exact fixed amount."
+                                else "Customer can enter custom amount (guided by Min/Max limits).",
+                                fontSize = 11.sp,
+                                color = textSecondary
+                            )
+                        }
+                        Switch(
+                            checked = field.isFixedPrice,
+                            onCheckedChange = { locked ->
+                                val currentDef = if (field.defaultValue.isBlank()) "500.00" else field.defaultValue
+                                onUpdate(field.copy(
+                                    isFixedPrice = locked,
+                                    defaultValue = currentDef,
+                                    minValue = currentDef.toDoubleOrNull() ?: field.minValue ?: 1.0
+                                ))
+                            }
+                        )
+                    }
+
+                    // Fixed Price / Preset Amount Input
+                    OutlinedTextField(
+                        value = field.defaultValue,
+                        onValueChange = { newVal ->
+                            val clean = newVal.filter { it.isDigit() || it in ".-" }
+                            val num = clean.toDoubleOrNull()
+                            onUpdate(field.copy(
+                                defaultValue = clean,
+                                minValue = if (field.isFixedPrice) (num ?: field.minValue) else field.minValue
+                            ))
+                        },
+                        label = { Text(if (field.isFixedPrice) "Fixed Pre-Price (BDT / টাকা)" else "Preset Default Amount (BDT)") },
+                        leadingIcon = { Text("৳", fontWeight = FontWeight.Bold, color = goldPrimary, modifier = Modifier.padding(start = 12.dp)) },
+                        placeholder = { Text("e.g. 500.00") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    // Quick Preset Chips (৳100, ৳500, ৳1000, ৳2500, ৳5000)
+                    Text("Quick Price Presets:", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = textSecondary)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf("100.00", "500.00", "1000.00", "2500.00", "5000.00").forEach { preset ->
+                            val isSelected = field.defaultValue == preset
+                            Surface(
+                                onClick = {
+                                    val num = preset.toDoubleOrNull()
+                                    onUpdate(field.copy(
+                                        defaultValue = preset,
+                                        minValue = if (field.isFixedPrice) (num ?: field.minValue) else field.minValue
+                                    ))
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) goldPrimary.copy(alpha = 0.2f) else if (isDark) Color(0xFF262014) else Color(0xFFF1F5F9),
+                                border = BorderStroke(1.dp, if (isSelected) goldPrimary else cardBorder)
+                            ) {
+                                Text(
+                                    "৳${preset.substringBefore('.')}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) goldText else textPrimary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // If not locked, show Min/Max bounds
+                    if (!field.isFixedPrice) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = field.minValue?.toString().orEmpty(),
+                                onValueChange = { value -> onUpdate(field.copy(minValue = value.filter { it.isDigit() || it in ".-" }.toDoubleOrNull())) },
+                                label = { Text("Minimum Amount") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            OutlinedTextField(
+                                value = field.maxValue?.toString().orEmpty(),
+                                onValueChange = { value -> onUpdate(field.copy(maxValue = value.filter { it.isDigit() || it in ".-" }.toDoubleOrNull())) },
+                                label = { Text("Maximum Amount") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+                    }
+
+                    // Promo Code Communication Notice
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF3B82F6).copy(alpha = 0.1f),
+                        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🎟️", fontSize = 14.sp)
+                            Text(
+                                "Promo Code Compatible: Customer promo codes & coupons apply directly against this price, calculating percentage or flat discounts in real-time.",
+                                fontSize = 11.sp,
+                                color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8),
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
             }
         }
         if (field.type in listOf(FormFieldType.FILE_UPLOAD, FormFieldType.CAMERA_UPLOAD)) {
@@ -5188,6 +5504,13 @@ private fun FormSettingsTab(
     var minQuantityStr by remember(themeConfig.minQuantity) { mutableStateOf(themeConfig.minQuantity.toString()) }
     var maxQuantityStr by remember(themeConfig.maxQuantity) { mutableStateOf(themeConfig.maxQuantity.toString()) }
     var enableAntiSpam by remember(themeConfig.enableAntiSpam) { mutableStateOf(themeConfig.enableAntiSpam) }
+    // Browser Lockdown & Anti-Cheating state
+    var enableBrowserLockdown by remember(themeConfig.enableBrowserLockdown) { mutableStateOf(themeConfig.enableBrowserLockdown) }
+    var lockdownRequireFullscreen by remember(themeConfig.lockdownRequireFullscreen) { mutableStateOf(themeConfig.lockdownRequireFullscreen) }
+    var lockdownBlockTabSwitch by remember(themeConfig.lockdownBlockTabSwitch) { mutableStateOf(themeConfig.lockdownBlockTabSwitch) }
+    var lockdownMaxViolationsStr by remember(themeConfig.lockdownMaxViolations) { mutableStateOf(themeConfig.lockdownMaxViolations.toString()) }
+    var lockdownDisableCopyPaste by remember(themeConfig.lockdownDisableCopyPaste) { mutableStateOf(themeConfig.lockdownDisableCopyPaste) }
+    var lockdownWatermark by remember(themeConfig.lockdownWatermark) { mutableStateOf(themeConfig.lockdownWatermark) }
 
     var formWidth by remember(themeConfig.formWidthPx) { mutableFloatStateOf(themeConfig.formWidthPx.toFloat()) }
     var pageMargin by remember(themeConfig.pageMarginPx) { mutableFloatStateOf(themeConfig.pageMarginPx.toFloat()) }
@@ -6049,7 +6372,73 @@ private fun FormSettingsTab(
             }
         }
 
-        // 5. PAYMENT SETTINGS
+        // 5. BROWSER LOCKDOWN & ANTI-CHEATING (EXAM PROCTORING)
+        item {
+            SettingsCardSection(
+                title = "Browser Lockdown & Anti-Cheating (ব্রাউজার লকডাউন)",
+                icon = Icons.Outlined.Shield,
+                isDark = isDark
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Enforce strict exam integrity and prevent cheating during online assessments, quizzes, and surveys. Monitors browser focus, fullscreen mode, and disables unauthorized copying.",
+                        fontSize = 11.5.sp,
+                        color = textSecondary,
+                        lineHeight = 16.sp
+                    )
+
+                    SettingsToggleRow("Enable Browser Lockdown Mode", enableBrowserLockdown) {
+                        enableBrowserLockdown = it
+                        viewModel.updateFormThemeConfig(themeConfig.copy(enableBrowserLockdown = it))
+                    }
+
+                    if (enableBrowserLockdown) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = goldPrimary.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, goldPrimary.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SettingsToggleRow("Enforce Full-Screen on Start (ফুল-স্ক্রিন)", lockdownRequireFullscreen) {
+                                    lockdownRequireFullscreen = it
+                                    viewModel.updateFormThemeConfig(themeConfig.copy(lockdownRequireFullscreen = it))
+                                }
+                                SettingsToggleRow("Detect & Warn on Tab Switch (ট্যাব পরিবর্তন সনাক্তকরণ)", lockdownBlockTabSwitch) {
+                                    lockdownBlockTabSwitch = it
+                                    viewModel.updateFormThemeConfig(themeConfig.copy(lockdownBlockTabSwitch = it))
+                                }
+                                if (lockdownBlockTabSwitch) {
+                                    OutlinedTextField(
+                                        value = lockdownMaxViolationsStr,
+                                        onValueChange = {
+                                            lockdownMaxViolationsStr = it.filter(Char::isDigit).take(2)
+                                            val maxV = lockdownMaxViolationsStr.toIntOrNull()?.coerceIn(1, 20) ?: 3
+                                            viewModel.updateFormThemeConfig(themeConfig.copy(lockdownMaxViolations = maxV))
+                                        },
+                                        label = { Text("Max Allowed Tab Violations Before Lock") },
+                                        supportingText = { Text("Candidate is locked out after this many tab/app switches (Default: 3).") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true
+                                    )
+                                }
+                                SettingsToggleRow("Disable Copy, Cut, Paste & Right-Click", lockdownDisableCopyPaste) {
+                                    lockdownDisableCopyPaste = it
+                                    viewModel.updateFormThemeConfig(themeConfig.copy(lockdownDisableCopyPaste = it))
+                                }
+                                SettingsToggleRow("Show Anti-Leak Watermark on Screen", lockdownWatermark) {
+                                    lockdownWatermark = it
+                                    viewModel.updateFormThemeConfig(themeConfig.copy(lockdownWatermark = it))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. PAYMENT SETTINGS
         item {
             SettingsCardSection(
                 title = "Payment Integration",

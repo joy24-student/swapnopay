@@ -6069,6 +6069,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     pageIndex = field.optInt("page_index", 0),
                     helperText = field.optString("helper_text"),
                     defaultValue = field.optString("default_value"),
+                    isFixedPrice = field.optBoolean("is_fixed_price", false),
                     validationRegex = field.optString("validation_regex"),
                     minLength = field.optInt("min_length", 0),
                     maxLength = field.optInt("max_length", 0),
@@ -6327,6 +6328,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             currencyCode = themeJson.optString("currency", "BDT"),
             taxPercent = themeJson.optDouble("tax_percent", 0.0),
             requirePaymentBeforeSubmit = themeJson.optBoolean("require_payment_before_submit", true),
+            enableBrowserLockdown = themeJson.optBoolean("enable_browser_lockdown", false),
+            lockdownRequireFullscreen = themeJson.optBoolean("lockdown_require_fullscreen", true),
+            lockdownBlockTabSwitch = themeJson.optBoolean("lockdown_block_tab_switch", true),
+            lockdownMaxViolations = themeJson.optInt("lockdown_max_violations", 3),
+            lockdownDisableCopyPaste = themeJson.optBoolean("lockdown_disable_copy_paste", true),
+            lockdownWatermark = themeJson.optBoolean("lockdown_watermark", false),
             enableEmailNotifications = themeJson.optBoolean("email_notifications", false),
             notificationEmail = themeJson.optString("notification_email"),
             enableSmsNotifications = themeJson.optBoolean("sms_notifications", false),
@@ -6723,7 +6730,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         put("merchant_id", activeProfile.value.id.ifBlank { "00000000-0000-0000-0000-000000000001" })
         val effectiveAmount = form.products.firstOrNull()?.let { if (it.salePrice > 0.0) it.salePrice else it.price }
             ?: form.fields.find { it.type == FormFieldType.PRODUCT || it.type == FormFieldType.PRODUCT_LIST }?.let { it.minValue ?: it.defaultValue.toDoubleOrNull() ?: 0.0 }
-            ?: form.fields.find { it.type == FormFieldType.CUSTOM_AMOUNT }?.minValue
+            ?: form.fields.find { it.type == FormFieldType.CUSTOM_AMOUNT }?.let { it.defaultValue.toDoubleOrNull() ?: it.minValue }
             ?: 0.0
         put("amount", effectiveAmount)
         put("title", form.title)
@@ -6746,6 +6753,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     put("page_index", field.pageIndex)
                     put("helper_text", field.helperText)
                     put("default_value", field.defaultValue)
+                    put("is_fixed_price", field.isFixedPrice)
                     put("validation_regex", field.validationRegex)
                     put("min_length", field.minLength)
                     put("max_length", field.maxLength)
@@ -6941,6 +6949,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             put("currency", theme.currencyCode)
             put("tax_percent", theme.taxPercent)
             put("require_payment_before_submit", theme.requirePaymentBeforeSubmit)
+            put("enable_browser_lockdown", theme.enableBrowserLockdown)
+            put("lockdown_require_fullscreen", theme.lockdownRequireFullscreen)
+            put("lockdown_block_tab_switch", theme.lockdownBlockTabSwitch)
+            put("lockdown_max_violations", theme.lockdownMaxViolations)
+            put("lockdown_disable_copy_paste", theme.lockdownDisableCopyPaste)
+            put("lockdown_watermark", theme.lockdownWatermark)
             put("email_notifications", theme.enableEmailNotifications)
             put("notification_email", theme.notificationEmail)
             put("sms_notifications", theme.enableSmsNotifications)
@@ -7289,6 +7303,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             placeholder = placeholder ?: if (type == FormFieldType.COUPON) "Enter promo code (e.g. SAVE10)" else "Enter ${type.displayName.lowercase()}",
             options = defaultOptions,
             isRequired = type in setOf(FormFieldType.PHONE, FormFieldType.CUSTOM_AMOUNT, FormFieldType.QUANTITY),
+            defaultValue = when (type) {
+                FormFieldType.CUSTOM_AMOUNT -> "500.00"
+                else -> ""
+            },
+            isFixedPrice = type == FormFieldType.CUSTOM_AMOUNT,
             minValue = when (type) {
                 FormFieldType.CUSTOM_AMOUNT, FormFieldType.QUANTITY -> 1.0
                 else -> null
@@ -9680,6 +9699,8 @@ function executePayment() {
             mediaUrl = defaultMediaUrl,
             mediaAltText = "Banner Image",
             mediaHeightDp = 180,
+            defaultValue = if (type == FormFieldType.CUSTOM_AMOUNT) "500.00" else "",
+            isFixedPrice = type == FormFieldType.CUSTOM_AMOUNT,
             minValue = when (type) {
                 FormFieldType.CUSTOM_AMOUNT, FormFieldType.QUANTITY -> 1.0
                 else -> null
@@ -9936,9 +9957,10 @@ function executePayment() {
                 theme.enablePayment &&
                 formProductsList.value.isEmpty() &&
                 field.type == FormFieldType.CUSTOM_AMOUNT &&
-                (field.minValue == null || field.minValue!! <= 0.0)
+                (field.minValue == null || field.minValue!! <= 0.0) &&
+                (field.defaultValue.toDoubleOrNull() == null || field.defaultValue.toDoubleOrNull()!! <= 0.0)
             ) {
-                publishErrors["field_amount_${field.id}"] = "$fieldKey needs a positive minimum amount for hosted checkout."
+                publishErrors["field_amount_${field.id}"] = "$fieldKey needs a positive fixed price or minimum amount for hosted checkout."
             }
             if (field.type in listOf(FormFieldType.FILE_UPLOAD, FormFieldType.CAMERA_UPLOAD) && field.allowedFileExtensions.isEmpty()) {
                 publishErrors["field_files_${field.id}"] = "$fieldKey needs at least one allowed file extension."
@@ -18466,6 +18488,13 @@ data class FormThemeConfig(
     var currencyCode: String = "BDT",
     var taxPercent: Double = 0.0,
     var requirePaymentBeforeSubmit: Boolean = true,
+    // Anti-Cheating & Browser Lockdown Configuration
+    var enableBrowserLockdown: Boolean = false,
+    var lockdownRequireFullscreen: Boolean = true,
+    var lockdownBlockTabSwitch: Boolean = true,
+    var lockdownMaxViolations: Int = 3,
+    var lockdownDisableCopyPaste: Boolean = true,
+    var lockdownWatermark: Boolean = false,
     // Custom variables defined per-form for substitution in hosted HTML/CSS
     var customVariables: List<CustomVariable> = emptyList(),
     // Flagship & Single Product Showcase Configurations
@@ -18738,6 +18767,7 @@ data class FormFieldItem(
     var stepIndex: Int = 0,
     var isCollapsed: Boolean = false,
     var defaultValue: String = "",
+    var isFixedPrice: Boolean = false,
     var dependsOnFieldId: String? = null,
     var conditionOperator: String = "EQUALS", // EQUALS, NOT_EQUALS, CONTAINS
     var conditionValue: String = "",

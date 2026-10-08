@@ -747,12 +747,167 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Amount & Fixed Pre-Price Component */
+    .amount-field-container {
+      margin-top: 4px;
+    }
+    .fixed-price-banner {
+      background: var(--card-bg, #f8fafc);
+      border: 1.5px solid var(--primary, #3b82f6);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .amount-promo-indicator {
+      margin-top: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #ecfdf5;
+      border: 1.5px solid #10b981;
+      font-size: 12.5px;
+      color: #065f46;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* Browser Lockdown & Anti-Cheating Mode */
+    .lockdown-active-banner {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #f8fafc;
+      border: 1.5px solid #dc2626;
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+    }
+    .lockdown-shield-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #dc2626;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .lockdown-badge-pill {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fca5a5;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .lockdown-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #f8fafc;
+      text-align: center;
+    }
+    .lockdown-modal-card {
+      background: #1e293b;
+      border: 2px solid #dc2626;
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+    }
+    .lockdown-btn-primary {
+      background: #dc2626;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s;
+    }
+    .lockdown-btn-primary:hover {
+      background: #b91c1c;
+    }
+    .lockdown-watermark {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.045;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(6, 1fr);
+      transform: rotate(-25deg) scale(1.2);
+      user-select: none;
+      font-size: 14px;
+      font-weight: 800;
+      color: #000;
+      overflow: hidden;
+    }
+    .lockdown-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #dc2626;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      z-index: 1000000;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    body.lockdown-anti-copy {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    body.lockdown-anti-copy input, body.lockdown-anti-copy textarea {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
   </style>
   <style id="custom-user-css"></style>
 </head>
 <body>
 
   <div class="form-container" id="form-wrap">
+    <!-- Browser Lockdown Banner -->
+    <div id="lockdown-banner-holder"></div>
+
     <!-- Optional Cover Banner -->
     <div id="banner-holder"></div>
 
@@ -1019,6 +1174,24 @@
           <button type="button" class="coupon-apply-btn" id="coupon-btn-${targetFieldId || 'apply'}" onclick="applyPromoCode(null, '${targetFieldId || ''}')">Apply</button>
         `;
       }
+    }
+
+    function updateAmountPromoIndicators(applied, discount, total) {
+      document.querySelectorAll('.amount-promo-indicator').forEach(el => {
+        if (applied && discount > 0) {
+          el.style.display = 'flex';
+          el.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span>🏷️</span>
+              <span>Promo <strong>${applied.code}</strong> Applied: <strong>-BDT ${discount.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong></span>
+            </div>
+            <div style="font-weight:700;color:#047857;">Payable: BDT ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+          `;
+        } else {
+          el.style.display = 'none';
+          el.innerHTML = '';
+        }
+      });
     }
 
     const fallbackProductSvg = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%221.5%22%3E%3Crect x=%223%22 y=%223%22 width=%2218%22 height=%2218%22 rx=%223%22/%3E%3Ccircle cx=%228.5%22 cy=%228.5%22 r=%221.5%22/%3E%3Cpath d=%22M21 15l-5-5L5 21%22/%3E%3C/svg%3E";
@@ -1402,6 +1575,308 @@
       });
     }
 
+    // --- BROWSER LOCKDOWN & ANTI-CHEATING PROCTORING ENGINE ---
+    let lockdownViolationsCount = 0;
+    let maxLockdownViolations = 3;
+    let isLockdownActive = false;
+    let isFormSubmitted = false;
+    let lastViolationTime = 0;
+    const lockdownLogs = [];
+
+    function setupBrowserLockdown(config, theme) {
+      maxLockdownViolations = Number(theme.lockdown_max_violations || theme.lockdownMaxViolations || 3);
+      const requireFullscreen = theme.lockdown_require_fullscreen !== false && theme.lockdownRequireFullscreen !== false;
+      const blockTabSwitch = theme.lockdown_block_tab_switch !== false && theme.lockdownBlockTabSwitch !== false;
+      const disableCopyPaste = theme.lockdown_disable_copy_paste !== false && theme.lockdownDisableCopyPaste !== false;
+      const enableWatermark = Boolean(theme.lockdown_watermark || theme.lockdownWatermark);
+
+      // Render top status banner
+      const bannerHolder = document.getElementById("lockdown-banner-holder");
+      if (bannerHolder) {
+        bannerHolder.innerHTML = `
+          <div class="lockdown-active-banner" id="lockdown-status-bar">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="lockdown-shield-icon">🛡️</span>
+              <div>
+                <div style="font-weight:700; font-size:13.5px; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
+                  <span>Browser Lockdown Proctored Mode Active</span>
+                  <span style="font-size:11px; background:#DC2626; color:#fff; padding:1px 6px; border-radius:4px; font-weight:700;">SECURE</span>
+                </div>
+                <div style="font-size:11.5px; color:#94A3B8;">Full-screen enforcement • Anti-cheating tab monitoring enabled</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="lockdown-badge-pill" id="lockdown-violation-badge">Violations: 0 / ${maxLockdownViolations}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      // Security Watermark if enabled
+      if (enableWatermark) {
+        const watermarkEl = document.createElement("div");
+        watermarkEl.className = "lockdown-watermark";
+        const wmText = `${config.title || 'EXAM'} • ${config.slug || 'SESSION'} • ${new Date().toISOString().substring(0, 10)}`;
+        for (let i = 0; i < 24; i++) {
+          const item = document.createElement("div");
+          item.innerText = wmText;
+          watermarkEl.appendChild(item);
+        }
+        document.body.appendChild(watermarkEl);
+      }
+
+      // Copy & Paste / DevTools Lockdown
+      if (disableCopyPaste) {
+        document.body.classList.add("lockdown-anti-copy");
+
+        document.addEventListener("contextmenu", e => {
+          e.preventDefault();
+          showLockdownToast("🚫 Right-click context menu is disabled in Lockdown Mode.");
+        });
+
+        document.addEventListener("copy", e => {
+          e.preventDefault();
+          showLockdownToast("🚫 Copying content is disabled to prevent cheating.");
+        });
+
+        document.addEventListener("cut", e => {
+          e.preventDefault();
+          showLockdownToast("🚫 Cutting content is disabled in Lockdown Mode.");
+        });
+
+        document.addEventListener("paste", e => {
+          const target = e.target;
+          if (target && target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+            e.preventDefault();
+            showLockdownToast("🚫 Pasting is disabled in Lockdown Mode.");
+          }
+        });
+
+        document.addEventListener("keydown", e => {
+          const key = e.key;
+          const isDevTools = key === "F12" ||
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === "I" || key === "i" || key === "J" || key === "j" || key === "C" || key === "c")) ||
+            ((e.ctrlKey || e.metaKey) && (key === "u" || key === "U")) ||
+            ((e.ctrlKey || e.metaKey) && (key === "s" || key === "S")) ||
+            ((e.ctrlKey || e.metaKey) && (key === "p" || key === "P"));
+
+          if (isDevTools) {
+            e.preventDefault();
+            e.stopPropagation();
+            showLockdownToast("🚫 Shortcut blocked in Lockdown Mode.");
+            if (isLockdownActive && !isFormSubmitted) {
+              recordLockdownViolation("DevTools / Inspection shortcut attempted");
+            }
+          }
+        });
+      }
+
+      // Full-screen change listener
+      if (requireFullscreen) {
+        const onFullscreenChange = () => {
+          const inFullscreen = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+          if (!inFullscreen && isLockdownActive && !isFormSubmitted) {
+            recordLockdownViolation("Exited full-screen mode");
+            showFullscreenPromptOverlay();
+          } else if (inFullscreen) {
+            const fsPrompt = document.getElementById("lockdown-fs-prompt-overlay");
+            if (fsPrompt) fsPrompt.remove();
+          }
+        };
+        document.addEventListener("fullscreenchange", onFullscreenChange);
+        document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+      }
+
+      // Tab Switch / Visibility Change listener
+      if (blockTabSwitch) {
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "hidden" && isLockdownActive && !isFormSubmitted) {
+            recordLockdownViolation("Tab switch or browser minimized");
+          }
+        });
+
+        window.addEventListener("blur", () => {
+          if (isLockdownActive && !isFormSubmitted) {
+            recordLockdownViolation("Window lost focus / switched application");
+          }
+        });
+      }
+
+      // Show initial Welcome / Pre-flight Proctored Screen
+      showLockdownStartModal(config, requireFullscreen);
+    }
+
+    function showLockdownStartModal(config, requireFullscreen) {
+      const modal = document.createElement("div");
+      modal.className = "lockdown-overlay";
+      modal.id = "lockdown-welcome-modal";
+      modal.innerHTML = `
+        <div class="lockdown-modal-card">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:#DC2626; color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px;">🛡️</div>
+            <div>
+              <div style="font-size:17px; font-weight:800; color:#F8FAFC;">Browser Lockdown Mode</div>
+              <div style="font-size:12.5px; color:#94A3B8;">Anti-Cheating Proctoring Enabled</div>
+            </div>
+          </div>
+          <div style="font-size:13px; color:#CBD5E1; line-height:1.6; display:flex; flex-direction:column; gap:8px;">
+            <div>This session requires strict proctored browser lockdown to ensure academic and assessment fairness:</div>
+            <div style="background:#0F172A; border:1px solid #334155; border-radius:10px; padding:12px; font-size:12px; display:flex; flex-direction:column; gap:6px;">
+              <div>🖥️ <strong>Full-Screen Required:</strong> Exiting full screen is logged as a violation.</div>
+              <div>🚨 <strong>Tab Switching Monitored:</strong> Navigating away from this tab will be detected.</div>
+              <div>🚫 <strong>Clipboard Locked:</strong> Copy, paste, and inspect tools are disabled.</div>
+              <div>⚠️ <strong>Limit:</strong> Maximum <strong>${maxLockdownViolations} violations</strong> before session lockout.</div>
+            </div>
+          </div>
+          <button type="button" class="lockdown-btn-primary" id="start-lockdown-btn">
+            I Agree • Enter Fullscreen & Begin
+          </button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      document.getElementById("start-lockdown-btn").addEventListener("click", () => {
+        isLockdownActive = true;
+        if (requireFullscreen) {
+          const docEl = document.documentElement;
+          if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+          else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+        }
+        modal.remove();
+      });
+    }
+
+    function showFullscreenPromptOverlay() {
+      if (document.getElementById("lockdown-fs-prompt-overlay")) return;
+      const overlay = document.createElement("div");
+      overlay.className = "lockdown-overlay";
+      overlay.id = "lockdown-fs-prompt-overlay";
+      overlay.innerHTML = `
+        <div class="lockdown-modal-card" style="border-color:#F59E0B;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:#F59E0B; color:#000; display:flex; align-items:center; justify-content:center; font-size:22px;">⚠️</div>
+            <div>
+              <div style="font-size:17px; font-weight:800; color:#F8FAFC;">Fullscreen Exited!</div>
+              <div style="font-size:12px; color:#FCD34D;">Action Logged as Security Violation</div>
+            </div>
+          </div>
+          <div style="font-size:13px; color:#CBD5E1; line-height:1.6;">
+            You have exited full-screen view. You must remain in full-screen for the duration of this proctored submission.
+          </div>
+          <button type="button" class="lockdown-btn-primary" style="background:#F59E0B; color:#000;" id="restore-fs-btn">
+            Restore Fullscreen & Continue
+          </button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      document.getElementById("restore-fs-btn").addEventListener("click", () => {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+        overlay.remove();
+      });
+    }
+
+    function recordLockdownViolation(reason) {
+      if (!isLockdownActive || isFormSubmitted) return;
+      const now = Date.now();
+      if (now - lastViolationTime < 1500) return;
+      lastViolationTime = now;
+
+      lockdownViolationsCount++;
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        reason: reason,
+        violation_number: lockdownViolationsCount
+      };
+      lockdownLogs.push(logEntry);
+
+      const badge = document.getElementById("lockdown-violation-badge");
+      if (badge) {
+        badge.innerText = `Violations: ${lockdownViolationsCount} / ${maxLockdownViolations}`;
+        badge.style.background = lockdownViolationsCount >= maxLockdownViolations ? '#DC2626' : '#FEE2E2';
+        badge.style.color = lockdownViolationsCount >= maxLockdownViolations ? '#fff' : '#DC2626';
+      }
+
+      if (lockdownViolationsCount >= maxLockdownViolations) {
+        showLockoutScreen();
+      } else {
+        showViolationWarningAlert(reason);
+      }
+    }
+
+    function showViolationWarningAlert(reason) {
+      if (document.getElementById("lockdown-violation-alert")) return;
+      const alertModal = document.createElement("div");
+      alertModal.className = "lockdown-overlay";
+      alertModal.id = "lockdown-violation-alert";
+      alertModal.innerHTML = `
+        <div class="lockdown-modal-card" style="border-color:#DC2626;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:#DC2626; color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px;">🚨</div>
+            <div>
+              <div style="font-size:16px; font-weight:800; color:#F8FAFC;">Security Alert: Tab Switch Detected!</div>
+              <div style="font-size:12px; color:#FCA5A5;">Violation ${lockdownViolationsCount} of ${maxLockdownViolations} Recorded</div>
+            </div>
+          </div>
+          <div style="font-size:13px; color:#CBD5E1; line-height:1.6;">
+            Reason: <strong>${reason}</strong><br><br>
+            Navigating away from this page or switching applications is prohibited. Further violations will result in automatic lockout and disqualification.
+          </div>
+          <button type="button" class="lockdown-btn-primary" id="dismiss-violation-btn">
+            I Understand • Return to Form
+          </button>
+        </div>
+      `;
+      document.body.appendChild(alertModal);
+
+      document.getElementById("dismiss-violation-btn").addEventListener("click", () => {
+        alertModal.remove();
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      });
+    }
+
+    function showLockoutScreen() {
+      document.querySelectorAll(".lockdown-overlay").forEach(el => el.remove());
+      const lockoutEl = document.createElement("div");
+      lockoutEl.className = "lockdown-overlay";
+      lockoutEl.id = "lockdown-final-lockout";
+      lockoutEl.innerHTML = `
+        <div class="lockdown-modal-card" style="border-color:#DC2626; text-align:center; align-items:center;">
+          <div style="width:54px; height:54px; border-radius:14px; background:#DC2626; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px;">⛔</div>
+          <div style="font-size:20px; font-weight:800; color:#F8FAFC;">Form Locked: Violations Exceeded</div>
+          <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
+            You have exceeded the maximum allowed security violations (${maxLockdownViolations} violations recorded).
+            Access to this session has been locked to prevent cheating. Your violation log has been stored for proctor audit.
+          </div>
+          <div style="font-size:11.5px; color:#EF4444; background:#450A0A; padding:8px 14px; border-radius:8px; border:1px solid #7F1D1D;">
+            Audit Log: ${lockdownLogs.length} incident(s) recorded
+          </div>
+        </div>
+      `;
+      document.body.appendChild(lockoutEl);
+
+      const subBtn = document.getElementById("submit-btn");
+      if (subBtn) {
+        subBtn.disabled = true;
+        subBtn.innerText = "Locked: Security Violations Exceeded";
+      }
+    }
+
+    function showLockdownToast(msg) {
+      const existing = document.getElementById("lockdown-active-toast");
+      if (existing) existing.remove();
+      const toast = document.createElement("div");
+      toast.className = "lockdown-toast";
+      toast.id = "lockdown-active-toast";
+      toast.innerHTML = `<span>🛡️</span><span>${msg}</span>`;
+      document.body.appendChild(toast);
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 2500);
+    }
+
     function renderConfiguredFields(config) {
       const theme = (config.theme && typeof config.theme === 'object') ? config.theme : {};
 
@@ -1586,6 +2061,11 @@
 
         // Auto-select first active method
         selectedMethod = methodsToRender[0];
+      }
+
+      // Browser Lockdown & Anti-Cheating Proctoring Engine
+      if (theme.enable_browser_lockdown === true || theme.enableBrowserLockdown === true) {
+        setupBrowserLockdown(config, theme);
       }
 
       const container = document.getElementById("fields-container");
@@ -1918,7 +2398,48 @@
           } else if (fType === "EMAIL") {
             group.innerHTML += `<input type="email" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || 'name@example.com'}" />`;
           } else if (fType === "CUSTOM_AMOUNT") {
-            group.innerHTML += `<input type="number" step="0.01" class="input-text" data-field-id="${f.id}" id="custom-amount-input" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '0.00'}" oninput="recalculateTotalAmount()" />`;
+            const isFixed = Boolean(f.is_fixed_price || f.isFixedPrice);
+            const rawPrePrice = (f.default_value !== undefined && f.default_value !== null && f.default_value !== '') 
+              ? f.default_value 
+              : ((f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') 
+                ? f.defaultValue 
+                : (f.value || f.min_value || f.minValue || ''));
+            let formattedPrePrice = '';
+            let numericVal = 0;
+            if (rawPrePrice !== '' && rawPrePrice !== null && rawPrePrice !== undefined) {
+              const parsed = parseFloat(String(rawPrePrice).replace(/[^0-9.]/g, ''));
+              if (!isNaN(parsed) && parsed > 0) {
+                numericVal = parsed;
+                formattedPrePrice = parsed.toFixed(2);
+              }
+            }
+
+            if (isFixed && numericVal > 0) {
+              group.innerHTML += `
+                <div class="amount-field-container">
+                  <div class="fixed-price-banner">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span class="fixed-price-badge">🔒 FIXED PRE-PRICE</span>
+                      <span style="font-size:12.5px;color:var(--text-light);font-weight:500;">নির্ধারিত মূল্য</span>
+                    </div>
+                    <div class="fixed-price-amount">৳ ${Number(formattedPrePrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <input type="hidden" data-field-id="${f.id}" id="custom-amount-input" value="${formattedPrePrice}" data-is-fixed="true" />
+                  <div id="amount-promo-indicator-${f.id}" class="amount-promo-indicator" style="display:none;"></div>
+                </div>
+              `;
+            } else {
+              group.innerHTML += `
+                <div class="amount-field-container">
+                  <input type="number" step="0.01" class="input-text" data-field-id="${f.id}" id="custom-amount-input" 
+                    ${f.required || f.isRequired ? 'required' : ''} 
+                    value="${formattedPrePrice || ''}"
+                    placeholder="${f.placeholder || '0.00'}" 
+                    oninput="recalculateTotalAmount()" />
+                  <div id="amount-promo-indicator-${f.id}" class="amount-promo-indicator" style="display:none;"></div>
+                </div>
+              `;
+            }
           } else if (fType === "QUANTITY") {
             group.innerHTML += `<input type="number" step="1" min="1" data-field-type="QUANTITY" class="input-text" data-field-id="${f.id}" ${f.required || f.isRequired ? 'required' : ''} placeholder="${f.placeholder || '1'}" value="1" oninput="recalculateTotalAmount()" />`;
           } else if (fType === "DONATION" || fType === "DONATION_TIER") {
@@ -2221,6 +2742,9 @@
         if (btnText) btnText.innerText = "Submit Response";
       }
 
+      // Synchronize amount fields with promo code status
+      updateAmountPromoIndicators(appliedCoupon, discount, total);
+
       return total;
     }
 
@@ -2321,6 +2845,12 @@
         return;
       }
 
+      if (isLockdownActive && lockdownViolationsCount >= maxLockdownViolations) {
+        alert(`Session is locked due to exceeding security violations (${lockdownViolationsCount}/${maxLockdownViolations}). Submission blocked.`);
+        return;
+      }
+      isFormSubmitted = true;
+
       const submitBtn = document.getElementById("submit-btn");
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<div class="loading-spinner"></div>`;
@@ -2404,6 +2934,10 @@
           answersMap['coupon_code'] = appliedCoupon.code;
           answersMap['discount_amount'] = appliedDiscount;
         }
+        if (isLockdownActive) {
+          answersMap['lockdown_violations'] = lockdownViolationsCount;
+          answersMap['lockdown_logs'] = lockdownLogs;
+        }
         const submitPayload = {
           customer_name: cusName,
           customer_phone: cusPhone,
@@ -2418,6 +2952,8 @@
           selected_products: selectedProductsList,
           payment_method: selectedMethod,
           answers: answersMap,
+          lockdown_violations: lockdownViolationsCount,
+          lockdown_logs: lockdownLogs,
           _hp_check: hp,
           request_id: requestId
         };

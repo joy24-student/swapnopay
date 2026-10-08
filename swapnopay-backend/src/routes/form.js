@@ -1301,9 +1301,17 @@ export function formRouter(io = null) {
               } else if (f.minValue && Number(f.minValue) > 0 && calculatedAmount === 0) {
                 calculatedAmount += Number(f.minValue)
               }
-            } else if (fType === 'CUSTOM_AMOUNT' && ansVal) {
-              const custVal = parseFloat(ansVal)
-              if (!isNaN(custVal) && custVal > 0) calculatedAmount += custVal
+            } else if (fType === 'CUSTOM_AMOUNT') {
+              const isFixed = Boolean(f.is_fixed_price || f.isFixedPrice)
+              const fixedPrePrice = parseFloat(f.default_value || f.defaultValue || f.value || f.min_value || f.minValue || 0)
+              if (isFixed && fixedPrePrice > 0) {
+                calculatedAmount += fixedPrePrice
+              } else if (ansVal) {
+                const custVal = parseFloat(ansVal)
+                if (!isNaN(custVal) && custVal > 0) calculatedAmount += custVal
+              } else if (fixedPrePrice > 0) {
+                calculatedAmount += fixedPrePrice
+              }
             } else if (fType === 'DONATION' && ansVal) {
               const donationAmt = parseAmountFromText(ansVal)
               if (donationAmt > 0) calculatedAmount += donationAmt
@@ -1427,6 +1435,15 @@ export function formRouter(io = null) {
       const clientPhone = customer_phone || answers['phone'] || answers['mobile'] || 'N/A'
       const clientEmail = customer_email || answers['email'] || ''
 
+      // Capture browser lockdown and anti-cheating audit records
+      const lockdownViolations = Number(req.body.lockdown_violations || answers['lockdown_violations'] || 0)
+      const lockdownLogs = req.body.lockdown_logs || answers['lockdown_logs'] || []
+      if (lockdownViolations > 0 || (Array.isArray(lockdownLogs) && lockdownLogs.length > 0)) {
+        answers['lockdown_violations'] = lockdownViolations
+        answers['lockdown_logs'] = lockdownLogs
+        answers['flagged_cheating'] = lockdownViolations >= Number(theme.lockdown_max_violations || theme.lockdownMaxViolations || 3)
+      }
+
       const submissionRecord = {
         id: submissionUuid,
         submission_id: submissionId,
@@ -1442,6 +1459,8 @@ export function formRouter(io = null) {
         payment_required: paymentRequired,
         payment_method: payment_method || (paymentRequired ? 'bKash' : 'Free'),
         payment_status: paymentRequired ? 'PENDING' : 'FREE',
+        lockdown_violations: lockdownViolations,
+        lockdown_logs: lockdownLogs,
         order_id: orderUuid,
         tran_id: tranId,
         created_at: new Date().toISOString()
