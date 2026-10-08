@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "100000000000",
+    "project_id": "swapnopay-fcm",
+    "storage_bucket": "swapnopay-fcm.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100000000000:android:abirluxeshopbd0558",
+        "android_client_info": {
+          "package_name": "com.abirluxe.shop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbirLuxeStoreKeyFCMNotificationService"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100000000000:android:abirluxeshopbddebug",
+        "android_client_info": {
+          "package_name": "com.abirluxe.shop.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbirLuxeStoreKeyFCMNotificationService"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Abir Luxe Shop BD</string>
+    <string name="store_url">https://shop.swapnopay.top/abir-luxe-shop-bd-0558/</string>
+    <string name="app_tagline">Exclusive Luxury Shopping Experience</string>
+    
+    <!-- Push Notification Channels -->
+    <string name="channel_alerts_name">Abir Luxe Store Alerts &amp; Deals</string>
+    <string name="channel_alerts_desc">Notifications about exclusive luxury collections, flash sales, and order status.</string>
+    <string name="channel_calls_name">Abir Luxe Direct Store Calls</string>
+    <string name="channel_calls_desc">Instant incoming voice calls and consultation notifications from Abir Luxe Shop.</string>
+    
+    <!-- Offline Animated Screen -->
+    <string name="offline_title">No Internet Connection</string>
+    <string name="offline_subtitle">Unable to reach Abir Luxe Shop. Please check your mobile data or Wi-Fi network.</string>
+    <string name="btn_retry">Retry Connection</string>
+    <string name="checking_connection">Connecting to Abir Luxe…</string>
+    
+    <!-- Incoming Call Screen -->
+    <string name="incoming_call_title">Abir Luxe Shop BD</string>
+    <string name="incoming_call_subtitle">VIP Customer Service &amp; Order Calling…</string>
+    <string name="call_answer">Answer</string>
+    <string name="call_decline">Decline</string>
+    
+    <!-- Dialog & Errors -->
+    <string name="file_chooser_title">Choose File or Take Photo</string>
+    <string name="permission_notification_rationale">Abir Luxe Shop needs notification permission to send instant order alerts and store calls.</string>
+</resources>

@@ -680,6 +680,7 @@ function renderTrendBadge($growth) {
                                     <option value="broadcast" selected>📢 General Broadcast / Notice</option>
                                     <option value="promo">⚡ Flash Deal & Promotion</option>
                                     <option value="order">📦 Order & Shipping Alert</option>
+                                    <option value="call">📞 Instant Store Call (Rings Phone Full-Screen Even Locked)</option>
                                     <option value="system">🛡️ System & Security Notice</option>
                                 </select>
                             </div>

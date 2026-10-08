@@ -189,6 +189,7 @@ $notificationList = $stmtList->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                             <option value="broadcast" selected>📢 Store Announcement / Notice</option>
                                             <option value="promo">⚡ Flash Deal & Discount Offer</option>
                                             <option value="order">📦 Order Tracking & Fulfillment</option>
+                                            <option value="call">📞 Instant Store Call (Rings Phone Full-Screen Even Locked)</option>
                                             <option value="system">🛡️ Security & System Alert</option>
                                         </select>
                                     </div>
