@@ -2566,8 +2566,13 @@ body {
                         <div class="sn-hero-slider-track" id="snHeroSliderTrack">
                             <?php foreach ($heroSlides as $i => $slide): 
                                 $slideImg = $slide['photo'];
-                                if (!str_starts_with($slideImg, 'http')) {
-                                    $slideImg = BASE_URL . 'assets/uploads/' . $slideImg;
+                                if (!str_starts_with($slideImg, 'http') && !str_starts_with($slideImg, '//')) {
+                                    $cleanSlide = ltrim($slideImg, '/');
+                                    if (str_starts_with($cleanSlide, 'assets/')) {
+                                        $slideImg = BASE_URL . $cleanSlide;
+                                    } else {
+                                        $slideImg = BASE_URL . 'assets/uploads/' . $cleanSlide;
+                                    }
                                 }
                             ?>
                                 <div class="sn-hero-slide <?php if ($i === 0) echo 'active'; ?>" data-slide-index="<?php echo $i; ?>">

@@ -45,8 +45,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
 
-    // Never interfere with non-GET requests (e.g., checkout POST, cart mutations)
-    if (request.method !== 'GET') {
+    // Never interfere with non-GET requests (e.g., checkout POST, cart mutations) or unsupported schemes (chrome-extension, moz-extension, blob, data, etc.)
+    if (request.method !== 'GET' || (!request.url.startsWith('http://') && !request.url.startsWith('https://'))) {
         return;
     }
 
@@ -118,8 +118,8 @@ self.addEventListener('fetch', (event) => {
                     if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                         const responseToCache = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseToCache);
-                        });
+                            cache.put(request, responseToCache).catch(() => {});
+                        }).catch(() => {});
                     }
                     return networkResponse;
                 }).catch(() => cachedResponse);

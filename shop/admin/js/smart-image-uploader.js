@@ -178,6 +178,24 @@
             return;
         }
 
+        // For multiple file inputs (like hero_slider_photos[]), never truncate files!
+        if (input.multiple) {
+            var container = getOrCreatePreviewContainer(input);
+            var totalSize = 0;
+            for (var fi = 0; fi < input.files.length; fi++) {
+                totalSize += input.files[fi].size;
+            }
+            container.innerHTML = '' +
+                '<div style="width:36px; height:36px; border-radius:6px; background:#EFF6FF; display:flex; align-items:center; justify-content:center; color:#2563EB; flex-shrink:0;">' +
+                    '<i class="fa fa-images" style="font-size:16px;"></i>' +
+                '</div>' +
+                '<div style="flex:1; line-height:1.3;">' +
+                    '<div style="font-weight:700; color:#1E40AF;"><i class="fa fa-check-circle"></i> ' + input.files.length + ' photo(s) selected</div>' +
+                    '<div style="color:#64748B; font-size:11px;">Total size: ' + formatBytes(totalSize) + ' &bull; Ready for upload</div>' +
+                '</div>';
+            return;
+        }
+
         var file = input.files[0];
         if (!isImageFile(file)) {
             removePreviewContainer(input);
@@ -264,11 +282,23 @@
         var hasFileInput = form.querySelector('input[type="file"]');
         if (!hasFileInput) return;
 
+        var submitter = e.submitter || (document.activeElement && (document.activeElement.type === 'submit' || document.activeElement.tagName === 'BUTTON') ? document.activeElement : null);
+        var submitBtn = submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+
+        // Always ensure the clicked button name/value is preserved in POST
+        if (submitter && submitter.name && !form.querySelector('input[type="hidden"][name="' + submitter.name + '"]')) {
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = submitter.name;
+            hidden.value = submitter.value || '1';
+            hidden.setAttribute('data-smart-submitter', '1');
+            form.appendChild(hidden);
+        }
+
         if (activeCompressions > 0) {
             e.preventDefault();
             e.stopPropagation();
 
-            var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
             var origBtnText = submitBtn ? submitBtn.innerHTML || submitBtn.value : '';
             if (submitBtn) {
                 submitBtn.disabled = true;
@@ -283,7 +313,13 @@
                     if (submitBtn.tagName === 'BUTTON') submitBtn.innerHTML = origBtnText;
                 }
                 // Trigger form submission now that images are optimized
-                if (typeof form.requestSubmit === 'function') {
+                if (submitter && typeof form.requestSubmit === 'function') {
+                    try {
+                        form.requestSubmit(submitter);
+                    } catch (err) {
+                        form.submit();
+                    }
+                } else if (typeof form.requestSubmit === 'function') {
                     form.requestSubmit();
                 } else {
                     form.submit();
@@ -293,7 +329,6 @@
         }
 
         // Lock submit button to prevent double-click / multiple POSTs
-        var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
         if (submitBtn && !submitBtn.disabled) {
             setTimeout(function () {
                 submitBtn.disabled = true;
@@ -302,7 +337,7 @@
                 } else {
                     submitBtn.value = 'Uploading & Saving...';
                 }
-            }, 10);
+            }, 50);
         }
     }, false);
 

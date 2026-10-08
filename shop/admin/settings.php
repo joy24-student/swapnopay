@@ -769,6 +769,11 @@ if(isset($_POST['form_home_features'])) {
     $promo2_image = $currSettings['promo_banner2_image'] ?? '';
     $payday_image = $currSettings['payday_image'] ?? 'assets/uploads/payday_cart_transparent.png';
 
+    $uploadsDir = dirname(__DIR__) . '/assets/uploads';
+    if (!is_dir($uploadsDir)) {
+        @mkdir($uploadsDir, 0777, true);
+    }
+
     // Promo Banner 1 Upload & Local Fallback
     if (!empty($_FILES['promo1_image_file']['tmp_name']) && is_uploaded_file($_FILES['promo1_image_file']['tmp_name'])) {
         $ext = strtolower(pathinfo($_FILES['promo1_image_file']['name'], PATHINFO_EXTENSION));
@@ -777,8 +782,10 @@ if(isset($_POST['form_home_features'])) {
             $promo1_image = $newPromo1Url;
         } else {
             $localName = 'promo1_' . time() . '.' . $ext;
-            if (@move_uploaded_file($_FILES['promo1_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+            if (@move_uploaded_file($_FILES['promo1_image_file']['tmp_name'], $uploadsDir . '/' . $localName)) {
                 $promo1_image = 'assets/uploads/' . $localName;
+            } else {
+                error_log("Failed to move promo1 upload to $uploadsDir/$localName");
             }
         }
     } elseif (isset($_POST['promo_banner1_image_url'])) {
@@ -793,8 +800,10 @@ if(isset($_POST['form_home_features'])) {
             $promo2_image = $newPromo2Url;
         } else {
             $localName = 'promo2_' . time() . '.' . $ext;
-            if (@move_uploaded_file($_FILES['promo2_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+            if (@move_uploaded_file($_FILES['promo2_image_file']['tmp_name'], $uploadsDir . '/' . $localName)) {
                 $promo2_image = 'assets/uploads/' . $localName;
+            } else {
+                error_log("Failed to move promo2 upload to $uploadsDir/$localName");
             }
         }
     } elseif (isset($_POST['promo_banner2_image_url'])) {
@@ -809,8 +818,10 @@ if(isset($_POST['form_home_features'])) {
             $payday_image = $newPaydayUrl;
         } else {
             $localName = 'payday_' . time() . '.' . $ext;
-            if (@move_uploaded_file($_FILES['payday_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+            if (@move_uploaded_file($_FILES['payday_image_file']['tmp_name'], $uploadsDir . '/' . $localName)) {
                 $payday_image = 'assets/uploads/' . $localName;
+            } else {
+                error_log("Failed to move payday upload to $uploadsDir/$localName");
             }
         }
     } elseif (isset($_POST['payday_image_url'])) {
@@ -901,9 +912,11 @@ if(isset($_POST['form_home_features'])) {
                         $uniqueRemoteName = 'hero_slide_' . time() . '_' . ($idx + 1) . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
                         $slideUrl = uploadFileToSupabase($tmpName, $uniqueRemoteName, 'assets');
                         if (!$slideUrl) {
-                            $localTarget = __DIR__ . '/../assets/uploads/' . $uniqueRemoteName;
+                            $localTarget = $uploadsDir . '/' . $uniqueRemoteName;
                             if (@move_uploaded_file($tmpName, $localTarget)) {
                                 $slideUrl = 'assets/uploads/' . $uniqueRemoteName;
+                            } else {
+                                error_log("Failed to move hero slide upload to $localTarget");
                             }
                         }
                         if ($slideUrl) {
@@ -940,6 +953,7 @@ if(isset($_POST['form_home_features'])) {
         }
         $success_message = implode(' ', $msgParts);
     }
+    $active_tab = '#tab_home_features';
 }
 // Payment Gateways Form
 if(isset($_POST['form_payment_gateways'])) {
@@ -2401,10 +2415,7 @@ $lang_sections = [
                                                     </thead>
                                                     <tbody>
                                                         <?php foreach ($slides as $idx => $slide): 
-                                                            $photoUrl = $slide['photo'];
-                                                            if (!str_starts_with($photoUrl, 'http')) {
-                                                                $photoUrl = '../assets/uploads/' . $photoUrl;
-                                                            }
+                                                            $photoUrl = get_media_url($slide['photo']);
                                                         ?>
                                                             <tr>
                                                                 <td style="vertical-align: middle; text-align:center;">
@@ -2615,7 +2626,7 @@ $lang_sections = [
                                                         </div>
                                                         <?php if (!empty($settings_data['promo_banner1_image'])): ?>
                                                             <div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center;">
-                                                                <img src="<?php echo htmlspecialchars($settings_data['promo_banner1_image']); ?>" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;">
+                                                                <img src="<?php echo htmlspecialchars(get_media_url($settings_data['promo_banner1_image'])); ?>" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;">
                                                             </div>
                                                         <?php endif; ?>
                                                     </div>
@@ -2656,7 +2667,7 @@ $lang_sections = [
                                                         </div>
                                                         <?php if (!empty($settings_data['promo_banner2_image'])): ?>
                                                             <div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center;">
-                                                                <img src="<?php echo htmlspecialchars($settings_data['promo_banner2_image']); ?>" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;">
+                                                                <img src="<?php echo htmlspecialchars(get_media_url($settings_data['promo_banner2_image'])); ?>" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;">
                                                             </div>
                                                         <?php endif; ?>
                                                     </div>
@@ -2901,9 +2912,11 @@ $lang_sections = [
                                                             <label>Or Graphic URL / Path</label>
                                                             <input type="text" name="payday_image_url" class="form-control" value="<?php echo htmlspecialchars($settings_data['payday_image'] ?? 'assets/uploads/payday_cart_transparent.png'); ?>">
                                                         </div>
-                                                        <?php if (!empty($settings_data['payday_image'])): ?>
+                                                        <?php if (!empty($settings_data['payday_image'])): 
+                                                            $paydayDisplay = get_media_url($settings_data['payday_image'], 'assets/uploads/payday_cart_transparent.png');
+                                                        ?>
                                                             <div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center; border:1px solid #e2e8f0;">
-                                                                <img src="<?php echo htmlspecialchars($settings_data['payday_image']); ?>" style="max-height:80px; max-width:100%; object-fit:contain;" onerror="this.src='../assets/uploads/payday_cart_transparent.png';">
+                                                                <img src="<?php echo htmlspecialchars($paydayDisplay); ?>" style="max-height:80px; max-width:100%; object-fit:contain;" onerror="this.src='<?php echo BASE_URL; ?>assets/uploads/payday_cart_transparent.png';">
                                                             </div>
                                                         <?php endif; ?>
                                                     </div>
@@ -4546,6 +4559,12 @@ if (window.jQuery) {
                         $submitBtn.click();
                     }
                 }
+            }
+        // Ensure clicking any button inside tab_home_features guarantees form_home_features is present in POST
+        $(document).on('click', '#tab_home_features button[type="submit"]', function() {
+            var $form = $(this).closest('form');
+            if ($form.length && !$form.find('input[name="form_home_features"][type="hidden"]').length) {
+                $form.append('<input type="hidden" name="form_home_features" value="1">');
             }
         });
     });

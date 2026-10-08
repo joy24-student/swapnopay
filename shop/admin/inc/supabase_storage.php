@@ -78,11 +78,15 @@ function uploadFileToSupabase($localFilePath, $destinationFilename, $folder = 'a
  */
 function get_media_url($photoPath, $default = 'assets/images/no-image.png') {
     if (empty($photoPath)) {
-        return (defined('BASE_URL') ? BASE_URL : '') . $default;
+        return (defined('BASE_URL') ? BASE_URL : '') . ltrim($default, '/');
     }
-    if (str_starts_with($photoPath, 'http://') || str_starts_with($photoPath, 'https://')) {
+    if (str_starts_with($photoPath, 'http://') || str_starts_with($photoPath, 'https://') || str_starts_with($photoPath, '//')) {
         return $photoPath;
     }
-    return (defined('BASE_URL') ? BASE_URL : '') . 'assets/uploads/' . ltrim($photoPath, '/');
+    $clean = ltrim($photoPath, '/');
+    if (str_starts_with($clean, 'assets/')) {
+        return (defined('BASE_URL') ? BASE_URL : '') . $clean;
+    }
+    return (defined('BASE_URL') ? BASE_URL : '') . 'assets/uploads/' . $clean;
 }
 
