@@ -2322,11 +2322,8 @@ $lang_sections = [
                                         <h4 style="margin:0 0 4px 0; color:#1e40af; font-weight:700;"><i class="fa fa-sliders"></i> Modern Homepage Customizer & Hero Slider</h4>
                                         <p style="margin:0; font-size:13px; color:#3b82f6;">All changes reflect immediately on your storefront. Click "Save All Customizations" after editing.</p>
                                     </div>
-                                    <div style="display:flex; gap:10px; align-items:center;">
-                                        <a href="homepage-banners.php" class="btn btn-default" style="border-radius:20px; font-weight:700; padding:8px 18px;">
-                                            <i class="fa fa-arrows-alt"></i> Full Screen Mode
-                                        </a>
-                                        <button type="submit" name="form_home_features" class="btn btn-success" style="border-radius:20px; font-weight:700; padding:8px 22px; font-size:14px; box-shadow:0 2px 8px rgba(34,197,94,0.3);">
+                                    <div>
+                                        <button type="submit" name="form_home_features" class="btn btn-success" style="border-radius:20px; font-weight:700; padding:8px 24px; font-size:14px; box-shadow:0 2px 8px rgba(34,197,94,0.3);">
                                             <i class="fa fa-save"></i> Save All Customizations
                                         </button>
                                     </div>
