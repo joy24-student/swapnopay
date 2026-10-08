@@ -49,6 +49,8 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 
 			<form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
 
+				<?php require_once __DIR__ . '/inc/ai_product_writer_widget.php'; ?>
+
 				<div class="box box-info">
 					<div class="box-body">
 						<div class="form-group">
@@ -86,7 +88,14 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Product Name <span>*</span></label>
+							<label for="" class="col-sm-3 control-label">
+								Product Name <span>*</span>
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="name" data-action="generate_field" title="AI Generate or refine product name">
+										<i class="fa fa-magic"></i> AI Title
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-4">
 								<input type="text" name="p_name" class="form-control">
 							</div>
@@ -170,31 +179,69 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 			                </div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Description</label>
+							<label for="" class="col-sm-3 control-label">
+								Description
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="description" data-editor="editor1" title="Write description with AI">
+										<i class="fa fa-magic"></i> AI Write
+									</button>
+									<button type="button" class="sn-ai-inline-btn secondary" data-field="description" data-action="polish" data-editor="editor1" title="Polish and improve description">
+										<i class="fa fa-pencil"></i> Polish
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-8">
 								<textarea name="p_description" class="form-control" cols="30" rows="10" id="editor1"></textarea>
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Short Description</label>
+							<label for="" class="col-sm-3 control-label">
+								Short Description
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="short_description" data-editor="editor2" title="Write short description with AI">
+										<i class="fa fa-magic"></i> AI Write
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-8">
 								<textarea name="p_short_description" class="form-control" cols="30" rows="10" id="editor2"></textarea>
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Features</label>
+							<label for="" class="col-sm-3 control-label">
+								Features
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="feature" data-editor="editor3" title="Write features & specifications with AI">
+										<i class="fa fa-magic"></i> AI Write
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-8">
 								<textarea name="p_feature" class="form-control" cols="30" rows="10" id="editor3"></textarea>
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Conditions</label>
+							<label for="" class="col-sm-3 control-label">
+								Conditions
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="condition" data-editor="editor4" title="Write conditions & warranty with AI">
+										<i class="fa fa-magic"></i> AI Write
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-8">
 								<textarea name="p_condition" class="form-control" cols="30" rows="10" id="editor4"></textarea>
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Return Policy</label>
+							<label for="" class="col-sm-3 control-label">
+								Return Policy
+								<span class="sn-ai-inline-btn-group">
+									<button type="button" class="sn-ai-inline-btn" data-field="return_policy" data-editor="editor5" title="Write return policy with AI">
+										<i class="fa fa-magic"></i> AI Write
+									</button>
+								</span>
+							</label>
 							<div class="col-sm-8">
 								<textarea name="p_return_policy" class="form-control" cols="30" rows="10" id="editor5"></textarea>
 							</div>
