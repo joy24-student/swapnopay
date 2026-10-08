@@ -31,3 +31,4 @@ swapnopay-backend/data/*.json
 *.pyc
 
 shop/admin/inc/cache_*.json
+shop2/
