@@ -902,8 +902,8 @@ CREATE TABLE IF NOT EXISTS "tbl_top_category" (
   "tcat_id" SERIAL PRIMARY KEY,
   "tcat_name" VARCHAR(255) NOT NULL,
   "show_on_menu" SMALLINT NOT NULL DEFAULT 0,
-  "tcat_order" INTEGER NOT NULL,
-  "photo" VARCHAR(255) NOT NULL
+  "tcat_order" INTEGER NOT NULL DEFAULT 1,
+  "photo" VARCHAR(255) NOT NULL DEFAULT 'placeholder.svg'
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_transport_bookings" (

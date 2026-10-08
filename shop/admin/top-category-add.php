@@ -29,10 +29,13 @@ if(isset($_POST['form1'])) {
     if($valid == 1) {
         if($final_name != '') {
             move_uploaded_file( $path_tmp, '../assets/uploads/'.$final_name );
+        } else {
+            $final_name = 'placeholder.svg';
         }
 
-		$statement = $pdo->prepare("INSERT INTO tbl_top_category (tcat_name,show_on_menu,photo) VALUES (?,?,?)");
-		$statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$final_name));
+        $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(tcat_order), 0) + 1 FROM tbl_top_category")->fetchColumn();
+		$statement = $pdo->prepare("INSERT INTO tbl_top_category (tcat_name,show_on_menu,tcat_order,photo) VALUES (?,?,?,?)");
+		$statement->execute(array($_POST['tcat_name'],(int)($_POST['show_on_menu'] ?? 0),$maxOrder,$final_name));
             
     	$success_message = 'Top Category is added successfully.';
     	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
