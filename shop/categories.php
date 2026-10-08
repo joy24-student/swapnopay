@@ -81,7 +81,7 @@ function getCategoryData($pdo, $tcat_id, $currencySymbol) {
 
     // Subcategories (tbl_mid_category)
     $subStmt = $pdo->prepare("
-        SELECT m.mcat_id, m.mcat_name, m.photo,
+        SELECT m.mcat_id, m.mcat_name, '' as photo,
                (SELECT p.p_featured_photo 
                 FROM tbl_end_category e 
                 JOIN tbl_product p ON p.ecat_id = e.ecat_id 
