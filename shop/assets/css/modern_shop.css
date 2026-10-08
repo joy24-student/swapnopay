@@ -118,9 +118,29 @@ body.shopnext-theme {
     letter-spacing: -0.4px;
 }
 
-.sn-brand-logo svg, .sn-brand-logo img {
-    height: 26px;
+.sn-brand-logo svg {
+    height: 28px;
     width: auto;
+}
+
+.sn-brand-logo img, .sn-brand-logo-img {
+    height: 44px;
+    max-height: 44px;
+    width: auto;
+    max-width: 140px;
+    object-fit: contain;
+    border-radius: 8px;
+    display: block;
+}
+
+.sn-brand-name {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--sn-dark, #0f172a);
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+    white-space: nowrap;
+    display: inline-block;
 }
 
 .sn-brand-logo .sn-logo-text-next {

@@ -51,7 +51,7 @@ if (!$settings) {
 } 
 
 // Assign settings variables
-$store_name = !empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Online Store'));
+$store_name = trim(!empty($settings['store_name']) ? $settings['store_name'] : (!empty($settings['meta_title_home']) ? $settings['meta_title_home'] : (defined('STORE_NAME') ? STORE_NAME : 'Online Store')));
 $logo = $settings['logo'] ?? 'default_logo.png';
 $logo_file_path = 'assets/uploads/' . $logo;
 if (!file_exists(__DIR__ . '/' . $logo_file_path)) {
@@ -63,7 +63,30 @@ if (!file_exists(__DIR__ . '/' . $logo_file_path)) {
         $logo_file_path = 'assets/store-defaults/logo.svg';
     }
 }
+$logo_url = '';
+if (!empty($logo) && !str_ends_with($logo, 'default_logo.png')) {
+    if (str_starts_with($logo, 'http')) {
+        $logo_url = $logo;
+    } elseif (file_exists(__DIR__ . '/' . $logo_file_path)) {
+        $logo_url = BASE_URL . $logo_file_path;
+    }
+}
+
 $favicon = $settings['favicon'] ?? 'default_favicon.png';
+$favicon_url = '';
+if (!empty($favicon) && !str_ends_with($favicon, 'default_favicon.png')) {
+    if (str_starts_with($favicon, 'http')) {
+        $favicon_url = $favicon;
+    } elseif (file_exists(__DIR__ . '/assets/uploads/' . $favicon)) {
+        $favicon_url = BASE_URL . 'assets/uploads/' . $favicon;
+    }
+}
+if (empty($favicon_url) && !empty($logo_url)) {
+    $favicon_url = $logo_url;
+}
+if (empty($favicon_url)) {
+    $favicon_url = BASE_URL . 'assets/uploads/favicon-1768060928-ae939e44e1.png';
+}
 $contact_email = $settings['contact_email'] ?? 'Not added';
 $contact_phone = $settings['contact_phone'] ?? 'Not added ';
 $meta_title_home = $settings['meta_title_home'] ?? 'E-commerce Website';
@@ -141,7 +164,17 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <meta name="keywords" content="<?php echo htmlspecialchars($page_meta_keyword); ?>">
     <meta name="description" content="<?php echo htmlspecialchars($page_meta_description); ?>">
 
-    <link rel="icon" type="image/png" href="assets/uploads/<?php echo htmlspecialchars($favicon); ?>">
+    <?php
+    $fav_ext = strtolower(pathinfo($favicon_url, PATHINFO_EXTENSION));
+    $fav_mime = 'image/png';
+    if ($fav_ext === 'jpeg' || $fav_ext === 'jpg') $fav_mime = 'image/jpeg';
+    elseif ($fav_ext === 'svg') $fav_mime = 'image/svg+xml';
+    elseif ($fav_ext === 'ico') $fav_mime = 'image/x-icon';
+    elseif ($fav_ext === 'webp') $fav_mime = 'image/webp';
+    ?>
+    <link rel="icon" type="<?php echo $fav_mime; ?>" href="<?php echo htmlspecialchars($favicon_url); ?>">
+    <link rel="shortcut icon" href="<?php echo htmlspecialchars($favicon_url); ?>">
+    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($favicon_url); ?>">
 
     <!-- Progressive Web App (PWA) Manifest & Meta Tags -->
     <link rel="manifest" href="manifest.json">
@@ -149,8 +182,7 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="ShopMart">
-    <link rel="apple-touch-icon" href="assets/img/pwa-icon-192.png">
+    <meta name="apple-mobile-web-app-title" content="<?php echo htmlspecialchars($store_name); ?>">
 
     <!-- Resource Hints & Fast Connection Preconnects -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -245,6 +277,79 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <?php echo $before_head; ?>
 
     <style>
+        /* High-Definition Brand Logo & Shop Name */
+        .sn-brand-logo {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            text-decoration: none !important;
+            flex-shrink: 0 !important;
+            line-height: 1 !important;
+            transition: opacity 0.2s ease, transform 0.2s ease !important;
+        }
+        .sn-brand-logo:hover {
+            text-decoration: none !important;
+            opacity: 0.95 !important;
+        }
+        .sn-brand-logo-img {
+            height: 44px !important;
+            max-height: 44px !important;
+            width: auto !important;
+            max-width: 140px !important;
+            object-fit: contain !important;
+            border-radius: 8px !important;
+            display: block !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+            background: #ffffff !important;
+        }
+        .sn-brand-icon-fallback {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 40px !important;
+            height: 40px !important;
+            background: #fef3c7 !important;
+            border-radius: 8px !important;
+            flex-shrink: 0 !important;
+        }
+        .sn-brand-name {
+            font-size: 20px !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            letter-spacing: -0.4px !important;
+            line-height: 1.15 !important;
+            white-space: nowrap !important;
+            display: inline-block !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        }
+        .sn-brand-logo:hover .sn-brand-name {
+            color: #d97706 !important;
+        }
+        @media (max-width: 768px) {
+            .sn-brand-logo {
+                gap: 8px !important;
+                max-width: calc(100% - 130px) !important;
+            }
+            .sn-brand-logo-img {
+                height: 36px !important;
+                max-height: 36px !important;
+                max-width: 90px !important;
+                border-radius: 6px !important;
+            }
+            .sn-brand-icon-fallback {
+                width: 34px !important;
+                height: 34px !important;
+            }
+            .sn-brand-name {
+                font-size: 15px !important;
+                font-weight: 800 !important;
+                max-width: 170px !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+        }
+
         /* General Reset & Body */
         /* PWA Install Button */
         .sn-pwa-install-btn {
@@ -1928,18 +2033,20 @@ body.sn-popup-open {
     <div class="sn-container">
         <!-- Top Row -->
         <div class="sn-header-top">
-            <!-- Brand Logo -->
+            <!-- Brand Logo & Shop Name -->
             <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo" title="<?php echo htmlspecialchars($store_name); ?>">
-                <?php if (!empty($logo) && file_exists(__DIR__ . '/' . $logo_file_path) && !str_ends_with($logo_file_path, 'default_logo.png')): ?>
-                    <img src="<?php echo BASE_URL . $logo_file_path; ?>" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height: 38px; width: auto; object-fit: contain;">
+                <?php if (!empty($logo_url)): ?>
+                    <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars($store_name); ?>" class="sn-brand-logo-img">
                 <?php else: ?>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    <span><?php echo htmlspecialchars($store_name); ?></span>
+                    <span class="sn-brand-icon-fallback">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
                 <?php endif; ?>
+                <span class="sn-brand-name"><?php echo htmlspecialchars($store_name); ?></span>
             </a>
 
             <!-- Search Bar -->
@@ -2158,8 +2265,13 @@ window.snOpenMobileSearch = function(e) {
 
 <div class="desktop-sidebar">
     <div class="sidebar-header">
-        <a href="<?php echo BASE_URL; ?>" class="sidebar-logo">
-            <img src="<?php echo htmlspecialchars($logo_file_path); ?>" alt="Logo" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
+        <a href="<?php echo BASE_URL; ?>" class="sidebar-logo" style="display:flex; align-items:center; gap:10px; text-decoration:none;">
+            <?php if (!empty($logo_url)): ?>
+                <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height:36px; width:auto; border-radius:6px; object-fit:contain;" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/uploads/logo_branding.png';">
+            <?php else: ?>
+                <img src="<?php echo BASE_URL; ?>assets/uploads/logo_branding.png" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height:36px; width:auto;">
+            <?php endif; ?>
+            <span style="font-weight:700; font-size:15px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?php echo htmlspecialchars($store_name); ?></span>
         </a>
         <button class="sidebar-toggle-btn" id="sidebar-toggle-btn">
             <i class="fas fa-times"></i> 

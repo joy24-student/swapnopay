@@ -60,13 +60,30 @@ $mobile_footer_on_off = isset($settings['mobile_footer_on_off']) ? (int)$setting
         <div class="sn-footer-top">
             <!-- Brand & Socials -->
             <div class="sn-footer-brand">
+                <?php
+                $footer_logo = $settings['logo'] ?? '';
+                $footer_logo_url = '';
+                if (!empty($footer_logo) && !str_ends_with($footer_logo, 'default_logo.png')) {
+                    if (str_starts_with($footer_logo, 'http')) {
+                        $footer_logo_url = $footer_logo;
+                    } elseif (file_exists(__DIR__ . '/assets/uploads/' . $footer_logo)) {
+                        $footer_logo_url = BASE_URL . 'assets/uploads/' . $footer_logo;
+                    } elseif (file_exists(__DIR__ . '/assets/store-defaults/' . $footer_logo)) {
+                        $footer_logo_url = BASE_URL . 'assets/store-defaults/' . $footer_logo;
+                    }
+                }
+                ?>
                 <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    <span><?php echo htmlspecialchars($store_name ?? (defined('STORE_NAME') ? STORE_NAME : 'Store')); ?></span>
+                    <?php if (!empty($footer_logo_url)): ?>
+                        <img src="<?php echo htmlspecialchars($footer_logo_url); ?>" alt="<?php echo htmlspecialchars($store_name ?? 'Store'); ?>" class="sn-brand-logo-img" style="height:38px; width:auto; max-width:130px; object-fit:contain; border-radius:6px;">
+                    <?php else: ?>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" fill="#F59E0B" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 6H21" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M16 10C16 11.0609 15.5786 12.0783 14.8284 12.8284C14.0783 13.5786 13.0609 14 12 14C10.9391 14 9.92172 13.5786 9.17157 12.8284C8.42143 12.0783 8 11.0609 8 10" stroke="#111827" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    <?php endif; ?>
+                    <span class="sn-brand-name"><?php echo htmlspecialchars(trim($store_name ?? (defined('STORE_NAME') ? STORE_NAME : 'Store'))); ?></span>
                 </a>
                 <h4>Your One-Stop Shop</h4>
                 <p>We bring you the best products from trusted brands, with a focus on quality, affordability and customer satisfaction.</p>
