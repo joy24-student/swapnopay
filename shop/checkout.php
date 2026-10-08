@@ -9,6 +9,18 @@ require_once("admin/inc/functions.php");
 require_once("admin/inc/CSRF_Protect.php");
 $csrf = new CSRF_Protect();
 
+$checkout_settings = [];
+try {
+    $st_s = $pdo->query("SELECT * FROM tbl_settings WHERE id=1 LIMIT 1");
+    if ($st_s) $checkout_settings = $st_s->fetch(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $_) {}
+
+$raw_methods = $checkout_settings['payment_methods'] ?? 'SwapnoPay,Cash on Delivery';
+$enabled_methods_list = array_filter(array_map('trim', explode(',', $raw_methods)));
+$is_cod_allowed = (isset($checkout_settings['cod_enabled']) && (int)$checkout_settings['cod_enabled'] === 0) ? false : in_array('Cash on Delivery', $enabled_methods_list);
+$is_swapnopay_allowed = in_array('SwapnoPay', $enabled_methods_list) || empty($enabled_methods_list);
+$default_payment_method = $is_swapnopay_allowed ? 'swapnopay' : ($is_cod_allowed ? 'cod' : 'swapnopay');
+
 // -------------------------------------------------------------------------
 // 1. ENSURE CART DATA & DEMO SEEDING
 // -------------------------------------------------------------------------
@@ -493,7 +505,7 @@ require_once('header.php');
             <input type="hidden" name="checkout_token" value="<?php echo htmlspecialchars($_SESSION['checkout_token'], ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="shipping_cost" id="inputShippingCost" value="<?php echo number_format($shipping_cost, 2, '.', ''); ?>">
             <input type="hidden" name="shipping_method" id="inputShippingMethod" value="standard">
-            <input type="hidden" name="payment_method" id="inputPaymentMethod" value="swapnopay">
+            <input type="hidden" name="payment_method" id="inputPaymentMethod" value="<?php echo $default_payment_method; ?>">
 
             <div class="sn-checkout-grid">
 
@@ -934,8 +946,9 @@ require_once('header.php');
                         </div>
 
                         <div class="sn-payment-options-list">
+                            <?php if ($is_swapnopay_allowed): ?>
                             <!-- Option 1: SwapnoPay Payment Gateway -->
-                            <div class="sn-pay-card active" id="payCardSwapnopay" onclick="selectPayment('swapnopay')">
+                            <div class="sn-pay-card <?php echo ($default_payment_method === 'swapnopay' ? 'active' : ''); ?>" id="payCardSwapnopay" onclick="selectPayment('swapnopay')">
                                 <div class="sn-radio-indicator">
                                     <div class="sn-radio-dot"></div>
                                 </div>
@@ -958,7 +971,7 @@ require_once('header.php');
                             </div>
 
                             <!-- MFS Provider Sub-Selection (appears when SwapnoPay is selected) -->
-                            <div class="sn-mfs-provider-selector" id="mfsProviderSelector" style="display: block;">
+                            <div class="sn-mfs-provider-selector" id="mfsProviderSelector" style="display: <?php echo ($default_payment_method === 'swapnopay' ? 'block' : 'none'); ?>;">
                                 <input type="hidden" name="mfs_provider" id="inputMfsProvider" value="bKash">
                                 <div class="sn-mfs-selector-label">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
@@ -987,9 +1000,11 @@ require_once('header.php');
                                     </div>
                                 </div>
                             </div>
+                            <?php endif; ?>
 
+                            <?php if ($is_cod_allowed): ?>
                             <!-- Option 2: Cash on Delivery -->
-                            <div class="sn-pay-card" id="payCardCod" onclick="selectPayment('cod')">
+                            <div class="sn-pay-card <?php echo ($default_payment_method === 'cod' ? 'active' : ''); ?>" id="payCardCod" onclick="selectPayment('cod')">
                                 <div class="sn-radio-indicator">
                                     <div class="sn-radio-dot"></div>
                                 </div>
@@ -1006,6 +1021,7 @@ require_once('header.php');
                                     <div class="sn-pay-desc sn-pay-desc-mobile">Pay cash upon delivery</div>
                                 </div>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -3411,7 +3427,7 @@ function updateAddressPreview() {
 // Ensure total is correctly initialized on load
 document.addEventListener('DOMContentLoaded', () => {
     recalculateTotal();
-    selectPayment('swapnopay');
+    selectPayment('<?php echo $default_payment_method; ?>');
 });
 </script>
 

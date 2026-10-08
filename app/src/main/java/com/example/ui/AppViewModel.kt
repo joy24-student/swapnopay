@@ -461,6 +461,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val dailyLimit: Double = 500000.0,
         val retryCount: Int = 3,
         val autoFailover: Boolean = true,
+        val webhookUrl: String = "",
+        val webhookSecret: String = "",
         val successCallbackUrl: String = "",
         val failureCallbackUrl: String = "",
         val cancelCallbackUrl: String = "",
@@ -497,6 +499,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     dailyLimit = json.optDouble("daily_limit", 500000.0),
                     retryCount = json.optInt("retry_count", 3),
                     autoFailover = json.optBoolean("auto_failover", true),
+                    webhookUrl = json.optString("webhook_url", ""),
+                    webhookSecret = json.optString("webhook_secret", ""),
                     successCallbackUrl = json.optString("success_callback_url", ""),
                     failureCallbackUrl = json.optString("failure_callback_url", ""),
                     cancelCallbackUrl = json.optString("cancel_callback_url", ""),
@@ -529,12 +533,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             safeConfig.dailyLimit < safeConfig.maxAmount || safeConfig.retryCount !in 1..10
         val invalidEmail = safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess &&
             !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(safeConfig.notificationEmail.trim())
+        val invalidWebhook = safeConfig.webhookUrl.isNotBlank() && !isSafeGatewayCallbackUrl(safeConfig.webhookUrl)
         val invalidCallback = listOf(safeConfig.successCallbackUrl, safeConfig.failureCallbackUrl, safeConfig.cancelCallbackUrl)
             .filter(String::isNotBlank).any { !isSafeGatewayCallbackUrl(it) }
-        if (invalidPolicy || invalidEmail || invalidCallback) {
+        if (invalidPolicy || invalidEmail || invalidCallback || invalidWebhook) {
             _gatewaySettingsStatus.value = when {
-                invalidPolicy -> "Invalid limits: min Γëñ max Γëñ daily limit; retries 1ΓÇô10"
+                invalidPolicy -> "Invalid limits: min ≤ max ≤ daily limit; retries 1–10"
                 invalidEmail -> "Enter a valid merchant receipt email"
+                invalidWebhook -> "Webhook must be a valid public URL"
                 else -> "Callbacks must be public HTTPS URLs"
             }
             logFirebaseStatus("Gateway settings were not saved because validation failed.")
@@ -549,6 +555,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 put("daily_limit", safeConfig.dailyLimit)
                 put("retry_count", safeConfig.retryCount)
                 put("auto_failover", safeConfig.autoFailover)
+                put("webhook_url", safeConfig.webhookUrl)
+                put("webhook_secret", safeConfig.webhookSecret)
                 put("success_callback_url", safeConfig.successCallbackUrl)
                 put("failure_callback_url", safeConfig.failureCallbackUrl)
                 put("cancel_callback_url", safeConfig.cancelCallbackUrl)
@@ -569,6 +577,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     put("daily_limit", safeConfig.dailyLimit)
                     put("receipt_retry_limit", safeConfig.retryCount)
                     put("auto_receipt_retry", safeConfig.autoFailover)
+                    put("webhook_url", safeConfig.webhookUrl.trim().ifEmpty { JSONObject.NULL })
+                    put("webhook_secret", safeConfig.webhookSecret.trim().ifEmpty { JSONObject.NULL })
                     put("customer_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.customerReceiptsEnabled)
                     put("merchant_receipts_enabled", safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess)
                     put("merchant_receipt_email", safeConfig.notificationEmail.trim().ifEmpty { JSONObject.NULL })
@@ -631,6 +641,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     put("success_url", safeConfig.successCallbackUrl.trim().ifEmpty { org.json.JSONObject.NULL })
                     put("fail_url", safeConfig.failureCallbackUrl.trim().ifEmpty { org.json.JSONObject.NULL })
                     put("cancel_url", safeConfig.cancelCallbackUrl.trim().ifEmpty { org.json.JSONObject.NULL })
+                    put("webhook_url", safeConfig.webhookUrl.trim().ifEmpty { org.json.JSONObject.NULL })
+                    put("webhook_secret", safeConfig.webhookSecret.trim().ifEmpty { org.json.JSONObject.NULL })
 
                     val receivingNums = org.json.JSONObject()
                     val accountTypesObj = org.json.JSONObject()
@@ -648,6 +660,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     put("receiving_numbers", receivingNums)
                     put("account_types", accountTypesObj)
                     put("qr_codes", qrCodesObj)
+                    put("replace_receiving_numbers", true)
                 }
 
                 val conn = java.net.URL("https://api.swapnopay.top/v1/payment/merchant-config").openConnection() as java.net.HttpURLConnection
@@ -671,6 +684,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (conn.responseCode in 200..299) {
                     logFirebaseStatus("Gateway setup synced dynamically with SwapnoPay Backend server.")
                 }
+
+                // Also sync with SwapnoPay Developer Webhook Dispatcher
+                if (safeConfig.webhookUrl.isNotBlank()) {
+                    try {
+                        val whPayload = org.json.JSONObject().apply {
+                            put("merchant_id", _activeProfile.value.id)
+                            put("webhook_url", safeConfig.webhookUrl.trim())
+                            put("secret", safeConfig.webhookSecret.trim())
+                        }
+                        val whConn = java.net.URL("https://api.swapnopay.top/v1/developer/webhook-config").openConnection() as java.net.HttpURLConnection
+                        whConn.requestMethod = "POST"
+                        whConn.setRequestProperty("Content-Type", "application/json")
+                        whConn.doOutput = true
+                        whConn.connectTimeout = 5000
+                        whConn.readTimeout = 5000
+                        whConn.outputStream.use { os ->
+                            os.write(whPayload.toString().toByteArray(Charsets.UTF_8))
+                        }
+                        whConn.responseCode
+                    } catch (_: Exception) {}
+                }
             } catch (e: Exception) {
                 logFirebaseStatus("SwapnoPay Backend sync notice: ${e.message}")
             }
@@ -680,7 +714,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun isSafeGatewayCallbackUrl(value: String): Boolean = runCatching {
         val uri = java.net.URI(value.trim())
         val host = uri.host?.lowercase().orEmpty()
-        if (uri.scheme != "https" || host.isBlank() || uri.userInfo != null) return@runCatching false
+        if ((uri.scheme != "https" && uri.scheme != "http") || host.isBlank() || uri.userInfo != null) return@runCatching false
         if (host == "localhost" || host.endsWith(".local") || host.startsWith("127.") ||
             host.startsWith("10.") || host.startsWith("192.168.") || host == "::1") return@runCatching false
         val private172 = Regex("^172\\.(\\d{1,3})\\.").find(host)?.groupValues?.getOrNull(1)?.toIntOrNull()
@@ -694,7 +728,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (active.supabaseUrl.isBlank() || active.anonKey.isBlank()) return@launch
             val isReal = active.supabaseUrl.isNotBlank() && !active.supabaseUrl.contains("abc123xyz") && !active.supabaseUrl.contains("def456uvw")
             if (isReal) supabaseConnected.value = true
-            _gatewaySettingsStatus.value = "Loading merchant database policyΓÇª"
+            _gatewaySettingsStatus.value = "Loading merchant database policy…"
             com.example.data.remote.SupabaseClient.fetchRecords(
                 active.supabaseUrl, active.anonKey, active.authSessionToken,
                 "payment_gateway_settings", "*",
@@ -711,6 +745,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         dailyLimit = remote.optDouble("daily_limit", current.dailyLimit),
                         retryCount = remote.optInt("receipt_retry_limit", current.retryCount),
                         autoFailover = remote.optBoolean("auto_receipt_retry", current.autoFailover),
+                        webhookUrl = remote.optString("webhook_url", current.webhookUrl),
+                        webhookSecret = remote.optString("webhook_secret", current.webhookSecret),
                         emailNotificationsEnabled = remote.optBoolean("customer_receipts_enabled", true) || remote.optBoolean("merchant_receipts_enabled", true),
                         customerReceiptsEnabled = remote.optBoolean("customer_receipts_enabled", true),
                         notificationEmail = remote.optString("merchant_receipt_email", current.notificationEmail),
@@ -841,6 +877,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             val minAmt = configObj.optDouble("min_amount", current.minAmount)
                             val maxAmt = configObj.optDouble("max_amount", current.maxAmount)
                             val dailyLim = configObj.optDouble("daily_limit", current.dailyLimit)
+                            val whUrl = configObj.optString("webhook_url", current.webhookUrl)
+                            val whSec = configObj.optString("webhook_secret", current.webhookSecret)
                             val updatedMethods = current.activeMethods.toMutableMap().apply {
                                 if (configObj.has("bkash_enabled")) put("bKash", configObj.optBoolean("bkash_enabled"))
                                 if (configObj.has("nagad_enabled")) put("Nagad", configObj.optBoolean("nagad_enabled"))
@@ -851,6 +889,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 minAmount = minAmt,
                                 maxAmount = maxAmt,
                                 dailyLimit = dailyLim,
+                                webhookUrl = whUrl,
+                                webhookSecret = whSec,
                                 activeMethods = updatedMethods
                             )
                             _gatewayConfig.value = newGatewayConfig
@@ -869,6 +909,86 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun pullMerchantConfigFromBackend(merchantId: String = activeProfile.value.id) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             pullMerchantConfigFromBackendDirect(merchantId)
+        }
+    }
+
+    fun generateWebhookSecret(): String {
+        val randomBytes = ByteArray(16)
+        java.security.SecureRandom().nextBytes(randomBytes)
+        val hex = randomBytes.joinToString("") { "%02x".format(it) }
+        return "whsec_$hex"
+    }
+
+    fun testWebhookEndpoint(
+        targetUrl: String,
+        secret: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        if (targetUrl.isBlank()) {
+            onResult(false, "Please specify a Webhook Callback URL first.")
+            return
+        }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val timestamp = (System.currentTimeMillis() / 1000).toString()
+                val tranId = "SWP-TEST-" + System.currentTimeMillis().toString().takeLast(6)
+                val testPayload = org.json.JSONObject().apply {
+                    put("event", "payment.test")
+                    put("tran_id", tranId)
+                    put("order_id", tranId)
+                    put("status", "TEST_PING")
+                    put("amount", 10.00)
+                    put("currency", "BDT")
+                    put("payment_method", "SwapnoPay")
+                    put("message", "Live Webhook Test Ping from SwapnoPay Gateway App")
+                    put("timestamp", timestamp)
+                }.toString()
+
+                var signatureHex = ""
+                if (secret.isNotBlank()) {
+                    val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+                    val keySpec = javax.crypto.spec.SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256")
+                    mac.init(keySpec)
+                    val rawHmac = mac.doFinal(testPayload.toByteArray(Charsets.UTF_8))
+                    signatureHex = rawHmac.joinToString("") { "%02x".format(it) }
+                }
+
+                val conn = java.net.URL(targetUrl).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                conn.setRequestProperty("User-Agent", "SwapnoPay-Webhook-Engine/2.0")
+                if (signatureHex.isNotBlank()) {
+                    conn.setRequestProperty("X-Signature", signatureHex)
+                    conn.setRequestProperty("X-SwapnoPay-Signature", signatureHex)
+                    conn.setRequestProperty("X-Webhook-Secret", secret)
+                }
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                conn.outputStream.use { os ->
+                    os.write(testPayload.toByteArray(Charsets.UTF_8))
+                }
+
+                val responseCode = conn.responseCode
+                val responseBody = runCatching {
+                    (if (responseCode in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                }.getOrDefault("")
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (responseCode in 200..299) {
+                        onResult(true, "Webhook ping successful (HTTP $responseCode)!")
+                    } else if (responseCode == 401) {
+                        onResult(false, "HTTP 401: Webhook Secret mismatch on receiver server.")
+                    } else {
+                        onResult(false, "Server responded with HTTP $responseCode: ${responseBody.take(100)}")
+                    }
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onResult(false, "Webhook connection failed: ${e.message ?: "Network error"}")
+                }
+            }
         }
     }
 
@@ -11088,6 +11208,59 @@ function executePayment() {
                 }
                 syncMerchantNumberToSupabase(entity)
                 syncMerchantConfigToAdminDatabase()
+            }
+        }
+    }
+
+    fun deleteMerchantNumber(number: String, onResult: ((Boolean, String) -> Unit)? = null) {
+        val current = merchantNumbers.value.find { it.number == number }
+        if (current == null) {
+            onResult?.invoke(false, "Payment number not found.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val mId = activeProfile.value.id
+                // 1. Delete from local Room database
+                repository.deleteMerchantNumber(mId, number)
+
+                // 2. If deleted number was the default, automatically assign the next active number as default
+                if (current.isDefault) {
+                    val remaining = repository.getMerchantNumbers(mId)
+                    if (remaining.isNotEmpty()) {
+                        val nextDefault = remaining.firstOrNull { it.isActive } ?: remaining.first()
+                        repository.setDefaultMerchantNumber(mId, nextDefault)
+                        syncMerchantNumberToSupabase(nextDefault.copy(isDefault = true))
+                    }
+                }
+
+                // 3. Delete from Supabase cloud database
+                val active = resolveActiveForGateway()
+                if (active != null && active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+                    val remoteId = merchantNumberRemoteId(mId, number)
+                    try {
+                        com.example.data.remote.SupabaseClient.deleteRecord(
+                            url = active.supabaseUrl,
+                            anonKey = active.anonKey,
+                            token = active.authSessionToken,
+                            tableName = "merchant_numbers",
+                            primaryKeyCol = "id",
+                            primaryKeyVal = remoteId,
+                            onSuccess = { logFirebaseStatus("Deleted remote merchant number: $number") },
+                            onFailure = { err -> logFirebaseStatus("Remote merchant number delete notice: $err") }
+                        )
+                    } catch (e: Exception) {
+                        logFirebaseStatus("Error deleting remote merchant number: ${e.message}")
+                    }
+                }
+
+                // 4. Sync updated receiving numbers to backend payment gateway
+                syncMerchantConfigToAdminDatabase()
+                logFirebaseStatus("Merchant number deleted: $number")
+                onResult?.invoke(true, "Payment number $number deleted successfully.")
+            } catch (e: Exception) {
+                logFirebaseStatus("Failed to delete merchant number: ${e.message}")
+                onResult?.invoke(false, e.localizedMessage ?: "Failed to delete number")
             }
         }
     }

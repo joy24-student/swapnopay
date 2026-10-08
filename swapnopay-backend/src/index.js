@@ -601,7 +601,10 @@ app.use('/v1', hostedFormRoutes)
 app.use('/', hostedFormRoutes)
 
 // Enterprise SMS Gateway & OTP Verification API
-app.use('/v1/sms-gateway', smsGatewayRouter(io, merchantHeartbeatMap))
+const smsGatewayInstance = smsGatewayRouter(io, merchantHeartbeatMap)
+app.use('/v1/sms-gateway', smsGatewayInstance)
+app.use('/api/v1/sms-gateway', smsGatewayInstance)
+app.use('/api/v1/sms', smsGatewayInstance)
 
 // AI Voice Calling & Automated Receptionist API
 app.use('/v1/voice', aiVoiceRouter(io))

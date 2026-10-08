@@ -1,6 +1,24 @@
 <?php require_once __DIR__ . '/inc/guard.php'; ?>
 <?php require_once __DIR__ . '/inc/supabase_storage.php'; ?>
-<?php require_once('header.php'); ?>
+<?php
+$error_message = '';
+$success_message = '';
+$error_message1 = '';
+$success_message1 = '';
+
+if (!defined('LANG_VALUE_1')) {
+    $i = 1;
+    try {
+        $st_lang = $pdo->query("SELECT lang_value FROM tbl_language ORDER BY lang_id ASC");
+        if ($st_lang) {
+            while ($r_lang = $st_lang->fetch(PDO::FETCH_ASSOC)) {
+                define('LANG_VALUE_' . $i, $r_lang['lang_value']);
+                $i++;
+            }
+        }
+    } catch (Throwable $_) {}
+}
+?>
 
 <?php
 // Helper to reliably clear tenant and legacy caches across all stores
@@ -19,6 +37,15 @@ if (!function_exists('clearShopCaches')) {
             if (is_file($legacy)) @unlink($legacy);
         }
         foreach (glob(__DIR__ . '/inc/cache_*.json') as $cFile) {
+            if (is_file($cFile)) @unlink($cFile);
+        }
+        foreach (glob(sys_get_temp_dir() . '/.dash_cache_*') as $cFile) {
+            if (is_file($cFile)) @unlink($cFile);
+        }
+        foreach (glob(sys_get_temp_dir() . '/.cache_lang_*') as $cFile) {
+            if (is_file($cFile)) @unlink($cFile);
+        }
+        foreach (glob(sys_get_temp_dir() . '/.notif_cache_*') as $cFile) {
             if (is_file($cFile)) @unlink($cFile);
         }
     }
@@ -40,8 +67,34 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
     exit;
 }
 
-// Ensure required columns exist across all tenant schemas safely
-$settings_migrations = [
+// Handle Test SMS Dispatch from settings tab
+if (isset($_GET['action']) && $_GET['action'] === 'test_sms') {
+    while (ob_get_level()) { @ob_end_clean(); }
+    header('Content-Type: application/json; charset=UTF-8');
+    require_once __DIR__ . '/inc/functions.php';
+    $testPhone = trim($_POST['test_phone'] ?? $_GET['test_phone'] ?? '');
+    $selectedProvider = trim($_POST['sms_provider'] ?? $_GET['sms_provider'] ?? 'swapnopay');
+    if (empty($testPhone)) {
+        echo json_encode(['success' => false, 'message' => 'Please enter a valid recipient phone number (e.g. 017XXXXXXXX).']);
+        exit;
+    }
+    $shopName = defined('STORE_NAME') ? STORE_NAME : 'SwapnoPay Store';
+    $testMsg = "Test SMS from {$shopName} via " . ($selectedProvider === 'swapnopay' ? 'SwapnoPay SMS Gateway' : 'Bulk SMS BD') . " (" . date('h:i A') . ")";
+    $res = sendSMS($testPhone, $testMsg, null, null, $selectedProvider);
+    if ($res) {
+        echo json_encode(['success' => true, 'message' => "Test SMS sent successfully to {$testPhone} via " . ($selectedProvider === 'swapnopay' ? 'SwapnoPay SMS Gateway' : 'Bulk SMS BD') . "!"]);
+    } else {
+        echo json_encode(['success' => false, 'message' => "Failed to dispatch test SMS. Please verify your credentials and gateway connection."]);
+    }
+    exit;
+}
+
+// Ensure required columns exist across all tenant schemas safely (run once per tenant, never on every page load)
+$tenantMigKey = md5(($runtime['merchant_id'] ?? 'def') . '_' . ($runtime['shop_slug'] ?? 'store') . '_v3');
+$migFlag1 = sys_get_temp_dir() . '/.mig_' . $tenantMigKey;
+$migFlag2 = __DIR__ . '/inc/.mig_' . $tenantMigKey;
+if (!is_file($migFlag1) && !is_file($migFlag2)) {
+    $settings_migrations = [
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS supabase_url text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS supabase_anon_key text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_google_login smallint DEFAULT 1",
@@ -132,8 +185,8 @@ $settings_migrations = [
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_feature_on_off smallint DEFAULT 0",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_api_key text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_sender_id varchar(50) DEFAULT ''",
-    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_provider varchar(50) DEFAULT 'bulk'",
-    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_sms_api_url text DEFAULT 'https://api.swapnopay.top/api/v1/sms/send'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_provider varchar(50) DEFAULT 'swapnopay'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_sms_api_url text DEFAULT 'https://api.swapnopay.top/v1/sms-gateway/send'",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_sms_api_key text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_sms_sender_id varchar(50) DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_sms_device_id varchar(100) DEFAULT ''",
@@ -205,9 +258,12 @@ $settings_migrations = [
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS payday_btn_text varchar(100) DEFAULT 'Claim Now'",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS payday_btn_url text DEFAULT 'product-category.php'",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS payday_image text DEFAULT 'assets/uploads/payday_cart_transparent.png'"
-];
-foreach ($settings_migrations as $sql) {
-    try { $pdo->exec($sql); } catch (Throwable $e) {}
+    ];
+    foreach ($settings_migrations as $sql) {
+        try { $pdo->exec($sql); } catch (Throwable $e) {}
+    }
+    @file_put_contents($migFlag1, (string)time());
+    @file_put_contents($migFlag2, (string)time());
 }
 
 // Fetch all settings data from the database
@@ -413,11 +469,11 @@ $review_feature_on_off = $settings_data['review_feature_on_off'] ?? 1;
 // SMS & Notification Settings
 $sms_api_key = $settings_data['sms_api_key'] ?? '';
 $sms_sender_id = $settings_data['sms_sender_id'] ?? '';
-$sms_feature_on_off = $settings_data['sms_feature_on_off'] ?? 0;
-$sms_provider = !empty($settings_data['sms_provider']) ? $settings_data['sms_provider'] : 'bulk';
-$swapnopay_sms_api_url = !empty($settings_data['swapnopay_sms_api_url']) ? $settings_data['swapnopay_sms_api_url'] : 'https://api.swapnopay.top/api/v1/sms/send';
-$swapnopay_sms_api_key = $settings_data['swapnopay_sms_api_key'] ?? '';
-$swapnopay_sms_sender_id = $settings_data['swapnopay_sms_sender_id'] ?? '';
+$sms_feature_on_off = isset($settings_data['sms_feature_on_off']) ? (int)$settings_data['sms_feature_on_off'] : 1;
+$sms_provider = !empty($settings_data['sms_provider']) ? $settings_data['sms_provider'] : 'swapnopay';
+$swapnopay_sms_api_url = !empty($settings_data['swapnopay_sms_api_url']) ? $settings_data['swapnopay_sms_api_url'] : 'https://api.swapnopay.top/v1/sms-gateway/send';
+$swapnopay_sms_api_key = !empty($settings_data['swapnopay_sms_api_key']) ? $settings_data['swapnopay_sms_api_key'] : ($runtime['gateway_api_key'] ?? ($GLOBALS['runtime']['gateway_api_key'] ?? ''));
+$swapnopay_sms_sender_id = !empty($settings_data['swapnopay_sms_sender_id']) ? $settings_data['swapnopay_sms_sender_id'] : ($runtime['store_name'] ?? ($GLOBALS['runtime']['store_name'] ?? 'SwapnoPay'));
 $swapnopay_sms_device_id = $settings_data['swapnopay_sms_device_id'] ?? '';
 $sms_order_placed_template = $settings_data['sms_order_placed_template'] ?? '';
 $sms_order_shipped_template = $settings_data['sms_order_shipped_template'] ?? '';
@@ -982,34 +1038,38 @@ if(isset($_POST['form_payment_gateways'])) {
         $swapnopay_api_url_val = 'https://api.swapnopay.top';
     }
 
-    $statement = $pdo->prepare("UPDATE tbl_settings SET
-                                swapnopay_merchant_id=?,
-                                swapnopay_api_key=?,
-                                swapnopay_api_url=?,
-                                swapnopay_webhook_secret=?,
-                                swapnopay_mode=?,
-                                sslcz_store_id=?,
-                                sslcz_store_pass=?,
-                                sslcz_mode=?,
-                                cod_enabled=?,
-                                payment_methods=?,
-                                bank_detail=?
-                                WHERE id=1");
-    $statement->execute(array(
-        trim($_POST['swapnopay_merchant_id'] ?? ''),
-        trim($_POST['swapnopay_api_key'] ?? ''),
-        $swapnopay_api_url_val,
-        trim($_POST['swapnopay_webhook_secret'] ?? ''),
-        in_array($_POST['swapnopay_mode'] ?? '', ['sandbox', 'test'], true) ? 'sandbox' : 'live',
-        $_POST['sslcz_store_id'] ?? '',
-        $_POST['sslcz_store_pass'] ?? '',
-        in_array($_POST['sslcz_mode'] ?? '', ['live','0'], true) ? 'live' : 'sandbox',
-        $cod_status,
-        $payment_methods_selected,
-        $_POST['bank_detail'] ?? ''
-    ));
-    clearShopCaches();
-    $success_message = 'Payment Gateway Settings are updated successfully.';
+    try {
+        $statement = $pdo->prepare("UPDATE tbl_settings SET
+                                    swapnopay_merchant_id=?,
+                                    swapnopay_api_key=?,
+                                    swapnopay_api_url=?,
+                                    swapnopay_webhook_secret=?,
+                                    swapnopay_mode=?,
+                                    sslcz_store_id=?,
+                                    sslcz_store_pass=?,
+                                    sslcz_mode=?,
+                                    cod_enabled=?,
+                                    payment_methods=?,
+                                    bank_detail=?
+                                    WHERE id=1");
+        $statement->execute(array(
+            trim($_POST['swapnopay_merchant_id'] ?? ''),
+            trim($_POST['swapnopay_api_key'] ?? ''),
+            $swapnopay_api_url_val,
+            trim($_POST['swapnopay_webhook_secret'] ?? ''),
+            in_array($_POST['swapnopay_mode'] ?? '', ['sandbox', 'test'], true) ? 'sandbox' : 'live',
+            $_POST['sslcz_store_id'] ?? '',
+            $_POST['sslcz_store_pass'] ?? '',
+            in_array($_POST['sslcz_mode'] ?? '', ['live','0'], true) ? 'live' : 'sandbox',
+            $cod_status,
+            $payment_methods_selected,
+            $_POST['bank_detail'] ?? ''
+        ));
+        clearShopCaches();
+        $success_message = 'Payment Gateway Settings are updated successfully.';
+    } catch (Throwable $ex) {
+        $error_message = 'Failed to update payment settings: ' . $ex->getMessage();
+    }
 }
 
 
@@ -1021,45 +1081,50 @@ if(isset($_POST['form_api_integrations'])) {
     $show_google_login = isset($_POST['show_google_login']) ? 1 : 0;
     $show_facebook_login = isset($_POST['show_facebook_login']) ? 1 : 0;
 
-    $statement = $pdo->prepare("UPDATE tbl_settings SET
-                                gemini_api_key=?,
-                                openrouter_api_key=?,
-                                ai_provider=?,
-                                ai_pool_strategy=?,
-                                openrouter_model=?,
-                                chat_whatsapp_url=?,
-                                chat_messenger_url=?,
-                                chat_floating_icon_on_off=?,
-                                chat_call_enabled=?,
-                                facebook_app_id=?, facebook_app_secret=?,
-                                google_client_id=?, google_client_secret=?,
-                                twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?,
-                                show_google_login=?, show_facebook_login=?,
-                                supabase_url=?, supabase_anon_key=?
-                                WHERE id=1");
-    $statement->execute(array(
-        $_POST['gemini_api_key'] ?? '',
-        $_POST['openrouter_api_key'] ?? '',
-        $_POST['ai_provider'] ?? 'auto',
-        $_POST['ai_pool_strategy'] ?? 'round_robin',
-        $_POST['openrouter_model'] ?? 'openrouter/free',
-        $_POST['chat_whatsapp_url'] ?? '',
-        $_POST['chat_messenger_url'] ?? '',
-        isset($_POST['chat_floating_icon_on_off']) ? (int)$_POST['chat_floating_icon_on_off'] : 0,
-        isset($_POST['chat_call_enabled']) ? (int)$_POST['chat_call_enabled'] : 0,
-        $_POST['facebook_app_id'] ?? '',
-        $_POST['facebook_app_secret'] ?? '',
-        $_POST['google_client_id'] ?? '',
-        $_POST['google_client_secret'] ?? '',
-        $_POST['twilio_account_sid'] ?? '',
-        $_POST['twilio_auth_token'] ?? '',
-        $_POST['twilio_phone_number'] ?? '',
-        $show_google_login,
-        $show_facebook_login,
-        trim($_POST['supabase_url'] ?? ''),
-        trim($_POST['supabase_anon_key'] ?? '')
-    ));
-    $success_message = 'API Integration, Database, and Social Authentication Settings are updated successfully.';
+    try {
+        $statement = $pdo->prepare("UPDATE tbl_settings SET
+                                    gemini_api_key=?,
+                                    openrouter_api_key=?,
+                                    ai_provider=?,
+                                    ai_pool_strategy=?,
+                                    openrouter_model=?,
+                                    chat_whatsapp_url=?,
+                                    chat_messenger_url=?,
+                                    chat_floating_icon_on_off=?,
+                                    chat_call_enabled=?,
+                                    facebook_app_id=?, facebook_app_secret=?,
+                                    google_client_id=?, google_client_secret=?,
+                                    twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?,
+                                    show_google_login=?, show_facebook_login=?,
+                                    supabase_url=?, supabase_anon_key=?
+                                    WHERE id=1");
+        $statement->execute(array(
+            $_POST['gemini_api_key'] ?? '',
+            $_POST['openrouter_api_key'] ?? '',
+            $_POST['ai_provider'] ?? 'auto',
+            $_POST['ai_pool_strategy'] ?? 'round_robin',
+            $_POST['openrouter_model'] ?? 'openrouter/free',
+            $_POST['chat_whatsapp_url'] ?? '',
+            $_POST['chat_messenger_url'] ?? '',
+            isset($_POST['chat_floating_icon_on_off']) ? (int)$_POST['chat_floating_icon_on_off'] : 0,
+            isset($_POST['chat_call_enabled']) ? (int)$_POST['chat_call_enabled'] : 0,
+            $_POST['facebook_app_id'] ?? '',
+            $_POST['facebook_app_secret'] ?? '',
+            $_POST['google_client_id'] ?? '',
+            $_POST['google_client_secret'] ?? '',
+            $_POST['twilio_account_sid'] ?? '',
+            $_POST['twilio_auth_token'] ?? '',
+            $_POST['twilio_phone_number'] ?? '',
+            $show_google_login,
+            $show_facebook_login,
+            trim($_POST['supabase_url'] ?? ''),
+            trim($_POST['supabase_anon_key'] ?? '')
+        ));
+        clearShopCaches();
+        $success_message = 'API Integration, Database, and Social Authentication Settings are updated successfully.';
+    } catch (Throwable $ex) {
+        $error_message = 'Failed to update API settings: ' . $ex->getMessage();
+    }
 
     $gemini_api_key = $_POST['gemini_api_key'] ?? '';
     $openrouter_api_key = $_POST['openrouter_api_key'] ?? '';
@@ -1119,11 +1184,11 @@ if(isset($_POST['form_sms_settings']) || isset($_POST['form_sms'])) {
                                 auto_order_email_on_off=?
                                 WHERE id=1");
     $statement->execute(array(
-        $_POST['sms_feature_on_off'] ?? 0,
+        isset($_POST['sms_feature_on_off']) ? (int)$_POST['sms_feature_on_off'] : 0,
         $_POST['sms_api_key'] ?? '',
         $_POST['sms_sender_id'] ?? '',
-        $_POST['sms_provider'] ?? 'bulk',
-        $_POST['swapnopay_sms_api_url'] ?? 'https://api.swapnopay.top/api/v1/sms/send',
+        $_POST['sms_provider'] ?? 'swapnopay',
+        $_POST['swapnopay_sms_api_url'] ?? 'https://api.swapnopay.top/v1/sms-gateway/send',
         $_POST['swapnopay_sms_api_key'] ?? '',
         $_POST['swapnopay_sms_sender_id'] ?? '',
         $_POST['swapnopay_sms_device_id'] ?? '',
@@ -1488,11 +1553,11 @@ elseif (isset($_POST['form_page_settings'])) $active_tab = '#tab_page_settings';
 elseif (isset($_POST['form_language_converter'])) $active_tab = '#tab_language_converter';
 elseif (isset($_POST['form_payment_gateways'])) $active_tab = '#tab_payment_gateways';
 elseif (isset($_POST['form_api_integrations'])) $active_tab = '#tab_api_integrations';
-elseif (isset($_POST['form_review_delivery'])) $active_tab = '#tab_review_delivery';
-elseif (isset($_POST['form_sms'])) $active_tab = '#tab_sms';
-elseif (isset($_POST['form_banners'])) $active_tab = '#tab_banners';
-elseif (isset($_POST['form_social_media'])) $active_tab = '#tab_social_media';
-elseif (isset($_POST['form_email']) || isset($_POST['form_email_template']) || isset($_POST['form_email_content'])) $active_tab = '#tab_email';
+elseif (isset($_POST['form_review_delivery']) || isset($_POST['form_review_delivery_settings'])) $active_tab = '#tab_review_delivery';
+elseif (isset($_POST['form_sms']) || isset($_POST['form_sms_settings'])) $active_tab = '#tab_sms';
+elseif (isset($_POST['form_banners']) || isset($_POST['form_banner_settings'])) $active_tab = '#tab_banners';
+elseif (isset($_POST['form_social_media']) || isset($_POST['form_social'])) $active_tab = '#tab_social_media';
+elseif (isset($_POST['form_email']) || isset($_POST['form_email_template']) || isset($_POST['form_email_content']) || isset($_POST['form_email_settings'])) $active_tab = '#tab_email';
 elseif (isset($_POST['form_footer_settings'])) $active_tab = '#tab_footer';
 elseif (isset($_POST['form_popup_settings'])) $active_tab = '#tab_ads';
 elseif (isset($_POST['form_general_settings'])) $active_tab = '#tab_general';
@@ -1501,9 +1566,16 @@ $isAjaxSettings = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SER
     || !empty($_POST['is_ajax']) || isset($_POST['ajax']);
 
 if ($isAjaxSettings && !empty($_POST)) {
+    while (ob_get_level()) {
+        @ob_end_clean();
+    }
     header('Content-Type: application/json; charset=UTF-8');
     if (!empty($error_message)) {
-        echo json_encode(['success' => false, 'message' => $error_message]);
+        echo json_encode([
+            'success' => false,
+            'message' => $error_message,
+            'csrf_token' => $csrf->getToken()
+        ]);
     } else {
         $msg = !empty($success_message) ? $success_message : 'Settings saved successfully!';
         
@@ -1539,6 +1611,7 @@ if ($isAjaxSettings && !empty($_POST)) {
             'active_tab' => $active_tab,
             'media' => $mediaUrls,
             'slides' => $formattedSlides,
+            'csrf_token' => $csrf->getToken(),
             'settings' => $freshSettings
         ]);
     }
@@ -1681,7 +1754,17 @@ $estimated_delivery_time_international = $settings_data['estimated_delivery_time
 
 $sms_api_key = $settings_data['sms_api_key'] ?? '';
 $sms_sender_id = $settings_data['sms_sender_id'] ?? '';
-$sms_feature_on_off = $settings_data['sms_feature_on_off'] ?? 0;
+$sms_feature_on_off = isset($settings_data['sms_feature_on_off']) ? (int)$settings_data['sms_feature_on_off'] : 0;
+$sms_provider = !empty($settings_data['sms_provider']) ? $settings_data['sms_provider'] : 'swapnopay';
+$swapnopay_sms_api_url = !empty($settings_data['swapnopay_sms_api_url']) ? $settings_data['swapnopay_sms_api_url'] : 'https://api.swapnopay.top/v1/sms-gateway/send';
+$swapnopay_sms_api_key = !empty($settings_data['swapnopay_sms_api_key']) ? $settings_data['swapnopay_sms_api_key'] : ($runtime['gateway_api_key'] ?? ($GLOBALS['runtime']['gateway_api_key'] ?? ''));
+$swapnopay_sms_sender_id = !empty($settings_data['swapnopay_sms_sender_id']) ? $settings_data['swapnopay_sms_sender_id'] : ($runtime['store_name'] ?? ($GLOBALS['runtime']['store_name'] ?? 'SwapnoPay'));
+$swapnopay_sms_device_id = $settings_data['swapnopay_sms_device_id'] ?? '';
+$sms_order_placed_template = $settings_data['sms_order_placed_template'] ?? '';
+$sms_order_shipped_template = $settings_data['sms_order_shipped_template'] ?? '';
+$sms_order_completed_template = $settings_data['sms_order_completed_template'] ?? '';
+$auto_order_sms_on_off = $settings_data['auto_order_sms_on_off'] ?? 1;
+$auto_order_email_on_off = $settings_data['auto_order_email_on_off'] ?? 1;
 
 $banner_cart = $settings_data['banner_cart'] ?? '';
 $banner_search = $settings_data['banner_search'] ?? '';
@@ -1939,6 +2022,7 @@ $lang_sections = [
     ],
 ];
 
+require_once('header.php');
 ?>
 
 <style>
@@ -2208,7 +2292,8 @@ $lang_sections = [
             </div>
             <?php endif; ?>
 
-            <form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
+            <form class="form-horizontal" action="settings.php" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($csrf->getToken(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="nav-tabs-custom bg-white shadow-lg rounded-lg">
                     <ul class="nav nav-tabs px-4 pt-4">
                         <li class="active"><a href="#tab_general" data-toggle="tab">General</a></li>
@@ -3278,6 +3363,18 @@ $lang_sections = [
                         <div class="tab-pane" id="tab_payment_gateways">
                             <div class="box box-info">
                                 <div class="box-body">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
+                                        <div>
+                                            <h3 style="margin:0; font-size:18px; font-weight:700; color:#1e293b;"><i class="fa fa-credit-card text-primary"></i> Payment Gateways &amp; Methods</h3>
+                                            <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Configure automated checkout gateways (SwapnoPay, SSLCommerz, COD &amp; Bank Transfer).</p>
+                                        </div>
+                                        <div>
+                                            <button type="submit" name="form_payment_gateways" class="btn btn-success" style="border-radius:20px; font-weight:700; padding:7px 24px; box-shadow:0 2px 8px rgba(34,197,94,0.3);">
+                                                <i class="fa fa-save"></i> Save Payment Settings
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <h3 class="seo-info">Enabled Payment Methods</h3>
                                     <div class="form-group">
                                         <label for="" class="col-sm-3 control-label">Select Methods</label>
@@ -3361,6 +3458,13 @@ $lang_sections = [
                                             <p class="help-block">Add this Webhook Callback URL in your SwapnoPay Merchant Dashboard.</p>
                                         </div>
                                     </div>
+                                    <div class="form-group">
+                                        <div class="col-sm-offset-3 col-sm-9">
+                                            <button type="submit" name="form_payment_gateways" class="btn btn-primary" style="font-weight:600; border-radius:6px; padding:6px 18px;">
+                                                <i class="fa fa-check"></i> Save SwapnoPay Settings
+                                            </button>
+                                        </div>
+                                    </div>
 
                                     <h3 class="seo-info mt-8">SSLCommerz Settings</h3>
                                     <div class="form-group">
@@ -3418,6 +3522,18 @@ $lang_sections = [
                         <div class="tab-pane" id="tab_api_integrations">
                             <div class="box box-info">
                                 <div class="box-body">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
+                                        <div>
+                                            <h3 style="margin:0; font-size:18px; font-weight:700; color:#1e293b;"><i class="fa fa-plug text-primary"></i> API Integrations &amp; AI Engine</h3>
+                                            <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Manage AI Copilot multi-key pools, Live Chat channels, Supabase, OAuth, and Twilio APIs.</p>
+                                        </div>
+                                        <div>
+                                            <button type="submit" name="form_api_integrations" class="btn btn-success" style="border-radius:20px; font-weight:700; padding:7px 24px; box-shadow:0 2px 8px rgba(34,197,94,0.3);">
+                                                <i class="fa fa-save"></i> Save API Settings
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div class="callout callout-info" style="border-left-width: 4px; margin-bottom: 25px;">
                                         <h4><i class="fa fa-bolt"></i> AI Copilot & Live Chat Multi-Engine Pooling</h4>
                                         <p>You can enter <strong>multiple API keys</strong> (one per line or comma-separated). The system will automatically pool, rotate (round-robin), and failover seamlessly if a key hits rate limits (HTTP 429) or quota errors.</p>
@@ -3467,6 +3583,13 @@ $lang_sections = [
                                                 <option value="round_robin" <?php if($ai_pool_strategy === 'round_robin') echo 'selected'; ?>>Round-Robin (Even load distribution across all keys)</option>
                                                 <option value="failover" <?php if($ai_pool_strategy === 'failover') echo 'selected'; ?>>Failover (Use Primary key until rate limited, then rotate)</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <div class="col-sm-offset-3 col-sm-9">
+                                            <button type="submit" name="form_api_integrations" class="btn btn-primary" style="font-weight:600; border-radius:6px; padding:6px 20px;">
+                                                <i class="fa fa-check"></i> Save AI Copilot &amp; Key Pool Settings
+                                            </button>
                                         </div>
                                     </div>
 
@@ -3695,15 +3818,63 @@ $lang_sections = [
                                         <label for="sms_provider" class="col-sm-3 control-label">Active SMS Provider</label>
                                         <div class="col-sm-9">
                                             <select name="sms_provider" id="sms_provider" class="form-control w-auto" onchange="toggleSmsProviderBoxes(this.value)">
+                                                <option value="swapnopay" <?php if($sms_provider === 'swapnopay') {echo 'selected';} ?>>SwapnoPay SMS Gateway (api.swapnopay.top) [Recommended]</option>
                                                 <option value="bulk" <?php if($sms_provider === 'bulk') {echo 'selected';} ?>>Bulk SMS BD (bulksmsbd.net)</option>
-                                                <option value="swapnopay" <?php if($sms_provider === 'swapnopay') {echo 'selected';} ?>>SwapnoPay SMS Gateway (api.swapnopay.top)</option>
                                             </select>
                                             <p class="help-block">Select your preferred SMS gateway provider for sending transactional texts.</p>
                                         </div>
                                     </div>
 
-                                    <!-- Provider Box 1: Bulk SMS BD -->
-                                    <div id="bulk_sms_box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 24px; <?php echo ($sms_provider === 'swapnopay') ? 'display:none;' : ''; ?>">
+                                    <script>
+                                    function toggleSmsProviderBoxes(val) {
+                                        var bulkBox = document.getElementById('bulk_sms_box');
+                                        var swapnoBox = document.getElementById('swapnopay_sms_box');
+                                        if (val === 'swapnopay') {
+                                            if (swapnoBox) swapnoBox.style.display = 'block';
+                                            if (bulkBox) bulkBox.style.display = 'none';
+                                        } else {
+                                            if (swapnoBox) swapnoBox.style.display = 'none';
+                                            if (bulkBox) bulkBox.style.display = 'block';
+                                        }
+                                    }
+                                    window.toggleSmsProviderBoxes = toggleSmsProviderBoxes;
+                                    </script>
+
+                                    <!-- Provider Box 1: SwapnoPay SMS Gateway -->
+                                    <div id="swapnopay_sms_box" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 20px; margin-bottom: 24px; <?php echo ($sms_provider === 'swapnopay') ? 'display:block;' : 'display:none;'; ?>">
+                                        <h4 style="margin-top:0; font-weight:700; color:#166534;"><i class="fa fa-shield" style="color:#16a34a;"></i> SwapnoPay SMS Gateway Settings</h4>
+                                        <div class="form-group">
+                                            <label for="swapnopay_sms_api_url" class="col-sm-3 control-label">API Endpoint URL</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="swapnopay_sms_api_url" id="swapnopay_sms_api_url" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_api_url); ?>" placeholder="https://api.swapnopay.top/v1/sms-gateway/send">
+                                                <p class="help-block">SwapnoPay SMS Gateway endpoint (Default: <code>https://api.swapnopay.top/v1/sms-gateway/send</code>).</p>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="swapnopay_sms_api_key" class="col-sm-3 control-label">SwapnoPay API Key / Bearer Token</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="swapnopay_sms_api_key" id="swapnopay_sms_api_key" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_api_key); ?>" placeholder="e.g. sp_live_xxxx or merchant secret">
+                                                <p class="help-block">Merchant Secret Key / Authorization Bearer token generated from SwapnoPay portal.</p>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="swapnopay_sms_sender_id" class="col-sm-3 control-label">Sender ID / Masking</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="swapnopay_sms_sender_id" id="swapnopay_sms_sender_id" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_sender_id); ?>" placeholder="e.g. SwapnoPay or ShopNext">
+                                                <p class="help-block">Sender ID / Masking brand registered in your SwapnoPay gateway profile.</p>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="swapnopay_sms_device_id" class="col-sm-3 control-label">SIM Gateway Device ID (Optional)</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="swapnopay_sms_device_id" id="swapnopay_sms_device_id" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_device_id); ?>" placeholder="e.g. device_sim1_001">
+                                                <p class="help-block">Android SIM Relay / Device ID if using direct SIM SMS dispatch.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Provider Box 2: Bulk SMS BD -->
+                                    <div id="bulk_sms_box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 24px; <?php echo ($sms_provider === 'bulk') ? 'display:block;' : 'display:none;'; ?>">
                                         <h4 style="margin-top:0; font-weight:700; color:#0f172a;"><i class="fa fa-paper-plane" style="color:#f59e0b;"></i> Bulk SMS BD Settings</h4>
                                         <div class="form-group">
                                             <label for="sms_api_key" class="col-sm-3 control-label">Bulk SMS BD API Key</label>
@@ -3721,35 +3892,22 @@ $lang_sections = [
                                         </div>
                                     </div>
 
-                                    <!-- Provider Box 2: SwapnoPay SMS Gateway -->
-                                    <div id="swapnopay_sms_box" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 20px; margin-bottom: 24px; <?php echo ($sms_provider === 'swapnopay') ? '' : 'display:none;'; ?>">
-                                        <h4 style="margin-top:0; font-weight:700; color:#166534;"><i class="fa fa-shield" style="color:#16a34a;"></i> SwapnoPay SMS Gateway Settings</h4>
-                                        <div class="form-group">
-                                            <label for="swapnopay_sms_api_url" class="col-sm-3 control-label">API Endpoint URL</label>
-                                            <div class="col-sm-9">
-                                                <input type="text" name="swapnopay_sms_api_url" id="swapnopay_sms_api_url" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_api_url); ?>" placeholder="https://api.swapnopay.top/api/v1/sms/send">
-                                                <p class="help-block">SwapnoPay SMS Gateway endpoint (Default: <code>https://api.swapnopay.top/api/v1/sms/send</code>).</p>
+                                    <!-- Test SMS Gateway Card -->
+                                    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px;">
+                                        <h4 style="margin-top:0; font-weight:700; color:#0369a1;"><i class="fa fa-paper-plane-o" style="color:#0284c7;"></i> Test SMS Gateway</h4>
+                                        <p class="text-muted" style="font-size:13px; margin-bottom:12px;">Test your currently selected provider credentials by dispatching a real-time verification SMS.</p>
+                                        <div class="row">
+                                            <div class="col-sm-6">
+                                                <div class="input-group">
+                                                    <span class="input-group-addon"><i class="fa fa-phone"></i></span>
+                                                    <input type="text" id="test_sms_phone" class="form-control" placeholder="Recipient phone (e.g. 017XXXXXXXX)" value="<?php echo htmlspecialchars($contact_phone); ?>">
+                                                    <span class="input-group-btn">
+                                                        <button type="button" id="btn_send_test_sms" class="btn btn-info" style="font-weight:600;"><i class="fa fa-bolt"></i> Send Test SMS</button>
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="swapnopay_sms_api_key" class="col-sm-3 control-label">SwapnoPay API Key / Bearer Token</label>
-                                            <div class="col-sm-9">
-                                                <input type="text" name="swapnopay_sms_api_key" id="swapnopay_sms_api_key" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_api_key); ?>" placeholder="e.g. snp_live_secret_key_xxxx">
-                                                <p class="help-block">Merchant Secret Key / Authorization Bearer token generated from SwapnoPay portal.</p>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="swapnopay_sms_sender_id" class="col-sm-3 control-label">Sender ID / Masking</label>
-                                            <div class="col-sm-9">
-                                                <input type="text" name="swapnopay_sms_sender_id" id="swapnopay_sms_sender_id" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_sender_id); ?>" placeholder="e.g. SwapnoPay or ShopNext">
-                                                <p class="help-block">Sender ID / Masking brand registered in your SwapnoPay gateway profile.</p>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="swapnopay_sms_device_id" class="col-sm-3 control-label">SIM Gateway Device ID (Optional)</label>
-                                            <div class="col-sm-9">
-                                                <input type="text" name="swapnopay_sms_device_id" id="swapnopay_sms_device_id" class="form-control" value="<?php echo htmlspecialchars($swapnopay_sms_device_id); ?>" placeholder="e.g. device_sim1_001">
-                                                <p class="help-block">Android SIM Relay / Device ID if using direct SIM SMS dispatch.</p>
+                                            <div class="col-sm-6" style="padding-top: 6px;">
+                                                <span id="test_sms_status" style="display:inline-block; font-weight:600; font-size:13px;"></span>
                                             </div>
                                         </div>
                                     </div>
@@ -4718,15 +4876,31 @@ if (window.jQuery) {
                 formData.set(btnName, btnVal);
             }
 
+            var postUrl = $form.attr('action') || 'settings.php';
+            if (!postUrl || postUrl === '#' || postUrl === '') {
+                postUrl = 'settings.php';
+            }
+
+            var currentCsrf = $('input[name="_csrf"]').val() || '';
+            if (currentCsrf) {
+                formData.set('_csrf', currentCsrf);
+            }
+
             $.ajax({
-                url: window.location.pathname,
+                url: postUrl,
                 type: 'POST',
                 data: formData,
                 processData: false,
                 contentType: false,
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': currentCsrf
+                },
                 dataType: 'json'
             }).done(function(res) {
+                if (res && res.csrf_token) {
+                    $('input[name="_csrf"]').val(res.csrf_token);
+                }
                 if (res && res.success) {
                     // 1. Show instant floating toast
                     if (window.showAdminToast) {
@@ -4810,11 +4984,22 @@ if (window.jQuery) {
                     $submitBtn.prop('disabled', false).html(originalBtnHtml);
                 }
             }).fail(function(xhr, status, error) {
-                var errText = xhr.responseText || 'Server error occurred while saving settings.';
-                try {
-                    var parsed = JSON.parse(errText);
-                    if (parsed && parsed.message) errText = parsed.message;
-                } catch(e) {}
+                var errText = 'Server error occurred while saving settings.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errText = xhr.responseJSON.message;
+                } else if (xhr.responseText) {
+                    try {
+                        var parsed = JSON.parse(xhr.responseText);
+                        if (parsed && parsed.message) errText = parsed.message;
+                    } catch(e) {
+                        var div = document.createElement("div");
+                        div.innerHTML = xhr.responseText;
+                        var txt = div.textContent || div.innerText || "";
+                        if (txt.trim().length > 0 && txt.length < 250) {
+                            errText = txt.trim();
+                        }
+                    }
+                }
                 if (window.showAdminToast) {
                     window.showAdminToast(errText, 'error');
                 } else {
@@ -4902,7 +5087,7 @@ if (window.jQuery) {
             $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
 
             $.ajax({
-                url: window.location.pathname + '?action=delete_slide&slide_id=' + slideId + '&is_ajax=1',
+                url: 'settings.php?action=delete_slide&slide_id=' + slideId + '&is_ajax=1',
                 type: 'GET',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 dataType: 'json'
@@ -4921,6 +5106,56 @@ if (window.jQuery) {
             }).fail(function() {
                 alert('Network error while deleting slide.');
                 $btn.prop('disabled', false).html('<i class="fa fa-trash"></i> Delete');
+            });
+        });
+
+        // Ensure SMS provider box state is synced on page load & change
+        if (typeof toggleSmsProviderBoxes === 'function') {
+            toggleSmsProviderBoxes($('#sms_provider').val());
+        }
+        $('#sms_provider').on('change', function() {
+            if (typeof toggleSmsProviderBoxes === 'function') {
+                toggleSmsProviderBoxes($(this).val());
+            }
+        });
+
+        // Test SMS Ajax Handler
+        $(document).on('click', '#btn_send_test_sms', function(e) {
+            e.preventDefault();
+            var phone = $('#test_sms_phone').val().trim();
+            var provider = $('#sms_provider').val();
+            if (!phone) {
+                alert('Please enter a recipient phone number (e.g. 017XXXXXXXX).');
+                $('#test_sms_phone').focus();
+                return;
+            }
+            var $btn = $(this);
+            var origHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Sending...');
+            $('#test_sms_status').html('<span class="text-info"><i class="fa fa-spinner fa-spin"></i> Dispatching test SMS via ' + provider + '...</span>');
+
+            $.ajax({
+                url: 'settings.php?action=test_sms',
+                type: 'POST',
+                data: {
+                    test_phone: phone,
+                    sms_provider: provider,
+                    _csrf: $('input[name="_csrf"]').val() || ''
+                },
+                dataType: 'json'
+            }).done(function(res) {
+                if (res && res.success) {
+                    $('#test_sms_status').html('<span class="text-success"><i class="fa fa-check-circle"></i> ' + res.message + '</span>');
+                    if (window.showAdminToast) window.showAdminToast(res.message, 'success');
+                } else {
+                    var msg = (res && res.message) ? res.message : 'Failed to send test SMS.';
+                    $('#test_sms_status').html('<span class="text-danger"><i class="fa fa-times-circle"></i> ' + msg + '</span>');
+                    if (window.showAdminToast) window.showAdminToast(msg, 'error');
+                }
+            }).fail(function() {
+                $('#test_sms_status').html('<span class="text-danger"><i class="fa fa-times-circle"></i> Network error while testing SMS.</span>');
+            }).always(function() {
+                $btn.prop('disabled', false).html(origHtml);
             });
         });
     });

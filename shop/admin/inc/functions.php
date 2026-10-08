@@ -254,20 +254,170 @@ if (!function_exists('formatCurrency')) {
 }
 
 /**
- * Sends an SMS message using a simulated BulkSMSBD.net API call.
- * IMPORTANT: Replace the simulated API call with the actual BulkSMSBD.net API integration.
+ * Sends an SMS message using either SwapnoPay SMS Gateway or Bulk SMS BD.
  *
- * @param string $to The recipient's phone number (e.g., +8801XXXXXXXXX).
+ * @param string $to The recipient's phone number (e.g., 01XXXXXXXXX, +8801XXXXXXXXX).
  * @param string $message The message content.
- * @param string $api_key Your BulkSMSBD.net API Key.
- * @param string $sender_id Your BulkSMSBD.net Sender ID.
+ * @param string|null $api_key Optional API Key override.
+ * @param string|null $sender_id Optional Sender ID override.
+ * @param string|null $provider Optional provider override ('swapnopay' or 'bulk').
  * @return bool True on success, false on failure.
  */
-function sendSMS($to, $message, $api_key, $sender_id) {
-    // BulkSMSBD.net API endpoint and parameters (THIS IS A PLACEHOLDER)
-    error_log("Simulated SMS sent to: {$to}, Message: '{$message}' via Sender ID: '{$sender_id}' using API Key: '{$api_key}'");
-    return true; // Assume success for simulation
+function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = null) {
+    global $pdo;
+
+    if (empty($to) || empty($message)) {
+        error_log("[sendSMS] Recipient or message is empty.");
+        return false;
+    }
+
+    // Clean and normalize phone number
+    $phone = preg_replace('/[^\d+]/', '', (string)$to);
+    if (str_starts_with($phone, '+880')) {
+        $phone = substr($phone, 1);
+    } elseif (str_starts_with($phone, '01')) {
+        $phone = '88' . $phone;
+    }
+
+    // Retrieve settings
+    $settings = $GLOBALS['STORE_SETTINGS'] ?? null;
+    if (!$settings && isset($pdo) && $pdo instanceof PDO) {
+        try {
+            $stmt = $pdo->query("SELECT * FROM tbl_settings WHERE id = 1 LIMIT 1");
+            $settings = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        } catch (Throwable $e) {
+            error_log("[sendSMS] Failed to read tbl_settings: " . $e->getMessage());
+        }
+    }
+
+    $activeProvider = $provider ?: (!empty($settings['sms_provider']) ? $settings['sms_provider'] : 'swapnopay');
+    $smsEnabled = isset($settings['sms_feature_on_off']) ? (int)$settings['sms_feature_on_off'] : 1;
+
+    if (!$smsEnabled) {
+        error_log("[sendSMS] SMS feature is turned off in settings. Skipping dispatch to {$phone}.");
+        return false;
+    }
+
+    if ($activeProvider === 'swapnopay') {
+        $endpoint = !empty($settings['swapnopay_sms_api_url'])
+            ? trim($settings['swapnopay_sms_api_url'])
+            : 'https://api.swapnopay.top/v1/sms-gateway/send';
+
+        $apiKey = !empty($api_key)
+            ? $api_key
+            : (!empty($settings['swapnopay_sms_api_key'])
+                ? trim($settings['swapnopay_sms_api_key'])
+                : ($GLOBALS['runtime']['gateway_api_key'] ?? ''));
+
+        $senderId = !empty($sender_id)
+            ? $sender_id
+            : (!empty($settings['swapnopay_sms_sender_id'])
+                ? trim($settings['swapnopay_sms_sender_id'])
+                : ($GLOBALS['runtime']['store_name'] ?? 'SwapnoPay'));
+
+        $deviceId = !empty($settings['swapnopay_sms_device_id'])
+            ? trim($settings['swapnopay_sms_device_id'])
+            : '';
+
+        $postData = [
+            'phone' => $phone,
+            'message' => $message,
+            'priority' => 'HIGH',
+            'sender_id' => $senderId,
+            'device_id' => $deviceId
+        ];
+
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ];
+        if (!empty($apiKey)) {
+            $headers[] = 'x-api-key: ' . $apiKey;
+            $headers[] = 'Authorization: Bearer ' . $apiKey;
+        }
+
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($postData),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) {
+            error_log("[sendSMS][SwapnoPay] cURL error: " . $curlErr);
+            return false;
+        }
+
+        $decoded = json_decode($response, true);
+        if ($httpCode >= 200 && $httpCode < 300 && (!empty($decoded['ok']) || !empty($decoded['success']) || !empty($decoded['job_id']))) {
+            error_log("[sendSMS][SwapnoPay] SMS dispatched to {$phone}: Job " . ($decoded['job_id'] ?? 'OK'));
+            return true;
+        }
+
+        error_log("[sendSMS][SwapnoPay] Failed (HTTP {$httpCode}): " . $response);
+        return false;
+
+    } else {
+        // Bulk SMS BD (bulksmsbd.net)
+        $apiKey = !empty($api_key) ? $api_key : ($settings['sms_api_key'] ?? '');
+        $senderId = !empty($sender_id) ? $sender_id : ($settings['sms_sender_id'] ?? '');
+
+        if (empty($apiKey)) {
+            error_log("[sendSMS][BulkSMSBD] Missing API key.");
+            return false;
+        }
+
+        $url = 'https://bulksmsbd.net/api/smsapi';
+        $params = [
+            'api_key' => $apiKey,
+            'type' => 'text',
+            'number' => $phone,
+            'senderid' => $senderId,
+            'message' => $message
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($params),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) {
+            error_log("[sendSMS][BulkSMSBD] cURL error: " . $curlErr);
+            return false;
+        }
+
+        $decoded = json_decode($response, true);
+        if ($httpCode >= 200 && $httpCode < 300 && (isset($decoded['response_code']) && ($decoded['response_code'] == 202 || $decoded['response_code'] == 200))) {
+            error_log("[sendSMS][BulkSMSBD] SMS sent successfully to {$phone}.");
+            return true;
+        }
+
+        error_log("[sendSMS][BulkSMSBD] Failed (HTTP {$httpCode}): " . $response);
+        return false;
+    }
 }
+
 
 /**
  * Loads cart data from the database into the session.

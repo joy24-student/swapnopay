@@ -17,13 +17,31 @@ if(!isset($_SESSION['user'])) {
 	exit;
 }
 
-// Getting all language variables
-$i=1;
-$statement = $pdo->prepare("SELECT * FROM tbl_language ORDER BY lang_id");
-$statement->execute();
-$result = $statement->fetchAll(PDO::FETCH_ASSOC);                           
-foreach ($result as $row) {
-    define('LANG_VALUE_'.$i,$row['lang_value']);
+// Getting all language variables (cached for ultra-fast page loads)
+$langCacheFile = sys_get_temp_dir() . '/.cache_lang_' . md5(($runtime['merchant_id'] ?? 'def') . '_' . ($runtime['shop_slug'] ?? 'store') . '_v1') . '.json';
+$langMap = null;
+if (is_file($langCacheFile)) {
+    $langMap = json_decode(@file_get_contents($langCacheFile), true);
+}
+if (!is_array($langMap) || empty($langMap)) {
+    try {
+        $statement = $pdo->prepare("SELECT lang_id, lang_value FROM tbl_language ORDER BY lang_id ASC");
+        $statement->execute();
+        $langRows = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $langMap = [];
+        foreach ($langRows as $row) {
+            $langMap[(int)$row['lang_id']] = $row['lang_value'];
+        }
+        @file_put_contents($langCacheFile, json_encode($langMap));
+    } catch (Throwable $_) {
+        $langMap = [];
+    }
+}
+$i = 1;
+foreach ($langMap as $val) {
+    if (!defined('LANG_VALUE_' . $i)) {
+        define('LANG_VALUE_' . $i, $val);
+    }
     $i++;
 }
 ?>
@@ -255,6 +273,19 @@ foreach ($result as $row) {
 			          <a href="live-chat.php">
 			            <i class="fa fa-commenting-o"></i> <span>Live Support Chat</span>
 			          </a>
+			        </li>
+
+			        <li class="treeview <?php if( ($cur_page == 'broadcast-notification.php') || ($cur_page == 'notifications.php') ) {echo 'active';} ?>">
+			          <a href="#">
+			            <i class="fa fa-bullhorn"></i> <span>Notifications</span>
+			            <span class="pull-right-container">
+			              <i class="fa fa-angle-right pull-right"></i>
+			            </span>
+			          </a>
+			          <ul class="treeview-menu">
+			            <li class="<?php if($cur_page == 'broadcast-notification.php') {echo 'active';} ?>"><a href="broadcast-notification.php"><i class="fa fa-paper-plane"></i> Broadcast Push (FCM)</a></li>
+			            <li class="<?php if($cur_page == 'notifications.php') {echo 'active';} ?>"><a href="notifications.php"><i class="fa fa-bell-o"></i> Store Alert Center</a></li>
+			          </ul>
 			        </li>
 
 

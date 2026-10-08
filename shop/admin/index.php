@@ -1,173 +1,158 @@
-<?php require_once __DIR__ . '/inc/guard.php'; ?>
-<?php require_once('header.php'); ?>
-
 <?php
-$statement = $pdo->prepare("SELECT * FROM tbl_top_category");
-$statement->execute();
-$total_top_category = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_mid_category");
-$statement->execute();
-$total_mid_category = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_end_category");
-$statement->execute();
-$total_end_category = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_product");
-$statement->execute();
-$total_product = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_customer WHERE cust_status='1'");
-$statement->execute();
-$total_customers = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_subscriber WHERE subs_active='1'");
-$statement->execute();
-$total_subscriber = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_shipping_cost");
-$statement->execute();
-$available_shipping = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status=?");
-$statement->execute(array('Completed'));
-$total_order_completed = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE shipping_status=?");
-$statement->execute(array('Completed'));
-$total_shipping_completed = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status=?");
-$statement->execute(array('Pending'));
-$total_order_pending = $statement->rowCount();
-
-$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status=? AND shipping_status=?");
-$statement->execute(array('Completed','Pending'));
-$total_order_complete_shipping_pending = $statement->rowCount();
-
-// Notification & FCM Stats
-$total_notifications_sent = 0;
-$total_fcm_devices = 0;
-$recent_broadcasts = [];
-try {
-    $total_notifications_sent = (int)$pdo->query("SELECT COUNT(*) FROM tbl_notifications")->fetchColumn();
-    $total_fcm_devices = (int)$pdo->query("SELECT COUNT(*) FROM tbl_fcm_tokens")->fetchColumn();
-    $recent_broadcasts = $pdo->query("SELECT * FROM tbl_notifications ORDER BY created_at DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {}
+require_once __DIR__ . '/inc/guard.php';
+if (!empty($_POST) && (
+    isset($_POST['form_api_integrations']) ||
+    isset($_POST['form_payment_gateways']) ||
+    isset($_POST['form_general_settings']) ||
+    isset($_POST['form_sms']) ||
+    isset($_POST['form_banners']) ||
+    isset($_POST['form_social_media']) ||
+    isset($_POST['form_footer_settings']) ||
+    isset($_POST['form_popup_settings']) ||
+    isset($_POST['form_language_converter']) ||
+    isset($_POST['form_review_delivery'])
+)) {
+    require_once __DIR__ . '/settings.php';
+    exit;
+}
+require_once('header.php');
 ?>
 
 <?php
 // Store Currency Symbol
 $currency_symbol = (defined('LANG_VALUE_1') && !empty(LANG_VALUE_1) && LANG_VALUE_1 !== '$') ? LANG_VALUE_1 : '৳';
 
-// Real KPI Metrics from Database
-$dash_revenue = 0.0;
-$dash_total_orders = 0;
-$dash_pending_orders = 0;
-$dash_online_pm_pct = 0.0;
-$dash_cod_pm_pct = 0.0;
-$cod_count = 0;
-$online_count = 0;
+// Cache key per tenant
+$tenantDashKey = md5(($runtime['merchant_id'] ?? 'def') . '_' . ($runtime['shop_slug'] ?? 'store'));
+$dashCacheFile = sys_get_temp_dir() . '/.dash_cache_' . $tenantDashKey . '.json';
+$dashData = null;
 
-// Date boundaries for real week-over-week trends & chart
 $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-6 days'));
 $fourteenDaysAgo = date('Y-m-d 00:00:00', strtotime('-13 days'));
 $sevenDaysEnd = date('Y-m-d 23:59:59', strtotime('-7 days'));
 
-$sales_growth = 0.0;
-$orders_growth = 0.0;
-$cust_growth = 0.0;
-$pending_growth = 0.0;
+if (is_file($dashCacheFile) && (time() - filemtime($dashCacheFile)) < 20) {
+    $dashData = json_decode(@file_get_contents($dashCacheFile), true);
+}
 
+if (!is_array($dashData) || empty($dashData)) {
+    $dashData = [];
+    try {
+        // 1. Consolidated table counts & core metrics in 1 single round trip
+        $dashStmt = $pdo->query("
+            SELECT
+                (SELECT COUNT(*) FROM tbl_top_category) AS total_top_category,
+                (SELECT COUNT(*) FROM tbl_mid_category) AS total_mid_category,
+                (SELECT COUNT(*) FROM tbl_end_category) AS total_end_category,
+                (SELECT COUNT(*) FROM tbl_product) AS total_product,
+                (SELECT COUNT(*) FROM tbl_customer WHERE cust_status='1') AS total_customers,
+                (SELECT COUNT(*) FROM tbl_subscriber WHERE subs_active='1') AS total_subscriber,
+                (SELECT COUNT(*) FROM tbl_shipping_cost) AS available_shipping,
+                (SELECT COUNT(*) FROM tbl_payment WHERE payment_status='Completed') AS total_order_completed,
+                (SELECT COUNT(*) FROM tbl_payment WHERE shipping_status='Completed') AS total_shipping_completed,
+                (SELECT COUNT(*) FROM tbl_payment WHERE payment_status='Pending') AS total_order_pending,
+                (SELECT COUNT(*) FROM tbl_payment WHERE payment_status='Completed' AND shipping_status='Pending') AS total_order_complete_shipping_pending,
+                (SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed') AS dash_revenue,
+                (SELECT COUNT(*) FROM tbl_payment) AS dash_total_orders,
+                (SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled') AS dash_pending_orders,
+                (SELECT COUNT(*) FROM tbl_payment WHERE payment_method IS NOT NULL AND payment_method != '') AS total_pm,
+                (SELECT COUNT(*) FROM tbl_payment WHERE payment_method IN ('COD', 'Cash on Delivery', 'Cash')) AS cod_count,
+                (SELECT COUNT(*) FROM tbl_notifications) AS total_notifications_sent,
+                (SELECT COUNT(*) FROM tbl_fcm_tokens) AS total_fcm_devices
+        ");
+        if ($dashStmt) {
+            $dashData = $dashStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        }
+    } catch (Throwable $_) {}
+
+    // 2. Week-over-week growth (consolidated in 1 single query)
+    try {
+        $growStmt = $pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN payment_status = 'Completed' AND payment_date >= :s7 THEN paid_amount ELSE 0 END), 0) AS sales_last_7,
+                COALESCE(SUM(CASE WHEN payment_status = 'Completed' AND payment_date >= :s14 AND payment_date <= :s7e THEN paid_amount ELSE 0 END), 0) AS sales_prev_7,
+                COUNT(CASE WHEN payment_date >= :s7 THEN 1 END) AS orders_last_7,
+                COUNT(CASE WHEN payment_date >= :s14 AND payment_date <= :s7e THEN 1 END) AS orders_prev_7,
+                COUNT(CASE WHEN (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= :s7 THEN 1 END) AS pending_last_7,
+                COUNT(CASE WHEN (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= :s14 AND payment_date <= :s7e THEN 1 END) AS pending_prev_7
+            FROM tbl_payment
+        ");
+        $growStmt->execute([
+            ':s7' => $sevenDaysAgo,
+            ':s14' => $fourteenDaysAgo,
+            ':s7e' => $sevenDaysEnd
+        ]);
+        $growRow = $growStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $dashData = array_merge($dashData, $growRow);
+    } catch (Throwable $_) {}
+
+    // 3. Customer growth (1 single query)
+    try {
+        $cgStmt = $pdo->prepare("
+            SELECT
+                COUNT(CASE WHEN cust_datetime >= :s7 THEN 1 END) AS cust_last_7,
+                COUNT(CASE WHEN cust_datetime >= :s14 AND cust_datetime <= :s7e THEN 1 END) AS cust_prev_7
+            FROM tbl_customer
+        ");
+        $cgStmt->execute([
+            ':s7' => $sevenDaysAgo,
+            ':s14' => $fourteenDaysAgo,
+            ':s7e' => $sevenDaysEnd
+        ]);
+        $cgRow = $cgStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $dashData = array_merge($dashData, $cgRow);
+    } catch (Throwable $_) {}
+
+    if (!empty($dashData)) {
+        @file_put_contents($dashCacheFile, json_encode($dashData));
+    }
+}
+
+// Populate view variables
+$total_top_category = (int)($dashData['total_top_category'] ?? 0);
+$total_mid_category = (int)($dashData['total_mid_category'] ?? 0);
+$total_end_category = (int)($dashData['total_end_category'] ?? 0);
+$total_product = (int)($dashData['total_product'] ?? 0);
+$total_customers = (int)($dashData['total_customers'] ?? 0);
+$total_subscriber = (int)($dashData['total_subscriber'] ?? 0);
+$available_shipping = (int)($dashData['available_shipping'] ?? 0);
+$total_order_completed = (int)($dashData['total_order_completed'] ?? 0);
+$total_shipping_completed = (int)($dashData['total_shipping_completed'] ?? 0);
+$total_order_pending = (int)($dashData['total_order_pending'] ?? 0);
+$total_order_complete_shipping_pending = (int)($dashData['total_order_complete_shipping_pending'] ?? 0);
+
+$total_notifications_sent = (int)($dashData['total_notifications_sent'] ?? 0);
+$total_fcm_devices = (int)($dashData['total_fcm_devices'] ?? 0);
+$recent_broadcasts = [];
 try {
-    // 1. Total Completed Revenue
-    $dash_revenue = (float)$pdo->query("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed'")->fetchColumn();
-    
-    // 2. Total Orders
-    $dash_total_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment")->fetchColumn();
-    
-    // 3. Total Pending / In-Fulfillment Orders
-    $dash_pending_orders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled'")->fetchColumn();
-    
-    // 4. Real Payment Breakdown
-    $total_pm = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IS NOT NULL AND payment_method != ''")->fetchColumn();
-    if ($total_pm > 0) {
-        $cod_count = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE payment_method IN ('COD', 'Cash on Delivery', 'Cash')")->fetchColumn();
-        $online_count = max(0, $total_pm - $cod_count);
-        $dash_cod_pm_pct = round(($cod_count / $total_pm) * 100, 1);
-        $dash_online_pm_pct = round(100 - $dash_cod_pm_pct, 1);
-    }
+    $recent_broadcasts = $pdo->query("SELECT * FROM tbl_notifications ORDER BY created_at DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $_) {}
 
-    // 5. Week-over-Week Calculations
-    // Sales: Last 7 Days vs Previous 7 Days
-    $s7Stmt = $pdo->prepare("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed' AND payment_date >= ?");
-    $s7Stmt->execute([$sevenDaysAgo]);
-    $sales_last_7 = (float)$s7Stmt->fetchColumn();
+$dash_revenue = (float)($dashData['dash_revenue'] ?? 0);
+$dash_total_orders = (int)($dashData['dash_total_orders'] ?? 0);
+$dash_pending_orders = (int)($dashData['dash_pending_orders'] ?? 0);
 
-    $sp7Stmt = $pdo->prepare("SELECT COALESCE(SUM(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed' AND payment_date >= ? AND payment_date <= ?");
-    $sp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
-    $sales_prev_7 = (float)$sp7Stmt->fetchColumn();
+$total_pm = (int)($dashData['total_pm'] ?? 0);
+$cod_count = (int)($dashData['cod_count'] ?? 0);
+$online_count = max(0, $total_pm - $cod_count);
+$dash_cod_pm_pct = ($total_pm > 0) ? round(($cod_count / $total_pm) * 100, 1) : 0.0;
+$dash_online_pm_pct = ($total_pm > 0) ? round(100 - $dash_cod_pm_pct, 1) : 0.0;
 
-    if ($sales_prev_7 > 0) {
-        $sales_growth = round((($sales_last_7 - $sales_prev_7) / $sales_prev_7) * 100, 1);
-    } elseif ($sales_last_7 > 0) {
-        $sales_growth = 100.0;
-    } else {
-        $sales_growth = 0.0;
-    }
+$sales_last_7 = (float)($dashData['sales_last_7'] ?? 0);
+$sales_prev_7 = (float)($dashData['sales_prev_7'] ?? 0);
+$sales_growth = ($sales_prev_7 > 0) ? round((($sales_last_7 - $sales_prev_7) / $sales_prev_7) * 100, 1) : (($sales_last_7 > 0) ? 100.0 : 0.0);
 
-    // Orders: Last 7 Days vs Previous 7 Days
-    $o7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE payment_date >= ?");
-    $o7Stmt->execute([$sevenDaysAgo]);
-    $orders_last_7 = (int)$o7Stmt->fetchColumn();
+$orders_last_7 = (int)($dashData['orders_last_7'] ?? 0);
+$orders_prev_7 = (int)($dashData['orders_prev_7'] ?? 0);
+$orders_growth = ($orders_prev_7 > 0) ? round((($orders_last_7 - $orders_prev_7) / $orders_prev_7) * 100, 1) : (($orders_last_7 > 0) ? 100.0 : 0.0);
 
-    $op7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE payment_date >= ? AND payment_date <= ?");
-    $op7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
-    $orders_prev_7 = (int)$op7Stmt->fetchColumn();
+$cust_last_7 = (int)($dashData['cust_last_7'] ?? 0);
+$cust_prev_7 = (int)($dashData['cust_prev_7'] ?? 0);
+$cust_growth = ($cust_prev_7 > 0) ? round((($cust_last_7 - $cust_prev_7) / $cust_prev_7) * 100, 1) : (($cust_last_7 > 0) ? 100.0 : 0.0);
 
-    if ($orders_prev_7 > 0) {
-        $orders_growth = round((($orders_last_7 - $orders_prev_7) / $orders_prev_7) * 100, 1);
-    } elseif ($orders_last_7 > 0) {
-        $orders_growth = 100.0;
-    } else {
-        $orders_growth = 0.0;
-    }
-
-    // Customers: Last 7 Days vs Previous 7 Days
-    $c7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_customer WHERE cust_datetime >= ?");
-    $c7Stmt->execute([$sevenDaysAgo]);
-    $cust_last_7 = (int)$c7Stmt->fetchColumn();
-
-    $cp7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_customer WHERE cust_datetime >= ? AND cust_datetime <= ?");
-    $cp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
-    $cust_prev_7 = (int)$cp7Stmt->fetchColumn();
-
-    if ($cust_prev_7 > 0) {
-        $cust_growth = round((($cust_last_7 - $cust_prev_7) / $cust_prev_7) * 100, 1);
-    } elseif ($cust_last_7 > 0) {
-        $cust_growth = 100.0;
-    } else {
-        $cust_growth = 0.0;
-    }
-
-    // Pending Orders: Last 7 Days vs Previous 7 Days
-    $p7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= ?");
-    $p7Stmt->execute([$sevenDaysAgo]);
-    $pending_last_7 = (int)$p7Stmt->fetchColumn();
-
-    $pp7Stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled' AND payment_date >= ? AND payment_date <= ?");
-    $pp7Stmt->execute([$fourteenDaysAgo, $sevenDaysEnd]);
-    $pending_prev_7 = (int)$pp7Stmt->fetchColumn();
-
-    if ($pending_prev_7 > 0) {
-        $pending_growth = round((($pending_last_7 - $pending_prev_7) / $pending_prev_7) * 100, 1);
-    } elseif ($pending_last_7 > 0) {
-        $pending_growth = 100.0;
-    } else {
-        $pending_growth = 0.0;
-    }
-} catch (Throwable $e) {}
+$pending_last_7 = (int)($dashData['pending_last_7'] ?? 0);
+$pending_prev_7 = (int)($dashData['pending_prev_7'] ?? 0);
+$pending_growth = ($pending_prev_7 > 0) ? round((($pending_last_7 - $pending_prev_7) / $pending_prev_7) * 100, 1) : (($pending_last_7 > 0) ? 100.0 : 0.0);
 
 // Real Formatted Strings (Zero Fallback to Fake Numbers)
 $disp_sales = $currency_symbol . ' ' . number_format($dash_revenue, 2);
@@ -644,7 +629,7 @@ function renderTrendBadge($growth) {
 </div>
 
 <!-- Broadcast Push Notification Center (Main Dashboard Section) -->
-<div class="row hidden-xs" style="margin-top: 20px;">
+<div class="row" style="margin-top: 20px;">
     <!-- Broadcast Form -->
     <div class="col-md-7">
         <div class="box box-warning" style="border-top: 3px solid #f39c12; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">

@@ -1220,6 +1220,8 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     default_success_url:  merchantRow?.success_url || memSettings?.success_url || globalConfig.default_success_url,
     default_fail_url:     merchantRow?.fail_url    || memSettings?.fail_url    || globalConfig.default_fail_url,
     default_cancel_url:   merchantRow?.cancel_url  || memSettings?.cancel_url  || globalConfig.default_cancel_url,
+    webhook_url:          memSettings?.webhook_url || memSettings?.callback_url || merchantRow?.webhook_url || null,
+    webhook_secret:       memSettings?.webhook_secret || merchantRow?.webhook_secret || null,
     receiving_numbers:    effectiveReceiving,
     account_types:        effectiveAccountTypes,
     qr_codes:             effectiveQrCodes,
@@ -1296,6 +1298,9 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
   if (settings.supabase_url)      row.supabase_url      = settings.supabase_url
   if (settings.supabase_anon_key) row.supabase_anon_key = settings.supabase_anon_key
 
+  if (settings.webhook_url || settings.callback_url) row.webhook_url = settings.webhook_url || settings.callback_url
+  if (settings.webhook_secret)    row.webhook_secret    = settings.webhook_secret
+
   const extraDbFields = {}
   if (settings.supabase_service_role_key) extraDbFields.supabase_service_role_key = settings.supabase_service_role_key
   if (settings.db_password)               extraDbFields.db_password               = settings.db_password
@@ -1308,13 +1313,18 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
 
   // Always update memory and disk immediately
   const prev = inMemoryMerchantGatewaySettings.get(merchantId) || {}
+  const shouldReplaceReceiving = Boolean(settings.replace_receiving_numbers || settings.exact_receiving_numbers || (settings.receiving_numbers && typeof settings.receiving_numbers === 'object'))
+  const finalReceiving = shouldReplaceReceiving ? receiving : { ...(prev.receiving_numbers || {}), ...receiving }
+  const finalAccountTypes = shouldReplaceReceiving ? accountTypes : { ...(prev.account_types || {}), ...accountTypes }
+  const finalQrCodes = shouldReplaceReceiving ? qrCodes : { ...(prev.qr_codes || {}), ...qrCodes }
+
   const merged = {
     ...prev,
     ...row,
     ...extraDbFields,
-    receiving_numbers: { ...(prev.receiving_numbers || {}), ...receiving },
-    account_types: { ...(prev.account_types || {}), ...accountTypes },
-    qr_codes: { ...(prev.qr_codes || {}), ...qrCodes },
+    receiving_numbers: finalReceiving,
+    account_types: finalAccountTypes,
+    qr_codes: finalQrCodes,
   }
   inMemoryMerchantGatewaySettings.set(merchantId, merged)
   saveMerchantSettingsToDisk()
@@ -1331,9 +1341,9 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
       inMemoryMerchantGatewaySettings.set(merchantId, {
         ...merged,
         ...dbData,
-        receiving_numbers: { ...(prev.receiving_numbers || {}), ...receiving },
-        account_types: { ...(prev.account_types || {}), ...accountTypes },
-        qr_codes: { ...(prev.qr_codes || {}), ...qrCodes }
+        receiving_numbers: finalReceiving,
+        account_types: finalAccountTypes,
+        qr_codes: finalQrCodes
       })
       saveMerchantSettingsToDisk()
     }
@@ -1342,13 +1352,15 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
   }
 
   // Asynchronously mirror branding & database credentials to merchants table if present
-  if (settings.merchant_name || settings.merchant_logo_url || settings.supabase_url || settings.supabase_anon_key) {
+  if (settings.merchant_name || settings.merchant_logo_url || settings.supabase_url || settings.supabase_anon_key || settings.webhook_secret || settings.webhook_url) {
     try {
       const updateData = {}
       if (settings.merchant_name) updateData.business_name = settings.merchant_name
       if (settings.merchant_logo_url) updateData.photo_url = settings.merchant_logo_url
       if (settings.supabase_url) updateData.supabase_url = settings.supabase_url
       if (settings.supabase_anon_key) updateData.supabase_anon_key = settings.supabase_anon_key
+      if (settings.webhook_secret) updateData.webhook_secret = settings.webhook_secret
+      if (settings.webhook_url) updateData.webhook_url = settings.webhook_url
       getAdminClient()
         .from('merchants')
         .update(updateData)

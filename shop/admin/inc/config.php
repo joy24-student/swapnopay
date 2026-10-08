@@ -208,6 +208,7 @@ if (!$runtime || empty($runtime['merchant_id']) || empty($runtime['db'])) {
 }
 
 // Tenant-isolated session
+$GLOBALS['runtime'] = $runtime;
 $merchantId = $runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: 'default-merchant');
 $sessionCookieName = 'SP_SESS_' . substr(md5($merchantId . '_' . ($runtime['shop_slug'] ?? '')), 0, 12);
 if (session_status() !== PHP_SESSION_ACTIVE) {

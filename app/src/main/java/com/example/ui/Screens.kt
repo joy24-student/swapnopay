@@ -14675,6 +14675,7 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
     val numbers by viewModel.merchantNumbers.collectAsState()
     var selectedTab by remember { mutableStateOf("All") }
     var showAddNumberDialog by remember { mutableStateOf(false) }
+    var numberToDelete by remember { mutableStateOf<MerchantNumber?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.pullMerchantConfigFromBackend()
@@ -14832,6 +14833,23 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp
                                     )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { numberToDelete = num },
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .background(
+                                                color = Color(0xFFEF4444).copy(alpha = 0.08f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Delete,
+                                            contentDescription = "Delete Number",
+                                            tint = Color(0xFFEF4444),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -14930,6 +14948,136 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                     }
                 }
             }
+        }
+
+        // Delete Number Confirmation Dialog
+        numberToDelete?.let { target ->
+            AlertDialog(
+                onDismissRequest = { numberToDelete = null },
+                shape = RoundedCornerShape(20.dp),
+                containerColor = AppCardBg,
+                icon = {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                },
+                title = {
+                    Text(
+                        text = "Delete Payment Number?",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = AppTextPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Are you sure you want to permanently delete this recipient number?",
+                            fontSize = 13.5.sp,
+                            color = AppTextSecondary,
+                            lineHeight = 18.sp
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppScreenBg,
+                            border = BorderStroke(1.dp, AppCardBorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OfficialMfsLogo(
+                                    method = target.method,
+                                    size = 36.dp,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "${target.method} (${target.type})",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = AppTextPrimary
+                                    )
+                                    Text(
+                                        text = target.number,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        color = BrandPurple
+                                    )
+                                }
+                            }
+                        }
+
+                        if (target.isDefault) {
+                            Text(
+                                text = "⚠️ Notice: This is your default receiving account. If deleted, another active number will automatically be designated as default.",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFFD97706),
+                                lineHeight = 15.sp
+                            )
+                        } else {
+                            Text(
+                                text = "This number will immediately be removed from all hosted payment forms, QR codes, and checkout gateway options.",
+                                fontSize = 11.5.sp,
+                                color = AppTextSecondary,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.deleteMerchantNumber(target.number)
+                            numberToDelete = null
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFDC2626),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "Delete Number (মুছে ফেলুন)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { numberToDelete = null },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = AppTextSecondary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            )
         }
 
         // Add Number Overlay

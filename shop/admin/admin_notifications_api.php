@@ -22,33 +22,37 @@ if (!isset($_SESSION['user'])) {
 require_once __DIR__ . '/inc/config.php';
 require_once __DIR__ . '/inc/functions.php';
 
-// Safe table auto-initialization
-try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS tbl_admin_notifications (
-            id SERIAL PRIMARY KEY,
-            notification_key VARCHAR(100) UNIQUE,
-            title VARCHAR(255) NOT NULL,
-            message TEXT NOT NULL,
-            category VARCHAR(50) DEFAULT 'system',
-            severity VARCHAR(20) DEFAULT 'info',
-            action_url VARCHAR(255) DEFAULT '',
-            is_read SMALLINT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    ");
+// Safe table auto-initialization (run once per tenant, skip on rapid polling)
+$notifInitFlag = sys_get_temp_dir() . '/.notifs_init_' . md5(($runtime['merchant_id'] ?? 'def') . '_v1');
+if (!is_file($notifInitFlag)) {
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tbl_admin_notifications (
+                id SERIAL PRIMARY KEY,
+                notification_key VARCHAR(100) UNIQUE,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                category VARCHAR(50) DEFAULT 'system',
+                severity VARCHAR(20) DEFAULT 'info',
+                action_url VARCHAR(255) DEFAULT '',
+                is_read SMALLINT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ");
 
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS tbl_admin_read_status (
-            id SERIAL PRIMARY KEY,
-            admin_id INTEGER DEFAULT 1,
-            notification_key VARCHAR(100) NOT NULL,
-            read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (admin_id, notification_key)
-        );
-    ");
-} catch (Throwable $e) {
-    // Graceful fallback if permission issue
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tbl_admin_read_status (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER DEFAULT 1,
+                notification_key VARCHAR(100) NOT NULL,
+                read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (admin_id, notification_key)
+            );
+        ");
+        @file_put_contents($notifInitFlag, '1');
+    } catch (Throwable $e) {
+        // Graceful fallback if permission issue
+    }
 }
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? 'get_notifications');
@@ -80,6 +84,15 @@ function humanTimeDiff($datetime) {
 // ACTION: GET NOTIFICATIONS
 // =========================================================================
 if ($action === 'get_notifications') {
+    $notifCacheFile = sys_get_temp_dir() . '/.notif_cache_' . md5($adminId . '_' . ($runtime['merchant_id'] ?? 'def')) . '.json';
+    if (is_file($notifCacheFile) && (time() - filemtime($notifCacheFile)) < 6) {
+        $cached = @file_get_contents($notifCacheFile);
+        if ($cached) {
+            echo $cached;
+            exit;
+        }
+    }
+
     // 1. Fetch read keys from database and session
     $readKeys = $_SESSION['admin_read_notifs'];
     try {
@@ -320,13 +333,17 @@ if ($action === 'get_notifications') {
         }
     }
 
-    echo json_encode([
+    $respJson = json_encode([
         'status' => 'success',
         'unread_count' => $unreadCount,
         'counts' => $counts,
         'notifications' => $notifications,
         'server_time' => date('Y-m-d H:i:s')
     ]);
+    if (!empty($notifCacheFile)) {
+        @file_put_contents($notifCacheFile, $respJson);
+    }
+    echo $respJson;
     exit;
 }
 
@@ -427,6 +444,8 @@ if ($action === 'create_announcement') {
             VALUES (?, ?, ?, ?, ?, ?, 0)
         ");
         $stmt->execute([$key, $title, $message, $category, $severity, $action_url]);
+        $notifCacheFile = sys_get_temp_dir() . '/.notif_cache_' . md5($adminId . '_' . ($runtime['merchant_id'] ?? 'def')) . '.json';
+        @unlink($notifCacheFile);
         echo json_encode(['status' => 'success', 'message' => 'Announcement posted successfully.']);
     } catch (Throwable $e) {
         echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
