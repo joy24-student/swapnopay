@@ -322,8 +322,11 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             display: inline-block !important;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
         }
+        .sn-brand-name > span {
+            display: inline-block;
+        }
         .sn-brand-logo:hover .sn-brand-name {
-            color: #d97706 !important;
+            color: #d97706;
         }
         @media (max-width: 768px) {
             .sn-brand-logo {
@@ -2034,9 +2037,9 @@ body.sn-popup-open {
         <!-- Top Row -->
         <div class="sn-header-top">
             <!-- Brand Logo & Shop Name -->
-            <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo" title="<?php echo htmlspecialchars($store_name); ?>">
+            <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo" title="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>">
                 <?php if (!empty($logo_url)): ?>
-                    <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars($store_name); ?>" class="sn-brand-logo-img">
+                    <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>" class="sn-brand-logo-img">
                 <?php else: ?>
                     <span class="sn-brand-icon-fallback">
                         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2046,7 +2049,7 @@ body.sn-popup-open {
                         </svg>
                     </span>
                 <?php endif; ?>
-                <span class="sn-brand-name"><?php echo htmlspecialchars($store_name); ?></span>
+                <span class="sn-brand-name"><?php echo render_store_name_html($store_name); ?></span>
             </a>
 
             <!-- Search Bar -->
@@ -2267,11 +2270,11 @@ window.snOpenMobileSearch = function(e) {
     <div class="sidebar-header">
         <a href="<?php echo BASE_URL; ?>" class="sidebar-logo" style="display:flex; align-items:center; gap:10px; text-decoration:none;">
             <?php if (!empty($logo_url)): ?>
-                <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height:36px; width:auto; border-radius:6px; object-fit:contain;" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/uploads/logo_branding.png';">
+                <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>" style="max-height:36px; width:auto; border-radius:6px; object-fit:contain;" onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>assets/uploads/logo_branding.png';">
             <?php else: ?>
-                <img src="<?php echo BASE_URL; ?>assets/uploads/logo_branding.png" alt="<?php echo htmlspecialchars($store_name); ?>" style="max-height:36px; width:auto;">
+                <img src="<?php echo BASE_URL; ?>assets/uploads/logo_branding.png" alt="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>" style="max-height:36px; width:auto;">
             <?php endif; ?>
-            <span style="font-weight:700; font-size:15px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?php echo htmlspecialchars($store_name); ?></span>
+            <span style="font-weight:700; font-size:15px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?php echo render_store_name_html($store_name); ?></span>
         </a>
         <button class="sidebar-toggle-btn" id="sidebar-toggle-btn">
             <i class="fas fa-times"></i> 

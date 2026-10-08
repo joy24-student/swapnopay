@@ -328,9 +328,14 @@
             return;
         }
 
-        // Lock submit button to prevent double-click / multiple POSTs
+        // Lock submit button to prevent double-click / multiple POSTs (skip if default-prevented or ajax-handled settings.php)
+        if (e.defaultPrevented || (form.classList && form.classList.contains('form-horizontal') && window.location.pathname.indexOf('settings.php') !== -1)) {
+            return;
+        }
+
         if (submitBtn && !submitBtn.disabled) {
             setTimeout(function () {
+                if (e.defaultPrevented) return;
                 submitBtn.disabled = true;
                 if (submitBtn.tagName === 'BUTTON') {
                     submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading & Saving...';

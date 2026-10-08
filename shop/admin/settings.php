@@ -30,6 +30,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
     $stmt = $pdo->prepare("DELETE FROM tbl_slider WHERE id = ?");
     $stmt->execute([$deleteId]);
     clearShopCaches();
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || !empty($_GET['is_ajax']);
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'message' => 'Slide deleted successfully.']);
+        exit;
+    }
     header("Location: settings.php#tab_home_features");
     exit;
 }
@@ -41,6 +47,7 @@ $settings_migrations = [
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_google_login smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_facebook_login smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS store_name varchar(255) DEFAULT ''",
+    "ALTER TABLE tbl_settings ALTER COLUMN store_name TYPE text",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_title text DEFAULT ''",
@@ -1499,10 +1506,40 @@ if ($isAjaxSettings && !empty($_POST)) {
         echo json_encode(['success' => false, 'message' => $error_message]);
     } else {
         $msg = !empty($success_message) ? $success_message : 'Settings saved successfully!';
+        
+        $freshSettings = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC) ?: [];
+        $freshSlides = [];
+        try {
+            $freshSlides = $pdo->query("SELECT * FROM tbl_slider ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $_) {}
+
+        $mediaUrls = [
+            'logo' => !empty($freshSettings['logo']) ? BASE_URL . 'assets/uploads/' . $freshSettings['logo'] : '',
+            'favicon' => !empty($freshSettings['favicon']) ? BASE_URL . 'assets/uploads/' . $freshSettings['favicon'] : '',
+            'promo1' => !empty($freshSettings['promo_banner1_image']) ? get_media_url($freshSettings['promo_banner1_image']) : '',
+            'promo2' => !empty($freshSettings['promo_banner2_image']) ? get_media_url($freshSettings['promo_banner2_image']) : '',
+            'payday' => !empty($freshSettings['payday_image']) ? get_media_url($freshSettings['payday_image'], 'assets/uploads/payday_cart_transparent.png') : '',
+            'popup_photo' => !empty($freshSettings['popup_photo']) ? get_media_url($freshSettings['popup_photo']) : '',
+        ];
+
+        $formattedSlides = [];
+        foreach ($freshSlides as $s) {
+            $formattedSlides[] = [
+                'id' => (int)$s['id'],
+                'photo' => $s['photo'],
+                'photo_url' => get_media_url($s['photo']),
+                'slide_order' => (int)($s['slide_order'] ?? 1),
+                'is_active' => (int)($s['is_active'] ?? 1),
+            ];
+        }
+
         echo json_encode([
             'success' => true,
             'message' => $msg,
-            'active_tab' => $active_tab
+            'active_tab' => $active_tab,
+            'media' => $mediaUrls,
+            'slides' => $formattedSlides,
+            'settings' => $freshSettings
         ]);
     }
     exit;
@@ -2232,10 +2269,71 @@ $lang_sections = [
                                     </div>
                                     <h3 class="seo-info mt-8">Store Identity &amp; SEO</h3>
                                     <div class="form-group">
-                                        <label for="store_name" class="col-sm-3 control-label">Store / Brand Name</label>
+                                        <label for="store_name" class="col-sm-3 control-label">
+                                            Store / Brand Name
+                                            <small style="display:block; font-weight:normal; color:#64748b; font-size:11px; margin-top:2px;">Supports colorful words &amp; tags</small>
+                                        </label>
                                         <div class="col-sm-9">
-                                            <input type="text" name="store_name" id="store_name" class="form-control" value="<?php echo htmlspecialchars($store_name); ?>" placeholder="e.g. My Online Store">
-                                            <p class="help-block" style="font-size:11.5px; color:#64748b; margin-top:4px;">Official store name dynamically displayed in header, footer, invoices, and system notifications.</p>
+                                            <input type="text" name="store_name" id="store_name" class="form-control input-lg" style="font-weight:700; letter-spacing:-0.2px;" value="<?php echo htmlspecialchars($store_name); ?>" placeholder="e.g. ABIR [gold]LUXE[/gold] SHOP BD">
+                                            
+                                            <!-- Live Header Preview -->
+                                            <div style="margin-top: 12px; padding: 14px 16px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.5px;">
+                                                        <i class="fa fa-eye text-primary"></i> Live Header Preview
+                                                    </span>
+                                                    <span style="font-size: 11px; color: #94a3b8;">Updates instantly as you type</span>
+                                                </div>
+                                                <div style="display: inline-flex; align-items: center; gap: 10px; background: #ffffff; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+                                                    <?php if (!empty($logo)): ?>
+                                                        <img src="../assets/uploads/<?php echo htmlspecialchars($logo); ?>" alt="Logo" style="height: 34px; max-width: 90px; object-fit: contain; border-radius: 6px;">
+                                                    <?php else: ?>
+                                                        <span style="display:inline-block; width:34px; height:34px; background:#fef3c7; border-radius:6px; line-height:34px; text-align:center; font-size:16px;">🛍️</span>
+                                                    <?php endif; ?>
+                                                    <span id="sn_store_name_live_preview" style="font-size: 19px; font-weight: 800; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; letter-spacing: -0.3px;">
+                                                        <?php echo render_store_name_html($store_name ?: 'Online Store'); ?>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- 1-Click Color Toolbar -->
+                                            <div style="margin-top: 10px; padding: 12px 14px; background: #fbfbfe; border: 1px solid #e0e7ff; border-radius: 8px;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+                                                    <span style="font-size: 12px; font-weight: 600; color: #3730a3;">
+                                                        <i class="fa fa-paint-brush"></i> 1-Click Color Tools (select any word above or click to insert):
+                                                    </span>
+                                                    <div style="display: inline-flex; align-items: center; gap: 6px;">
+                                                        <span style="font-size: 11px; color: #64748b;">Custom:</span>
+                                                        <input type="color" id="sn_custom_color" value="#F59E0B" style="width: 26px; height: 24px; padding: 0; border: none; cursor: pointer; border-radius: 4px; vertical-align: middle;">
+                                                        <button type="button" class="btn btn-xs btn-default" id="sn_btn_apply_custom_color" style="font-size: 11px; font-weight: 600;">Apply Hex</button>
+                                                    </div>
+                                                </div>
+
+                                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;" id="sn_color_pills">
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="gold" style="background:#FEF3C7; color:#B45309; border:1px solid #FDE68A; font-weight:700;">✨ Gold</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="orange" style="background:#FFEDD5; color:#C2410C; border:1px solid #FED7AA; font-weight:700;">🔥 Orange</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="red" style="background:#FEE2E2; color:#B91C1C; border:1px solid #FECACA; font-weight:700;">🔴 Red</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="blue" style="background:#DBEAFE; color:#1D4ED8; border:1px solid #BFDBFE; font-weight:700;">💎 Blue</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="green" style="background:#D1FAE5; color:#047857; border:1px solid #A7F3D0; font-weight:700;">🌿 Green</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="purple" style="background:#EDE9FE; color:#6D28D9; border:1px solid #DDD6FE; font-weight:700;">💜 Purple</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="pink" style="background:#FCE7F3; color:#BE185D; border:1px solid #FBCFE8; font-weight:700;">💖 Pink</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="gradient" style="background:linear-gradient(135deg, #F59E0B, #EC4899); color:#fff; border:none; font-weight:700;">🌈 Sunset Gradient</button>
+                                                    <button type="button" class="btn btn-xs sn-color-pill" data-tag="badge" style="background:#FEDB65; color:#0F172A; border:1px solid #FCD34D; font-weight:800;">🏷️ Badge Tag</button>
+                                                </div>
+
+                                                <!-- Quick Template Inspiration -->
+                                                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 11.5px; color: #64748b;">
+                                                    <strong>Click to try examples:</strong>
+                                                    <a href="javascript:void(0)" class="sn-example-name" style="margin-left:6px; color:#4f46e5; text-decoration:underline;">ABIR [gold]LUXE[/gold] SHOP BD</a> |
+                                                    <a href="javascript:void(0)" class="sn-example-name" style="margin-left:6px; color:#4f46e5; text-decoration:underline;">ABIR [gradient]LUXE[/gradient] SHOP BD</a> |
+                                                    <a href="javascript:void(0)" class="sn-example-name" style="margin-left:6px; color:#4f46e5; text-decoration:underline;">ABIR [badge]LUXE[/badge] SHOP BD</a> |
+                                                    <a href="javascript:void(0)" class="sn-example-name" style="margin-left:6px; color:#4f46e5; text-decoration:underline;">[gold]ABIR[/gold] LUXE [gradient]SHOP BD[/gradient]</a>
+                                                </div>
+                                            </div>
+
+                                            <p class="help-block" style="font-size:11.5px; color:#64748b; margin-top:6px;">
+                                                <i class="fa fa-info-circle text-info"></i> Color tags like <code>[gold]WORD[/gold]</code>, <code>[color=#hex]WORD[/color]</code>, <code>[gradient]WORD[/gradient]</code>, or standard HTML <code>&lt;span style="color:#..."&gt;</code> are supported. Clean plain text is automatically used in page titles, SMS, and invoices.
+                                            </p>
                                         </div>
                                     </div>
                                     <div class="form-group">
@@ -4548,7 +4646,6 @@ if (window.jQuery) {
         });
 
         // Tab-aware Enter key handler: pressing Enter inside inputs submits the current tab's submit button
-        // instead of defaulting to the first submit button in the form (form_general_settings)
         $('form.form-horizontal').on('keydown', 'input:not([type="button"]):not([type="submit"]):not([type="reset"])', function(e) {
             if (e.keyCode === 13) {
                 var $activePane = $(this).closest('.tab-pane');
@@ -4560,15 +4657,357 @@ if (window.jQuery) {
                     }
                 }
             }
-        // Ensure clicking any button inside tab_home_features guarantees form_home_features is present in POST
-        $(document).on('click', '#tab_home_features button[type="submit"]', function() {
-            var $form = $(this).closest('form');
-            if ($form.length && !$form.find('input[name="form_home_features"][type="hidden"]').length) {
-                $form.append('<input type="hidden" name="form_home_features" value="1">');
+        });
+
+        // =========================================================================
+        // ZERO-PAGE-RELOAD INSTANT AJAX SETTINGS SAVING SYSTEM
+        // =========================================================================
+        var isSavingSettings = false;
+        var lastClickedSubmitBtn = null;
+
+        // Track which submit button was clicked in any tab
+        $(document).on('click', 'form.form-horizontal button[type="submit"], form.form-horizontal input[type="submit"]', function() {
+            lastClickedSubmitBtn = this;
+        });
+
+        $('form.form-horizontal').on('submit', function(e) {
+            e.preventDefault();
+            if (isSavingSettings) return false;
+
+            // Sync CKEditor instances if present
+            if (window.CKEDITOR && CKEDITOR.instances) {
+                for (var instance in CKEDITOR.instances) {
+                    try { CKEDITOR.instances[instance].updateElement(); } catch(err) {}
+                }
             }
+
+            // Sync Summernote instances if present
+            if ($.fn.summernote) {
+                $(this).find('textarea').each(function() {
+                    try {
+                        if ($(this).data('summernote')) {
+                            $(this).val($(this).summernote('code'));
+                        }
+                    } catch(err) {}
+                });
+            }
+
+            var $form = $(this);
+            var $activePane = $form.find('.tab-pane.active');
+            var $submitBtn = $(lastClickedSubmitBtn);
+
+            // If no specific button was tracked or it's not inside active pane, find active pane's submit button
+            if (!$submitBtn.length || !$submitBtn.closest('.tab-pane.active').length) {
+                $submitBtn = $activePane.find('button[type="submit"], input[type="submit"]').first();
+            }
+            if (!$submitBtn.length) {
+                $submitBtn = $form.find('button[type="submit"], input[type="submit"]').first();
+            }
+
+            var btnName = $submitBtn.attr('name') || '';
+            var btnVal = $submitBtn.val() || '1';
+            var originalBtnHtml = $submitBtn.html();
+
+            // Set saving state
+            isSavingSettings = true;
+            $submitBtn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+
+            var formData = new FormData(this);
+            formData.set('is_ajax', '1');
+            if (btnName) {
+                formData.set(btnName, btnVal);
+            }
+
+            $.ajax({
+                url: window.location.pathname,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                dataType: 'json'
+            }).done(function(res) {
+                if (res && res.success) {
+                    // 1. Show instant floating toast
+                    if (window.showAdminToast) {
+                        window.showAdminToast(res.message || 'Settings saved successfully!', 'success');
+                    }
+
+                    // 2. Button success animation
+                    $submitBtn.html('<i class="fa fa-check"></i> Saved!');
+                    setTimeout(function() {
+                        $submitBtn.prop('disabled', false).html(originalBtnHtml);
+                    }, 1500);
+
+                    // 3. Dynamic Preview Updates without reload
+                    if (res.media) {
+                        if (res.media.promo1) {
+                            var $p1 = $('input[name="promo1_image_file"]').closest('.panel-body');
+                            var $p1Img = $p1.find('img');
+                            if ($p1Img.length) {
+                                $p1Img.attr('src', res.media.promo1 + '?t=' + Date.now());
+                            } else {
+                                $p1.append('<div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center; margin-top:10px;"><img src="' + res.media.promo1 + '" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;"></div>');
+                            }
+                            $('input[name="promo_banner1_image_url"]').val(res.media.promo1);
+                        }
+                        if (res.media.promo2) {
+                            var $p2 = $('input[name="promo2_image_file"]').closest('.panel-body');
+                            var $p2Img = $p2.find('img');
+                            if ($p2Img.length) {
+                                $p2Img.attr('src', res.media.promo2 + '?t=' + Date.now());
+                            } else {
+                                $p2.append('<div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center; margin-top:10px;"><img src="' + res.media.promo2 + '" style="max-height:90px; max-width:100%; border-radius:4px; object-fit:contain;"></div>');
+                            }
+                            $('input[name="promo_banner2_image_url"]').val(res.media.promo2);
+                        }
+                        if (res.media.payday) {
+                            var $pd = $('input[name="payday_image_file"]').closest('.panel-body');
+                            var $pdImg = $pd.find('img');
+                            if ($pdImg.length) {
+                                $pdImg.attr('src', res.media.payday + '?t=' + Date.now());
+                            } else {
+                                $pd.append('<div style="background:#f8fafc; padding:8px; border-radius:6px; text-align:center; border:1px solid #e2e8f0; margin-top:10px;"><img src="' + res.media.payday + '" style="max-height:80px; max-width:100%; object-fit:contain;"></div>');
+                            }
+                            $('input[name="payday_image_url"]').val(res.media.payday);
+                        }
+                        if (res.media.logo) {
+                            var $logoImg = $('input[name="photo_logo"]').siblings('img.existing-photo');
+                            if ($logoImg.length) {
+                                $logoImg.attr('src', res.media.logo + '?t=' + Date.now());
+                            }
+                        }
+                        if (res.media.favicon) {
+                            var $favImg = $('input[name="photo_favicon"]').siblings('img.existing-photo');
+                            if ($favImg.length) {
+                                $favImg.attr('src', res.media.favicon + '?t=' + Date.now());
+                            }
+                        }
+                        if (res.media.popup_photo) {
+                            var $popupImg = $('input[name="popup_photo"]').siblings('img.existing-photo');
+                            if ($popupImg.length) {
+                                $popupImg.attr('src', res.media.popup_photo + '?t=' + Date.now());
+                            }
+                        }
+                    }
+
+                    // 4. Update Hero Slides table dynamically if slides were returned
+                    if (res.slides && Array.isArray(res.slides)) {
+                        updateHeroSlidesTable(res.slides);
+                    }
+
+                    // 5. Clear file inputs in active tab to prevent duplicate re-upload
+                    $activePane.find('input[type="file"]').val('');
+                    $activePane.find('.sn-smart-img-preview').remove();
+
+                } else {
+                    var errMsg = (res && res.message) ? res.message : 'Failed to save settings.';
+                    if (window.showAdminToast) {
+                        window.showAdminToast(errMsg, 'error');
+                    } else {
+                        alert(errMsg);
+                    }
+                    $submitBtn.prop('disabled', false).html(originalBtnHtml);
+                }
+            }).fail(function(xhr, status, error) {
+                var errText = xhr.responseText || 'Server error occurred while saving settings.';
+                try {
+                    var parsed = JSON.parse(errText);
+                    if (parsed && parsed.message) errText = parsed.message;
+                } catch(e) {}
+                if (window.showAdminToast) {
+                    window.showAdminToast(errText, 'error');
+                } else {
+                    alert(errText);
+                }
+                $submitBtn.prop('disabled', false).html(originalBtnHtml);
+            }).always(function() {
+                isSavingSettings = false;
+            });
+        });
+
+        // Helper function to re-render Hero Slides table dynamically
+        function updateHeroSlidesTable(slides) {
+            var $tableWrap = $('#tab_home_features .table-responsive');
+            var $badge = $('#tab_home_features .box-primary h4 i.fa-list').parent();
+            if ($badge.length) {
+                $badge.html('<i class="fa fa-list"></i> Current Slides in Hero Carousel (' + slides.length + ' active):');
+            }
+            if (!slides || slides.length === 0) {
+                if ($tableWrap.length) {
+                    $tableWrap.html('<div class="alert alert-info">No slides uploaded yet. Upload images above to enable sliding!</div>');
+                }
+                return;
+            }
+
+            var rowsHtml = '';
+            slides.forEach(function(slide, idx) {
+                var checked = slide.is_active == 1 ? 'checked' : '';
+                rowsHtml += '<tr>' +
+                    '<td style="vertical-align: middle; text-align:center;">' +
+                        '<input type="number" name="slide_order[' + slide.id + ']" value="' + (slide.slide_order || (idx + 1)) + '" class="form-control text-center" style="width:65px; margin:0 auto;">' +
+                    '</td>' +
+                    '<td style="vertical-align: middle; text-align:center;">' +
+                        '<a href="' + slide.photo_url + '" target="_blank">' +
+                            '<img src="' + slide.photo_url + '" style="width:85px; height:55px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">' +
+                        '</a>' +
+                    '</td>' +
+                    '<td style="vertical-align: middle;">' +
+                        '<div style="font-size:12px; font-family:monospace; color:#3b82f6; word-break:break-all;">' + slide.photo_url + '</div>' +
+                        '<small class="text-muted">Slide ID: #' + slide.id + '</small>' +
+                    '</td>' +
+                    '<td style="vertical-align: middle; text-align:center;">' +
+                        '<label style="margin:0; cursor:pointer;">' +
+                            '<input type="checkbox" name="slide_active[' + slide.id + ']" value="1" ' + checked + '>' +
+                            '<span class="text-success" style="font-size:12px;"> Active</span>' +
+                        '</label>' +
+                    '</td>' +
+                    '<td style="vertical-align: middle; text-align:center;">' +
+                        '<button type="button" class="btn btn-danger btn-xs btn-ajax-delete-slide" data-id="' + slide.id + '">' +
+                            '<i class="fa fa-trash"></i> Delete' +
+                        '</button>' +
+                    '</td>' +
+                '</tr>';
+            });
+
+            if ($tableWrap.length && $tableWrap.find('tbody').length) {
+                $tableWrap.find('tbody').html(rowsHtml);
+            } else {
+                var tableHtml = '<div class="table-responsive"><table class="table table-bordered table-striped" style="background:#fff;">' +
+                    '<thead><tr style="background:#f1f5f9;">' +
+                        '<th style="width: 60px; text-align:center;">Order</th>' +
+                        '<th style="width: 120px; text-align:center;">Preview</th>' +
+                        '<th>Cloud Storage CDN URL</th>' +
+                        '<th style="width: 90px; text-align:center;">Active</th>' +
+                        '<th style="width: 90px; text-align:center;">Action</th>' +
+                    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+                $('#tab_home_features .alert-info').replaceWith(tableHtml);
+            }
+        }
+
+        // Zero-reload Slide Deletion
+        $(document).on('click', '.btn-ajax-delete-slide, a[href*="action=delete_slide"]', function(e) {
+            e.preventDefault();
+            if (!confirm('Delete this slide from hero carousel?')) return;
+
+            var $btn = $(this);
+            var $row = $btn.closest('tr');
+            var slideId = $btn.data('id');
+            if (!slideId) {
+                var match = ($btn.attr('href') || '').match(/slide_id=(\d+)/);
+                if (match) slideId = match[1];
+            }
+            if (!slideId) return;
+
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+            $.ajax({
+                url: window.location.pathname + '?action=delete_slide&slide_id=' + slideId + '&is_ajax=1',
+                type: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                dataType: 'json'
+            }).done(function(res) {
+                if (res && res.success) {
+                    $row.fadeOut(300, function() {
+                        $(this).remove();
+                        if (window.showAdminToast) {
+                            window.showAdminToast('Slide deleted successfully.', 'info');
+                        }
+                    });
+                } else {
+                    alert((res && res.message) ? res.message : 'Failed to delete slide.');
+                    $btn.prop('disabled', false).html('<i class="fa fa-trash"></i> Delete');
+                }
+            }).fail(function() {
+                alert('Network error while deleting slide.');
+                $btn.prop('disabled', false).html('<i class="fa fa-trash"></i> Delete');
+            });
         });
     });
 }
+
+// Live Store Name Colorizer & Realtime Preview
+(function($) {
+    function parseStoreNameHtml(val) {
+        if (!val) return 'Online Store';
+        var s = $('<div>').text(val).html(); // basic escape
+
+        // [color=#HEX]word[/color]
+        s = s.replace(/\[color=([#a-zA-Z0-9]+)\](.*?)\[\/color\]/gi, function(m, col, txt) {
+            return '<span style="color:' + col + ' !important;">' + txt + '</span>';
+        });
+
+        // [gradient]word[/gradient]
+        s = s.replace(/\[gradient(?:=(.*?))?\](.*?)\[\/gradient\]/gi, function(m, grad, txt) {
+            var g = grad ? grad : 'linear-gradient(135deg, #F59E0B 0%, #EC4899 50%, #8B5CF6 100%)';
+            return '<span style="background:' + g + '; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; font-weight:800; display:inline-block;">' + txt + '</span>';
+        });
+
+        // [badge]word[/badge]
+        s = s.replace(/\[badge(?:=(.*?))?\](.*?)\[\/badge\]/gi, function(m, bg, txt) {
+            var b = bg ? bg : '#FEDB65';
+            return '<span style="background:' + b + '; color:#0F172A; padding:2px 8px; border-radius:6px; font-size:0.82em; font-weight:800; display:inline-block; vertical-align:middle; line-height:1.2;">' + txt + '</span>';
+        });
+
+        var colorMap = {
+            'gold': '#F59E0B', 'orange': '#EA580C', 'red': '#EF4444', 'rose': '#F43F5E',
+            'blue': '#2563EB', 'cyan': '#06B6D4', 'green': '#10B981', 'purple': '#8B5CF6',
+            'pink': '#EC4899', 'yellow': '#EAB308'
+        };
+        $.each(colorMap, function(tag, hex) {
+            var re = new RegExp('\\[' + tag + '\\](.*?)\\[\\/' + tag + '\\]', 'gi');
+            s = s.replace(re, '<span style="color:' + hex + ' !important;">$1</span>');
+        });
+
+        return s;
+    }
+
+    function updateStorePreview() {
+        var val = $('#store_name').val().trim();
+        $('#sn_store_name_live_preview').html(parseStoreNameHtml(val));
+    }
+
+    function wrapSelectedText(openTag, closeTag) {
+        var input = document.getElementById('store_name');
+        if (!input) return;
+        var start = input.selectionStart;
+        var end = input.selectionEnd;
+        var val = input.value;
+        var selected = val.substring(start, end);
+
+        if (!selected) {
+            selected = 'WORD';
+        }
+
+        var replacement = openTag + selected + closeTag;
+        input.value = val.substring(0, start) + replacement + val.substring(end);
+        input.focus();
+        input.setSelectionRange(start + openTag.length, start + openTag.length + selected.length);
+        updateStorePreview();
+    }
+
+    $(document).ready(function() {
+        $('#store_name').on('input keyup change', updateStorePreview);
+
+        $('.sn-color-pill').on('click', function(e) {
+            e.preventDefault();
+            var tag = $(this).data('tag');
+            wrapSelectedText('[' + tag + ']', '[/' + tag + ']');
+        });
+
+        $('#sn_btn_apply_custom_color').on('click', function(e) {
+            e.preventDefault();
+            var hex = $('#sn_custom_color').val();
+            wrapSelectedText('[color=' + hex + ']', '[/color]');
+        });
+
+        $('.sn-example-name').on('click', function(e) {
+            e.preventDefault();
+            var txt = $(this).text().trim();
+            $('#store_name').val(txt).trigger('change').focus();
+        });
+    });
+})(jQuery);
 </script>
 
 <?php require_once('footer.php'); ?>

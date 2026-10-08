@@ -92,7 +92,7 @@ foreach ($result as $row) {
 							</svg>
 						</div>
 						<div class="sn-logo-info">
-							<span class="sn-logo-title"><?php echo htmlspecialchars(defined('STORE_NAME') ? STORE_NAME : 'Admin Panel'); ?></span>
+							<span class="sn-logo-title"><?php echo render_store_name_html(defined('STORE_NAME') ? STORE_NAME : 'Admin Panel'); ?></span>
 							<span class="sn-logo-sub">Admin Panel</span>
 						</div>
 					</div>

@@ -345,9 +345,73 @@ if (!empty($settingsRow['store_name'])) {
 if (!defined('STORE_NAME')) define('STORE_NAME', $dynamicStoreName);
 if (!defined('SHOP_NAME')) define('SHOP_NAME', $dynamicStoreName);
 
+if (!function_exists('clean_store_name')) {
+    function clean_store_name($name) {
+        if (empty($name)) return '';
+        $clean = preg_replace('/\[\/?(?:color(?:=[^\]]+)?|gradient(?:=[^\]]+)?|badge(?:=[^\]]+)?|gold|orange|amber|red|rose|blue|cyan|green|emerald|purple|violet|indigo|pink|yellow)\]/i', '', (string)$name);
+        return trim(strip_tags($clean));
+    }
+}
+
+if (!function_exists('render_store_name_html')) {
+    function render_store_name_html($name) {
+        if (empty($name)) return '';
+        $s = (string)$name;
+
+        // Custom hex/name color: [color=#FF5722]Word[/color] or [color=crimson]Word[/color]
+        $s = preg_replace_callback('/\[color=([#a-zA-Z0-9]+)\](.*?)\[\/color\]/is', function($m) {
+            $col = htmlspecialchars($m[1], ENT_QUOTES, 'UTF-8');
+            return '<span style="color:' . $col . ' !important;">' . $m[2] . '</span>';
+        }, $s);
+
+        // Gradient shortcut: [gradient]Word[/gradient] or [gradient=#F59E0B,#EC4899]Word[/gradient]
+        $s = preg_replace_callback('/\[gradient(?:=(.*?))?\](.*?)\[\/gradient\]/is', function($m) {
+            $colors = !empty($m[1]) ? trim($m[1]) : '#F59E0B, #EC4899';
+            if (!str_contains($colors, 'linear-gradient')) {
+                $grad = 'linear-gradient(135deg, ' . htmlspecialchars($colors, ENT_QUOTES, 'UTF-8') . ')';
+            } else {
+                $grad = htmlspecialchars($colors, ENT_QUOTES, 'UTF-8');
+            }
+            return '<span style="background:' . $grad . '; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; font-weight:800; display:inline-block;">' . $m[2] . '</span>';
+        }, $s);
+
+        // Badge shortcut: [badge]Word[/badge] or [badge=#FEDB65]Word[/badge]
+        $s = preg_replace_callback('/\[badge(?:=(.*?))?\](.*?)\[\/badge\]/is', function($m) {
+            $bg = !empty($m[1]) ? htmlspecialchars(trim($m[1]), ENT_QUOTES, 'UTF-8') : '#FEDB65';
+            return '<span style="background:' . $bg . '; color:#0F172A; padding:2px 8px; border-radius:6px; font-size:0.82em; font-weight:800; display:inline-block; vertical-align:middle; line-height:1.2; letter-spacing:0;">' . $m[2] . '</span>';
+        }, $s);
+
+        // Built-in named color tags
+        $colorAliases = [
+            'gold'    => '#F59E0B',
+            'orange'  => '#EA580C',
+            'amber'   => '#D97706',
+            'red'     => '#EF4444',
+            'rose'    => '#F43F5E',
+            'blue'    => '#2563EB',
+            'cyan'    => '#06B6D4',
+            'green'   => '#10B981',
+            'emerald' => '#059669',
+            'purple'  => '#8B5CF6',
+            'violet'  => '#7C3AED',
+            'indigo'  => '#4F46E5',
+            'pink'    => '#EC4899',
+            'yellow'  => '#EAB308'
+        ];
+        foreach ($colorAliases as $tag => $hex) {
+            $s = preg_replace('/\[' . $tag . '\](.*?)\[\/' . $tag . '\]/is', '<span style="color:' . $hex . ' !important;">$1</span>', $s);
+        }
+
+        // Allow safe HTML tags: <span>, <b>, <strong>, <i>, <em>, <font>, <small>
+        $allowed = '<span><b><strong><i><em><font><small>';
+        return strip_tags($s, $allowed);
+    }
+}
+
 if (!function_exists('getStoreName')) {
-    function getStoreName() {
-        return defined('STORE_NAME') ? STORE_NAME : 'Online Store';
+    function getStoreName($plain = false) {
+        $name = defined('STORE_NAME') ? STORE_NAME : 'Online Store';
+        return $plain ? clean_store_name($name) : render_store_name_html($name);
     }
 }
 
