@@ -26,6 +26,10 @@ $stmt = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
 $stmt->execute();
 $settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
+$show_google_login = isset($settings['show_google_login']) ? (int)$settings['show_google_login'] : 1;
+$show_facebook_login = isset($settings['show_facebook_login']) ? (int)$settings['show_facebook_login'] : 1;
+$show_social_buttons = ($show_google_login || $show_facebook_login);
+
 $banner_login = !empty($settings['banner_login']) 
     ? $settings['banner_login'] 
     : 'https://oaudxkhxwdrdsybyaheb.supabase.co/storage/v1/object/public/storefront/assets/auth_login_side_banner.jpg';
@@ -426,6 +430,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
             gap: 12px;
             cursor: pointer;
             transition: all 0.2s;
+        }
+
+        .social-btn-container {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .btn-facebook {
+            width: 100%;
+            height: 48px;
+            background: #ffffff;
+            color: #1877F2;
+            border: 1.5px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-facebook:hover {
+            background: #f0f4ff;
+            border-color: #93c5fd;
+            color: #0b57d0;
         }
 
         .btn-google:hover {
@@ -861,21 +894,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
                 </button>
             </form>
 
+            <?php if ($show_social_buttons): ?>
             <!-- DIVIDER -->
             <div class="divider-row">
                 <span>or continue with</span>
             </div>
 
-            <!-- GOOGLE AUTH BUTTON -->
-            <button type="button" class="btn-google js-google-login" id="googleLoginBtn">
-                <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Continue with Google</span>
-            </button>
+            <div class="social-btn-container">
+                <?php if ($show_google_login): ?>
+                <!-- GOOGLE AUTH BUTTON -->
+                <button type="button" class="btn-google js-google-login" id="googleLoginBtn" style="<?php echo (!$show_facebook_login ? 'width: 100%;' : 'flex: 1;'); ?>">
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    <span>Google</span>
+                </button>
+                <?php endif; ?>
+
+                <?php if ($show_facebook_login): ?>
+                <!-- FACEBOOK AUTH BUTTON -->
+                <button type="button" class="btn-facebook js-facebook-login" id="facebookLoginBtnDesktop" style="<?php echo (!$show_google_login ? 'width: 100%;' : 'flex: 1;'); ?>">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#1877F2"/>
+                        <path d="M14.5 12H12.7V18H10.2V12H9V9.9H10.2V8.4C10.2 7.2 10.8 5.5 13.2 5.5L15 5.5V7.5H13.7C13.1 7.5 12.7 7.8 12.7 8.5V9.9H15L14.5 12Z" fill="white"/>
+                    </svg>
+                    <span>Facebook</span>
+                </button>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- FOOTER SWITCH -->
@@ -1013,13 +1063,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
             </button>
         </form>
 
+        <?php if ($show_social_buttons): ?>
         <!-- DIVIDER -->
         <div class="m-divider-row">
             <span>or continue with</span>
         </div>
 
         <!-- SOCIAL LOGINS -->
-        <div class="m-social-grid">
+        <div class="m-social-grid" style="<?php echo (!$show_google_login || !$show_facebook_login) ? 'grid-template-columns: 1fr;' : ''; ?>">
+            <?php if ($show_google_login): ?>
             <button type="button" class="m-btn-social js-google-login">
                 <svg width="20" height="20" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -1029,15 +1081,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
                 </svg>
                 <span>Google</span>
             </button>
+            <?php endif; ?>
 
-            <button type="button" class="m-btn-social" id="facebookLoginBtn">
+            <?php if ($show_facebook_login): ?>
+            <button type="button" class="m-btn-social js-facebook-login" id="facebookLoginBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="12" fill="#1877F2"/>
                     <path d="M14.5 12H12.7V18H10.2V12H9V9.9H10.2V8.4C10.2 7.2 10.8 5.5 13.2 5.5L15 5.5V7.5H13.7C13.1 7.5 12.7 7.8 12.7 8.5V9.9H15L14.5 12Z" fill="white"/>
                 </svg>
                 <span>Facebook</span>
             </button>
+            <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- FOOTER SWITCH -->
         <div class="m-footer-switch">
@@ -1077,8 +1133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
     bindPasswordToggle('mTogglePasswordBtn', 'm_cust_password', 'mEyeIcon');
 
     // Supabase Social OAuth integration
-    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://pueowrrkspsykbwzwgua.supabase.co"; ?>';
-    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1ZW93cnJrc3BzeWtid3p3Z3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MDkwNzksImV4cCI6MjEwNjQ4NTA3OX0.f4wk8rYN6SzdCglQO3aFFrMh8oo96Q-5L7oAhhYTuuw"; ?>';
+    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://tldubojeokgyoclxnzkb.supabase.co"; ?>';
+    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0"; ?>';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     document.querySelectorAll('.js-google-login').forEach(googleBtn => {
@@ -1109,11 +1165,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
         });
     });
 
-    const fbBtn = document.getElementById('facebookLoginBtn');
-    if (fbBtn) {
+    document.querySelectorAll('.js-facebook-login').forEach(fbBtn => {
         fbBtn.addEventListener('click', async function() {
+            const origHtml = fbBtn.innerHTML;
             try {
                 fbBtn.disabled = true;
+                fbBtn.innerHTML = `
+                    <div style="width: 18px; height: 18px; border: 2.5px solid #cbd5e1; border-top: 2.5px solid #1877F2; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <span>Connecting...</span>
+                `;
                 const callbackUrl = '<?php echo BASE_URL; ?>supabase_auth_callback.php';
                 const { error } = await supabase.auth.signInWithOAuth({
                     provider: 'facebook',
@@ -1122,14 +1182,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
                 if (error) {
                     alert('Facebook Sign-In: ' + error.message);
                     fbBtn.disabled = false;
+                    fbBtn.innerHTML = origHtml;
                 }
             } catch (err) {
                 console.error(err);
-                alert('Facebook Sign-In is not currently enabled for this store. Please use Google or Email.');
+                alert('Facebook Sign-In error. Please try again.');
                 fbBtn.disabled = false;
+                fbBtn.innerHTML = origHtml;
             }
         });
-    }
+    });
 </script>
 </body>
 </html>

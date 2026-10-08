@@ -15,6 +15,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET
 
 // Ensure required columns exist across all tenant schemas safely
 $settings_migrations = [
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_google_login smallint DEFAULT 1",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_facebook_login smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS store_name varchar(255) DEFAULT ''",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS slide_order integer DEFAULT 1",
     "ALTER TABLE tbl_slider ADD COLUMN IF NOT EXISTS is_active smallint DEFAULT 1",
@@ -361,6 +363,8 @@ $facebook_app_id = $settings_data['facebook_app_id'] ?? '';
 $facebook_app_secret = $settings_data['facebook_app_secret'] ?? '';
 $google_client_id = $settings_data['google_client_id'] ?? '';
 $google_client_secret = $settings_data['google_client_secret'] ?? '';
+$show_google_login = isset($settings_data['show_google_login']) ? (int)$settings_data['show_google_login'] : 1;
+$show_facebook_login = isset($settings_data['show_facebook_login']) ? (int)$settings_data['show_facebook_login'] : 1;
 // Assuming Twilio API key and secret will also be added if needed
 $twilio_account_sid = $settings_data['twilio_account_sid'] ?? '';
 $twilio_auth_token = $settings_data['twilio_auth_token'] ?? '';
@@ -945,6 +949,9 @@ if(isset($_POST['form_payment_gateways'])) {
 
 // API Integrations Form
 if(isset($_POST['form_api_integrations'])) {
+    $show_google_login = isset($_POST['show_google_login']) ? 1 : 0;
+    $show_facebook_login = isset($_POST['show_facebook_login']) ? 1 : 0;
+
     $statement = $pdo->prepare("UPDATE tbl_settings SET
                                 gemini_api_key=?,
                                 openrouter_api_key=?,
@@ -957,7 +964,8 @@ if(isset($_POST['form_api_integrations'])) {
                                 chat_call_enabled=?,
                                 facebook_app_id=?, facebook_app_secret=?,
                                 google_client_id=?, google_client_secret=?,
-                                twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?
+                                twilio_account_sid=?, twilio_auth_token=?, twilio_phone_number=?,
+                                show_google_login=?, show_facebook_login=?
                                 WHERE id=1");
     $statement->execute(array(
         $_POST['gemini_api_key'] ?? '',
@@ -975,9 +983,11 @@ if(isset($_POST['form_api_integrations'])) {
         $_POST['google_client_secret'] ?? '',
         $_POST['twilio_account_sid'] ?? '',
         $_POST['twilio_auth_token'] ?? '',
-        $_POST['twilio_phone_number'] ?? ''
+        $_POST['twilio_phone_number'] ?? '',
+        $show_google_login,
+        $show_facebook_login
     ));
-    $success_message = 'API Integration and Live Chat Settings are updated successfully.';
+    $success_message = 'API Integration and Social Authentication Settings are updated successfully.';
 
     $gemini_api_key = $_POST['gemini_api_key'] ?? '';
     $openrouter_api_key = $_POST['openrouter_api_key'] ?? '';
@@ -988,6 +998,13 @@ if(isset($_POST['form_api_integrations'])) {
     $chat_messenger_url = $_POST['chat_messenger_url'] ?? '';
     $chat_floating_icon_on_off = isset($_POST['chat_floating_icon_on_off']) ? (int)$_POST['chat_floating_icon_on_off'] : 0;
     $chat_call_enabled = isset($_POST['chat_call_enabled']) ? (int)$_POST['chat_call_enabled'] : 0;
+    $facebook_app_id = $_POST['facebook_app_id'] ?? '';
+    $facebook_app_secret = $_POST['facebook_app_secret'] ?? '';
+    $google_client_id = $_POST['google_client_id'] ?? '';
+    $google_client_secret = $_POST['google_client_secret'] ?? '';
+    $twilio_account_sid = $_POST['twilio_account_sid'] ?? '';
+    $twilio_auth_token = $_POST['twilio_auth_token'] ?? '';
+    $twilio_phone_number = $_POST['twilio_phone_number'] ?? '';
 }
 
 
@@ -1546,6 +1563,8 @@ $facebook_app_id = $settings_data['facebook_app_id'] ?? '';
 $facebook_app_secret = $settings_data['facebook_app_secret'] ?? '';
 $google_client_id = $settings_data['google_client_id'] ?? '';
 $google_client_secret = $settings_data['google_client_secret'] ?? '';
+$show_google_login = isset($settings_data['show_google_login']) ? (int)$settings_data['show_google_login'] : 1;
+$show_facebook_login = isset($settings_data['show_facebook_login']) ? (int)$settings_data['show_facebook_login'] : 1;
 $twilio_account_sid = $settings_data['twilio_account_sid'] ?? '';
 $twilio_auth_token = $settings_data['twilio_auth_token'] ?? '';
 $twilio_phone_number = $settings_data['twilio_phone_number'] ?? '';
@@ -3311,17 +3330,55 @@ $lang_sections = [
                                     </div>
 
 
-                                    <h3 class="seo-info mt-8">Google Sign-in API</h3>
+                                    <h3 class="seo-info mt-8"><i class="fa fa-google text-danger"></i> Google Authentication &amp; OAuth</h3>
+                                    <div class="form-group">
+                                        <label class="col-sm-3 control-label">Google Sign-in Button</label>
+                                        <div class="col-sm-9">
+                                            <div class="checkbox">
+                                                <label>
+                                                    <input type="checkbox" name="show_google_login" id="show_google_login" value="1" <?php if($show_google_login) echo 'checked'; ?>>
+                                                    <strong>Show Google Sign-in button</strong> on Storefront Login &amp; Registration pages
+                                                </label>
+                                            </div>
+                                            <p class="help-block">When enabled, customers see the "Continue with Google" button connected with Supabase authentication.</p>
+                                        </div>
+                                    </div>
                                     <div class="form-group">
                                         <label for="google_client_id" class="col-sm-3 control-label">Google Client ID</label>
                                         <div class="col-sm-9">
-                                            <input type="text" name="google_client_id" id="google_client_id" class="form-control" value="<?php echo htmlspecialchars($google_client_id); ?>">
+                                            <input type="text" name="google_client_id" id="google_client_id" class="form-control" value="<?php echo htmlspecialchars($google_client_id); ?>" placeholder="e.g. 123456789-abc.apps.googleusercontent.com">
                                         </div>
                                     </div>
                                     <div class="form-group">
                                         <label for="google_client_secret" class="col-sm-3 control-label">Google Client Secret</label>
                                         <div class="col-sm-9">
                                             <input type="text" name="google_client_secret" id="google_client_secret" class="form-control" value="<?php echo htmlspecialchars($google_client_secret); ?>">
+                                        </div>
+                                    </div>
+
+                                    <h3 class="seo-info mt-8"><i class="fa fa-facebook-square text-primary"></i> Facebook Authentication &amp; OAuth</h3>
+                                    <div class="form-group">
+                                        <label class="col-sm-3 control-label">Facebook Sign-in Button</label>
+                                        <div class="col-sm-9">
+                                            <div class="checkbox">
+                                                <label>
+                                                    <input type="checkbox" name="show_facebook_login" id="show_facebook_login" value="1" <?php if($show_facebook_login) echo 'checked'; ?>>
+                                                    <strong>Show Facebook Sign-in button</strong> on Storefront Login &amp; Registration pages
+                                                </label>
+                                            </div>
+                                            <p class="help-block">When enabled, customers see the "Continue with Facebook" button on Login &amp; Registration pages.</p>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="facebook_app_id" class="col-sm-3 control-label">Facebook App ID</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="facebook_app_id" id="facebook_app_id" class="form-control" value="<?php echo htmlspecialchars($facebook_app_id); ?>" placeholder="e.g. 123456789012345">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="facebook_app_secret" class="col-sm-3 control-label">Facebook App Secret</label>
+                                        <div class="col-sm-9">
+                                            <input type="text" name="facebook_app_secret" id="facebook_app_secret" class="form-control" value="<?php echo htmlspecialchars($facebook_app_secret); ?>">
                                         </div>
                                     </div>
 

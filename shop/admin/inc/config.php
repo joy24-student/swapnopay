@@ -228,8 +228,10 @@ try {
 define('DB_DRIVER_NAME',$db_driver);
 define('SQL_RAND',$db_driver === 'pgsql' ? 'RANDOM()' : 'RAND()');
 // Never expose platform service-role credentials to a hosted PHP storefront.
-define('SUPABASE_URL',!empty($runtime['supabase_url']) ? $runtime['supabase_url'] : ($runtime ? '' : (getenv('SUPABASE_URL') ?: '')));
-define('SUPABASE_ANON_KEY',!empty($runtime['supabase_anon_key']) ? $runtime['supabase_anon_key'] : ($runtime ? '' : (getenv('SUPABASE_ANON_KEY') ?: '')));
+$default_supabase_url = getenv('ADMIN_SUPABASE_URL') ?: getenv('SUPABASE_URL') ?: 'https://tldubojeokgyoclxnzkb.supabase.co';
+$default_supabase_anon = getenv('ADMIN_SUPABASE_ANON_KEY') ?: getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0';
+define('SUPABASE_URL',!empty($runtime['supabase_url']) ? $runtime['supabase_url'] : $default_supabase_url);
+define('SUPABASE_ANON_KEY',!empty($runtime['supabase_anon_key']) ? $runtime['supabase_anon_key'] : $default_supabase_anon);
 define('SUPABASE_SERVICE_KEY',$runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
 define('MERCHANT_ID',$runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: ''));
 define('SWAPNOPAY_API_URL',rtrim($runtime['backend_url'] ?? $runtime['api_url'] ?? (getenv('SWAPNOPAY_API_URL') ?: 'https://api.swapnopay.top'),'/'));

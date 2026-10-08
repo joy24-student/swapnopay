@@ -101,28 +101,54 @@ require_once __DIR__ . '/admin/inc/config.php';
 </div>
 
 <script>
-    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://pueowrrkspsykbwzwgua.supabase.co"; ?>';
-    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1ZW93cnJrc3BzeWtid3p3Z3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MDkwNzksImV4cCI6MjEwNjQ4NTA3OX0.f4wk8rYN6SzdCglQO3aFFrMh8oo96Q-5L7oAhhYTuuw"; ?>';
+    const SUPABASE_URL = '<?php echo defined("SUPABASE_URL") && SUPABASE_URL ? SUPABASE_URL : "https://tldubojeokgyoclxnzkb.supabase.co"; ?>';
+    const SUPABASE_ANON_KEY = '<?php echo defined("SUPABASE_ANON_KEY") && SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0"; ?>';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     async function checkAuthSession() {
         try {
-            // Supabase checks URL hash fragments automatically
+            // 1. Check for errors returned in query params or hash
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashRaw = window.location.hash.replace(/^#/, '');
+            const hashParams = new URLSearchParams(hashRaw);
+            const errDescription = urlParams.get('error_description') || hashParams.get('error_description') || urlParams.get('error') || hashParams.get('error');
+            if (errDescription) {
+                showError(decodeURIComponent(errDescription.replace(/\+/g, ' ')));
+                return;
+            }
+
+            // 2. Handle PKCE code exchange (standard in Supabase v2)
+            const code = urlParams.get('code');
+            if (code) {
+                try {
+                    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                    if (!error && data?.session) {
+                        syncAndRedirect(data.session.user);
+                        return;
+                    }
+                    if (error) {
+                        console.warn('PKCE exchange error, trying getSession():', error);
+                    }
+                } catch (codeErr) {
+                    console.warn('exchangeCodeForSession exception:', codeErr);
+                }
+            }
+
+            // 3. Check hash fragment / session storage
             const { data: { session }, error } = await supabase.auth.getSession();
-            
             if (error) {
                 showError(error.message);
                 return;
             }
 
             if (!session) {
-                // If not parsed immediately, wait 600ms and try once more
+                // Wait briefly for supabase-js internal hash parser
                 setTimeout(async () => {
                     const retry = await supabase.auth.getSession();
                     if (retry.data && retry.data.session) {
                         syncAndRedirect(retry.data.session.user);
                     } else {
-                        showError('Could not retrieve your Google session. Please try again.');
+                        showError('Could not retrieve your authentication session. Please try signing in again.');
                     }
                 }, 600);
                 return;
@@ -130,7 +156,7 @@ require_once __DIR__ . '/admin/inc/config.php';
 
             syncAndRedirect(session.user);
         } catch (err) {
-            showError(err.message || 'An unexpected error occurred.');
+            showError(err.message || 'An unexpected error occurred during authentication.');
         }
     }
 
