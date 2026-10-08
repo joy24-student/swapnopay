@@ -51,7 +51,7 @@ function initNotificationTables(PDO $pdo): void {
             ");
             try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_fcm_tokens_merchant ON tbl_fcm_tokens(merchant_id);"); } catch (Throwable $e) {}
 
-            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key'];
+            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key', 'firebase_service_account_json'];
             foreach ($cols as $col) {
                 try {
                     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS {$col} TEXT");
@@ -90,7 +90,7 @@ function initNotificationTables(PDO $pdo): void {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             ");
 
-            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key'];
+            $cols = ['fcm_server_key', 'firebase_api_key', 'firebase_auth_domain', 'firebase_project_id', 'firebase_storage_bucket', 'firebase_messaging_sender_id', 'firebase_app_id', 'firebase_vapid_key', 'firebase_service_account_json'];
             foreach ($cols as $col) {
                 try {
                     $pdo->exec("ALTER TABLE tbl_settings ADD COLUMN {$col} TEXT NULL");
@@ -101,6 +101,70 @@ function initNotificationTables(PDO $pdo): void {
     } catch (Throwable $e) {
         error_log("initNotificationTables error: " . $e->getMessage());
     }
+}
+
+/**
+ * Automatically parses Firebase JSON configuration file (google-services.json, service-account.json, or web config)
+ * and extracts all credentials.
+ */
+function parseFirebaseConfigFile(string $jsonString): array {
+    $data = json_decode($jsonString, true);
+    if (!is_array($data)) {
+        return [];
+    }
+
+    $extracted = [];
+
+    // 1. Google Services JSON (Android config from Firebase Console: google-services.json)
+    if (isset($data['project_info']) && is_array($data['project_info'])) {
+        $pInfo = $data['project_info'];
+        $extracted['firebase_project_id'] = (string)($pInfo['project_id'] ?? '');
+        $extracted['firebase_messaging_sender_id'] = (string)($pInfo['project_number'] ?? '');
+        $extracted['firebase_storage_bucket'] = (string)($pInfo['storage_bucket'] ?? '');
+        if (!empty($extracted['firebase_project_id'])) {
+            $extracted['firebase_auth_domain'] = $extracted['firebase_project_id'] . '.firebaseapp.com';
+            if (empty($extracted['firebase_storage_bucket'])) {
+                $extracted['firebase_storage_bucket'] = $extracted['firebase_project_id'] . '.appspot.com';
+            }
+        }
+
+        if (isset($data['client']) && is_array($data['client']) && !empty($data['client'])) {
+            $client = $data['client'][0];
+            if (isset($client['client_info']['mobilesdk_app_id'])) {
+                $extracted['firebase_app_id'] = (string)$client['client_info']['mobilesdk_app_id'];
+            }
+            if (isset($client['api_key']) && is_array($client['api_key']) && !empty($client['api_key'])) {
+                $extracted['firebase_api_key'] = (string)($client['api_key'][0]['current_key'] ?? '');
+            }
+        }
+        $extracted['_detected_type'] = 'Google Services JSON (google-services.json)';
+    }
+
+    // 2. Google Service Account JSON (service-account.json / firebase-adminsdk-xxx.json)
+    elseif (isset($data['type']) && $data['type'] === 'service_account') {
+        $extracted['firebase_project_id'] = (string)($data['project_id'] ?? '');
+        if (!empty($extracted['firebase_project_id'])) {
+            $extracted['firebase_auth_domain'] = $extracted['firebase_project_id'] . '.firebaseapp.com';
+            $extracted['firebase_storage_bucket'] = $extracted['firebase_project_id'] . '.appspot.com';
+        }
+        $extracted['firebase_service_account_json'] = $jsonString;
+        $extracted['_detected_type'] = 'Google Cloud / Firebase Service Account Key';
+    }
+
+    // 3. Web App Config JSON or generic key-value map
+    else {
+        $extracted['firebase_api_key'] = (string)($data['apiKey'] ?? $data['api_key'] ?? $data['firebase_api_key'] ?? '');
+        $extracted['firebase_auth_domain'] = (string)($data['authDomain'] ?? $data['auth_domain'] ?? $data['firebase_auth_domain'] ?? '');
+        $extracted['firebase_project_id'] = (string)($data['projectId'] ?? $data['project_id'] ?? $data['firebase_project_id'] ?? '');
+        $extracted['firebase_storage_bucket'] = (string)($data['storageBucket'] ?? $data['storage_bucket'] ?? $data['firebase_storage_bucket'] ?? '');
+        $extracted['firebase_messaging_sender_id'] = (string)($data['messagingSenderId'] ?? $data['messaging_sender_id'] ?? $data['firebase_messaging_sender_id'] ?? '');
+        $extracted['firebase_app_id'] = (string)($data['appId'] ?? $data['app_id'] ?? $data['firebase_app_id'] ?? '');
+        $extracted['firebase_vapid_key'] = (string)($data['vapidKey'] ?? $data['vapid_key'] ?? $data['firebase_vapid_key'] ?? '');
+        $extracted['fcm_server_key'] = (string)($data['serverKey'] ?? $data['server_key'] ?? $data['fcm_server_key'] ?? '');
+        $extracted['_detected_type'] = 'Firebase Web Configuration';
+    }
+
+    return array_filter($extracted, static fn($v) => $v !== '');
 }
 
 if (isset($pdo) && $pdo instanceof PDO) {

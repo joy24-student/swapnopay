@@ -63,6 +63,15 @@ if($method==='POST') {
             exit('Upload an image up to 16 MB.');
         }
         $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($adminPage === 'broadcast-notification.php' && $ext === 'json') {
+            $jsonContent = @file_get_contents($file['tmp_name']);
+            if ($jsonContent !== false && json_decode($jsonContent, true) !== null) {
+                return;
+            }
+            http_response_code(400);
+            exit('Please upload a valid Firebase JSON configuration file.');
+        }
+
         $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         if(!in_array($ext, $allowedExts, true)) {
             http_response_code(400);
