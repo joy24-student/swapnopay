@@ -421,6 +421,9 @@ switch ($action) {
 
             if (!empty($incomingCall)) {
                 $signals = array_merge($signals, $incomingCall);
+                if ($threadId === 0) {
+                    $threadId = (int)$incomingCall[0]['thread_id'];
+                }
             }
 
             // 2. If admin is focused on a specific thread, fetch all remaining signals for that thread (offer, answer, candidate, call_end)

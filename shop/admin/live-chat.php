@@ -2432,6 +2432,9 @@ let pendingAdminOfferSignal = null;
 let queuedAdminCandidates = [];
 let fastAdminSignalTimer = null;
 let adminCallRingtoneInterval = null;
+let adminActiveCallThreadId = null;
+let adminWebRtcAudioCtx = null;
+let adminRemoteAudioSourceNode = null;
 
 const adminRtcConfig = {
     iceServers: [
@@ -2445,14 +2448,40 @@ const adminRtcConfig = {
     iceCandidatePoolSize: 10
 };
 
-// Web Audio API Ringtone for Admin (Reliable double-chime)
+// Singleton Web Audio context for chime, ringtone, and stream routing
+function getAdminWebRtcAudioContext() {
+    if (!adminWebRtcAudioCtx || adminWebRtcAudioCtx.state === 'closed') {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+            adminWebRtcAudioCtx = new AudioCtx();
+        }
+    }
+    if (adminWebRtcAudioCtx && adminWebRtcAudioCtx.state === 'suspended') {
+        adminWebRtcAudioCtx.resume().catch(() => {});
+    }
+    return adminWebRtcAudioCtx;
+}
+
+// User-gesture audio unlocker: bypasses Chrome/Safari autoplay policy restrictions
+function unlockAdminAudioPlayback() {
+    const ctx = getAdminWebRtcAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+    const audioEl = document.getElementById('adminRemoteAudio');
+    if (audioEl) {
+        audioEl.muted = false;
+        audioEl.play().catch(() => {});
+    }
+}
+
+// Web Audio API Ringtone for Admin (Single-instance, zero memory leak)
 function playAdminRingtone() {
     stopAdminRingtone();
-    adminCallRingtoneInterval = setInterval(() => {
+    const triggerTone = () => {
         try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-            const ctx = new AudioCtx();
+            const ctx = getAdminWebRtcAudioContext();
+            if (!ctx) return;
             const now = ctx.currentTime;
             const osc1 = ctx.createOscillator();
             const osc2 = ctx.createOscillator();
@@ -2479,7 +2508,10 @@ function playAdminRingtone() {
             osc1.stop(now + 1.15);
             osc2.stop(now + 1.15);
         } catch (e) {}
-    }, 2200);
+    };
+
+    triggerTone();
+    adminCallRingtoneInterval = setInterval(triggerTone, 2200);
 }
 
 function stopAdminRingtone() {
@@ -2502,13 +2534,70 @@ function stopFastAdminSignalPolling() {
     }
 }
 
+// Fallback MediaStream retriever
+async function getAdminMediaStreamWithFallback(type) {
+    const preferredConstraints = {
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        },
+        video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
+    };
+
+    try {
+        return await navigator.mediaDevices.getUserMedia(preferredConstraints);
+    } catch (prefErr) {
+        console.warn('[WebRTC Admin] High-spec constraints rejected, falling back to basic audio/video:', prefErr);
+        const basicConstraints = {
+            audio: true,
+            video: type === 'video' ? true : false
+        };
+        return await navigator.mediaDevices.getUserMedia(basicConstraints);
+    }
+}
+
+// Dual remote audio delivery: HTML5 <audio> element + Web Audio Destination fallback
+function attachAdminRemoteAudio(stream) {
+    const remoteAudio = document.getElementById('adminRemoteAudio');
+    if (remoteAudio) {
+        remoteAudio.srcObject = stream;
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1.0;
+        const playPromise = remoteAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('[WebRTC Admin] Audio playing via HTML5 audio element.');
+            }).catch(async (playErr) => {
+                console.warn('[WebRTC Admin] HTML5 audio play blocked, engaging Web Audio API destination:', playErr);
+                try {
+                    const ctx = getAdminWebRtcAudioContext();
+                    if (ctx) {
+                        await ctx.resume();
+                        if (adminRemoteAudioSourceNode) {
+                            try { adminRemoteAudioSourceNode.disconnect(); } catch (e) {}
+                        }
+                        adminRemoteAudioSourceNode = ctx.createMediaStreamSource(stream);
+                        adminRemoteAudioSourceNode.connect(ctx.destination);
+                        console.log('[WebRTC Admin] Web Audio route connected successfully.');
+                    }
+                } catch (webaudioErr) {
+                    console.error('[WebRTC Admin] Web Audio fallback failed:', webaudioErr);
+                }
+            });
+        }
+    }
+}
+
 async function startAdminWebRtcCall(type) {
     if (!currentThreadId) {
         alert('Please select a customer conversation first.');
         return;
     }
 
+    unlockAdminAudioPlayback();
     adminCallType = type;
+    adminActiveCallThreadId = currentThreadId;
     pendingAdminOfferSignal = null;
     queuedAdminCandidates = [];
 
@@ -2530,45 +2619,47 @@ async function startAdminWebRtcCall(type) {
     startFastAdminSignalPolling();
 
     try {
-        const constraints = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            },
-            video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-        };
-
-        adminLocalStream = await navigator.mediaDevices.getUserMedia(constraints);
+        adminLocalStream = await getAdminMediaStreamWithFallback(type);
         if (type === 'video') {
-            document.getElementById('adminLocalVideo').srcObject = adminLocalStream;
+            const locVid = document.getElementById('adminLocalVideo');
+            if (locVid) locVid.srcObject = adminLocalStream;
         }
 
         adminPeer = new RTCPeerConnection(adminRtcConfig);
-        adminLocalStream.getTracks().forEach(track => adminPeer.addTrack(track, adminLocalStream));
+        adminLocalStream.getTracks().forEach(track => {
+            track.enabled = true;
+            adminPeer.addTrack(track, adminLocalStream);
+        });
 
         adminPeer.ontrack = (event) => {
             stopAdminRingtone();
-            let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-            if (!stream) {
-                stream = new MediaStream([event.track]);
-            }
-            const remoteAudio = document.getElementById('adminRemoteAudio');
-            if (remoteAudio) {
-                remoteAudio.srcObject = stream;
-                remoteAudio.muted = false;
-                remoteAudio.volume = 1.0;
-                remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
-            }
+            const track = event.track;
+            const stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
 
-            if (type === 'video') {
+            if (track.kind === 'audio') {
+                const audioStream = stream || new MediaStream([track]);
+                attachAdminRemoteAudio(audioStream);
+            } else if (track.kind === 'video') {
+                const videoStream = stream || new MediaStream([track]);
                 const remoteVid = document.getElementById('adminRemoteVideo');
                 if (remoteVid) {
-                    remoteVid.srcObject = stream;
+                    remoteVid.srcObject = videoStream;
                     remoteVid.play().catch(e => console.warn('Admin video play error:', e));
                 }
             }
             startCallTimer();
+        };
+
+        adminPeer.oniceconnectionstatechange = () => {
+            console.log('[WebRTC Admin] ICE State:', adminPeer.iceConnectionState);
+            if (adminPeer.iceConnectionState === 'connected' || adminPeer.iceConnectionState === 'completed') {
+                stopAdminRingtone();
+            } else if (adminPeer.iceConnectionState === 'failed') {
+                console.warn('[WebRTC Admin] ICE state failed, restarting ICE...');
+                if (typeof adminPeer.restartIce === 'function') {
+                    adminPeer.restartIce();
+                }
+            }
         };
 
         adminPeer.onicecandidate = (event) => {
@@ -2577,11 +2668,14 @@ async function startAdminWebRtcCall(type) {
             }
         };
 
-        // 1. Notify peer of call_start BEFORE setting local description
+        // 1. Notify peer of call_start
         await sendWebRtcSignal('call_start', type);
 
-        // 2. Create offer & set local description
-        const offer = await adminPeer.createOffer();
+        // 2. Create offer with explicit receive audio option
+        const offer = await adminPeer.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: type === 'video'
+        });
         await adminPeer.setLocalDescription(offer);
 
         // 3. Send offer to peer
@@ -2597,10 +2691,11 @@ async function startAdminWebRtcCall(type) {
 }
 
 async function sendWebRtcSignal(type, payload) {
-    if (!currentThreadId) return;
+    const threadId = adminActiveCallThreadId || currentThreadId;
+    if (!threadId) return;
     try {
         const fd = new FormData();
-        fd.append('thread_id', currentThreadId);
+        fd.append('thread_id', threadId);
         fd.append('sender', 'admin');
         fd.append('signal_type', type);
         fd.append('call_type', adminCallType);
@@ -2611,7 +2706,7 @@ async function sendWebRtcSignal(type, payload) {
 
 async function pollAdminWebRtcSignals() {
     try {
-        const targetThreadId = currentThreadId || 0;
+        const targetThreadId = adminActiveCallThreadId || currentThreadId || 0;
         const res = await fetch(`../live_chat_api.php?action=fetch_signals&receiver=admin&thread_id=${targetThreadId}`);
         const data = await res.json();
         if (data.status === 'success' && data.signals && data.signals.length > 0) {
@@ -2624,7 +2719,7 @@ async function pollAdminWebRtcSignals() {
 
 async function handleAdminIncomingSignal(sig) {
     if (sig.signal_type === 'call_start') {
-        // Customer is calling Admin
+        adminActiveCallThreadId = sig.thread_id;
         if (sig.thread_id && (!currentThreadId || currentThreadId !== sig.thread_id)) {
             await selectThread(sig.thread_id);
         }
@@ -2643,10 +2738,13 @@ async function handleAdminIncomingSignal(sig) {
         if (adminPeer && adminPeer.signalingState !== 'closed') {
             try {
                 await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
-                await drainQueuedAdminCandidates(adminPeer);
-                const answer = await adminPeer.createAnswer();
+                const answer = await adminPeer.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: adminCallType === 'video'
+                });
                 await adminPeer.setLocalDescription(answer);
                 sendWebRtcSignal('answer', JSON.stringify(answer));
+                await drainQueuedAdminCandidates(adminPeer);
             } catch (e) {
                 console.error('Admin offer handling error:', e);
             }
@@ -2664,10 +2762,12 @@ async function handleAdminIncomingSignal(sig) {
     } else if (sig.signal_type === 'candidate') {
         try {
             const cand = JSON.parse(sig.payload);
-            if (adminPeer && adminPeer.remoteDescription && adminPeer.remoteDescription.type) {
-                await adminPeer.addIceCandidate(new RTCIceCandidate(cand));
-            } else {
-                queuedAdminCandidates.push(cand);
+            if (cand && (cand.candidate || cand.candidate === '')) {
+                if (adminPeer && adminPeer.remoteDescription && adminPeer.remoteDescription.type) {
+                    await adminPeer.addIceCandidate(new RTCIceCandidate(cand));
+                } else {
+                    queuedAdminCandidates.push(cand);
+                }
             }
         } catch (e) {}
     } else if (sig.signal_type === 'call_end') {
@@ -2676,15 +2776,22 @@ async function handleAdminIncomingSignal(sig) {
 }
 
 async function drainQueuedAdminCandidates(pc) {
-    while (queuedAdminCandidates.length > 0) {
-        const cand = queuedAdminCandidates.shift();
+    if (!pc || !pc.remoteDescription) return;
+    const candidates = [...queuedAdminCandidates];
+    queuedAdminCandidates = [];
+    for (const cand of candidates) {
         try {
-            await pc.addIceCandidate(new RTCIceCandidate(cand));
-        } catch (e) {}
+            if (cand && (cand.candidate || cand.candidate === '')) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+        } catch (e) {
+            console.warn('[WebRTC Admin] Candidate add error:', e);
+        }
     }
 }
 
 async function acceptAdminIncomingCall() {
+    unlockAdminAudioPlayback();
     stopAdminRingtone();
     document.getElementById('adminIncomingCallModal').style.display = 'none';
 
@@ -2703,45 +2810,47 @@ async function acceptAdminIncomingCall() {
     }
 
     try {
-        const constraints = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            },
-            video: adminCallType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-        };
-
-        adminLocalStream = await navigator.mediaDevices.getUserMedia(constraints);
+        adminLocalStream = await getAdminMediaStreamWithFallback(adminCallType);
         if (adminCallType === 'video') {
-            document.getElementById('adminLocalVideo').srcObject = adminLocalStream;
+            const locVid = document.getElementById('adminLocalVideo');
+            if (locVid) locVid.srcObject = adminLocalStream;
         }
 
         adminPeer = new RTCPeerConnection(adminRtcConfig);
-        adminLocalStream.getTracks().forEach(track => adminPeer.addTrack(track, adminLocalStream));
+        adminLocalStream.getTracks().forEach(track => {
+            track.enabled = true;
+            adminPeer.addTrack(track, adminLocalStream);
+        });
 
         adminPeer.ontrack = (event) => {
             stopAdminRingtone();
-            let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-            if (!stream) {
-                stream = new MediaStream([event.track]);
-            }
-            const remoteAudio = document.getElementById('adminRemoteAudio');
-            if (remoteAudio) {
-                remoteAudio.srcObject = stream;
-                remoteAudio.muted = false;
-                remoteAudio.volume = 1.0;
-                remoteAudio.play().catch(e => console.warn('Admin audio play error:', e));
-            }
+            const track = event.track;
+            const stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
 
-            if (adminCallType === 'video') {
+            if (track.kind === 'audio') {
+                const audioStream = stream || new MediaStream([track]);
+                attachAdminRemoteAudio(audioStream);
+            } else if (track.kind === 'video') {
+                const videoStream = stream || new MediaStream([track]);
                 const remoteVid = document.getElementById('adminRemoteVideo');
                 if (remoteVid) {
-                    remoteVid.srcObject = stream;
+                    remoteVid.srcObject = videoStream;
                     remoteVid.play().catch(e => console.warn('Admin video play error:', e));
                 }
             }
             startCallTimer();
+        };
+
+        adminPeer.oniceconnectionstatechange = () => {
+            console.log('[WebRTC Admin] ICE State:', adminPeer.iceConnectionState);
+            if (adminPeer.iceConnectionState === 'connected' || adminPeer.iceConnectionState === 'completed') {
+                stopAdminRingtone();
+            } else if (adminPeer.iceConnectionState === 'failed') {
+                console.warn('[WebRTC Admin] ICE state failed, restarting ICE...');
+                if (typeof adminPeer.restartIce === 'function') {
+                    adminPeer.restartIce();
+                }
+            }
         };
 
         adminPeer.onicecandidate = (event) => {
@@ -2752,10 +2861,13 @@ async function acceptAdminIncomingCall() {
 
         if (pendingAdminOfferSignal) {
             await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingAdminOfferSignal)));
-            await drainQueuedAdminCandidates(adminPeer);
-            const answer = await adminPeer.createAnswer();
+            const answer = await adminPeer.createAnswer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: adminCallType === 'video'
+            });
             await adminPeer.setLocalDescription(answer);
             sendWebRtcSignal('answer', JSON.stringify(answer));
+            await drainQueuedAdminCandidates(adminPeer);
         }
 
     } catch (e) {
@@ -2772,6 +2884,7 @@ function declineAdminIncomingCall() {
     sendWebRtcSignal('call_end', 'declined');
     pendingAdminOfferSignal = null;
     queuedAdminCandidates = [];
+    adminActiveCallThreadId = null;
 }
 
 function startCallTimer() {
@@ -2803,8 +2916,22 @@ function hangupAdminCall(notify = true) {
         adminPeer = null;
     }
 
+    if (adminRemoteAudioSourceNode) {
+        try { adminRemoteAudioSourceNode.disconnect(); } catch (e) {}
+        adminRemoteAudioSourceNode = null;
+    }
+    const remoteAudio = document.getElementById('adminRemoteAudio');
+    if (remoteAudio) {
+        remoteAudio.srcObject = null;
+    }
+    const remoteVid = document.getElementById('adminRemoteVideo');
+    if (remoteVid) {
+        remoteVid.srcObject = null;
+    }
+
     pendingAdminOfferSignal = null;
     queuedAdminCandidates = [];
+    adminActiveCallThreadId = null;
 
     document.getElementById('adminIncomingCallModal').style.display = 'none';
     document.getElementById('adminCallModal').style.display = 'none';

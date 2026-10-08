@@ -1250,7 +1250,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
     let pendingOfferSignal = null;
     let queuedCandidates = [];
     let fastSignalTimer = null;
-    let ringtoneInterval = null;
+    let callRingtoneInterval = null;
+    let custWebRtcAudioCtx = null;
+    let custRemoteAudioSourceNode = null;
 
     const rtcConfig = {
         iceServers: [
@@ -1264,14 +1266,40 @@ if (!empty($_SESSION['cart_p_qty'])) {
         iceCandidatePoolSize: 10
     };
 
-    // Web Audio Ringtone Generator (100% reliable, zero asset dependencies)
+    // Singleton Web Audio context for customer side
+    function getCustWebRtcAudioContext() {
+        if (!custWebRtcAudioCtx || custWebRtcAudioCtx.state === 'closed') {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                custWebRtcAudioCtx = new AudioCtx();
+            }
+        }
+        if (custWebRtcAudioCtx && custWebRtcAudioCtx.state === 'suspended') {
+            custWebRtcAudioCtx.resume().catch(() => {});
+        }
+        return custWebRtcAudioCtx;
+    }
+
+    // User-gesture audio unlocker: bypasses Chrome/Safari autoplay restrictions
+    function unlockCustAudioPlayback() {
+        const ctx = getCustWebRtcAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+        const audioEl = document.getElementById('remoteAudio');
+        if (audioEl) {
+            audioEl.muted = false;
+            audioEl.play().catch(() => {});
+        }
+    }
+
+    // Single-instance Web Audio Ringtone Generator (100% reliable, zero asset dependencies)
     function playCallRingtone() {
         stopCallRingtone();
-        ringtoneInterval = setInterval(() => {
+        const triggerTone = () => {
             try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-                const ctx = new AudioCtx();
+                const ctx = getCustWebRtcAudioContext();
+                if (!ctx) return;
                 const now = ctx.currentTime;
                 const osc1 = ctx.createOscillator();
                 const osc2 = ctx.createOscillator();
@@ -1298,13 +1326,16 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 osc1.stop(now + 1.15);
                 osc2.stop(now + 1.15);
             } catch (e) {}
-        }, 2200);
+        };
+
+        triggerTone();
+        callRingtoneInterval = setInterval(triggerTone, 2200);
     }
 
     function stopCallRingtone() {
-        if (ringtoneInterval) {
-            clearInterval(ringtoneInterval);
-            ringtoneInterval = null;
+        if (callRingtoneInterval) {
+            clearInterval(callRingtoneInterval);
+            callRingtoneInterval = null;
         }
     }
 
@@ -1321,7 +1352,63 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
     }
 
+    // Fallback MediaStream retriever
+    async function getCustMediaStreamWithFallback(type) {
+        const preferredConstraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
+        };
+
+        try {
+            return await navigator.mediaDevices.getUserMedia(preferredConstraints);
+        } catch (prefErr) {
+            console.warn('[WebRTC Cust] High-spec constraints rejected, falling back to basic audio/video:', prefErr);
+            const basicConstraints = {
+                audio: true,
+                video: type === 'video' ? true : false
+            };
+            return await navigator.mediaDevices.getUserMedia(basicConstraints);
+        }
+    }
+
+    // Dual remote audio delivery: HTML5 <audio> element + Web Audio Destination fallback
+    function attachCustRemoteAudio(stream) {
+        const remoteAudio = document.getElementById('remoteAudio');
+        if (remoteAudio) {
+            remoteAudio.srcObject = stream;
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1.0;
+            const playPromise = remoteAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('[WebRTC Cust] Audio playing via HTML5 audio element.');
+                }).catch(async (playErr) => {
+                    console.warn('[WebRTC Cust] HTML5 audio play blocked, engaging Web Audio API destination:', playErr);
+                    try {
+                        const ctx = getCustWebRtcAudioContext();
+                        if (ctx) {
+                            await ctx.resume();
+                            if (custRemoteAudioSourceNode) {
+                                try { custRemoteAudioSourceNode.disconnect(); } catch (e) {}
+                            }
+                            custRemoteAudioSourceNode = ctx.createMediaStreamSource(stream);
+                            custRemoteAudioSourceNode.connect(ctx.destination);
+                            console.log('[WebRTC Cust] Web Audio route connected successfully.');
+                        }
+                    } catch (webaudioErr) {
+                        console.error('[WebRTC Cust] Web Audio fallback failed:', webaudioErr);
+                    }
+                });
+            }
+        }
+    }
+
     async function startWebRtcCall(type) {
+        unlockCustAudioPlayback();
         currentCallType = type;
         pendingOfferSignal = null;
         queuedCandidates = [];
@@ -1344,16 +1431,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         startFastSignalPolling();
 
         try {
-            const mediaConstraints = {
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-            };
-
-            localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+            localStream = await getCustMediaStreamWithFallback(type);
 
             if (type === 'video') {
                 const localVid = document.getElementById('localVideo');
@@ -1361,30 +1439,40 @@ if (!empty($_SESSION['cart_p_qty'])) {
             }
 
             peerConnection = new RTCPeerConnection(rtcConfig);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            localStream.getTracks().forEach(track => {
+                track.enabled = true;
+                peerConnection.addTrack(track, localStream);
+            });
 
             peerConnection.ontrack = (event) => {
                 stopCallRingtone();
-                let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-                if (!stream) {
-                    stream = new MediaStream([event.track]);
-                }
-                const remoteAudio = document.getElementById('remoteAudio');
-                if (remoteAudio) {
-                    remoteAudio.srcObject = stream;
-                    remoteAudio.muted = false;
-                    remoteAudio.volume = 1.0;
-                    remoteAudio.play().catch(e => console.warn('Audio play request:', e));
-                }
+                const track = event.track;
+                const stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
 
-                if (type === 'video') {
+                if (track.kind === 'audio') {
+                    const audioStream = stream || new MediaStream([track]);
+                    attachCustRemoteAudio(audioStream);
+                } else if (track.kind === 'video') {
+                    const videoStream = stream || new MediaStream([track]);
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
-                        remoteVid.srcObject = stream;
+                        remoteVid.srcObject = videoStream;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }
                 startCallTimer();
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('[WebRTC Cust] ICE State:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+                    stopCallRingtone();
+                } else if (peerConnection.iceConnectionState === 'failed') {
+                    console.warn('[WebRTC Cust] ICE failed, attempting restart...');
+                    if (typeof peerConnection.restartIce === 'function') {
+                        peerConnection.restartIce();
+                    }
+                }
             };
 
             peerConnection.onicecandidate = (event) => {
@@ -1393,11 +1481,14 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 }
             };
 
-            // 1. Notify server call has started BEFORE setting local description
+            // 1. Notify server call has started
             await sendSignal('call_start', '', type);
 
-            // 2. Create offer & set local description
-            const offer = await peerConnection.createOffer();
+            // 2. Create offer with explicit receive audio option
+            const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: type === 'video'
+            });
             await peerConnection.setLocalDescription(offer);
 
             // 3. Send offer payload
@@ -1443,10 +1534,13 @@ if (!empty($_SESSION['cart_p_qty'])) {
             if (peerConnection && peerConnection.signalingState !== 'closed') {
                 try {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
-                    await drainQueuedCandidates(peerConnection);
-                    const answer = await peerConnection.createAnswer();
+                    const answer = await peerConnection.createAnswer({
+                        offerToReceiveAudio: true,
+                        offerToReceiveVideo: currentCallType === 'video'
+                    });
                     await peerConnection.setLocalDescription(answer);
                     sendSignal('answer', JSON.stringify(answer), sig.call_type || currentCallType);
+                    await drainQueuedCandidates(peerConnection);
                 } catch (e) {
                     console.error('Error handling offer:', e);
                 }
@@ -1464,10 +1558,12 @@ if (!empty($_SESSION['cart_p_qty'])) {
         } else if (sig.signal_type === 'candidate') {
             try {
                 const cand = JSON.parse(sig.payload);
-                if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
-                } else {
-                    queuedCandidates.push(cand);
+                if (cand && (cand.candidate || cand.candidate === '')) {
+                    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+                    } else {
+                        queuedCandidates.push(cand);
+                    }
                 }
             } catch (e) {}
         } else if (sig.signal_type === 'call_end') {
@@ -1476,15 +1572,22 @@ if (!empty($_SESSION['cart_p_qty'])) {
     }
 
     async function drainQueuedCandidates(pc) {
-        while (queuedCandidates.length > 0) {
-            const cand = queuedCandidates.shift();
+        if (!pc || !pc.remoteDescription) return;
+        const candidates = [...queuedCandidates];
+        queuedCandidates = [];
+        for (const cand of candidates) {
             try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
-            } catch (e) {}
+                if (cand && (cand.candidate || cand.candidate === '')) {
+                    await pc.addIceCandidate(new RTCIceCandidate(cand));
+                }
+            } catch (e) {
+                console.warn('[WebRTC Cust] Candidate add error:', e);
+            }
         }
     }
 
     async function acceptIncomingCall() {
+        unlockCustAudioPlayback();
         stopCallRingtone();
         const incomingModal = document.getElementById('incomingCallModal');
         if (incomingModal) {
@@ -1507,16 +1610,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
 
         try {
-            const mediaConstraints = {
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: currentCallType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-            };
-
-            localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+            localStream = await getCustMediaStreamWithFallback(currentCallType);
 
             if (currentCallType === 'video') {
                 const localVid = document.getElementById('localVideo');
@@ -1524,30 +1618,40 @@ if (!empty($_SESSION['cart_p_qty'])) {
             }
 
             peerConnection = new RTCPeerConnection(rtcConfig);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            localStream.getTracks().forEach(track => {
+                track.enabled = true;
+                peerConnection.addTrack(track, localStream);
+            });
 
             peerConnection.ontrack = (event) => {
                 stopCallRingtone();
-                let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-                if (!stream) {
-                    stream = new MediaStream([event.track]);
-                }
-                const remoteAudio = document.getElementById('remoteAudio');
-                if (remoteAudio) {
-                    remoteAudio.srcObject = stream;
-                    remoteAudio.muted = false;
-                    remoteAudio.volume = 1.0;
-                    remoteAudio.play().catch(e => console.warn('Audio play request:', e));
-                }
+                const track = event.track;
+                const stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
 
-                if (currentCallType === 'video') {
+                if (track.kind === 'audio') {
+                    const audioStream = stream || new MediaStream([track]);
+                    attachCustRemoteAudio(audioStream);
+                } else if (track.kind === 'video') {
+                    const videoStream = stream || new MediaStream([track]);
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
-                        remoteVid.srcObject = stream;
+                        remoteVid.srcObject = videoStream;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }
                 startCallTimer();
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('[WebRTC Cust] ICE State:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+                    stopCallRingtone();
+                } else if (peerConnection.iceConnectionState === 'failed') {
+                    console.warn('[WebRTC Cust] ICE failed, attempting restart...');
+                    if (typeof peerConnection.restartIce === 'function') {
+                        peerConnection.restartIce();
+                    }
+                }
             };
 
             peerConnection.onicecandidate = (event) => {
@@ -1556,13 +1660,15 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 }
             };
 
-            // If offer was already received, set remote description and answer right away
             if (pendingOfferSignal) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingOfferSignal)));
-                await drainQueuedCandidates(peerConnection);
-                const answer = await peerConnection.createAnswer();
+                const answer = await peerConnection.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: currentCallType === 'video'
+                });
                 await peerConnection.setLocalDescription(answer);
                 sendSignal('answer', JSON.stringify(answer), currentCallType);
+                await drainQueuedCandidates(peerConnection);
             }
 
         } catch (e) {
@@ -1645,6 +1751,19 @@ if (!empty($_SESSION['cart_p_qty'])) {
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
+        }
+
+        if (custRemoteAudioSourceNode) {
+            try { custRemoteAudioSourceNode.disconnect(); } catch (e) {}
+            custRemoteAudioSourceNode = null;
+        }
+        const remoteAudio = document.getElementById('remoteAudio');
+        if (remoteAudio) {
+            remoteAudio.srcObject = null;
+        }
+        const remoteVid = document.getElementById('remoteVideo');
+        if (remoteVid) {
+            remoteVid.srcObject = null;
         }
 
         pendingOfferSignal = null;
