@@ -711,6 +711,22 @@ body.live-chat-page-body.sidebar-collapse .content-wrapper {
     font-size: 12px;
 }
 
+/* Strictly hide any agent profile icon inside chat message rows */
+.sup-agent-avatar,
+img.sup-agent-avatar,
+.wa-bubble-wrap img.sup-agent-avatar,
+.sup-msg-row img.sup-agent-avatar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-width: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* Product Card in Chat */
 .wa-product-card {
     display: flex;
@@ -2061,22 +2077,22 @@ function renderMessages(messages) {
         formattedMsg = formattedMsg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">🔗 $1</a>');
 
         if (isMe) {
-            // Admin Message: Left side with Agent Avatar and clean White Bubble
+            // Admin Message: Outgoing on Right (Clean WhatsApp Green)
             container.innerHTML += `
                 <div class="sup-msg-row admin wa-bubble-wrap outgoing">
-                    <img src="${currentAdminAvatar}" class="sup-agent-avatar" alt="Support Agent" title="Support Agent">
                     <div class="sup-bubble admin wa-bubble outgoing">
                         <div class="sup-msg-text" style="white-space: pre-wrap;">${formattedMsg}</div>
                         ${productCardHtml}
                         ${attach}
                         <div class="sup-msg-footer wa-meta-row">
                             <span class="sup-msg-time wa-bubble-time">${timeStr}</span>
+                            <span class="wa-ticks">✓✓</span>
                         </div>
                     </div>
                 </div>
             `;
         } else {
-            // Customer Message: Right side with Warm Yellow (#FEDB65) Bubble and checkmarks
+            // Customer Message: Incoming on Left (Clean WhatsApp White)
             container.innerHTML += `
                 <div class="sup-msg-row customer wa-bubble-wrap incoming">
                     <div class="sup-bubble customer wa-bubble incoming">
@@ -2085,7 +2101,6 @@ function renderMessages(messages) {
                         ${attach}
                         <div class="sup-msg-footer wa-meta-row">
                             <span class="sup-msg-time wa-bubble-time">${timeStr}</span>
-                            ${ticksHtml}
                         </div>
                     </div>
                 </div>

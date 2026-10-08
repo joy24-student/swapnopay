@@ -829,45 +829,45 @@
     }
 
     .sup-msg-row.customer {
-        justify-content: flex-end !important;
+        justify-content: flex-start !important;
     }
 
     .sup-msg-row.admin {
-        justify-content: flex-start !important;
+        justify-content: flex-end !important;
         align-items: flex-end !important;
-        gap: 8px !important;
     }
 
-    /* Agent Avatar on Admin Messages */
-    .sup-agent-avatar {
-        width: 28px !important;
-        height: 28px !important;
-        border-radius: 50% !important;
-        object-fit: cover !important;
-        border: 1.5px solid #FEDB65 !important;
-        margin-bottom: 2px !important;
-        flex-shrink: 0 !important;
+    /* Agent Avatar on Admin Messages - STRICTLY HIDDEN */
+    .sup-agent-avatar,
+    img.sup-agent-avatar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
 
-    /* Customer Bubble: Warm Yellow (#FEDB65 / #FDE047) on Right */
+    /* Customer Bubble: Clean White on Left (Incoming) */
     .sup-bubble.customer {
-        background: #FEDB65 !important;
-        color: #0F172A !important;
-        border-radius: 18px 18px 4px 18px !important;
-        padding: 10px 14px !important;
+        background: #FFFFFF !important;
+        color: #111b21 !important;
+        border-radius: 8px 8px 8px 0 !important;
+        padding: 8px 12px !important;
         max-width: 82% !important;
-        box-shadow: 0 2px 6px rgba(254, 219, 101, 0.25) !important;
+        box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13) !important;
     }
 
-    /* Admin Bubble: Clean White on Left */
+    /* Admin Bubble: Official WhatsApp Green on Right (Outgoing) */
     .sup-bubble.admin {
-        background: #FFFFFF !important;
-        color: #0F172A !important;
-        border-radius: 18px 18px 18px 4px !important;
-        padding: 10px 14px !important;
+        background: #d9fdd3 !important;
+        color: #111b21 !important;
+        border-radius: 8px 8px 0 8px !important;
+        padding: 8px 12px !important;
         max-width: 82% !important;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
-        border: 1px solid #F1F5F9 !important;
+        box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13) !important;
     }
 
     .sup-msg-text {
