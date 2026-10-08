@@ -3,7 +3,9 @@
 
 <?php
 require_once __DIR__ . '/inc/catalog.php';
-if(isset($_POST['form1'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && !empty($_SERVER['CONTENT_LENGTH'])) {
+    $error_message = 'Uploaded data (' . round((int)$_SERVER['CONTENT_LENGTH'] / 1048576, 1) . ' MB) exceeded server limits. Please select smaller photos.';
+} elseif(isset($_POST['form1'])) {
     try {
         $savedProduct=saveStoreProduct($pdo,$_POST,$_FILES,(int)($_REQUEST['id'] ?? 0));
         header('Location: product-edit.php?id=' . $savedProduct . '&saved=1');exit;

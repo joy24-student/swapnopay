@@ -263,8 +263,8 @@ try {
     error_log('Store database unavailable: ' . $error->getMessage());
     http_response_code(503); header('Retry-After: 30'); exit('The store is temporarily unavailable. Please try again shortly. (Database error: ' . htmlspecialchars($error->getMessage()) . ')');
 }
-define('DB_DRIVER_NAME',$db_driver);
-define('SQL_RAND',$db_driver === 'pgsql' ? 'RANDOM()' : 'RAND()');
+if (!defined('DB_DRIVER_NAME')) define('DB_DRIVER_NAME',$db_driver);
+if (!defined('SQL_RAND')) define('SQL_RAND',$db_driver === 'pgsql' ? 'RANDOM()' : 'RAND()');
 // Dynamic Supabase configuration resolved automatically per merchant:
 // 1. Merchant's provisioned runtime configuration (from shop provisioning / launch)
 // 2. Or tenant-level database settings (tbl_settings configured by merchant)
@@ -287,11 +287,11 @@ if (empty($resolved_supabase_url)) {
     $resolved_supabase_anon = getenv('SUPABASE_ANON_KEY') ?: getenv('ADMIN_SUPABASE_ANON_KEY') ?: '';
 }
 
-define('SUPABASE_URL', rtrim((string)$resolved_supabase_url, '/'));
-define('SUPABASE_ANON_KEY', (string)$resolved_supabase_anon);
-define('SUPABASE_SERVICE_KEY', $runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
-define('MERCHANT_ID',$runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: ''));
-define('SWAPNOPAY_API_URL',rtrim($runtime['backend_url'] ?? $runtime['api_url'] ?? (getenv('SWAPNOPAY_API_URL') ?: 'https://api.swapnopay.top'),'/'));
+if (!defined('SUPABASE_URL')) define('SUPABASE_URL', rtrim((string)$resolved_supabase_url, '/'));
+if (!defined('SUPABASE_ANON_KEY')) define('SUPABASE_ANON_KEY', (string)$resolved_supabase_anon);
+if (!defined('SUPABASE_SERVICE_KEY')) define('SUPABASE_SERVICE_KEY', $runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+if (!defined('MERCHANT_ID')) define('MERCHANT_ID',$runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: ''));
+if (!defined('SWAPNOPAY_API_URL')) define('SWAPNOPAY_API_URL',rtrim($runtime['backend_url'] ?? $runtime['api_url'] ?? (getenv('SWAPNOPAY_API_URL') ?: 'https://api.swapnopay.top'),'/'));
 $BASE_URL = $runtime['base_url'] ?? (getenv('STORE_BASE_URL') ?: '');
 if (!$BASE_URL) {
     $column = $db_driver === 'pgsql' ? '"BASE_URL"' : '`BASE_URL`';
@@ -300,7 +300,7 @@ if (!$BASE_URL) {
 if (!filter_var($BASE_URL,FILTER_VALIDATE_URL) || !in_array(parse_url($BASE_URL,PHP_URL_SCHEME),['https','http'],true)) {
     http_response_code(503); exit('The store address has not been configured.');
 }
-define('BASE_URL',rtrim($BASE_URL,'/') . '/');
+if (!defined('BASE_URL')) define('BASE_URL',rtrim($BASE_URL,'/') . '/');
 
 // Tenant cache isolation helper
 $tenantKey = preg_replace('/[^a-zA-Z0-9_-]/', '_', $runtime['shop_slug'] ?? $runtime['merchant_id'] ?? 'default');
@@ -342,8 +342,8 @@ if (!empty($settingsRow['store_name'])) {
     $dynamicStoreName = 'Online Store';
 }
 
-define('STORE_NAME', $dynamicStoreName);
-define('SHOP_NAME', $dynamicStoreName);
+if (!defined('STORE_NAME')) define('STORE_NAME', $dynamicStoreName);
+if (!defined('SHOP_NAME')) define('SHOP_NAME', $dynamicStoreName);
 
 if (!function_exists('getStoreName')) {
     function getStoreName() {

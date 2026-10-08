@@ -3,12 +3,30 @@
 <?php require_once('header.php'); ?>
 
 <?php
+// Helper to reliably clear tenant and legacy caches across all stores
+if (!function_exists('clearShopCaches')) {
+    function clearShopCaches() {
+        $keys = ['settings', 'slides', 'home_feed', 'menu'];
+        foreach ($keys as $k) {
+            if (function_exists('getShopCacheFile')) {
+                $f = getShopCacheFile($k);
+                if (is_file($f)) @unlink($f);
+            }
+            $legacy = __DIR__ . '/inc/cache_' . $k . '.json';
+            if (is_file($legacy)) @unlink($legacy);
+        }
+        foreach (glob(__DIR__ . '/inc/cache_*.json') as $cFile) {
+            if (is_file($cFile)) @unlink($cFile);
+        }
+    }
+}
+
 // Handle Slide Deletion from settings tab
 if (isset($_GET['action']) && $_GET['action'] === 'delete_slide' && !empty($_GET['slide_id'])) {
     $deleteId = (int)$_GET['slide_id'];
     $stmt = $pdo->prepare("DELETE FROM tbl_slider WHERE id = ?");
     $stmt->execute([$deleteId]);
-    @unlink(__DIR__ . '/inc/cache_slides.json');
+    clearShopCaches();
     header("Location: settings.php#tab_home_features");
     exit;
 }
@@ -597,7 +615,7 @@ if(isset($_POST['form_general_settings'])) {
             isset($_POST['hide_free_delivery_mobile']) ? 1 : 0
         ));
         $success_message = 'General Settings are updated successfully.';
-        @unlink(__DIR__ . '/inc/cache_settings.json');
+        clearShopCaches();
     }
 }
 
@@ -666,7 +684,7 @@ if(isset($_POST['form_popup_settings']) || isset($_POST['form_ads_settings'])) {
 // Home Page Features Form
 if(isset($_POST['form_home_features'])) {
     // 1. General & Hero Settings
-    $hero_slider_autoplay = isset($_POST['hero_slider_autoplay']) ? 1 : 0;
+    $hero_slider_autoplay = isset($_POST['hero_slider_autoplay']) ? (int)$_POST['hero_slider_autoplay'] : 1;
     $hero_slider_interval = !empty($_POST['hero_slider_interval']) ? (int)$_POST['hero_slider_interval'] : 4500;
     $home_slider_on_off   = isset($_POST['home_slider_on_off']) ? (int)$_POST['home_slider_on_off'] : 1;
     $hero_tag             = trim($_POST['hero_tag'] ?? '');
@@ -748,29 +766,39 @@ if(isset($_POST['form_home_features'])) {
     $promo2_image = $currSettings['promo_banner2_image'] ?? '';
     $payday_image = $currSettings['payday_image'] ?? 'assets/uploads/payday_cart_transparent.png';
 
-    // Supabase Upload for Promo Banner 1
+    // Promo Banner 1 Upload & Local Fallback
     if (!empty($_FILES['promo1_image_file']['tmp_name']) && is_uploaded_file($_FILES['promo1_image_file']['tmp_name'])) {
         $ext = strtolower(pathinfo($_FILES['promo1_image_file']['name'], PATHINFO_EXTENSION));
         $newPromo1Url = uploadFileToSupabase($_FILES['promo1_image_file']['tmp_name'], 'promo1_' . time() . '.' . $ext);
         if ($newPromo1Url) {
             $promo1_image = $newPromo1Url;
+        } else {
+            $localName = 'promo1_' . time() . '.' . $ext;
+            if (@move_uploaded_file($_FILES['promo1_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+                $promo1_image = 'assets/uploads/' . $localName;
+            }
         }
-    } elseif (!empty($_POST['promo_banner1_image_url'])) {
+    } elseif (isset($_POST['promo_banner1_image_url'])) {
         $promo1_image = trim($_POST['promo_banner1_image_url']);
     }
 
-    // Supabase Upload for Promo Banner 2
+    // Promo Banner 2 Upload & Local Fallback
     if (!empty($_FILES['promo2_image_file']['tmp_name']) && is_uploaded_file($_FILES['promo2_image_file']['tmp_name'])) {
         $ext = strtolower(pathinfo($_FILES['promo2_image_file']['name'], PATHINFO_EXTENSION));
         $newPromo2Url = uploadFileToSupabase($_FILES['promo2_image_file']['tmp_name'], 'promo2_' . time() . '.' . $ext);
         if ($newPromo2Url) {
             $promo2_image = $newPromo2Url;
+        } else {
+            $localName = 'promo2_' . time() . '.' . $ext;
+            if (@move_uploaded_file($_FILES['promo2_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+                $promo2_image = 'assets/uploads/' . $localName;
+            }
         }
-    } elseif (!empty($_POST['promo_banner2_image_url'])) {
+    } elseif (isset($_POST['promo_banner2_image_url'])) {
         $promo2_image = trim($_POST['promo_banner2_image_url']);
     }
 
-    // Supabase Upload for Payday Banner Image
+    // Payday Banner Upload & Local Fallback
     if (!empty($_FILES['payday_image_file']['tmp_name']) && is_uploaded_file($_FILES['payday_image_file']['tmp_name'])) {
         $ext = strtolower(pathinfo($_FILES['payday_image_file']['name'], PATHINFO_EXTENSION));
         $newPaydayUrl = uploadFileToSupabase($_FILES['payday_image_file']['tmp_name'], 'payday_' . time() . '.' . $ext);
@@ -778,68 +806,73 @@ if(isset($_POST['form_home_features'])) {
             $payday_image = $newPaydayUrl;
         } else {
             $localName = 'payday_' . time() . '.' . $ext;
-            if (move_uploaded_file($_FILES['payday_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
+            if (@move_uploaded_file($_FILES['payday_image_file']['tmp_name'], __DIR__ . '/../assets/uploads/' . $localName)) {
                 $payday_image = 'assets/uploads/' . $localName;
             }
         }
-    } elseif (isset($_POST['payday_image_url']) && trim($_POST['payday_image_url']) !== '') {
+    } elseif (isset($_POST['payday_image_url'])) {
         $payday_image = trim($_POST['payday_image_url']);
     }
 
-    // Update tbl_settings in Supabase
-    $updateStmt = $pdo->prepare("UPDATE tbl_settings SET 
-        home_slider_on_off = ?, hero_slider_autoplay = ?, hero_slider_interval = ?,
-        hero_tag = ?, hero_title = ?, hero_subtitle = ?, hero_btn_text = ?, hero_btn_url = ?, 
-        hero_btn2_text = ?, hero_btn2_url = ?, hero_badge1_text = ?, hero_badge2_text = ?,
-        home_category_on_off = ?, categories_title = ?, categories_subtitle = ?,
-        home_welcome_on_off = ?,
-        promo_banner1_tag = ?, promo_banner1_title = ?, promo_banner1_subtitle = ?, promo_banner1_btn_text = ?, promo_banner1_btn_url = ?, promo_banner1_image = ?,
-        promo_banner2_tag = ?, promo_banner2_title = ?, promo_banner2_subtitle = ?, promo_banner2_btn_text = ?, promo_banner2_btn_url = ?, promo_banner2_image = ?,
-        home_featured_product_on_off = ?, featured_products_title = ?, featured_products_subtitle = ?, total_featured_product_home = ?,
-        home_service_on_off = ?,
-        trust_item1_title = ?, trust_item1_desc = ?,
-        trust_item2_title = ?, trust_item2_desc = ?,
-        trust_item3_title = ?, trust_item3_desc = ?,
-        trust_item4_title = ?, trust_item4_desc = ?,
-        home_marquee_on_off = ?,
-        marquee_item1_tag = ?, marquee_item1_text = ?, marquee_item1_url = ?,
-        marquee_item2_tag = ?, marquee_item2_text = ?, marquee_item2_url = ?,
-        marquee_item3_tag = ?, marquee_item3_text = ?, marquee_item3_url = ?,
-        marquee_item4_tag = ?, marquee_item4_text = ?, marquee_item4_url = ?,
-        marquee_item5_tag = ?, marquee_item5_text = ?, marquee_item5_url = ?,
-        payday_banner_on_off = ?,
-        payday_badge_title = ?, payday_badge_sub = ?,
-        payday_center_title = ?, payday_center_sub = ?,
-        payday_btn_text = ?, payday_btn_url = ?,
-        payday_image = ?
-        WHERE id = 1");
+    // Update tbl_settings with Try/Catch
+    try {
+        $updateStmt = $pdo->prepare("UPDATE tbl_settings SET 
+            home_slider_on_off = ?, hero_slider_autoplay = ?, hero_slider_interval = ?,
+            hero_tag = ?, hero_title = ?, hero_subtitle = ?, hero_btn_text = ?, hero_btn_url = ?, 
+            hero_btn2_text = ?, hero_btn2_url = ?, hero_badge1_text = ?, hero_badge2_text = ?,
+            home_category_on_off = ?, categories_title = ?, categories_subtitle = ?,
+            home_welcome_on_off = ?,
+            promo_banner1_tag = ?, promo_banner1_title = ?, promo_banner1_subtitle = ?, promo_banner1_btn_text = ?, promo_banner1_btn_url = ?, promo_banner1_image = ?,
+            promo_banner2_tag = ?, promo_banner2_title = ?, promo_banner2_subtitle = ?, promo_banner2_btn_text = ?, promo_banner2_btn_url = ?, promo_banner2_image = ?,
+            home_featured_product_on_off = ?, featured_products_title = ?, featured_products_subtitle = ?, total_featured_product_home = ?,
+            home_service_on_off = ?,
+            trust_item1_title = ?, trust_item1_desc = ?,
+            trust_item2_title = ?, trust_item2_desc = ?,
+            trust_item3_title = ?, trust_item3_desc = ?,
+            trust_item4_title = ?, trust_item4_desc = ?,
+            home_marquee_on_off = ?,
+            marquee_item1_tag = ?, marquee_item1_text = ?, marquee_item1_url = ?,
+            marquee_item2_tag = ?, marquee_item2_text = ?, marquee_item2_url = ?,
+            marquee_item3_tag = ?, marquee_item3_text = ?, marquee_item3_url = ?,
+            marquee_item4_tag = ?, marquee_item4_text = ?, marquee_item4_url = ?,
+            marquee_item5_tag = ?, marquee_item5_text = ?, marquee_item5_url = ?,
+            payday_banner_on_off = ?,
+            payday_badge_title = ?, payday_badge_sub = ?,
+            payday_center_title = ?, payday_center_sub = ?,
+            payday_btn_text = ?, payday_btn_url = ?,
+            payday_image = ?
+            WHERE id = 1");
 
-    $updateStmt->execute([
-        $home_slider_on_off, $hero_slider_autoplay, $hero_slider_interval,
-        $hero_tag, $hero_title, $hero_subtitle, $hero_btn_text, $hero_btn_url,
-        $hero_btn2_text, $hero_btn2_url, $hero_badge1_text, $hero_badge2_text,
-        $home_category_on_off, $categories_title, $categories_subtitle,
-        $home_welcome_on_off,
-        $promo1_tag, $promo1_title, $promo1_subtitle, $promo1_btn_text, $promo1_btn_url, $promo1_image,
-        $promo2_tag, $promo2_title, $promo2_subtitle, $promo2_btn_text, $promo2_btn_url, $promo2_image,
-        $home_featured_product_on_off, $featured_products_title, $featured_products_subtitle, $total_featured_product_home,
-        $home_service_on_off,
-        $trust1_title, $trust1_desc,
-        $trust2_title, $trust2_desc,
-        $trust3_title, $trust3_desc,
-        $trust4_title, $trust4_desc,
-        $home_marquee_on_off,
-        $marquee_item1_tag, $marquee_item1_text, $marquee_item1_url,
-        $marquee_item2_tag, $marquee_item2_text, $marquee_item2_url,
-        $marquee_item3_tag, $marquee_item3_text, $marquee_item3_url,
-        $marquee_item4_tag, $marquee_item4_text, $marquee_item4_url,
-        $marquee_item5_tag, $marquee_item5_text, $marquee_item5_url,
-        $payday_banner_on_off,
-        $payday_badge_title, $payday_badge_sub,
-        $payday_center_title, $payday_center_sub,
-        $payday_btn_text, $payday_btn_url,
-        $payday_image
-    ]);
+        $updateStmt->execute([
+            $home_slider_on_off, $hero_slider_autoplay, $hero_slider_interval,
+            $hero_tag, $hero_title, $hero_subtitle, $hero_btn_text, $hero_btn_url,
+            $hero_btn2_text, $hero_btn2_url, $hero_badge1_text, $hero_badge2_text,
+            $home_category_on_off, $categories_title, $categories_subtitle,
+            $home_welcome_on_off,
+            $promo1_tag, $promo1_title, $promo1_subtitle, $promo1_btn_text, $promo1_btn_url, $promo1_image,
+            $promo2_tag, $promo2_title, $promo2_subtitle, $promo2_btn_text, $promo2_btn_url, $promo2_image,
+            $home_featured_product_on_off, $featured_products_title, $featured_products_subtitle, $total_featured_product_home,
+            $home_service_on_off,
+            $trust1_title, $trust1_desc,
+            $trust2_title, $trust2_desc,
+            $trust3_title, $trust3_desc,
+            $trust4_title, $trust4_desc,
+            $home_marquee_on_off,
+            $marquee_item1_tag, $marquee_item1_text, $marquee_item1_url,
+            $marquee_item2_tag, $marquee_item2_text, $marquee_item2_url,
+            $marquee_item3_tag, $marquee_item3_text, $marquee_item3_url,
+            $marquee_item4_tag, $marquee_item4_text, $marquee_item4_url,
+            $marquee_item5_tag, $marquee_item5_text, $marquee_item5_url,
+            $payday_banner_on_off,
+            $payday_badge_title, $payday_badge_sub,
+            $payday_center_title, $payday_center_sub,
+            $payday_btn_text, $payday_btn_url,
+            $payday_image
+        ]);
+    } catch (Throwable $updErr) {
+        error_log('Error saving home features: ' . $updErr->getMessage());
+        $error_message = 'Failed to save settings: ' . $updErr->getMessage();
+    }
 
     // Process Existing Slide Orders & Active Status
     if (!empty($_POST['slide_order']) && is_array($_POST['slide_order'])) {
@@ -851,7 +884,7 @@ if(isset($_POST['form_home_features'])) {
         }
     }
 
-    // Process MULTIPLE Image Uploads for Hero Slider to Supabase Bucket
+    // Process MULTIPLE Image Uploads for Hero Slider with Local Fallback
     $uploadedCount = 0;
     if (!empty($_FILES['hero_slider_photos']['name']) && is_array($_FILES['hero_slider_photos']['name'])) {
         $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(slide_order), 0) FROM tbl_slider")->fetchColumn();
@@ -863,11 +896,17 @@ if(isset($_POST['form_home_features'])) {
                     $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
                     if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
                         $uniqueRemoteName = 'hero_slide_' . time() . '_' . ($idx + 1) . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
-                        $cloudUrl = uploadFileToSupabase($tmpName, $uniqueRemoteName, 'assets');
-                        if ($cloudUrl) {
+                        $slideUrl = uploadFileToSupabase($tmpName, $uniqueRemoteName, 'assets');
+                        if (!$slideUrl) {
+                            $localTarget = __DIR__ . '/../assets/uploads/' . $uniqueRemoteName;
+                            if (@move_uploaded_file($tmpName, $localTarget)) {
+                                $slideUrl = 'assets/uploads/' . $uniqueRemoteName;
+                            }
+                        }
+                        if ($slideUrl) {
                             $maxOrder++;
                             $insertStmt = $pdo->prepare("INSERT INTO tbl_slider (photo, heading, content, button_text, button_url, position, slide_order, is_active) VALUES (?, '', '', '', '', 'Center', ?, 1)");
-                            $insertStmt->execute([$cloudUrl, $maxOrder]);
+                            $insertStmt->execute([$slideUrl, $maxOrder]);
                             $uploadedCount++;
                         }
                     }
@@ -876,8 +915,8 @@ if(isset($_POST['form_home_features'])) {
         }
     }
 
-    // Invalidate settings cache
-    @unlink(__DIR__ . '/inc/cache_settings.json');
+    // Reliably clear tenant and global storefront caches
+    clearShopCaches();
     
     // Refresh settings data & slides for this page render
     $settings_data = $pdo->query("SELECT * FROM tbl_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
@@ -891,11 +930,13 @@ if(isset($_POST['form_home_features'])) {
         }
     }
     
-    $msgParts = ['Homepage features and customizations updated successfully!'];
-    if ($uploadedCount > 0) {
-        $msgParts[] = "{$uploadedCount} new hero slide(s) uploaded directly to Supabase Storage.";
+    if (empty($error_message)) {
+        $msgParts = ['Homepage features and customizations updated successfully!'];
+        if ($uploadedCount > 0) {
+            $msgParts[] = "{$uploadedCount} new hero slide(s) uploaded successfully.";
+        }
+        $success_message = implode(' ', $msgParts);
     }
-    $success_message = implode(' ', $msgParts);
 }
 // Payment Gateways Form
 if(isset($_POST['form_payment_gateways'])) {
@@ -943,7 +984,7 @@ if(isset($_POST['form_payment_gateways'])) {
         $payment_methods_selected,
         $_POST['bank_detail'] ?? ''
     ));
-    @unlink(__DIR__ . '/inc/cache_settings.json');
+    clearShopCaches();
     $success_message = 'Payment Gateway Settings are updated successfully.';
 }
 
@@ -1068,7 +1109,7 @@ if(isset($_POST['form_sms_settings']) || isset($_POST['form_sms'])) {
         $_POST['auto_order_sms_on_off'] ?? 1,
         $_POST['auto_order_email_on_off'] ?? 1
     ));
-    @unlink(__DIR__ . '/inc/cache_settings.json');
+    clearShopCaches();
     $success_message = 'SMS & Notification Settings updated successfully.';
 }
 
@@ -1187,7 +1228,7 @@ if(isset($_POST['form_footer_settings'])) {
             $mobile_footer_on_off,
             $related_products_on_off
         ));
-        @unlink(__DIR__ . '/inc/cache_settings.json');
+        clearShopCaches();
         $success_message = 'Footer & Display Settings are updated successfully.';
     }
 }
@@ -1406,7 +1447,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $pdo->prepare('UPDATE tbl_settings SET footer_copyright=copyright_text,footer_about=footer_about_us WHERE id=1')->execute();
             } catch (Throwable $e) {}
         }
-        @unlink(__DIR__ . '/inc/cache_settings.json');
+        clearShopCaches();
         if ($pdo->inTransaction()) $pdo->commit();
     }
 }
@@ -2273,15 +2314,18 @@ $lang_sections = [
 
                       <div class="tab-pane" id="tab_home_features">
                             
-                                <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; padding:14px 20px; border-radius:10px; margin-bottom:25px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; padding:14px 20px; border-radius:10px; margin-bottom:25px; position:sticky; top:10px; z-index:100; box-shadow:0 4px 15px rgba(30,64,175,0.12);">
                                     <div>
                                         <h4 style="margin:0 0 4px 0; color:#1e40af; font-weight:700;"><i class="fa fa-sliders"></i> Modern Homepage Customizer & Hero Slider</h4>
-                                        <p style="margin:0; font-size:13px; color:#3b82f6;">All image uploads are streamed directly to Supabase Storage (<code>storefront/assets/</code>). Changes reflect immediately on your storefront.</p>
+                                        <p style="margin:0; font-size:13px; color:#3b82f6;">All changes reflect immediately on your storefront. Click "Save All Customizations" after editing.</p>
                                     </div>
-                                    <div>
-                                        <a href="homepage-banners.php" class="btn btn-primary" style="border-radius:20px; font-weight:700; padding:6px 18px;">
+                                    <div style="display:flex; gap:10px; align-items:center;">
+                                        <a href="homepage-banners.php" class="btn btn-default" style="border-radius:20px; font-weight:700; padding:8px 18px;">
                                             <i class="fa fa-arrows-alt"></i> Full Screen Mode
                                         </a>
+                                        <button type="submit" name="form_home_features" class="btn btn-success" style="border-radius:20px; font-weight:700; padding:8px 22px; font-size:14px; box-shadow:0 2px 8px rgba(34,197,94,0.3);">
+                                            <i class="fa fa-save"></i> Save All Customizations
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2289,7 +2333,10 @@ $lang_sections = [
                                 <div class="box box-primary" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-picture-o text-primary"></i> 1. Hero Auto-Sliding Gallery & Multi-Upload</h3>
-                                        <span class="pull-right badge bg-green" style="font-size:11px; padding:5px 10px; border-radius:12px;"><i class="fa fa-cloud-upload"></i> Supabase Storage CDN</span>
+                                        <div class="pull-right" style="display:flex; align-items:center; gap:8px;">
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                            <span class="badge bg-green" style="font-size:11px; padding:5px 10px; border-radius:12px;"><i class="fa fa-cloud-upload"></i> Supabase Storage CDN</span>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <div class="row">
@@ -2398,6 +2445,9 @@ $lang_sections = [
                                 <div class="box box-warning" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-font text-yellow"></i> 2. Hero Headings, Buttons & Floating Badges</h3>
+                                        <div class="pull-right">
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <div class="row">
@@ -2458,6 +2508,9 @@ $lang_sections = [
                                 <div class="box box-success" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-th text-green"></i> 3. Category & Product Sections Controllability</h3>
+                                        <div class="pull-right">
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <div class="row">
@@ -2519,9 +2572,12 @@ $lang_sections = [
                                 <div class="box box-info" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-th-large text-aqua"></i> 4. Promotional Banners (Dual Poster Cards)</h3>
-                                        <label class="pull-right" style="margin:0; font-weight:normal;">
-                                            <input type="checkbox" name="home_welcome_on_off" value="1" <?php if(($settings_data['home_welcome_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Dual Banners
-                                        </label>
+                                        <div class="pull-right" style="display:flex; align-items:center; gap:12px;">
+                                            <label style="margin:0; font-weight:normal; cursor:pointer;">
+                                                <input type="checkbox" name="home_welcome_on_off" value="1" <?php if(($settings_data['home_welcome_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Dual Banners
+                                            </label>
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <div class="row">
@@ -2614,9 +2670,12 @@ $lang_sections = [
                                 <div class="box box-success" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-shield text-green"></i> 5. Trust & Guarantees Value Bar</h3>
-                                        <label class="pull-right" style="margin:0; font-weight:normal;">
-                                            <input type="checkbox" name="home_service_on_off" value="1" <?php if(($settings_data['home_service_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Trust Bar
-                                        </label>
+                                        <div class="pull-right" style="display:flex; align-items:center; gap:12px;">
+                                            <label style="margin:0; font-weight:normal; cursor:pointer;">
+                                                <input type="checkbox" name="home_service_on_off" value="1" <?php if(($settings_data['home_service_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Trust Bar
+                                            </label>
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <div class="row">
@@ -2656,9 +2715,12 @@ $lang_sections = [
                                 <div class="box box-warning" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-bullhorn text-warning"></i> 6. Live Deal Marquee Ribbon (Infinite Scrolling Ticker)</h3>
-                                        <label class="pull-right" style="margin:0; font-weight:600; cursor:pointer;">
-                                            <input type="checkbox" name="home_marquee_on_off" value="1" <?php if(($settings_data['home_marquee_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Ribbon on Home
-                                        </label>
+                                        <div class="pull-right" style="display:flex; align-items:center; gap:12px;">
+                                            <label style="margin:0; font-weight:600; cursor:pointer;">
+                                                <input type="checkbox" name="home_marquee_on_off" value="1" <?php if(($settings_data['home_marquee_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show Ribbon on Home
+                                            </label>
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <p class="text-muted" style="margin-bottom:15px; font-size:13px;"><i class="fa fa-info-circle"></i> An animated ticker banner that scrolls across the screen showing hot deals, vouchers, free shipping, flash deals, and trust badges.</p>
@@ -2766,9 +2828,12 @@ $lang_sections = [
                                 <div class="box box-primary" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:25px;">
                                     <div class="box-header with-border" style="background:#f8fafc; padding:15px 20px;">
                                         <h3 class="box-title" style="font-weight:700; color:#1e293b;"><i class="fa fa-shopping-cart text-primary"></i> 7. PayDay Sale Promo Banner (Screenshot Banner)</h3>
-                                        <label class="pull-right" style="margin:0; font-weight:600; cursor:pointer;">
-                                            <input type="checkbox" name="payday_banner_on_off" value="1" <?php if(($settings_data['payday_banner_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show PayDay Banner on Home
-                                        </label>
+                                        <div class="pull-right" style="display:flex; align-items:center; gap:12px;">
+                                            <label style="margin:0; font-weight:600; cursor:pointer;">
+                                                <input type="checkbox" name="payday_banner_on_off" value="1" <?php if(($settings_data['payday_banner_on_off'] ?? 1) == 1) echo 'checked'; ?>> Show PayDay Banner on Home
+                                            </label>
+                                            <button type="submit" name="form_home_features" class="btn btn-primary btn-sm" style="font-weight:600; border-radius:15px; padding:3px 14px;"><i class="fa fa-save"></i> Save</button>
+                                        </div>
                                     </div>
                                     <div class="box-body" style="padding:20px;">
                                         <p class="text-muted" style="margin-bottom:15px; font-size:13px;"><i class="fa fa-info-circle"></i> Custom promotional highlight banner featuring an angled title badge, primary offer texts, CTA action button, and 3D floating graphic.</p>
@@ -4467,6 +4532,21 @@ if (window.jQuery) {
                     $(this).hide();
                 }
             });
+        });
+
+        // Tab-aware Enter key handler: pressing Enter inside inputs submits the current tab's submit button
+        // instead of defaulting to the first submit button in the form (form_general_settings)
+        $('form.form-horizontal').on('keydown', 'input:not([type="button"]):not([type="submit"]):not([type="reset"])', function(e) {
+            if (e.keyCode === 13) {
+                var $activePane = $(this).closest('.tab-pane');
+                if ($activePane.length) {
+                    var $submitBtn = $activePane.find('button[type="submit"]:first');
+                    if ($submitBtn.length) {
+                        e.preventDefault();
+                        $submitBtn.click();
+                    }
+                }
+            }
         });
     });
 }

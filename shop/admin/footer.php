@@ -871,5 +871,6 @@
 <script src="js/ai-global-voice.js?v=<?php echo time(); ?>"></script>
 <script src="js/admin-notifications.js?v=<?php echo filemtime(__DIR__ . '/js/admin-notifications.js'); ?>"></script>
 <script src="js/admin-pwa.js?v=<?php echo filemtime(__DIR__ . '/js/admin-pwa.js'); ?>"></script>
+<script src="js/smart-image-uploader.js?v=<?php echo filemtime(__DIR__ . '/js/smart-image-uploader.js'); ?>"></script>
 </body>
 </html>

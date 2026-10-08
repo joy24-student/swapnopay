@@ -164,10 +164,14 @@ foreach ($result as $row) {
 							}
 						}
 						$display_role = !empty($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'Administrator';
+						$user_avatar = !empty($_SESSION['user']['photo']) ? trim($_SESSION['user']['photo']) : '';
+						if (empty($user_avatar) || $user_avatar === 'user-1.' || !preg_match('/\.(jpe?g|png|gif|webp)$/i', $user_avatar)) {
+							$user_avatar = 'user-1.png';
+						}
 						?>
 						<li class="dropdown user user-menu sn-user-li" style="list-style: none !important;">
 							<a href="#" class="dropdown-toggle sn-user-link" data-toggle="dropdown" title="<?php echo htmlspecialchars($raw_name); ?>">
-								<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="user-image sn-user-avatar" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
+								<img src="../assets/uploads/<?php echo htmlspecialchars($user_avatar); ?>" class="user-image sn-user-avatar" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
 								<div class="sn-user-meta hidden-xs">
 									<span class="sn-user-name"><?php echo htmlspecialchars($display_name); ?></span>
 									<span class="sn-user-role"><?php echo htmlspecialchars($display_role); ?></span>
@@ -178,7 +182,7 @@ foreach ($result as $row) {
 							</a>
 							<ul class="dropdown-menu sn-user-dropdown-menu">
 								<li class="user-header" style="background:#FFFDF0; padding:18px; text-align:center;">
-									<img src="../assets/uploads/<?php echo !empty($_SESSION['user']['photo']) ? htmlspecialchars($_SESSION['user']['photo']) : 'user-1.png'; ?>" class="img-circle" style="width:60px; height:60px; object-fit:cover; border:2px solid #FEDB65;" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
+									<img src="../assets/uploads/<?php echo htmlspecialchars($user_avatar); ?>" class="img-circle" style="width:60px; height:60px; object-fit:cover; border:2px solid #FEDB65;" alt="User Image" onerror="this.onerror=null; this.src='../assets/uploads/mob_avatar_default.png';">
 									<p style="color:#0F172A; font-weight:700; margin-top:8px;">
 										<?php echo htmlspecialchars(!empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : (!empty($_SESSION['user']['email']) ? $_SESSION['user']['email'] : 'Admin')); ?>
 										<small style="color:#64748B; font-weight:500; display:block;"><?php echo htmlspecialchars($_SESSION['user']['role'] ?? 'Administrator'); ?></small>

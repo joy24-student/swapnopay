@@ -66,15 +66,17 @@ if(isset($_POST['form2'])) {
 
 	$valid = 1;
 
-	$path = $_FILES['photo']['name'];
-    $path_tmp = $_FILES['photo']['tmp_name'];
+	$path = $_FILES['photo']['name'] ?? '';
+    $path_tmp = $_FILES['photo']['tmp_name'] ?? '';
 
-    if($path!='') {
-        $ext = pathinfo( $path, PATHINFO_EXTENSION );
-        $file_name = basename( $path, '.' . $ext );
-        if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' ) {
+    if(empty($path) || empty($path_tmp)) {
+        $valid = 0;
+        $error_message .= 'Please select a photo to upload.<br>';
+    } else {
+        $ext = strtolower(pathinfo( $path, PATHINFO_EXTENSION ));
+        if( !in_array($ext, ['jpg', 'png', 'jpeg', 'gif', 'webp'], true) ) {
             $valid = 0;
-            $error_message .= 'You must have to upload jpg, jpeg, gif or png file<br>';
+            $error_message .= 'You must upload a jpg, jpeg, gif, webp or png file.<br>';
         }
     }
 

@@ -14,9 +14,15 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
     require_once __DIR__ . '/image_compressor.php';
     $saveImage=static function(array $file,string $folder='') use (&$uploaded): ?string {
         if(($file['error'] ?? UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_NO_FILE) return null;
+        if(($file['error'] ?? 0) === UPLOAD_ERR_INI_SIZE || ($file['error'] ?? 0) === UPLOAD_ERR_FORM_SIZE) {
+            throw new RuntimeException('The uploaded image exceeds maximum server size limits (max 64 MB).');
+        }
+        if(($file['error'] ?? 0) !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Image upload failed (error code ' . ($file['error'] ?? 'unknown') . ').');
+        }
         $info=is_uploaded_file($file['tmp_name'] ?? '') ? @getimagesize($file['tmp_name']) : false;
         $extensions=['image/jpeg'=>'jpg','image/png'=>'png','image/gif'=>'gif','image/webp'=>'webp'];
-        if(!$info || !isset($extensions[$info['mime']]) || ($file['error'] ?? 1)!==UPLOAD_ERR_OK || ($file['size'] ?? 0)>20971520) throw new RuntimeException('Choose a valid product image up to 20 MB.');
+        if(!$info || !isset($extensions[$info['mime']]) || ($file['size'] ?? 0)>67108864) throw new RuntimeException('Choose a valid product image (JPG, PNG, GIF, WebP) up to 64 MB.');
         $directory=dirname(__DIR__,2) . '/assets/uploads/' . $folder;
         if(!is_dir($directory) && !mkdir($directory,0775,true)) throw new RuntimeException('The image folder could not be created.');
         $targetExt = function_exists('imagewebp') ? 'webp' : $extensions[$info['mime']];

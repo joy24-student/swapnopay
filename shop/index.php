@@ -78,6 +78,10 @@ $hero_title         = !empty($s['hero_title']) ? $s['hero_title'] : 'Upgrade You
 $hero_subtitle      = !empty($s['hero_subtitle']) ? $s['hero_subtitle'] : 'Discover top-quality products, unbeatable prices, and a seamless shopping experience.';
 $hero_btn_text      = !empty($s['hero_btn_text']) ? $s['hero_btn_text'] : 'Shop Now';
 $hero_btn_url       = !empty($s['hero_btn_url']) ? $s['hero_btn_url'] : 'product-category.php?id=1&type=top-category';
+$hero_btn2_text     = !empty($s['hero_btn2_text']) ? $s['hero_btn2_text'] : '';
+$hero_btn2_url      = !empty($s['hero_btn2_url']) ? $s['hero_btn2_url'] : '';
+$hero_badge1_text   = !empty($s['hero_badge1_text']) ? $s['hero_badge1_text'] : "Top Brands\nBest Deals";
+$hero_badge2_text   = !empty($s['hero_badge2_text']) ? $s['hero_badge2_text'] : 'Mega Sale';
 $hero_slider_autoplay = isset($s['hero_slider_autoplay']) ? (int)$s['hero_slider_autoplay'] : 1;
 $hero_slider_interval = !empty($s['hero_slider_interval']) ? (int)$s['hero_slider_interval'] : 4500;
 
@@ -108,6 +112,7 @@ if (empty($heroSlides)) {
 
 // Categories Section Defaults & Data (Reusing preloaded categories)
 $categories_title = !empty($s['categories_title']) ? $s['categories_title'] : 'Shop by Category';
+$categories_subtitle = !empty($s['categories_subtitle']) ? $s['categories_subtitle'] : '';
 $categories = [];
 if (!empty($GLOBALS['all_tcat']) && is_array($GLOBALS['all_tcat'])) {
     foreach ($GLOBALS['all_tcat'] as $tc) {
@@ -2521,20 +2526,27 @@ body {
                 <!-- Left Details -->
                 <div class="sn-hero-left">
                     <div class="sn-hero-top-badge-row">
-                        <span class="sn-hero-mega-badge">Mega Sale</span>
+                        <span class="sn-hero-mega-badge"><?php echo htmlspecialchars(!empty($hero_badge2_text) ? $hero_badge2_text : 'Mega Sale'); ?></span>
                     </div>
+                    <?php if (!empty($hero_tag)): ?>
                     <div class="sn-hero-eyebrow sn-desktop-only"><?php echo htmlspecialchars($hero_tag); ?></div>
-                    <h1 class="sn-hero-heading">Big Brands<br>Bigger Savings</h1>
-                    <p class="sn-hero-subtitle">Up to 60% Off on Electronics, Home & More!</p>
+                    <?php endif; ?>
+                    <h1 class="sn-hero-heading"><?php echo nl2br(htmlspecialchars(!empty($hero_title) ? $hero_title : "Big Brands\nBigger Savings")); ?></h1>
+                    <p class="sn-hero-subtitle"><?php echo htmlspecialchars(!empty($hero_subtitle) ? $hero_subtitle : 'Up to 60% Off on Electronics, Home & More!'); ?></p>
                     
-                    <div class="sn-hero-actions">
-                        <a href="<?php echo htmlspecialchars($hero_btn_url); ?>" class="sn-btn-primary">
-                            <span>Shop Now</span>
+                    <div class="sn-hero-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <a href="<?php echo htmlspecialchars(!empty($hero_btn_url) ? $hero_btn_url : 'product-category.php'); ?>" class="sn-btn-primary">
+                            <span><?php echo htmlspecialchars(!empty($hero_btn_text) ? $hero_btn_text : 'Shop Now'); ?></span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                                 <polyline points="12 5 19 12 12 19"></polyline>
                             </svg>
                         </a>
+                        <?php if (!empty($hero_btn2_text)): ?>
+                        <a href="<?php echo htmlspecialchars(!empty($hero_btn2_url) ? $hero_btn2_url : 'product-category.php'); ?>" class="sn-btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:25px; border:1.5px solid #0f172a; color:#0f172a; font-weight:700; font-size:13px; text-decoration:none; background:#ffffff; transition:all 0.2s;">
+                            <span><?php echo htmlspecialchars($hero_btn2_text); ?></span>
+                        </a>
+                        <?php endif; ?>
                     </div>
 
                     <!-- 3 Dots Indicator (Desktop only) -->
@@ -2566,7 +2578,7 @@ body {
 
                         <!-- Static Top Brands Best Deals Doodle (Desktop only) -->
                         <div class="sn-hero-doodle-badge sn-desktop-only">
-                            <div>Top Brands<br>Best Deals</div>
+                            <div><?php echo nl2br(htmlspecialchars(!empty($hero_badge1_text) ? $hero_badge1_text : "Top Brands\nBest Deals")); ?></div>
                             <svg class="sn-doodle-arrow" width="30" height="30" viewBox="0 0 45 45" fill="none">
                                 <path d="M10 5 C 28 12, 34 26, 22 38 M 16 33 L 22 38 L 27 32" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
@@ -2590,17 +2602,22 @@ body {
         <?php if ($category_on == 1): ?>
         <section class="sn-category-section">
             <div class="sn-section-header" style="margin-bottom: 10px;">
-                <h2 class="sn-section-title" style="display:flex; align-items:center; gap:7px;">
-                    <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:7px; background:#fef3c7; color:#d97706;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                    </span>
-                    <span><?php echo htmlspecialchars($categories_title); ?></span>
-                </h2>
+                <div>
+                    <h2 class="sn-section-title" style="display:flex; align-items:center; gap:7px; margin-bottom:0;">
+                        <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:7px; background:#fef3c7; color:#d97706;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                        </span>
+                        <span><?php echo htmlspecialchars($categories_title); ?></span>
+                    </h2>
+                    <?php if (!empty($categories_subtitle)): ?>
+                    <p style="margin:2px 0 0 31px; font-size:12px; color:#64748b;"><?php echo htmlspecialchars($categories_subtitle); ?></p>
+                    <?php endif; ?>
+                </div>
                 <a href="<?php echo BASE_URL; ?>categories.php" class="sn-view-all">
                     <span>See All</span>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
@@ -2652,8 +2669,8 @@ body {
                         </svg>
                     </div>
                     <div class="sn-trust-info">
-                        <h4>Free Shipping</h4>
-                        <p>On orders over ৳ 2,000</p>
+                        <h4><?php echo htmlspecialchars(!empty($trust1_title) ? $trust1_title : 'Free Shipping'); ?></h4>
+                        <p><?php echo htmlspecialchars(!empty($trust1_desc) ? $trust1_desc : 'On orders over ৳ 2,000'); ?></p>
                     </div>
                 </div>
 
@@ -2665,8 +2682,8 @@ body {
                         </svg>
                     </div>
                     <div class="sn-trust-info">
-                        <h4>Secure Payment</h4>
-                        <p>100% secure payments</p>
+                        <h4><?php echo htmlspecialchars(!empty($trust2_title) ? $trust2_title : 'Secure Payment'); ?></h4>
+                        <p><?php echo htmlspecialchars(!empty($trust2_desc) ? $trust2_desc : '100% secure payments'); ?></p>
                     </div>
                 </div>
 
@@ -2679,8 +2696,8 @@ body {
                         </svg>
                     </div>
                     <div class="sn-trust-info">
-                        <h4>7 Days Return</h4>
-                        <p>Easy return policy</p>
+                        <h4><?php echo htmlspecialchars(!empty($trust3_title) ? $trust3_title : 'Easy Returns'); ?></h4>
+                        <p><?php echo htmlspecialchars(!empty($trust3_desc) ? $trust3_desc : '30-day return policy'); ?></p>
                     </div>
                 </div>
 
@@ -2693,10 +2710,61 @@ body {
                         </svg>
                     </div>
                     <div class="sn-trust-info">
-                        <h4>24/7 Support</h4>
-                        <p>We're here to help</p>
+                        <h4><?php echo htmlspecialchars(!empty($trust4_title) ? $trust4_title : '24/7 Support'); ?></h4>
+                        <p><?php echo htmlspecialchars(!empty($trust4_desc) ? $trust4_desc : "We're here to help"); ?></p>
                     </div>
                 </div>
+            </div>
+        </section>
+        <?php endif; ?>
+
+        <!-- ============================================================
+             4. DUAL PROMOTIONAL BANNERS
+             ============================================================ -->
+        <?php if ($promo_on == 1): ?>
+        <section class="sn-promo-duo-section" style="margin: 18px 0;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <!-- Poster 1: Electronics -->
+                <a href="<?php echo htmlspecialchars(!empty($promo1_url) ? (str_starts_with($promo1_url, 'http') ? $promo1_url : BASE_URL . ltrim($promo1_url, '/')) : '#'); ?>" style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1.5px solid #bfdbfe; border-radius: 18px; padding: 22px 24px; text-decoration: none; color: inherit; position: relative; overflow: hidden; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.08); transition: transform 0.2s, box-shadow 0.2s;">
+                    <div style="max-width: 60%; z-index: 1;">
+                        <?php if (!empty($promo1_tag)): ?>
+                        <span style="display: inline-block; background: #2563eb; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; margin-bottom: 8px;"><?php echo htmlspecialchars($promo1_tag); ?></span>
+                        <?php endif; ?>
+                        <h3 style="margin: 0 0 6px 0; font-size: 19px; font-weight: 800; color: #1e3a8a; line-height: 1.25;"><?php echo htmlspecialchars($promo1_title); ?></h3>
+                        <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #3b82f6; line-height: 1.4;"><?php echo htmlspecialchars($promo1_sub); ?></p>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #1d4ed8;">
+                            <?php echo htmlspecialchars($promo1_btn); ?> &rarr;
+                        </span>
+                    </div>
+                    <?php 
+                        $p1_src = $promo1_img;
+                        if (!str_starts_with($p1_src, 'http')) {
+                            $p1_src = BASE_URL . ltrim($p1_src, '/');
+                        }
+                    ?>
+                    <img src="<?php echo htmlspecialchars($p1_src); ?>" alt="<?php echo htmlspecialchars($promo1_title); ?>" style="width: 110px; height: 110px; object-fit: contain; z-index: 1;" onerror="this.style.display='none';">
+                </a>
+
+                <!-- Poster 2: Fashion -->
+                <a href="<?php echo htmlspecialchars(!empty($promo2_url) ? (str_starts_with($promo2_url, 'http') ? $promo2_url : BASE_URL . ltrim($promo2_url, '/')) : '#'); ?>" style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1.5px solid #fde68a; border-radius: 18px; padding: 22px 24px; text-decoration: none; color: inherit; position: relative; overflow: hidden; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08); transition: transform 0.2s, box-shadow 0.2s;">
+                    <div style="max-width: 60%; z-index: 1;">
+                        <?php if (!empty($promo2_tag)): ?>
+                        <span style="display: inline-block; background: #d97706; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; margin-bottom: 8px;"><?php echo htmlspecialchars($promo2_tag); ?></span>
+                        <?php endif; ?>
+                        <h3 style="margin: 0 0 6px 0; font-size: 19px; font-weight: 800; color: #78350f; line-height: 1.25;"><?php echo htmlspecialchars($promo2_title); ?></h3>
+                        <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #b45309; line-height: 1.4;"><?php echo htmlspecialchars($promo2_sub); ?></p>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #b45309;">
+                            <?php echo htmlspecialchars($promo2_btn); ?> &rarr;
+                        </span>
+                    </div>
+                    <?php 
+                        $p2_src = $promo2_img;
+                        if (!str_starts_with($p2_src, 'http')) {
+                            $p2_src = BASE_URL . ltrim($p2_src, '/');
+                        }
+                    ?>
+                    <img src="<?php echo htmlspecialchars($p2_src); ?>" alt="<?php echo htmlspecialchars($promo2_title); ?>" style="width: 110px; height: 110px; object-fit: contain; z-index: 1;" onerror="this.style.display='none';">
+                </a>
             </div>
         </section>
         <?php endif; ?>
