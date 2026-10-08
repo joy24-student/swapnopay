@@ -60,14 +60,17 @@ if (!$runtime && ($candidateSlug !== '' || $rawHost !== '')) {
     $dbUrl = getenv('SHOP_DATABASE_URL') ?: getenv('DATABASE_URL') ?: null;
     if (!$dbUrl) {
         $backendEnv = dirname(__DIR__, 3) . '/swapnopay-backend/.env';
-        if (is_file($backendEnv)) {
-            foreach (file($backendEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-                if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
-                [$k, $v] = explode('=', $line, 2);
-                $cleanK = trim($k);
-                if ($cleanK === 'SHOP_DATABASE_URL' || $cleanK === 'DATABASE_URL') {
-                    $dbUrl = trim($v, " \t\n\r\0\x0B\"'");
-                    break;
+        if (is_file($backendEnv) && is_readable($backendEnv)) {
+            $lines = @file($backendEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
+                    [$k, $v] = explode('=', $line, 2);
+                    $cleanK = trim($k);
+                    if ($cleanK === 'SHOP_DATABASE_URL' || $cleanK === 'DATABASE_URL') {
+                        $dbUrl = trim($v, " \t\n\r\0\x0B\"'");
+                        break;
+                    }
                 }
             }
         }

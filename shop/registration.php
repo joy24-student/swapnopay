@@ -35,7 +35,7 @@ $banner_registration = !empty($settings['banner_registration'])
     ? $settings['banner_registration'] 
     : 'assets/uploads/banner_registration.jpg';
 
-if (!str_starts_with($banner_registration, 'http')) {
+if (!str_starts_with($banner_registration, 'http') && !str_starts_with($banner_registration, 'assets/uploads/')) {
     $banner_registration = 'assets/uploads/' . ltrim($banner_registration, '/');
 }
 

@@ -35,7 +35,7 @@ $banner_login = !empty($settings['banner_login'])
     ? $settings['banner_login'] 
     : 'assets/uploads/banner_login.jpg';
 
-if (!str_starts_with($banner_login, 'http')) {
+if (!str_starts_with($banner_login, 'http') && !str_starts_with($banner_login, 'assets/uploads/')) {
     $banner_login = 'assets/uploads/' . ltrim($banner_login, '/');
 }
 
