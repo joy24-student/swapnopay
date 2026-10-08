@@ -232,16 +232,6 @@ foreach ($result as $row) {
 			          </a>
 			        </li>
 
-			        <!-- Download WebApp / Install PWA Menu Item -->
-			        <li class="treeview sn-sidebar-pwa-item">
-			          <a href="javascript:void(0)" onclick="window.triggerAdminPwaInstall && window.triggerAdminPwaInstall(event)" title="Download Admin WebApp from Chrome Side Bar">
-			            <i class="fa fa-download" style="color: #F59E0B;"></i> <span>Download WebApp</span>
-			            <span class="pull-right-container">
-			              <small class="label pull-right" style="background:#FEDB65; color:#0F172A; font-weight:700; border-radius:4px; padding:2px 6px;">App</small>
-			            </span>
-			          </a>
-			        </li>
-
 			        <li class="treeview <?php if( ($cur_page == 'settings.php') ) {echo 'active';} ?>">
 			          <a href="settings.php">
 			            <i class="fa fa-sliders"></i> <span>Website Settings</span>
