@@ -350,33 +350,16 @@ class MainActivity : AppCompatActivity() {
     private fun checkCallPermissions() {
         if (isFinishing || isDestroyed) return
 
-        // 1. Check Full Screen Intent permission on Android 14+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
-            if (notificationManager != null && !notificationManager.canUseFullScreenIntent()) {
-                try {
-                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                    return
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        // 2. Check Display Over Other Apps (Overlay) for WhatsApp-like full-screen call popups
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
             val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
-            val alreadyPrompted = prefs.getBoolean("overlay_prompted", false)
-            if (!alreadyPrompted) {
+            val sessionPrompted = prefs.getBoolean("overlay_session_prompted", false)
+            if (!sessionPrompted) {
+                prefs.edit().putBoolean("overlay_session_prompted", true).apply()
                 androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("📞 Instant Store Call Permission")
-                    .setMessage("To receive incoming calls directly on your lock screen and home screen (like WhatsApp), please enable 'Display over other apps'.")
-                    .setCancelable(false)
+                    .setTitle("📞 Enable Instant Call Screen")
+                    .setMessage("To allow store calls to ring and appear directly on your home screen and lock screen (just like WhatsApp), please enable 'Display over other apps'.")
+                    .setCancelable(true)
                     .setPositiveButton("Enable Now") { _, _ ->
-                        prefs.edit().putBoolean("overlay_prompted", true).apply()
                         try {
                             val intent = Intent(
                                 android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -387,10 +370,20 @@ class MainActivity : AppCompatActivity() {
                             e.printStackTrace()
                         }
                     }
-                    .setNegativeButton("Later") { _, _ ->
-                        prefs.edit().putBoolean("overlay_prompted", true).apply()
-                    }
+                    .setNegativeButton("Later", null)
                     .show()
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
+            if (notificationManager != null && !notificationManager.canUseFullScreenIntent()) {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }

@@ -6,9 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.abirluxe.shop.AbirLuxeApp
 import com.abirluxe.shop.IncomingCallActivity
 import com.abirluxe.shop.MainActivity
@@ -126,11 +130,29 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        val shopLogoBitmap = try {
+            BitmapFactory.decodeResource(resources, R.drawable.app_logo)
+        } catch (e: Exception) {
+            null
+        }
 
-        val callNotification = NotificationCompat.Builder(this, AbirLuxeApp.CHANNEL_ID_CALLS)
-            .setSmallIcon(R.drawable.ic_notification)
+        val callerPerson = Person.Builder()
+            .setName(callerName)
+            .setIcon(IconCompat.createWithResource(this, R.drawable.app_logo))
+            .setImportant(true)
+            .build()
+
+        val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+            callerPerson,
+            declinePendingIntent,
+            fullScreenPendingIntent
+        )
+
+        val callNotificationBuilder = NotificationCompat.Builder(this, AbirLuxeApp.CHANNEL_ID_CALLS)
+            .setSmallIcon(R.drawable.ic_stat_shop)
             .setContentTitle(callerName)
             .setContentText(if (callNote.isNotBlank()) callNote else getString(R.string.incoming_call_subtitle))
+            .setStyle(callStyle)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -143,14 +165,21 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             .setColor(ContextCompat.getColor(this, R.color.brand_gold))
             .addAction(R.drawable.ic_call, "Answer", fullScreenPendingIntent)
             .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
-            .build()
+
+        if (shopLogoBitmap != null) {
+            callNotificationBuilder.setLargeIcon(shopLogoBitmap)
+        }
+
+        val callNotification = callNotificationBuilder.build()
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(9999, callNotification)
 
-        // Directly launch the activity (succeeds if on lockscreen, or if SYSTEM_ALERT_WINDOW / overlay permission is granted)
+        // Directly launch the activity if screen is locked or if overlay permission is granted
         try {
-            startActivity(callIntent)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(this)) {
+                startActivity(callIntent)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -175,7 +204,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.app_logo)
 
         val notification = NotificationCompat.Builder(this, AbirLuxeApp.CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_stat_shop)
             .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(message)

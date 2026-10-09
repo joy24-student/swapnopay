@@ -376,6 +376,41 @@ switch ($action) {
             $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'ringing', active_call_type = ? WHERE id = ?")
                 ->execute([$callType, $threadId]);
+
+            // Dispatch instant high-priority FCM Call Push to customer app so phone rings even when app is closed/locked
+            if ($sender === 'admin') {
+                try {
+                    require_once __DIR__ . '/admin/inc/notifications.php';
+                    $mId = defined('MERCHANT_ID') && MERCHANT_ID ? MERCHANT_ID : 'local-merchant-001';
+                    $stmtTokens = $pdo->prepare("SELECT fcm_token FROM tbl_fcm_tokens WHERE merchant_id = ?");
+                    $stmtTokens->execute([$mId]);
+                    $devTokens = $stmtTokens->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+                    if (!empty($devTokens)) {
+                        $callLabel = ($callType === 'video') ? 'Video Call' : 'Voice Call';
+                        $storeBaseUrl = defined('BASE_URL') ? BASE_URL : '/';
+                        sendFCMPushNotification(
+                            $pdo,
+                            $devTokens,
+                            'Abir Luxe Store (' . $callLabel . ')',
+                            'Store Admin is calling you...',
+                            $storeBaseUrl,
+                            null,
+                            [
+                                'type' => 'call',
+                                'action' => 'call',
+                                'incoming_call' => 'true',
+                                'call_type' => $callType,
+                                'thread_id' => (string)$threadId,
+                                'caller_name' => 'Abir Luxe Store',
+                                'call_note' => 'Incoming ' . $callLabel
+                            ]
+                        );
+                    }
+                } catch (Throwable $e) {
+                    error_log("FCM call push error in live_chat_api: " . $e->getMessage());
+                }
+            }
         } else if ($type === 'answer') {
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'in_call' WHERE id = ?")
                 ->execute([$threadId]);

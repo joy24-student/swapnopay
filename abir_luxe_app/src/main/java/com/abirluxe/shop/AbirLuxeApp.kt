@@ -12,7 +12,7 @@ class AbirLuxeApp : Application() {
 
     companion object {
         const val CHANNEL_ID_ALERTS = "abir_luxe_store_alerts"
-        const val CHANNEL_ID_CALLS = "abir_luxe_store_calls"
+        const val CHANNEL_ID_CALLS = "abir_luxe_calls_v3"
         lateinit var instance: AbirLuxeApp
             private set
     }
@@ -40,6 +40,10 @@ class AbirLuxeApp : Application() {
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NotificationManager::class.java)
+
+            // Clean up obsolete channels so fresh sound and max importance take effect
+            try { notificationManager.deleteNotificationChannel("abir_luxe_store_calls") } catch (e: Exception) {}
+            try { notificationManager.deleteNotificationChannel("abir_luxe_store_calls_v2") } catch (e: Exception) {}
 
             // High Priority Channel for Deals, Orders & Admin Alerts
             val alertChannel = NotificationChannel(
