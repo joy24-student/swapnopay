@@ -478,9 +478,70 @@ body.live-chat-page-body.sidebar-collapse .content-wrapper {
     padding: 0 !important;
     transition: all 0.15s ease !important;
 }
-.sup-card-dots-btn:hover {
+.sup-card-dots-btn:hover,
+.sup-card-dots-btn:active {
     background: #e2e8f0 !important;
     color: #0f172a !important;
+}
+.sup-thread-menu {
+    position: fixed;
+    z-index: 999999;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.2), 0 6px 12px -4px rgba(15, 23, 42, 0.1);
+    border: 1px solid #e2e8f0;
+    min-width: 190px;
+    padding: 6px;
+    display: none;
+    animation: supMenuPop 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes supMenuPop {
+    from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.sup-menu-header {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 10px 4px 10px;
+}
+.sup-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #1e293b;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.sup-menu-item:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+.sup-menu-item.danger {
+    color: #dc2626;
+}
+.sup-menu-item.danger:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+.sup-menu-divider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 4px 0;
+}
+@keyframes popInModal {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
 }
 .wa-unread-count {
     background: #2563eb;
@@ -1144,7 +1205,7 @@ img.sup-agent-avatar,
                         <button type="button" class="sup-hdr-action-btn" onclick="triggerTopVoiceCall()" title="Voice call">
                             <i class="fa fa-phone" style="font-size: 16px;"></i>
                         </button>
-                        <button type="button" class="sup-hdr-action-btn" onclick="openThreadStatusForCurrent()" title="Thread options">
+                        <button type="button" class="sup-hdr-action-btn" onclick="openThreadMenu(event, currentThreadId)" title="Thread options">
                             <i class="fa fa-ellipsis-v" style="font-size: 16px;"></i>
                         </button>
                     </div>
@@ -1409,6 +1470,53 @@ img.sup-agent-avatar,
             </button>
             <button type="button" onclick="updateThreadStatus('resolved')" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #FAF5FF; color: #9333EA; font-weight: 700; border: 1px solid #E9D5FF; font-size: 13.5px;">
                 🟣 Resolved (Completed)
+            </button>
+            <div style="height: 1px; background: #E2E8F0; margin: 6px 0;"></div>
+            <button type="button" onclick="promptDeleteThread(activeStatusModalThreadId)" class="btn" style="text-align: left; padding: 12px 14px; border-radius: 12px; background: #FEF2F2; color: #DC2626; font-weight: 700; border: 1px solid #FECACA; font-size: 13.5px; display: flex; align-items: center; justify-content: space-between;">
+                <span><i class="fa fa-trash-o" style="margin-right: 8px; font-size: 15px;"></i> Delete Chat Permanently</span>
+                <span class="label label-danger" style="background: #DC2626; font-size: 10px; padding: 3px 6px;">Delete</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Thread Context Dropdown Menu -->
+<div id="supThreadContextMenu" class="sup-thread-menu">
+    <div class="sup-menu-header">Change Status</div>
+    <button type="button" onclick="contextMenuSetStatus('active')" class="sup-menu-item">
+        <i class="fa fa-circle" style="color: #10b981; font-size: 8px;"></i> Mark as Active
+    </button>
+    <button type="button" onclick="contextMenuSetStatus('pending')" class="sup-menu-item">
+        <i class="fa fa-circle" style="color: #f59e0b; font-size: 8px;"></i> Mark as Pending
+    </button>
+    <button type="button" onclick="contextMenuSetStatus('resolved')" class="sup-menu-item">
+        <i class="fa fa-circle" style="color: #8b5cf6; font-size: 8px;"></i> Mark as Resolved
+    </button>
+    <button type="button" onclick="contextMenuSetStatus('blocked')" class="sup-menu-item">
+        <i class="fa fa-circle" style="color: #ef4444; font-size: 8px;"></i> Block Customer
+    </button>
+    <div class="sup-menu-divider"></div>
+    <button type="button" onclick="contextMenuDeleteThread()" class="sup-menu-item danger">
+        <i class="fa fa-trash-o" style="font-size: 14px;"></i> Delete Chat
+    </button>
+</div>
+
+<!-- Delete Conversation Confirmation Modal -->
+<div id="supDeleteModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 9999999; align-items: center; justify-content: center;" onclick="closeDeleteModal()">
+    <div style="background: #ffffff; width: 90%; max-width: 420px; border-radius: 16px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25); animation: popInModal 0.15s ease;" onclick="event.stopPropagation()">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 16px;">
+            <i class="fa fa-trash-o"></i>
+        </div>
+        <h4 style="margin: 0 0 8px 0; font-size: 17px; font-weight: 800; color: #0f172a;">Delete Conversation?</h4>
+        <p style="margin: 0 0 20px 0; font-size: 13.5px; color: #64748b; line-height: 1.5;" id="supDeleteModalText">
+            Are you sure you want to delete this chat? All messages, attachments, and call history will be permanently deleted.
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn btn-default" onclick="closeDeleteModal()" style="border-radius: 8px; font-weight: 600; padding: 8px 16px;">
+                Cancel
+            </button>
+            <button type="button" class="btn btn-danger" id="btnConfirmDeleteThread" onclick="executeDeleteThread()" style="border-radius: 8px; font-weight: 700; padding: 8px 18px; background: #dc2626; border-color: #dc2626;">
+                <i class="fa fa-trash-o" style="margin-right: 4px;"></i> Delete Chat
             </button>
         </div>
     </div>
@@ -1766,7 +1874,7 @@ function renderThreadList() {
                         <span class="sup-status-pill status-${rawStatus}" onclick="openThreadStatusModal(event, ${t.id})" title="Status: ${statusLabel}">
                             <i class="fa fa-circle" style="font-size: 6px;"></i> ${statusLabel}
                         </span>
-                        <button type="button" class="sup-card-dots-btn" onclick="openThreadStatusModal(event, ${t.id})" title="Thread options">
+                        <button type="button" class="sup-card-dots-btn" onclick="openThreadMenu(event, ${t.id})" title="Thread options">
                             <i class="fa fa-ellipsis-v"></i>
                         </button>
                     </div>
@@ -2188,6 +2296,170 @@ async function updateThreadStatus(status) {
         alert('Could not update status.');
     }
 }
+
+// ==========================================================================
+// FLOATING THREAD OPTIONS & DELETE CHAT HANDLERS
+// ==========================================================================
+let activeMenuThreadId = null;
+let threadToDeleteId = null;
+
+function openThreadMenu(event, threadId) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    if (!threadId) return;
+
+    activeMenuThreadId = threadId;
+    const menu = document.getElementById('supThreadContextMenu');
+    if (!menu) return;
+
+    // Position menu relative to the clicked button / target
+    const btn = (event && event.currentTarget) ? event.currentTarget : null;
+    let top = 0;
+    let left = 0;
+
+    if (btn) {
+        const rect = btn.getBoundingClientRect();
+        top = rect.bottom + 6;
+        left = rect.right - 190;
+    } else if (event && event.clientX) {
+        top = event.clientY + 6;
+        left = event.clientX - 100;
+    } else {
+        top = 80;
+        left = Math.max(10, window.innerWidth / 2 - 95);
+    }
+
+    const menuWidth = 200;
+    const menuHeight = 230;
+    if (left < 10) left = 10;
+    if (left + menuWidth > window.innerWidth - 10) {
+        left = window.innerWidth - menuWidth - 10;
+    }
+    if (top + menuHeight > window.innerHeight - 10) {
+        if (btn) {
+            top = Math.max(10, btn.getBoundingClientRect().top - menuHeight - 6);
+        } else {
+            top = Math.max(10, window.innerHeight - menuHeight - 10);
+        }
+    }
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.display = 'block';
+}
+
+function closeThreadMenu() {
+    const menu = document.getElementById('supThreadContextMenu');
+    if (menu) menu.style.display = 'none';
+    activeMenuThreadId = null;
+}
+
+function contextMenuSetStatus(status) {
+    if (!activeMenuThreadId) return;
+    const tid = activeMenuThreadId;
+    closeThreadMenu();
+    activeStatusModalThreadId = tid;
+    updateThreadStatus(status);
+}
+
+function contextMenuDeleteThread() {
+    if (!activeMenuThreadId) return;
+    const tid = activeMenuThreadId;
+    closeThreadMenu();
+    promptDeleteThread(tid);
+}
+
+function promptDeleteThread(threadId) {
+    closeStatusModal();
+    closeThreadMenu();
+    if (!threadId) return;
+
+    threadToDeleteId = threadId;
+    const thread = allThreads.find(t => t.id === threadId);
+    const name = thread ? (thread.customer_name || `Customer #${thread.id}`) : `Chat #${threadId}`;
+
+    const textEl = document.getElementById('supDeleteModalText');
+    if (textEl) {
+        textEl.textContent = `Are you sure you want to permanently delete the conversation with "${name}"? All chat history, messages, attachments, and call logs will be removed immediately.`;
+    }
+
+    const modal = document.getElementById('supDeleteModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('supDeleteModal');
+    if (modal) modal.style.display = 'none';
+    threadToDeleteId = null;
+}
+
+async function executeDeleteThread() {
+    if (!threadToDeleteId) return;
+    const tid = threadToDeleteId;
+    const btn = document.getElementById('btnConfirmDeleteThread');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('thread_id', tid);
+
+        const res = await fetch('../live_chat_api.php?action=admin_delete_thread', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            closeDeleteModal();
+
+            // Remove from client threads list
+            allThreads = allThreads.filter(t => t.id !== tid);
+
+            // If the deleted thread was active workspace
+            if (currentThreadId === tid) {
+                currentThreadId = null;
+                const panel = document.getElementById('activeThreadPanel');
+                if (panel) panel.style.display = 'none';
+                const empty = document.getElementById('emptyThreadState');
+                if (empty) empty.style.display = 'flex';
+                document.body.classList.remove('mobile-chat-active');
+
+                // If threads remain and on desktop, select first
+                if (allThreads.length > 0 && window.innerWidth >= 768) {
+                    selectThread(allThreads[0].id);
+                }
+            }
+
+            renderThreadList();
+            updateCounts();
+        } else {
+            alert(data.message || 'Could not delete conversation.');
+        }
+    } catch (e) {
+        console.error('Delete chat error:', e);
+        alert('Network error: Could not delete conversation.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-trash-o" style="margin-right: 4px;"></i> Delete Chat';
+        }
+    }
+}
+
+// Global click listener to close thread context menu when clicking outside
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('supThreadContextMenu');
+    if (menu && menu.style.display === 'block') {
+        if (!menu.contains(e.target) && !e.target.closest('.sup-card-dots-btn') && !e.target.closest('.sup-hdr-action-btn')) {
+            closeThreadMenu();
+        }
+    }
+});
 
 // ==========================================================================
 // CONTEXT SIDEBAR & ORDERS (from tbl_payment)

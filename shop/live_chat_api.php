@@ -389,12 +389,13 @@ switch ($action) {
                     if (!empty($devTokens)) {
                         $callLabel = ($callType === 'video') ? 'Video Call' : 'Voice Call';
                         $storeBaseUrl = defined('BASE_URL') ? BASE_URL : '/';
+                        $callActionUrl = rtrim($storeBaseUrl, '/') . '/messages.php?auto_answer=1';
                         sendFCMPushNotification(
                             $pdo,
                             $devTokens,
                             'Abir Luxe Store (' . $callLabel . ')',
                             'Store Admin is calling you...',
-                            $storeBaseUrl,
+                            $callActionUrl,
                             null,
                             [
                                 'type' => 'call',
@@ -403,7 +404,9 @@ switch ($action) {
                                 'call_type' => $callType,
                                 'thread_id' => (string)$threadId,
                                 'caller_name' => 'Abir Luxe Store',
-                                'call_note' => 'Incoming ' . $callLabel
+                                'call_note' => 'Incoming ' . $callLabel,
+                                'url' => $callActionUrl,
+                                'target_url' => $callActionUrl
                             ]
                         );
                     }
@@ -604,6 +607,27 @@ switch ($action) {
             echo json_encode(['status' => 'success', 'new_status' => $status]);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Invalid parameters']);
+        }
+        exit;
+    }
+
+    case 'admin_delete_thread': {
+        $threadId = (int)($_POST['thread_id'] ?? $_GET['thread_id'] ?? 0);
+        if (!$threadId) {
+            echo json_encode(['status' => 'error', 'message' => 'Missing thread ID']);
+            exit;
+        }
+
+        try {
+            // Delete associated signals, messages and the thread
+            $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
+            $pdo->prepare("DELETE FROM tbl_shop_chat_messages WHERE thread_id = ?")->execute([$threadId]);
+            $del = $pdo->prepare("DELETE FROM tbl_shop_chat_threads WHERE id = ?");
+            $del->execute([$threadId]);
+
+            echo json_encode(['status' => 'success', 'message' => 'Conversation deleted successfully', 'thread_id' => $threadId]);
+        } catch (Throwable $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
         }
         exit;
     }

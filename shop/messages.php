@@ -669,6 +669,18 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 // Start polling for new messages & signals
                 startPolling();
 
+                // Auto-answer incoming call if opened via call answer action
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('auto_answer') === '1') {
+                    setTimeout(async () => {
+                        await pollWebRtcSignals();
+                        const modal = document.getElementById('incomingCallModal');
+                        if (modal && !modal.classList.contains('hidden')) {
+                            acceptIncomingCall();
+                        }
+                    }, 500);
+                }
+
                 // Auto-forward product link if inquiring from product page
                 if (currentProductInfo && currentProductInfo.id) {
                     const sessionKey = 'sn_chat_p_auto_forwarded_' + currentProductInfo.id;
