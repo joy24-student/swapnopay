@@ -517,7 +517,28 @@ try {
                                         <textarea class="form-control" name="firebase_vapid_key" id="firebase_vapid_key" rows="2" placeholder="BOn0f9... (found under Cloud Messaging > Web configuration > Web Push certificates)" style="border-radius: 6px;"><?php echo htmlspecialchars($currentSettings['firebase_vapid_key'] ?? ''); ?></textarea>
                                     </div>
 
-                                    <input type="hidden" name="firebase_service_account_json" id="firebase_service_account_json" value="<?php echo htmlspecialchars($currentSettings['firebase_service_account_json'] ?? ''); ?>">
+                                    <hr style="margin: 20px 0;">
+
+                                    <div class="form-group">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                                            <label style="font-weight: 700; margin-bottom: 0;">
+                                                <i class="fa fa-shield text-green" style="margin-right: 4px;"></i> Firebase Service Account Private Key JSON (FCM HTTP v1 - Recommended)
+                                            </label>
+                                            <?php if (!empty($currentSettings['firebase_service_account_json'])): ?>
+                                                <span class="label label-success" style="font-size: 11px; padding: 4px 8px; border-radius: 4px;">
+                                                    <i class="fa fa-check"></i> HTTP v1 Active &amp; Connected
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="label label-warning" style="font-size: 11px; padding: 4px 8px; border-radius: 4px;">
+                                                    <i class="fa fa-exclamation-circle"></i> Not Configured (Using Legacy Fallback)
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <textarea class="form-control" name="firebase_service_account_json" id="firebase_service_account_json" rows="4" placeholder='{"type": "service_account", "project_id": "abir-luxe-...", "private_key": "-----BEGIN PRIVATE KEY-----...", ...}' style="border-radius: 6px; font-family: monospace; font-size: 12px;"><?php echo htmlspecialchars($currentSettings['firebase_service_account_json'] ?? ''); ?></textarea>
+                                        <small class="text-muted" style="display: block; margin-top: 5px; line-height: 1.5;">
+                                            <strong>Essential for modern Firebase projects:</strong> Google has disabled Legacy API for newly created projects. Get this in 1 click from <strong>Firebase Console &gt; Project Settings ⚙️ &gt; Service accounts &gt; "Generate new private key"</strong>, then copy &amp; paste the downloaded JSON here (or drop it into the dropzone above).
+                                        </small>
+                                    </div>
 
                                     <div style="margin-top: 25px;">
                                         <button type="submit" class="btn btn-success btn-lg" style="font-weight: 700; border-radius: 6px; padding: 11px 28px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);">

@@ -1,13 +1,14 @@
 {
   "project_info": {
-    "project_number": "100000000000",
-    "project_id": "swapnopay-fcm",
-    "storage_bucket": "swapnopay-fcm.appspot.com"
+    "project_number": "148035648865",
+    "firebase_url": "https://abir-luxe-shop-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "abir-luxe-shop",
+    "storage_bucket": "abir-luxe-shop.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:100000000000:android:abirluxeshopbd0558",
+        "mobilesdk_app_id": "1:148035648865:android:c702f5b51163d966119920",
         "android_client_info": {
           "package_name": "com.abirluxe.shop"
         }
@@ -15,26 +16,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAbirLuxeStoreKeyFCMNotificationService"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:100000000000:android:abirluxeshopbddebug",
-        "android_client_info": {
-          "package_name": "com.abirluxe.shop.debug"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAbirLuxeStoreKeyFCMNotificationService"
+          "current_key": "AIzaSyDtpuCZe6QxPJ2W-el_yFRm384yLhAms4o"
         }
       ],
       "services": {

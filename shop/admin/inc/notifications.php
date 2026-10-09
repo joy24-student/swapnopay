@@ -231,7 +231,80 @@ function createNotification(
 }
 
 /**
+ * Generates or retrieves a cached OAuth 2.0 Access Token from Google for Firebase HTTP v1
+ */
+function getFirebaseV1AccessToken(string $serviceAccountJson): ?string {
+    $sa = json_decode($serviceAccountJson, true);
+    if (!is_array($sa) || empty($sa['client_email']) || empty($sa['private_key'])) {
+        return null;
+    }
+
+    $tokenCacheFile = sys_get_temp_dir() . '/fcm_v1_token_' . md5($sa['client_email']) . '.json';
+    if (file_exists($tokenCacheFile)) {
+        $cached = @json_decode((string)@file_get_contents($tokenCacheFile), true);
+        if (is_array($cached) && !empty($cached['access_token']) && ($cached['expires_at'] ?? 0) > (time() + 90)) {
+            return (string)$cached['access_token'];
+        }
+    }
+
+    $now = time();
+    $header = rtrim(strtr(base64_encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
+    $claims = rtrim(strtr(base64_encode(json_encode([
+        'iss' => $sa['client_email'],
+        'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+        'aud' => 'https://oauth2.googleapis.com/token',
+        'exp' => $now + 3600,
+        'iat' => $now
+    ])), '+/', '-_'), '=');
+
+    $jwtUnsigned = $header . '.' . $claims;
+    $binarySignature = '';
+    $pkey = openssl_pkey_get_private($sa['private_key']);
+    if (!$pkey) {
+        error_log("FCM V1 OAuth: Invalid private key in service account JSON");
+        return null;
+    }
+
+    if (!openssl_sign($jwtUnsigned, $binarySignature, $pkey, OPENSSL_ALGO_SHA256)) {
+        error_log("FCM V1 OAuth: OpenSSL signing failed");
+        return null;
+    }
+
+    $jwtSignature = rtrim(strtr(base64_encode($binarySignature), '+/', '-_'), '=');
+    $assertion = $jwtUnsigned . '.' . $jwtSignature;
+
+    $ch = curl_init('https://oauth2.googleapis.com/token');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+        'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion' => $assertion
+    ]));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $res = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode === 200 && $res) {
+        $tokenData = json_decode($res, true);
+        if (!empty($tokenData['access_token'])) {
+            $expiresIn = (int)($tokenData['expires_in'] ?? 3600);
+            @file_put_contents($tokenCacheFile, json_encode([
+                'access_token' => $tokenData['access_token'],
+                'expires_at' => $now + $expiresIn
+            ]));
+            return (string)$tokenData['access_token'];
+        }
+    }
+
+    error_log("FCM V1 OAuth Token Request failed HTTP {$httpCode}: " . $res);
+    return null;
+}
+
+/**
  * Sends a native Push Notification to a list of device tokens via Firebase Cloud Messaging (FCM)
+ * Supports both modern Firebase HTTP v1 (OAuth 2.0) and Legacy HTTP API.
  */
 function sendFCMPushNotification(
     PDO $pdo,
@@ -263,24 +336,149 @@ function sendFCMPushNotification(
         $settings = [];
     }
 
+    $serviceAccountJson = trim((string)($settings['firebase_service_account_json'] ?? ''));
+    $projectId = trim((string)($settings['firebase_project_id'] ?? ''));
     $serverKey = trim((string)($settings['fcm_server_key'] ?? ''));
     if (empty($serverKey)) {
         $serverKey = getenv('FCM_SERVER_KEY') ?: '';
     }
 
-    if (empty($serverKey)) {
-        $result['message'] = 'FCM Server Key is not configured in settings. In-app notification was saved.';
-        return $result;
-    }
-
     $defaultIcon = defined('BASE_URL') ? BASE_URL . 'assets/uploads/default_logo.png' : '';
     $finalIcon = $iconUrl ?: $defaultIcon;
     $finalUrl = $actionUrl ?: (defined('BASE_URL') ? BASE_URL : '/');
+    $isCallType = (isset($extraData['type']) && strtolower((string)$extraData['type']) === 'call');
+
+    // 1. Attempt Modern Firebase HTTP v1 first if service account JSON is available
+    $v1AccessToken = null;
+    if (!empty($serviceAccountJson)) {
+        $saData = json_decode($serviceAccountJson, true);
+        if (is_array($saData) && !empty($saData['project_id']) && empty($projectId)) {
+            $projectId = (string)$saData['project_id'];
+        }
+        $v1AccessToken = getFirebaseV1AccessToken($serviceAccountJson);
+    }
+
+    if ($v1AccessToken && !empty($projectId)) {
+        // --- MODERN FIREBASE HTTP v1 DISPATCH ---
+        $v1Url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        $baseData = $isCallType ? [
+            'title' => $title,
+            'body' => $body,
+            'caller_name' => $title,
+            'call_note' => $body,
+            'type' => 'call',
+            'action' => 'call',
+            'incoming_call' => 'true',
+            'url' => $finalUrl,
+            'click_action' => $finalUrl,
+            'icon' => $finalIcon,
+            'timestamp' => (string)time()
+        ] : [
+            'title' => $title,
+            'body' => $body,
+            'url' => $finalUrl,
+            'click_action' => $finalUrl,
+            'icon' => $finalIcon,
+            'timestamp' => (string)time()
+        ];
+
+        $mergedData = array_merge($baseData, $extraData);
+        $dataPayload = [];
+        foreach ($mergedData as $k => $v) {
+            $dataPayload[(string)$k] = is_scalar($v) ? (string)$v : json_encode($v);
+        }
+
+        foreach ($tokens as $token) {
+            if ($isCallType) {
+                // High-priority pure DATA payload (NO top-level notification object)
+                // Ensures onMessageReceived() is invoked by Android even when app is killed/background
+                $messagePayload = [
+                    'message' => [
+                        'token' => $token,
+                        'data' => $dataPayload,
+                        'android' => [
+                            'priority' => 'HIGH'
+                        ]
+                    ]
+                ];
+            } else {
+                $messagePayload = [
+                    'message' => [
+                        'token' => $token,
+                        'notification' => [
+                            'title' => $title,
+                            'body' => $body
+                        ],
+                        'data' => $dataPayload,
+                        'android' => [
+                            'priority' => 'HIGH',
+                            'notification' => [
+                                'sound' => 'default',
+                                'click_action' => $finalUrl,
+                                'icon' => $finalIcon
+                            ]
+                        ]
+                    ]
+                ];
+            }
+
+            $ch = curl_init($v1Url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Bearer ' . $v1AccessToken,
+                'Content-Type: application/json'
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messagePayload));
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) {
+                error_log("FCM V1 cURL Error: " . $curlErr);
+                $result['failed']++;
+                $result['message'] = $curlErr;
+                continue;
+            }
+
+            if ($httpCode === 200) {
+                $result['sent']++;
+            } else {
+                $result['failed']++;
+                error_log("FCM V1 HTTP {$httpCode}: " . $response);
+                $respData = json_decode($response, true);
+                $errStatus = $respData['error']['status'] ?? '';
+                if ($errStatus === 'NOT_FOUND' || (isset($respData['error']['message']) && stripos($respData['error']['message'], 'Requested entity was not found') !== false)) {
+                    try {
+                        $delStmt = $pdo->prepare("DELETE FROM tbl_fcm_tokens WHERE fcm_token=?");
+                        $delStmt->execute([$token]);
+                    } catch (Throwable $e) {}
+                }
+                $result['message'] = "FCM V1 Error: " . ($respData['error']['message'] ?? "HTTP {$httpCode}");
+            }
+        }
+
+        if ($result['sent'] > 0) {
+            $result['success'] = true;
+            $result['message'] = "Sent successfully via FCM HTTP v1 to {$result['sent']} device(s).";
+        }
+
+        return $result;
+    }
+
+    // 2. Fallback to Legacy HTTP API if Server Key is configured
+    if (empty($serverKey)) {
+        $result['message'] = 'Firebase is not configured. Please add your Service Account JSON (recommended) or FCM Server Key in Firebase Settings.';
+        return $result;
+    }
 
     // Split tokens into batches of 500 for FCM limits
     $batches = array_chunk($tokens, 500);
-
-    $isCallType = (isset($extraData['type']) && strtolower((string)$extraData['type']) === 'call');
 
     foreach ($batches as $batchTokens) {
         if ($isCallType) {
@@ -398,6 +596,7 @@ function sendFCMPushNotification(
 
     return $result;
 }
+
 
 /**
  * Broadcasts a notification to all customers or a specific customer,

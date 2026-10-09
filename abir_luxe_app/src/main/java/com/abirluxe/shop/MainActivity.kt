@@ -67,7 +67,11 @@ class MainActivity : AppCompatActivity() {
         setupOfflineView()
         setupBackNavigation()
         monitorNetworkChanges()
-        checkFullScreenIntentPermission()
+
+        // Check and prompt for incoming call permissions (Display Over Other Apps & Full Screen Intent)
+        Handler(Looper.getMainLooper()).postDelayed({
+            checkCallPermissions()
+        }, 1200)
 
         // Load initial target URL or base store URL
         val initialUrl = intent?.getStringExtra("target_url")
@@ -135,6 +139,18 @@ class MainActivity : AppCompatActivity() {
                         "if(window.ShopNotifications && typeof window.ShopNotifications.saveTokenToServer === 'function'){ window.ShopNotifications.saveTokenToServer('$token', 'android'); } else if(typeof window.onNativeFcmTokenReceived === 'function'){ window.onNativeFcmTokenReceived('$token'); }",
                         null
                     )
+                } else {
+                    try {
+                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                            if (task.isSuccessful && !task.result.isNullOrBlank()) {
+                                val freshToken = task.result
+                                prefs.edit().putString("fcm_token", freshToken).apply()
+                                com.abirluxe.shop.fcm.AbirFirebaseMessagingService.sendTokenToBackend(applicationContext, freshToken)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
 
@@ -331,7 +347,10 @@ class MainActivity : AppCompatActivity() {
         CookieManager.getInstance().flush()
     }
 
-    private fun checkFullScreenIntentPermission() {
+    private fun checkCallPermissions() {
+        if (isFinishing || isDestroyed) return
+
+        // 1. Check Full Screen Intent permission on Android 14+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val notificationManager = getSystemService(android.app.NotificationManager::class.java)
             if (notificationManager != null && !notificationManager.canUseFullScreenIntent()) {
@@ -340,9 +359,38 @@ class MainActivity : AppCompatActivity() {
                         data = Uri.parse("package:$packageName")
                     }
                     startActivity(intent)
+                    return
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
+            }
+        }
+
+        // 2. Check Display Over Other Apps (Overlay) for WhatsApp-like full-screen call popups
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+            val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
+            val alreadyPrompted = prefs.getBoolean("overlay_prompted", false)
+            if (!alreadyPrompted) {
+                androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("📞 Instant Store Call Permission")
+                    .setMessage("To receive incoming calls directly on your lock screen and home screen (like WhatsApp), please enable 'Display over other apps'.")
+                    .setCancelable(false)
+                    .setPositiveButton("Enable Now") { _, _ ->
+                        prefs.edit().putBoolean("overlay_prompted", true).apply()
+                        try {
+                            val intent = Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName")
+                            )
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    .setNegativeButton("Later") { _, _ ->
+                        prefs.edit().putBoolean("overlay_prompted", true).apply()
+                    }
+                    .show()
             }
         }
     }
