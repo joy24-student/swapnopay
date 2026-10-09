@@ -52,31 +52,87 @@ $types = [
 if (!isset($types[$category_type])) {
     $category_type = 'top-category';
 }
-[$table, $idColumn, $nameColumn] = $types[$category_type];
 
-$stmtCat = $pdo->prepare("SELECT $nameColumn FROM $table WHERE $idColumn = ?");
-$stmtCat->execute([$category_id]);
-$title = $stmtCat->fetchColumn();
-if ($title === false) {
-    $title = 'Products';
+$title = 'Products';
+$catBanner = '';
+$catPhoto = '';
+$activeTopCatId = 0;
+$activeTopCatName = '';
+$activeMidCatId = 0;
+$activeMidCatName = '';
+$activeEndCatId = 0;
+
+if ($category_type === 'top-category') {
+    $activeTopCatId = (int)$category_id;
+    try {
+        $stmtCat = $pdo->prepare("SELECT tcat_name, photo, banner FROM tbl_top_category WHERE tcat_id = ?");
+        $stmtCat->execute([$category_id]);
+        $rowCat = $stmtCat->fetch(PDO::FETCH_ASSOC);
+        if ($rowCat) {
+            $title = $rowCat['tcat_name'] ?: 'Products';
+            $activeTopCatName = $title;
+            $catPhoto = $rowCat['photo'] ?? '';
+            $catBanner = $rowCat['banner'] ?? '';
+        }
+    } catch (Throwable $e) {}
+} elseif ($category_type === 'mid-category') {
+    $activeMidCatId = (int)$category_id;
+    try {
+        $stmtCat = $pdo->prepare("SELECT m.mcat_name, m.tcat_id, t.tcat_name, t.photo as tcat_photo, t.banner as tcat_banner 
+                                  FROM tbl_mid_category m 
+                                  LEFT JOIN tbl_top_category t ON t.tcat_id = m.tcat_id 
+                                  WHERE m.mcat_id = ?");
+        $stmtCat->execute([$category_id]);
+        $rowCat = $stmtCat->fetch(PDO::FETCH_ASSOC);
+        if ($rowCat) {
+            $title = $rowCat['mcat_name'] ?: 'Products';
+            $activeMidCatName = $title;
+            $activeTopCatId = (int)($rowCat['tcat_id'] ?? 0);
+            $activeTopCatName = $rowCat['tcat_name'] ?? '';
+            $catBanner = $rowCat['tcat_banner'] ?? '';
+            $catPhoto = $rowCat['tcat_photo'] ?? '';
+        }
+    } catch (Throwable $e) {}
+} elseif ($category_type === 'end-category') {
+    $activeEndCatId = (int)$category_id;
+    try {
+        $stmtCat = $pdo->prepare("SELECT e.ecat_name, e.mcat_id, m.mcat_name, m.tcat_id, t.tcat_name, t.photo as tcat_photo, t.banner as tcat_banner 
+                                  FROM tbl_end_category e 
+                                  LEFT JOIN tbl_mid_category m ON m.mcat_id = e.mcat_id 
+                                  LEFT JOIN tbl_top_category t ON t.tcat_id = m.tcat_id 
+                                  WHERE e.ecat_id = ?");
+        $stmtCat->execute([$category_id]);
+        $rowCat = $stmtCat->fetch(PDO::FETCH_ASSOC);
+        if ($rowCat) {
+            $title = $rowCat['ecat_name'] ?: 'Products';
+            $activeMidCatId = (int)($rowCat['mcat_id'] ?? 0);
+            $activeMidCatName = $rowCat['mcat_name'] ?? '';
+            $activeTopCatId = (int)($rowCat['tcat_id'] ?? 0);
+            $activeTopCatName = $rowCat['tcat_name'] ?? '';
+            $catBanner = $rowCat['tcat_banner'] ?? '';
+            $catPhoto = $rowCat['tcat_photo'] ?? '';
+        }
+    } catch (Throwable $e) {}
 }
 
 // ── 2. Collect end-category IDs for product query ─────────────────────────
+// Top category includes all products belonging to its mid and lower (end) categories
 $final_ecat_ids = [];
+$hasExplicitCategory = false;
+
 if ($category_type === 'top-category') {
     $s = $pdo->prepare('SELECT e.ecat_id FROM tbl_end_category e JOIN tbl_mid_category m ON e.mcat_id=m.mcat_id WHERE m.tcat_id=?');
     $s->execute([$category_id]);
-    $final_ecat_ids = $s->fetchAll(PDO::FETCH_COLUMN);
-    if (empty($final_ecat_ids)) {
-        $sAll = $pdo->query('SELECT DISTINCT ecat_id FROM tbl_product WHERE p_is_active = 1');
-        $final_ecat_ids = $sAll->fetchAll(PDO::FETCH_COLUMN) ?: [];
-    }
+    $final_ecat_ids = $s->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $hasExplicitCategory = true;
 } elseif ($category_type === 'mid-category') {
     $s = $pdo->prepare('SELECT ecat_id FROM tbl_end_category WHERE mcat_id=?');
     $s->execute([$category_id]);
-    $final_ecat_ids = $s->fetchAll(PDO::FETCH_COLUMN);
+    $final_ecat_ids = $s->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $hasExplicitCategory = true;
 } else {
     $final_ecat_ids = [$category_id];
+    $hasExplicitCategory = true;
 }
 $final_ecat_ids = array_map('intval', array_filter($final_ecat_ids));
 
@@ -94,13 +150,17 @@ $filterSubcat= trim($_GET['subcat'] ?? '');
 $dbProducts = [];
 $totalProductCount = 0;
 
-if (empty($final_ecat_ids)) {
-    $whereClauses = ["p.p_is_active = 1"];
+if ($hasExplicitCategory && empty($final_ecat_ids)) {
+    // When category has no child end categories or products, strictly show 0 products
+    $whereClauses = ["1 = 0"];
     $params = [];
-} else {
+} elseif (!empty($final_ecat_ids)) {
     $placeholders = implode(',', array_fill(0, count($final_ecat_ids), '?'));
     $whereClauses = ["p.ecat_id IN ($placeholders)", "p.p_is_active = 1"];
     $params = $final_ecat_ids;
+} else {
+    $whereClauses = ["p.p_is_active = 1"];
+    $params = [];
 }
 
 if ($filterBrand !== '') {
@@ -160,41 +220,59 @@ try {
 
 $displayProducts = $dbProducts;
 
+// ── 5. Hierarchy: Mid Categories & Lower Categories ───────────────────────
 $realSubcategories = [];
-try {
-    if ($category_type === 'top-category') {
-        $subStmt = $pdo->prepare("SELECT m.mcat_id, m.mcat_name, COUNT(p.p_id) as p_count 
+$realEndcategories = [];
+if ($activeTopCatId > 0) {
+    try {
+        $subStmt = $pdo->prepare("SELECT m.mcat_id, m.mcat_name, COUNT(DISTINCT p.p_id) as p_count 
                                   FROM tbl_mid_category m 
                                   LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
                                   LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
                                   WHERE m.tcat_id = ? 
                                   GROUP BY m.mcat_id, m.mcat_name 
                                   ORDER BY m.mcat_id ASC");
-        $subStmt->execute([$category_id]);
+        $subStmt->execute([$activeTopCatId]);
         $realSubcategories = $subStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-} catch (Throwable $e) {}
+    } catch (Throwable $e) {}
 
-$sidebarCategories = $_SESSION['sn_sidebar_cats'] ?? null;
-$sbCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('sidebar_cats') : __DIR__ . '/admin/inc/cache_sidebar_cats.json';
-if (!$sidebarCategories && file_exists($sbCacheFile) && (time() - filemtime($sbCacheFile) < 300)) {
-    $sidebarCategories = json_decode(file_get_contents($sbCacheFile), true);
-    $_SESSION['sn_sidebar_cats'] = $sidebarCategories;
-}
-if (!$sidebarCategories) {
     try {
-        $sbCatStmt = $pdo->query("SELECT t.tcat_id, t.tcat_name, COUNT(p.p_id) as cat_count 
-                                 FROM tbl_top_category t 
-                                 LEFT JOIN tbl_mid_category m ON m.tcat_id = t.tcat_id 
-                                 LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
-                                 LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
-                                 GROUP BY t.tcat_id, t.tcat_name 
-                                 ORDER BY t.tcat_order ASC, t.tcat_id ASC");
-        $sidebarCategories = $sbCatStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $_SESSION['sn_sidebar_cats'] = $sidebarCategories;
-        @file_put_contents($sbCacheFile, json_encode($sidebarCategories));
+        if ($category_type === 'mid-category') {
+            $endStmt = $pdo->prepare("SELECT e.ecat_id, e.ecat_name, e.mcat_id, COUNT(DISTINCT p.p_id) as p_count 
+                                      FROM tbl_end_category e 
+                                      LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                                      WHERE e.mcat_id = ? 
+                                      GROUP BY e.ecat_id, e.ecat_name, e.mcat_id 
+                                      ORDER BY e.ecat_id ASC");
+            $endStmt->execute([$category_id]);
+            $realEndcategories = $endStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } else {
+            $endStmt = $pdo->prepare("SELECT e.ecat_id, e.ecat_name, e.mcat_id, m.mcat_name, COUNT(DISTINCT p.p_id) as p_count 
+                                      FROM tbl_end_category e 
+                                      JOIN tbl_mid_category m ON m.mcat_id = e.mcat_id 
+                                      LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                                      WHERE m.tcat_id = ? 
+                                      GROUP BY e.ecat_id, e.ecat_name, e.mcat_id, m.mcat_name 
+                                      ORDER BY e.ecat_id ASC");
+            $endStmt->execute([$activeTopCatId]);
+            $realEndcategories = $endStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
     } catch (Throwable $e) {}
 }
+
+// ── 6. Query Top Categories for Sidebar and Quick Navigation ──────────────
+// Only Top Categories are shown in the categories list, with aggregated count
+$sidebarCategories = [];
+try {
+    $sbCatStmt = $pdo->query("SELECT t.tcat_id, t.tcat_name, t.photo, t.banner, COUNT(DISTINCT p.p_id) as cat_count 
+                             FROM tbl_top_category t 
+                             LEFT JOIN tbl_mid_category m ON m.tcat_id = t.tcat_id 
+                             LEFT JOIN tbl_end_category e ON e.mcat_id = m.mcat_id 
+                             LEFT JOIN tbl_product p ON p.ecat_id = e.ecat_id AND p.p_is_active = 1 
+                             GROUP BY t.tcat_id, t.tcat_name, t.photo, t.banner 
+                             ORDER BY t.tcat_order ASC, t.tcat_id ASC");
+    $sidebarCategories = $sbCatStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {}
 
 // ── 6. Wishlist check ─────────────────────────────────────────────────────
 $wishlistIds = [];
@@ -273,6 +351,221 @@ function renderStarIcons($rating) {
 .sn-breadcrumb .current {
     color: #0f172a;
     font-weight: 500;
+}
+
+/* Category Hero Banner */
+.sn-cat-banner-section {
+    width: 100%;
+    margin-bottom: 20px;
+}
+.sn-cat-banner-card {
+    width: 100%;
+    max-height: 250px;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    background: #f1f5f9;
+}
+.sn-cat-banner-img {
+    width: 100%;
+    height: 100%;
+    max-height: 250px;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+@media (max-width: 768px) {
+    .sn-cat-banner-section {
+        margin-bottom: 14px;
+    }
+    .sn-cat-banner-card,
+    .sn-cat-banner-img {
+        max-height: 150px;
+        border-radius: 10px;
+    }
+}
+
+/* Horizontal Top Category Quick Nav Bar (Mobile & Desktop) */
+.sn-top-cats-bar {
+    width: 100%;
+    margin-bottom: 18px;
+}
+.sn-top-cats-scroll {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 2px 2px 8px 2px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+.sn-top-cats-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+.sn-top-cats-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.sn-top-cat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    flex-shrink: 0;
+}
+.sn-top-cat-pill:hover {
+    border-color: #fab802;
+    color: #0f172a;
+    background: #fffdf5;
+    transform: translateY(-1px);
+}
+.sn-top-cat-pill.active {
+    background: #fab802;
+    border-color: #fab802;
+    color: #0f172a;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(250, 184, 2, 0.28);
+}
+.sn-top-cat-pill-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.sn-top-cat-pill-badge {
+    background: rgba(15, 23, 42, 0.08);
+    color: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+}
+.sn-top-cat-pill.active .sn-top-cat-pill-badge {
+    background: rgba(15, 23, 42, 0.16);
+}
+
+/* Sidebar Top Category Navigation Items */
+.sn-cat-nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #334155;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+.sn-cat-nav-item:hover {
+    background: #f8fafc;
+    color: #0f172a;
+}
+.sn-cat-nav-item.active {
+    background: #fffdf2;
+    color: #0f172a;
+    font-weight: 800;
+    border-left: 3px solid #fab802;
+    padding-left: 8px;
+}
+.sn-cat-nav-item.active .sn-count-tag {
+    color: #854d0e;
+    font-weight: 700;
+}
+
+/* Hierarchy: Subcategories (Mid) & Lower Categories (End) */
+.sn-hierarchy-section {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sn-hierarchy-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+.sn-midcat-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.sn-midcat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.sn-midcat-pill:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+.sn-midcat-pill.active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+}
+.sn-midcat-pill.active .sn-sub-count {
+    color: #cbd5e1;
+}
+.sn-sub-count {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.sn-endcat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.sn-endcat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    border: 1px solid transparent;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.sn-endcat-chip:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.sn-endcat-chip.active {
+    background: #fab802;
+    color: #0f172a;
+    font-weight: 700;
 }
 
 /* Top Section: Title on Left + Hero Promo Card on Right */
@@ -1043,9 +1336,46 @@ function renderStarIcons($rating) {
         <!-- 1. Breadcrumbs -->
         <nav class="sn-breadcrumb">
             <a href="index.php">Home</a>
+            <?php if ($activeTopCatId > 0 && ($category_type !== 'top-category' || $category_id != $activeTopCatId)): ?>
+                <span class="sep">&gt;</span>
+                <a href="product-category.php?id=<?= $activeTopCatId ?>&type=top-category"><?= htmlspecialchars($activeTopCatName) ?></a>
+            <?php endif; ?>
+            <?php if ($category_type === 'end-category' && $activeMidCatId > 0): ?>
+                <span class="sep">&gt;</span>
+                <a href="product-category.php?id=<?= $activeMidCatId ?>&type=mid-category"><?= htmlspecialchars($activeMidCatName) ?></a>
+            <?php endif; ?>
             <span class="sep">&gt;</span>
             <span class="current"><?= htmlspecialchars($title) ?></span>
         </nav>
+
+        <?php if (!empty($sidebarCategories) && count($sidebarCategories) > 1): ?>
+        <!-- Top Categories Quick Navigation Bar (Horizontal Scrollable on Mobile & Desktop) -->
+        <div class="sn-top-cats-bar">
+            <div class="sn-top-cats-scroll">
+                <?php foreach ($sidebarCategories as $tCat): 
+                    $isTopActive = ($activeTopCatId == $tCat['tcat_id']);
+                ?>
+                    <a href="product-category.php?id=<?= $tCat['tcat_id'] ?>&type=top-category" 
+                       class="sn-top-cat-pill <?= $isTopActive ? 'active' : '' ?>">
+                        <?php if (!empty($tCat['photo']) && $tCat['photo'] !== 'placeholder.svg' && file_exists(__DIR__ . '/assets/uploads/' . $tCat['photo'])): ?>
+                            <img src="assets/uploads/<?= htmlspecialchars($tCat['photo']) ?>" alt="" class="sn-top-cat-pill-icon">
+                        <?php endif; ?>
+                        <span><?= htmlspecialchars($tCat['tcat_name']) ?></span>
+                        <span class="sn-top-cat-pill-badge"><?= (int)$tCat['cat_count'] ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($catBanner) && file_exists(__DIR__ . '/assets/uploads/' . $catBanner)): ?>
+        <!-- Top Category Hero Banner -->
+        <section class="sn-cat-banner-section">
+            <div class="sn-cat-banner-card">
+                <img src="assets/uploads/<?= htmlspecialchars($catBanner) ?>" alt="<?= htmlspecialchars($title) ?>" class="sn-cat-banner-img" loading="eager">
+            </div>
+        </section>
+        <?php endif; ?>
 
         <!-- 2. Top Header Row: Category Info -->
         <section class="sn-top-row">
@@ -1055,19 +1385,50 @@ function renderStarIcons($rating) {
             </div>
         </section>
 
-        <?php if (!empty($realSubcategories)): ?>
-        <!-- 3. Quick-Filter Subcategory Tabs -->
-        <section class="sn-subcat-tabs">
-            <a href="product-category.php?id=<?= $category_id ?>&type=<?= $category_type ?>" class="sn-subcat-card <?= ($filterSubcat === '' || $filterSubcat === 'all') ? 'active' : '' ?>">
-                <div class="sn-subcat-name">All</div>
-                <div class="sn-subcat-count"><?= $totalProductCount ?> items</div>
-            </a>
-            <?php foreach ($realSubcategories as $rSub): ?>
-                <a href="product-category.php?id=<?= $rSub['mcat_id'] ?>&type=mid-category" class="sn-subcat-card <?= ($category_type === 'mid-category' && $category_id == $rSub['mcat_id']) ? 'active' : '' ?>">
-                    <div class="sn-subcat-name"><?= htmlspecialchars($rSub['mcat_name']) ?></div>
-                    <div class="sn-subcat-count"><?= (int)$rSub['p_count'] ?> items</div>
-                </a>
-            <?php endforeach; ?>
+        <?php if (!empty($realSubcategories) || !empty($realEndcategories)): ?>
+        <!-- 3. Subcategories (Mid) & Lower Categories (End) Exploration -->
+        <section class="sn-hierarchy-section">
+            <?php if (!empty($realSubcategories)): ?>
+            <div>
+                <div class="sn-hierarchy-label">Subcategories in <?= htmlspecialchars($activeTopCatName ?: $title) ?></div>
+                <div class="sn-midcat-pills">
+                    <a href="product-category.php?id=<?= $activeTopCatId ?>&type=top-category" 
+                       class="sn-midcat-pill <?= ($category_type === 'top-category') ? 'active' : '' ?>">
+                        <span>All</span>
+                        <span class="sn-sub-count">(<?= $totalProductCount ?>)</span>
+                    </a>
+                    <?php foreach ($realSubcategories as $rSub): 
+                        $isSubActive = ($category_type === 'mid-category' && $category_id == $rSub['mcat_id']);
+                    ?>
+                        <a href="product-category.php?id=<?= $rSub['mcat_id'] ?>&type=mid-category" 
+                           class="sn-midcat-pill <?= $isSubActive ? 'active' : '' ?>">
+                            <span><?= htmlspecialchars($rSub['mcat_name']) ?></span>
+                            <span class="sn-sub-count">(<?= (int)$rSub['p_count'] ?>)</span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($realEndcategories)): ?>
+            <div>
+                <div class="sn-hierarchy-label">Browse by Lower Category</div>
+                <div class="sn-endcat-chips">
+                    <?php foreach ($realEndcategories as $rEnd): 
+                        $isEndActive = ($category_type === 'end-category' && $category_id == $rEnd['ecat_id']);
+                    ?>
+                        <a href="product-category.php?id=<?= $rEnd['ecat_id'] ?>&type=end-category" 
+                           class="sn-endcat-chip <?= $isEndActive ? 'active' : '' ?>">
+                            <span><?= htmlspecialchars($rEnd['ecat_name']) ?></span>
+                            <?php if (!empty($rEnd['mcat_name']) && $category_type !== 'mid-category'): ?>
+                                <small style="opacity:0.75;font-size:10px;">(<?= htmlspecialchars($rEnd['mcat_name']) ?>)</small>
+                            <?php endif; ?>
+                            <span style="font-size:10.5px;opacity:0.8;">(<?= (int)$rEnd['p_count'] ?>)</span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
         </section>
         <?php endif; ?>
 
@@ -1081,17 +1442,25 @@ function renderStarIcons($rating) {
                     <a href="javascript:void(0)" class="sn-clear-btn" onclick="clearAllFilters()">Clear All</a>
                 </div>
 
-                <!-- Category Accordion -->
+                <!-- Category Accordion: Shows ONLY Top Categories, clicking directs directly to top category on desktop and mobile -->
                 <div class="sn-accordion" id="acc-cat">
                     <div class="sn-acc-header" onclick="toggleAccordion('acc-cat')">
                         <span class="sn-acc-title">Categories</span>
                         <i class="fa-solid fa-chevron-up sn-acc-arrow"></i>
                     </div>
                     <div class="sn-acc-body">
-                        <?php foreach ($sidebarCategories as $sbCat): ?>
+                        <?php foreach ($sidebarCategories as $sbCat): 
+                            $isTopSelected = ($activeTopCatId == $sbCat['tcat_id']);
+                        ?>
                             <div class="sn-check-item">
-                                <a href="product-category.php?id=<?= $sbCat['tcat_id'] ?>&type=top-category" style="text-decoration:none; color:inherit; display:flex; justify-content:space-between; width:100%; font-size:13px; padding:4px 0;">
-                                    <span><?= htmlspecialchars($sbCat['tcat_name']) ?></span>
+                                <a href="product-category.php?id=<?= $sbCat['tcat_id'] ?>&type=top-category" 
+                                   class="sn-cat-nav-item <?= $isTopSelected ? 'active' : '' ?>">
+                                    <span style="display:flex;align-items:center;gap:6px;">
+                                        <?php if ($isTopSelected): ?>
+                                            <i class="fa-solid fa-check" style="font-size:11px;color:#fab802;"></i>
+                                        <?php endif; ?>
+                                        <?= htmlspecialchars($sbCat['tcat_name']) ?>
+                                    </span>
                                     <span class="sn-count-tag">(<?= (int)$sbCat['cat_count'] ?>)</span>
                                 </a>
                             </div>

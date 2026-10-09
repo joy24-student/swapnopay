@@ -903,7 +903,8 @@ CREATE TABLE IF NOT EXISTS "tbl_top_category" (
   "tcat_name" VARCHAR(255) NOT NULL,
   "show_on_menu" SMALLINT NOT NULL DEFAULT 0,
   "tcat_order" INTEGER NOT NULL DEFAULT 1,
-  "photo" VARCHAR(255) NOT NULL DEFAULT 'placeholder.svg'
+  "photo" VARCHAR(255) NOT NULL DEFAULT 'placeholder.svg',
+  "banner" TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_transport_bookings" (
@@ -1999,6 +2000,7 @@ ALTER TABLE tbl_settings ADD COLUMN banner_team text NOT NULL DEFAULT '';
 ALTER TABLE tbl_settings ADD COLUMN banner_terms text NOT NULL DEFAULT '';
 ALTER TABLE tbl_product ADD COLUMN slug text UNIQUE;
 ALTER TABLE tbl_top_category ADD COLUMN slug text UNIQUE;
+ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS banner text DEFAULT '';
 ALTER TABLE tbl_mid_category ADD COLUMN slug text UNIQUE;
 ALTER TABLE tbl_end_category ADD COLUMN slug text UNIQUE;
 ALTER TABLE tbl_product_size ADD CONSTRAINT product_size_unique UNIQUE(p_id,size_id);

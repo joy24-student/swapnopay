@@ -428,9 +428,11 @@ if (!function_exists('clearShopCache')) {
             @unlink($dir . '/cache_' . $tk . '_settings.json');
             @unlink($dir . '/cache_settings.json');
         }
-        if ($type === 'menu' || $type === 'all') {
+        if ($type === 'menu' || $type === 'categories' || $type === 'all') {
             @unlink($dir . '/cache_' . $tk . '_menu.json');
             @unlink($dir . '/cache_menu.json');
+            @unlink($dir . '/cache_' . $tk . '_sidebar_cats.json');
+            @unlink($dir . '/cache_sidebar_cats.json');
         }
         if ($type === 'slides' || $type === 'all') {
             @unlink($dir . '/cache_' . $tk . '_slides.json');
@@ -440,7 +442,7 @@ if (!function_exists('clearShopCache')) {
             @unlink($dir . '/cache_' . $tk . '_prod_' . (int)$id . '.json');
             @unlink($dir . '/cache_prod_' . (int)$id . '.json');
         }
-        if ($type === 'products' || $type === 'all') {
+        if ($type === 'products' || $type === 'categories' || $type === 'all') {
             $files = glob($dir . '/cache_' . $tk . '_prod_*.json');
             if ($files) {
                 foreach ($files as $f) {

@@ -1,6 +1,11 @@
 <?php require_once __DIR__ . '/inc/guard.php'; ?>
 <?php require_once('header.php'); ?>
 
+<?php
+try {
+    $pdo->exec("ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS banner TEXT DEFAULT ''");
+} catch (Throwable $e) {}
+?>
 <section class="content-header">
 	<div class="content-header-left">
 		<h1>View Top Level Categories</h1>
@@ -25,6 +30,7 @@
 			    <tr>
 			        <th>#</th>
 			        <th>Photo</th>
+			        <th>Banner</th>
 			        <th>Top Category Name</th>
                     <th>Show on Menu?</th>
 			        <th>Action</th>
@@ -46,6 +52,13 @@
 	                            <img src="../assets/uploads/<?php echo htmlspecialchars($row['photo'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($row['tcat_name'], ENT_QUOTES, 'UTF-8'); ?>" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;">
 	                        <?php else: ?>
 	                            <span class="text-muted" style="font-size:11px;color:#999;">No photo</span>
+	                        <?php endif; ?>
+	                    </td>
+	                    <td style="width:110px;text-align:center;">
+	                        <?php if(!empty($row['banner']) && file_exists('../assets/uploads/'.$row['banner'])): ?>
+	                            <img src="../assets/uploads/<?php echo htmlspecialchars($row['banner'], ENT_QUOTES, 'UTF-8'); ?>" alt="Banner" style="width:90px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;">
+	                        <?php else: ?>
+	                            <span class="text-muted" style="font-size:11px;color:#999;">No banner</span>
 	                        <?php endif; ?>
 	                    </td>
 	                    <td><?php echo htmlspecialchars($row['tcat_name'], ENT_QUOTES, 'UTF-8'); ?></td>

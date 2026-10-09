@@ -2,6 +2,10 @@
 <?php require_once('header.php'); ?>
 
 <?php
+try {
+    $pdo->exec("ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS banner TEXT DEFAULT ''");
+} catch (Throwable $e) {}
+
 if(isset($_POST['form1'])) {
 	$valid = 1;
 
@@ -11,8 +15,8 @@ if(isset($_POST['form1'])) {
     }
 
     // Handle Photo Upload
-    $path = $_FILES['photo']['name'];
-    $path_tmp = $_FILES['photo']['tmp_name'];
+    $path = $_FILES['photo']['name'] ?? '';
+    $path_tmp = $_FILES['photo']['tmp_name'] ?? '';
     $final_name = '';
 
     if($path != '') {
@@ -20,9 +24,25 @@ if(isset($_POST['form1'])) {
         $ext = strtolower($ext);
         if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' && $ext!='webp' ) {
             $valid = 0;
-            $error_message .= 'You must have to upload jpg, jpeg, gif, webp or png file<br>';
+            $error_message .= 'Photo must be a jpg, jpeg, gif, webp or png file<br>';
         } else {
             $final_name = 'tcat-'.time().'.'.$ext;
+        }
+    }
+
+    // Handle Banner Upload
+    $banner_path = $_FILES['banner']['name'] ?? '';
+    $banner_tmp = $_FILES['banner']['tmp_name'] ?? '';
+    $final_banner_name = '';
+
+    if($banner_path != '') {
+        $b_ext = pathinfo( $banner_path, PATHINFO_EXTENSION );
+        $b_ext = strtolower($b_ext);
+        if( $b_ext!='jpg' && $b_ext!='png' && $b_ext!='jpeg' && $b_ext!='gif' && $b_ext!='webp' ) {
+            $valid = 0;
+            $error_message .= 'Banner must be a jpg, jpeg, gif, webp or png file<br>';
+        } else {
+            $final_banner_name = 'tcat-banner-'.time().'.'.$b_ext;
         }
     }
 
@@ -33,12 +53,22 @@ if(isset($_POST['form1'])) {
             $final_name = 'placeholder.svg';
         }
 
+        if($final_banner_name != '') {
+            move_uploaded_file( $banner_tmp, '../assets/uploads/'.$final_banner_name );
+        }
+
         $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(tcat_order), 0) + 1 FROM tbl_top_category")->fetchColumn();
-		$statement = $pdo->prepare("INSERT INTO tbl_top_category (tcat_name,show_on_menu,tcat_order,photo) VALUES (?,?,?,?)");
-		$statement->execute(array($_POST['tcat_name'],(int)($_POST['show_on_menu'] ?? 0),$maxOrder,$final_name));
+		$statement = $pdo->prepare("INSERT INTO tbl_top_category (tcat_name,show_on_menu,tcat_order,photo,banner) VALUES (?,?,?,?,?)");
+		$statement->execute(array($_POST['tcat_name'],(int)($_POST['show_on_menu'] ?? 0),$maxOrder,$final_name,$final_banner_name));
             
     	$success_message = 'Top Category is added successfully.';
-    	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
+    	if (function_exists('clearShopCache')) {
+            clearShopCache('menu');
+            clearShopCache('categories');
+            clearShopCache('products');
+            clearShopCache('all');
+        }
+        unset($_SESSION['sn_sidebar_cats']);
     }
 }
 ?>
@@ -82,6 +112,13 @@ if(isset($_POST['form1'])) {
 							<div class="col-sm-4" style="padding-top:6px;">
 								<input type="file" name="photo">
 								<p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp</p>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="" class="col-sm-2 control-label">Banner Image</label>
+							<div class="col-sm-4" style="padding-top:6px;">
+								<input type="file" name="banner">
+								<p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp (Recommended: 1200x300 or 1200x400)</p>
 							</div>
 						</div>
 						<div class="form-group">

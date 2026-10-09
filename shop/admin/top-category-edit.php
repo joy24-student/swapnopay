@@ -2,6 +2,10 @@
 <?php require_once('header.php'); ?>
 
 <?php
+try {
+    $pdo->exec("ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS banner TEXT DEFAULT ''");
+} catch (Throwable $e) {}
+
 if(isset($_POST['form1'])) {
 	$valid = 1;
 
@@ -27,6 +31,7 @@ if(isset($_POST['form1'])) {
     	}
     }
 
+    // Photo validation
     $path = $_FILES['photo']['name'] ?? '';
     $path_tmp = $_FILES['photo']['tmp_name'] ?? '';
 
@@ -35,29 +40,53 @@ if(isset($_POST['form1'])) {
         $ext = strtolower($ext);
         if( $ext!='jpg' && $ext!='png' && $ext!='jpeg' && $ext!='gif' && $ext!='webp' ) {
             $valid = 0;
-            $error_message .= 'You must have to upload jpg, jpeg, gif, webp or png file<br>';
+            $error_message .= 'Photo must be a jpg, jpeg, gif, webp or png file<br>';
         }
     }
 
-    if($valid == 1) {    	
-        if($path == '') {
-            // updating into the database without changing photo
-            $statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=? WHERE tcat_id=?");
-            $statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$_REQUEST['id']));
-        } else {
-            $current_photo = $_POST['current_photo'] ?? '';
-            if(!empty($current_photo) && file_exists('../assets/uploads/'.$current_photo)) {
-                unlink('../assets/uploads/'.$current_photo);
-            }
-            $final_name = 'tcat-'.$_REQUEST['id'].'-'.time().'.'.$ext;
-            move_uploaded_file( $path_tmp, '../assets/uploads/'.$final_name );
+    // Banner validation
+    $banner_path = $_FILES['banner']['name'] ?? '';
+    $banner_tmp = $_FILES['banner']['tmp_name'] ?? '';
 
-            $statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=?,photo=? WHERE tcat_id=?");
-            $statement->execute(array($_POST['tcat_name'],$_POST['show_on_menu'],$final_name,$_REQUEST['id']));
+    if($banner_path != '') {
+        $b_ext = pathinfo( $banner_path, PATHINFO_EXTENSION );
+        $b_ext = strtolower($b_ext);
+        if( $b_ext!='jpg' && $b_ext!='png' && $b_ext!='jpeg' && $b_ext!='gif' && $b_ext!='webp' ) {
+            $valid = 0;
+            $error_message .= 'Banner must be a jpg, jpeg, gif, webp or png file<br>';
+        }
+    }
+
+    if($valid == 1) {
+        $final_photo = $_POST['current_photo'] ?? '';
+        if($path != '') {
+            if(!empty($final_photo) && $final_photo !== 'placeholder.svg' && file_exists('../assets/uploads/'.$final_photo)) {
+                unlink('../assets/uploads/'.$final_photo);
+            }
+            $final_photo = 'tcat-'.$_REQUEST['id'].'-'.time().'.'.$ext;
+            move_uploaded_file( $path_tmp, '../assets/uploads/'.$final_photo );
         }
 
+        $final_banner = $_POST['current_banner'] ?? '';
+        if($banner_path != '') {
+            if(!empty($final_banner) && file_exists('../assets/uploads/'.$final_banner)) {
+                unlink('../assets/uploads/'.$final_banner);
+            }
+            $final_banner = 'tcat-banner-'.$_REQUEST['id'].'-'.time().'.'.$b_ext;
+            move_uploaded_file( $banner_tmp, '../assets/uploads/'.$final_banner );
+        }
+
+        $statement = $pdo->prepare("UPDATE tbl_top_category SET tcat_name=?,show_on_menu=?,photo=?,banner=? WHERE tcat_id=?");
+        $statement->execute(array($_POST['tcat_name'],(int)$_POST['show_on_menu'],$final_photo,$final_banner,$_REQUEST['id']));
+
     	$success_message = 'Top Category is updated successfully.';
-    	if (function_exists('clearShopCache')) { clearShopCache('menu'); }
+    	if (function_exists('clearShopCache')) {
+            clearShopCache('menu');
+            clearShopCache('categories');
+            clearShopCache('products');
+            clearShopCache('all');
+        }
+        unset($_SESSION['sn_sidebar_cats']);
     }
 }
 ?>
@@ -94,6 +123,7 @@ foreach ($result as $row) {
 	$tcat_name = $row['tcat_name'];
     $show_on_menu = $row['show_on_menu'];
     $photo = $row['photo'] ?? '';
+    $banner = $row['banner'] ?? '';
 }
 ?>
 
@@ -120,6 +150,7 @@ foreach ($result as $row) {
 
         <form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
         <input type="hidden" name="current_photo" value="<?php echo htmlspecialchars($photo, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="current_banner" value="<?php echo htmlspecialchars($banner, ENT_QUOTES, 'UTF-8'); ?>">
 
         <div class="box box-info">
 
@@ -145,6 +176,23 @@ foreach ($result as $row) {
                     <div class="col-sm-6" style="padding-top:6px;">
                         <input type="file" name="photo">
                         <p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">Existing Banner</label>
+                    <div class="col-sm-6" style="padding-top:6px;">
+                        <?php if(!empty($banner) && file_exists('../assets/uploads/'.$banner)): ?>
+                            <img src="../assets/uploads/<?php echo htmlspecialchars($banner, ENT_QUOTES, 'UTF-8'); ?>" alt="Banner" style="max-width:320px;max-height:120px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.15);object-fit:cover;">
+                        <?php else: ?>
+                            <span class="text-muted" style="font-size:12px;color:#888;">No banner uploaded</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">Banner Image</label>
+                    <div class="col-sm-6" style="padding-top:6px;">
+                        <input type="file" name="banner">
+                        <p class="help-block" style="font-size:11px;margin-bottom:0;color:#888;">Allowed: jpg, jpeg, png, gif, webp (Recommended: 1200x300 or 1200x400)</p>
                     </div>
                 </div>
                 <div class="form-group">

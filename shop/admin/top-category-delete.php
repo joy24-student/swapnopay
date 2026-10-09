@@ -3,15 +3,26 @@ require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/inc/catalog-delete.php';
 try {
     $catId = (int)($_REQUEST['id'] ?? $_POST['id'] ?? $_GET['id'] ?? 0);
-    $photoStmt = $pdo->prepare("SELECT photo FROM tbl_top_category WHERE tcat_id=?");
-    $photoStmt->execute([$catId]);
-    $catPhoto = $photoStmt->fetchColumn();
+    $catStmt = $pdo->prepare("SELECT photo, banner FROM tbl_top_category WHERE tcat_id=?");
+    $catStmt->execute([$catId]);
+    $catRow = $catStmt->fetch(PDO::FETCH_ASSOC);
+    $catPhoto = $catRow['photo'] ?? '';
+    $catBanner = $catRow['banner'] ?? '';
 
     deleteStoreCatalogEntry($pdo, 'top-category', $catId);
-    if (function_exists('clearShopCache')) { clearShopCache('menu'); }
+    if (function_exists('clearShopCache')) {
+        clearShopCache('menu');
+        clearShopCache('categories');
+        clearShopCache('products');
+        clearShopCache('all');
+    }
+    unset($_SESSION['sn_sidebar_cats']);
 
-    if(!empty($catPhoto) && file_exists('../assets/uploads/'.$catPhoto)) {
+    if(!empty($catPhoto) && $catPhoto !== 'placeholder.svg' && file_exists('../assets/uploads/'.$catPhoto)) {
         @unlink('../assets/uploads/'.$catPhoto);
+    }
+    if(!empty($catBanner) && file_exists('../assets/uploads/'.$catBanner)) {
+        @unlink('../assets/uploads/'.$catBanner);
     }
     
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
