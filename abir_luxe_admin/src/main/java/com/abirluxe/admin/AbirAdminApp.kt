@@ -1,4 +1,4 @@
-package com.abirluxe.shop
+package com.abirluxe.admin
 
 import android.app.Application
 import android.app.NotificationChannel
@@ -8,12 +8,13 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.webkit.CookieManager
 
-class AbirLuxeApp : Application() {
+class AbirAdminApp : Application() {
 
     companion object {
-        const val CHANNEL_ID_ALERTS = "abir_luxe_store_alerts"
-        const val CHANNEL_ID_CALLS = "abir_luxe_calls_v3"
-        lateinit var instance: AbirLuxeApp
+        const val CHANNEL_ID_ORDERS = "abir_admin_orders"
+        const val CHANNEL_ID_CALLS = "abir_admin_calls_v3"
+        const val CHANNEL_ID_ALERTS = "abir_admin_alerts"
+        lateinit var instance: AbirAdminApp
             private set
     }
 
@@ -26,7 +27,7 @@ class AbirLuxeApp : Application() {
 
         registerLifecycleTracker()
 
-        // 1. Initialize persistent CookieManager to preserve user login sessions
+        // 1. Initialize persistent CookieManager to preserve Admin sessions
         setupPersistentCookies()
 
         // 2. Register High-Priority Notification & Call Channels
@@ -60,7 +61,6 @@ class AbirLuxeApp : Application() {
     private fun setupPersistentCookies() {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        // Flush cookies immediately to ensure no session is lost
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             cookieManager.flush()
         }
@@ -70,27 +70,9 @@ class AbirLuxeApp : Application() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NotificationManager::class.java)
 
-            // Clean up obsolete channels so fresh sound and max importance take effect
-            try { notificationManager.deleteNotificationChannel("abir_luxe_store_calls") } catch (e: Exception) {}
-            try { notificationManager.deleteNotificationChannel("abir_luxe_store_calls_v2") } catch (e: Exception) {}
-
-            // High Priority Channel for Deals, Orders & Admin Alerts
-            val alertChannel = NotificationChannel(
-                CHANNEL_ID_ALERTS,
-                getString(R.string.channel_alerts_name),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = getString(R.string.channel_alerts_desc)
-                enableLights(true)
-                lightColor = getColor(R.color.brand_gold)
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 250, 250)
-                setShowBadge(true)
-            }
-
-            // Urgent Channel for Instant Store Incoming Calls
+            // 1. Urgent Channel for Incoming Customer Support Calls
             val callSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            val audioAttributes = AudioAttributes.Builder()
+            val callAudioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .build()
@@ -105,13 +87,51 @@ class AbirLuxeApp : Application() {
                 lightColor = getColor(R.color.brand_gold)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000, 1000)
-                setSound(callSoundUri, audioAttributes)
+                setSound(callSoundUri, callAudioAttributes)
                 setBypassDnd(true)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
 
-            notificationManager.createNotificationChannel(alertChannel)
+            // 2. High Priority Channel for Realtime New Orders & Sales Alerts
+            val notifSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val notifAudioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build()
+
+            val orderChannel = NotificationChannel(
+                CHANNEL_ID_ORDERS,
+                getString(R.string.channel_orders_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.channel_orders_desc)
+                enableLights(true)
+                lightColor = getColor(R.color.brand_gold)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+                setSound(notifSoundUri, notifAudioAttributes)
+                setShowBadge(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+
+            // 3. Admin Alerts & Inquiries Channel
+            val alertChannel = NotificationChannel(
+                CHANNEL_ID_ALERTS,
+                getString(R.string.channel_alerts_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.channel_alerts_desc)
+                enableLights(true)
+                lightColor = getColor(R.color.brand_gold)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 200, 200, 200)
+                setShowBadge(true)
+            }
+
             notificationManager.createNotificationChannel(callChannel)
+            notificationManager.createNotificationChannel(orderChannel)
+            notificationManager.createNotificationChannel(alertChannel)
         }
     }
 }
+

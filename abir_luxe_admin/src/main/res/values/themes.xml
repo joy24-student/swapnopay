@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Application Theme -->
+    <style name="Theme.AbirLuxe" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Primary Brand Colors -->
+        <item name="colorPrimary">@color/brand_gold</item>
+        <item name="colorPrimaryVariant">@color/brand_gold_dark</item>
+        <item name="colorOnPrimary">@color/brand_black</item>
+        <item name="colorSecondary">@color/brand_gold</item>
+        <item name="colorSecondaryVariant">@color/brand_gold_dark</item>
+        <item name="colorOnSecondary">@color/brand_white</item>
+        
+        <!-- Window Chrome -->
+        <item name="android:statusBarColor">@color/brand_white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/brand_white</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/brand_white</item>
+    </style>
+
+    <!-- Pure White Splash Screen Theme -->
+    <style name="Theme.AbirLuxe.Splash" parent="Theme.AbirLuxe">
+        <item name="android:windowBackground">@color/bg_splash</item>
+        <item name="android:statusBarColor">@color/bg_splash</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/bg_splash</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- Full-Screen Incoming Luxury Call Theme -->
+    <style name="Theme.AbirLuxe.Call" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/brand_gold</item>
+        <item name="android:windowBackground">@color/bg_call</item>
+        <item name="android:statusBarColor">@color/bg_call</item>
+        <item name="android:navigationBarColor">@color/bg_call</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:showWhenLocked">true</item>
+        <item name="android:turnScreenOn">true</item>
+    </style>
+</resources>

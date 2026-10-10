@@ -209,9 +209,28 @@ switch ($action) {
         $pdo->prepare("UPDATE tbl_shop_chat_threads SET unread_admin = unread_admin + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             ->execute([$thread['id']]);
 
-        // If in live mode, trigger email alert if admin is away
+        // If in live mode, trigger email alert and mobile push if admin is away
         if ($thread['mode'] === 'live') {
             notify_admin_live_message($pdo, $thread, $message ?: '[Attachment sent]');
+            try {
+                require_once __DIR__ . '/admin/inc/notifications.php';
+                $custTitle = !empty($thread['customer_name']) ? $thread['customer_name'] : 'Customer #' . $thread['id'];
+                $chatUrl = (defined('BASE_URL') ? BASE_URL : '') . 'admin/live-chat.php';
+                sendAdminPushNotification(
+                    $pdo,
+                    '💬 ' . $custTitle,
+                    mb_substr($message ?: 'Sent an attachment', 0, 100),
+                    $chatUrl,
+                    [
+                        'type' => 'chat',
+                        'action' => 'chat',
+                        'thread_id' => (string)$thread['id'],
+                        'customer_name' => $custTitle,
+                        'url' => $chatUrl,
+                        'target_url' => $chatUrl
+                    ]
+                );
+            } catch (Throwable $e) {}
         }
 
         echo json_encode([
@@ -382,9 +401,44 @@ switch ($action) {
                 try {
                     require_once __DIR__ . '/admin/inc/notifications.php';
                     $mId = defined('MERCHANT_ID') && MERCHANT_ID ? MERCHANT_ID : 'local-merchant-001';
-                    $stmtTokens = $pdo->prepare("SELECT fcm_token FROM tbl_fcm_tokens WHERE merchant_id = ?");
-                    $stmtTokens->execute([$mId]);
-                    $devTokens = $stmtTokens->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+                    // Find customer info associated with this chat thread
+                    $thStmt = $pdo->prepare("SELECT customer_name, customer_email, customer_phone FROM tbl_shop_chat_threads WHERE id = ?");
+                    $thStmt->execute([$threadId]);
+                    $thData = $thStmt->fetch(PDO::FETCH_ASSOC);
+
+                    $targetCustId = null;
+                    if (!empty($thData['customer_email'])) {
+                        $cStmt = $pdo->prepare("SELECT cust_id FROM tbl_customer WHERE cust_email = ? LIMIT 1");
+                        $cStmt->execute([$thData['customer_email']]);
+                        $targetCustId = $cStmt->fetchColumn() ?: null;
+                    }
+                    if (!$targetCustId && !empty($thData['customer_phone'])) {
+                        $cStmt = $pdo->prepare("SELECT cust_id FROM tbl_customer WHERE cust_phone = ? LIMIT 1");
+                        $cStmt->execute([$thData['customer_phone']]);
+                        $targetCustId = $cStmt->fetchColumn() ?: null;
+                    }
+
+                    $devTokens = [];
+                    if ($targetCustId) {
+                        $stmtTokens = $pdo->prepare("
+                            SELECT DISTINCT fcm_token FROM tbl_fcm_tokens 
+                            WHERE merchant_id = ? AND customer_id = ? AND device_type NOT IN ('admin_android', 'admin')
+                        ");
+                        $stmtTokens->execute([$mId, $targetCustId]);
+                        $devTokens = $stmtTokens->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    }
+
+                    // Fallback to customer-only devices (strictly NEVER include admin devices)
+                    if (empty($devTokens)) {
+                        $stmtTokens = $pdo->prepare("
+                            SELECT DISTINCT fcm_token FROM tbl_fcm_tokens 
+                            WHERE merchant_id = ? AND device_type NOT IN ('admin_android', 'admin')
+                            ORDER BY updated_at DESC LIMIT 5
+                        ");
+                        $stmtTokens->execute([$mId]);
+                        $devTokens = $stmtTokens->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    }
 
                     if (!empty($devTokens)) {
                         $callLabel = ($callType === 'video') ? 'Video Call' : 'Voice Call';
@@ -413,12 +467,109 @@ switch ($action) {
                 } catch (Throwable $e) {
                     error_log("FCM call push error in live_chat_api: " . $e->getMessage());
                 }
+            } else if ($sender === 'customer') {
+                try {
+                    require_once __DIR__ . '/admin/inc/notifications.php';
+                    $callLabel = ($callType === 'video') ? 'Video Call' : 'Voice Call';
+                    $storeBaseUrl = defined('BASE_URL') ? BASE_URL : '/';
+                    $adminCallUrl = rtrim($storeBaseUrl, '/') . '/admin/live-chat.php?thread_id=' . $threadId . '&auto_answer=1';
+
+                    $custStmt = $pdo->prepare("SELECT customer_name, customer_email, customer_phone FROM tbl_shop_chat_threads WHERE id = ?");
+                    $custStmt->execute([$threadId]);
+                    $threadRow = $custStmt->fetch(PDO::FETCH_ASSOC);
+                    $callerName = !empty($threadRow['customer_name']) ? $threadRow['customer_name'] : 'Customer #' . $threadId;
+
+                    sendAdminPushNotification(
+                        $pdo,
+                        $callerName . ' (' . $callLabel . ')',
+                        'Customer requested live support consultation',
+                        $adminCallUrl,
+                        [
+                            'type' => 'call',
+                            'action' => 'call',
+                            'incoming_call' => 'true',
+                            'call_type' => $callType,
+                            'thread_id' => (string)$threadId,
+                            'caller_name' => $callerName,
+                            'call_note' => 'Customer requested live ' . $callLabel,
+                            'url' => $adminCallUrl,
+                            'target_url' => $adminCallUrl
+                        ]
+                    );
+                } catch (Throwable $e) {
+                    error_log("FCM admin call push error in live_chat_api: " . $e->getMessage());
+                }
             }
         } else if ($type === 'answer') {
             $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'in_call' WHERE id = ?")
                 ->execute([$threadId]);
         } else if ($type === 'call_end') {
-            $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'idle', active_call_type = 'none' WHERE id = ?")
+            // Retrieve previous call status & details to log accurately
+            $thStmt = $pdo->prepare("SELECT call_status, active_call_type, customer_name FROM tbl_shop_chat_threads WHERE id = ?");
+            $thStmt->execute([$threadId]);
+            $thRow = $thStmt->fetch(PDO::FETCH_ASSOC);
+            $prevStatus = $thRow['call_status'] ?? 'idle';
+            $actualCallType = (!empty($thRow['active_call_type']) && $thRow['active_call_type'] !== 'none') ? $thRow['active_call_type'] : $callType;
+            $isVoice = ($actualCallType === 'audio');
+            $callTypeLabel = $isVoice ? 'Voice Call' : 'Video Call';
+            $callIcon = $isVoice ? '📞' : '📹';
+
+            // Parse payload for duration, decline, or cancel state
+            $durationStr = '';
+            $isDeclined = false;
+            $isCancelled = false;
+
+            if (!empty($payload)) {
+                $payloadData = @json_decode($payload, true);
+                if (is_array($payloadData)) {
+                    if (!empty($payloadData['duration'])) {
+                        $durationStr = trim($payloadData['duration']);
+                    }
+                    if (!empty($payloadData['status']) && $payloadData['status'] === 'declined') {
+                        $isDeclined = true;
+                    }
+                    if (!empty($payloadData['status']) && $payloadData['status'] === 'cancelled') {
+                        $isCancelled = true;
+                    }
+                } else {
+                    $pStr = strtolower(trim($payload));
+                    if ($pStr === 'declined') {
+                        $isDeclined = true;
+                    } else if ($pStr === 'cancelled') {
+                        $isCancelled = true;
+                    } else if (strpos($pStr, 'ended:') === 0) {
+                        $durationStr = substr($pStr, 6);
+                    }
+                }
+            }
+
+            // Construct WhatsApp-style system call log message
+            if (!empty($durationStr) && $durationStr !== '00:00') {
+                $callLogText = "{$callIcon} {$callTypeLabel} ended • {$durationStr}";
+            } else if ($isDeclined) {
+                $callLogText = "🚫 {$callTypeLabel} declined";
+            } else if ($prevStatus === 'ringing' || $isCancelled) {
+                if ($sender === 'customer') {
+                    $callLogText = "📵 Missed {$callTypeLabel}";
+                } else {
+                    $callLogText = "{$callIcon} Outgoing {$callTypeLabel} • No answer";
+                }
+            } else {
+                $callLogText = "{$callIcon} {$callTypeLabel} ended";
+            }
+
+            // Insert system message into chat messages table
+            try {
+                $msgStmt = $pdo->prepare("
+                    INSERT INTO tbl_shop_chat_messages (thread_id, sender_type, message)
+                    VALUES (?, 'system', ?)
+                ");
+                $msgStmt->execute([$threadId, $callLogText]);
+            } catch (Throwable $e) {
+                error_log("Failed to insert call log message: " . $e->getMessage());
+            }
+
+            $pdo->prepare("UPDATE tbl_shop_chat_threads SET call_status = 'idle', active_call_type = 'none', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                 ->execute([$threadId]);
             $pdo->prepare("DELETE FROM tbl_shop_chat_signals WHERE thread_id = ?")->execute([$threadId]);
         }
@@ -433,13 +584,63 @@ switch ($action) {
         exit;
     }
 
+    case 'get_call_status': {
+        $threadId = !empty($_GET['thread_id']) ? (int)$_GET['thread_id'] : (!empty($_POST['thread_id']) ? (int)$_POST['thread_id'] : 0);
+        $thread = null;
+
+        if ($threadId > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_threads WHERE id = ?");
+            $stmt->execute([$threadId]);
+            $thread = $stmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            // Find any thread with an active or ringing call
+            $stmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_threads WHERE call_status IN ('ringing', 'in_call') ORDER BY updated_at DESC LIMIT 1");
+            $stmt->execute();
+            $thread = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$thread) {
+            echo json_encode(['status' => 'success', 'has_call' => false]);
+            exit;
+        }
+
+        $hasCall = in_array($thread['call_status'], ['ringing', 'in_call']);
+        $offerPayload = null;
+
+        if ($hasCall) {
+            // Retrieve latest offer signal for this thread (from whoever initiated the call)
+            $sigStmt = $pdo->prepare("
+                SELECT payload FROM tbl_shop_chat_signals 
+                WHERE thread_id = ? AND signal_type = 'offer' 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $sigStmt->execute([$thread['id']]);
+            $sig = $sigStmt->fetch(PDO::FETCH_ASSOC);
+            if ($sig) {
+                $offerPayload = $sig['payload'];
+            }
+        }
+
+        echo json_encode([
+            'status' => 'success',
+            'has_call' => $hasCall,
+            'thread_id' => (int)$thread['id'],
+            'call_status' => $thread['call_status'],
+            'call_type' => $thread['active_call_type'] ?: 'audio',
+            'customer_name' => $thread['customer_name'] ?: 'Customer #' . $thread['id'],
+            'customer_phone' => $thread['customer_phone'] ?: '',
+            'offer' => $offerPayload
+        ]);
+        exit;
+    }
+
     case 'fetch_signals': {
         $receiver = $_GET['receiver'] ?? 'customer'; // 'customer' or 'admin'
         $threadId = (int)($_GET['thread_id'] ?? 0);
 
-        // Auto-purge stale signals older than 60 seconds
+        // Auto-purge stale signals older than 90 seconds
         try {
-            $pdo->exec("DELETE FROM tbl_shop_chat_signals WHERE created_at < NOW() - INTERVAL '60 seconds'");
+            $pdo->exec("DELETE FROM tbl_shop_chat_signals WHERE created_at < NOW() - INTERVAL '90 seconds'");
         } catch (Throwable $e) {}
 
         if ($receiver === 'admin') {
@@ -478,12 +679,38 @@ switch ($action) {
                 if (!empty($threadSignals)) {
                     $signals = array_merge($signals, $threadSignals);
                 }
+
+                // If ringing, ensure offer is present even if previously marked processed
+                $thCheck = $pdo->prepare("SELECT call_status FROM tbl_shop_chat_threads WHERE id = ?");
+                $thCheck->execute([$threadId]);
+                $thRow = $thCheck->fetch(PDO::FETCH_ASSOC);
+                if ($thRow && $thRow['call_status'] === 'ringing') {
+                    $hasOffer = false;
+                    foreach ($signals as $s) {
+                        if ($s['signal_type'] === 'offer') { $hasOffer = true; break; }
+                    }
+                    if (!$hasOffer) {
+                        $offStmt = $pdo->prepare("
+                            SELECT s.*, t.customer_name, t.customer_phone 
+                            FROM tbl_shop_chat_signals s 
+                            JOIN tbl_shop_chat_threads t ON t.id = s.thread_id
+                            WHERE s.thread_id = ? AND s.sender = 'customer' AND s.signal_type = 'offer' 
+                            ORDER BY s.id DESC LIMIT 1
+                        ");
+                        $offStmt->execute([$threadId]);
+                        $offRow = $offStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($offRow) {
+                            $signals[] = $offRow;
+                        }
+                    }
+                }
             }
 
             if (!empty($signals)) {
                 $ids = array_column($signals, 'id');
                 $inClause = implode(',', array_map('intval', $ids));
-                $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause)");
+                // Only mark processed for candidate and answer signals; keep offer/call_start active while ringing
+                $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause) AND signal_type NOT IN ('call_start', 'offer')");
             }
 
             echo json_encode(['status' => 'success', 'signals' => $signals]);
@@ -505,10 +732,40 @@ switch ($action) {
         $stmt->execute([$threadId]);
         $signals = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // If thread is currently ringing, ensure call_start and offer are provided even if polled earlier!
+        $thCheck = $pdo->prepare("SELECT call_status FROM tbl_shop_chat_threads WHERE id = ?");
+        $thCheck->execute([$threadId]);
+        $thRow = $thCheck->fetch(PDO::FETCH_ASSOC);
+        if ($thRow && $thRow['call_status'] === 'ringing') {
+            $hasCallStart = false;
+            $hasOffer = false;
+            foreach ($signals as $s) {
+                if ($s['signal_type'] === 'call_start') $hasCallStart = true;
+                if ($s['signal_type'] === 'offer') $hasOffer = true;
+            }
+            if (!$hasCallStart) {
+                $csStmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_signals WHERE thread_id = ? AND sender = 'admin' AND signal_type = 'call_start' ORDER BY id DESC LIMIT 1");
+                $csStmt->execute([$threadId]);
+                $csRow = $csStmt->fetch(PDO::FETCH_ASSOC);
+                if ($csRow) {
+                    array_unshift($signals, $csRow);
+                }
+            }
+            if (!$hasOffer) {
+                $offStmt = $pdo->prepare("SELECT * FROM tbl_shop_chat_signals WHERE thread_id = ? AND sender = 'admin' AND signal_type = 'offer' ORDER BY id DESC LIMIT 1");
+                $offStmt->execute([$threadId]);
+                $offRow = $offStmt->fetch(PDO::FETCH_ASSOC);
+                if ($offRow) {
+                    $signals[] = $offRow;
+                }
+            }
+        }
+
         if (!empty($signals)) {
             $ids = array_column($signals, 'id');
             $inClause = implode(',', array_map('intval', $ids));
-            $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause)");
+            // Mark candidate/answer as processed; keep offer/call_start active while ringing so reload can auto-answer
+            $pdo->exec("UPDATE tbl_shop_chat_signals SET processed = 1 WHERE id IN ($inClause) AND signal_type NOT IN ('call_start', 'offer')");
         }
 
         echo json_encode(['status' => 'success', 'signals' => $signals]);

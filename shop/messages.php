@@ -672,13 +672,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 // Auto-answer incoming call if opened via call answer action
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('auto_answer') === '1') {
-                    setTimeout(async () => {
-                        await pollWebRtcSignals();
-                        const modal = document.getElementById('incomingCallModal');
-                        if (modal && !modal.classList.contains('hidden')) {
-                            acceptIncomingCall();
-                        }
-                    }, 500);
+                    setTimeout(() => {
+                        handleAutoAnswerFlowCustomer();
+                    }, 400);
                 }
 
                 // Auto-forward product link if inquiring from product page
@@ -1271,9 +1267,24 @@ if (!empty($_SESSION['cart_p_qty'])) {
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' },
-            { urls: 'stun:stun.cloudflare.com:3478' }
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            {
+                urls: [
+                    'turn:80.225.247.237:3478?transport=udp',
+                    'turn:80.225.247.237:3478?transport=tcp'
+                ],
+                username: 'swapno',
+                credential: 'SwapnoWebRtcTurn2026!'
+            },
+            {
+                urls: [
+                    'turn:openrelay.metered.ca:80',
+                    'turn:openrelay.metered.ca:443',
+                    'turn:openrelay.metered.ca:443?transport=tcp'
+                ],
+                username: 'openrelay',
+                credential: 'openrelay'
+            }
         ],
         iceCandidatePoolSize: 10
     };
@@ -1596,6 +1607,31 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 console.warn('[WebRTC Cust] Candidate add error:', e);
             }
         }
+    async function handleAutoAnswerFlowCustomer() {
+        console.log('[WebRTC Cust] Auto-answering incoming call...');
+        unlockCustAudioPlayback();
+        try {
+            const threadParam = (currentThread && currentThread.id) ? `&thread_id=${currentThread.id}` : '';
+            const res = await fetch(`live_chat_api.php?action=get_call_status${threadParam}`);
+            const data = await res.json();
+            if (data.status === 'success' && data.has_call) {
+                currentCallType = data.call_type || 'audio';
+                if (data.offer) {
+                    pendingOfferSignal = data.offer;
+                }
+                await acceptIncomingCall();
+                return;
+            }
+        } catch (e) {
+            console.warn('[WebRTC Cust] Auto-answer check error:', e);
+        }
+
+        // Fallback: poll signals and answer if incoming modal opened
+        await pollWebRtcSignals();
+        const modal = document.getElementById('incomingCallModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            await acceptIncomingCall();
+        }
     }
 
     async function acceptIncomingCall() {
@@ -1672,6 +1708,17 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 }
             };
 
+            if (!pendingOfferSignal) {
+                try {
+                    const threadParam = (currentThread && currentThread.id) ? `&thread_id=${currentThread.id}` : '';
+                    const qRes = await fetch(`live_chat_api.php?action=get_call_status${threadParam}`);
+                    const qData = await qRes.json();
+                    if (qData.status === 'success' && qData.offer) {
+                        pendingOfferSignal = qData.offer;
+                    }
+                } catch (e) {}
+            }
+
             if (pendingOfferSignal) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingOfferSignal)));
                 const answer = await peerConnection.createAnswer({
@@ -1681,6 +1728,9 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 await peerConnection.setLocalDescription(answer);
                 sendSignal('answer', JSON.stringify(answer), currentCallType);
                 await drainQueuedCandidates(peerConnection);
+            } else {
+                console.log('[WebRTC Cust] Waiting for remote offer signal...');
+                startFastSignalPolling();
             }
 
         } catch (e) {
@@ -1698,9 +1748,10 @@ if (!empty($_SESSION['cart_p_qty'])) {
             incomingModal.classList.add('hidden');
             incomingModal.classList.remove('flex');
         }
-        sendSignal('call_end', '', currentCallType);
+        sendSignal('call_end', JSON.stringify({ status: 'declined' }), currentCallType);
         pendingOfferSignal = null;
         queuedCandidates = [];
+        setTimeout(initChatState, 800);
     }
 
     async function sendSignal(type, payload, callType) {
@@ -1746,9 +1797,21 @@ if (!empty($_SESSION['cart_p_qty'])) {
         stopCallRingtone();
         stopFastSignalPolling();
 
-        if (notifyPeer) {
-            sendSignal('call_end', '', currentCallType);
+        let callPayload = '';
+        if (callStartTime) {
+            const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            callPayload = JSON.stringify({ status: 'ended', duration: `${mins}:${secs}`, elapsed: elapsed });
+        } else {
+            callPayload = JSON.stringify({ status: 'cancelled' });
         }
+
+        if (notifyPeer) {
+            sendSignal('call_end', callPayload, currentCallType);
+        }
+
+        callStartTime = null;
 
         if (callTimerInterval) {
             clearInterval(callTimerInterval);

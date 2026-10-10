@@ -1,4 +1,4 @@
-package com.abirluxe.shop
+package com.abirluxe.admin
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -32,8 +32,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.abirluxe.shop.bridge.AndroidBridge
-import com.abirluxe.shop.utils.NetworkUtils
+import com.abirluxe.admin.bridge.AndroidBridge
+import com.abirluxe.admin.utils.NetworkUtils
 
 class MainActivity : AppCompatActivity() {
 
@@ -104,7 +104,7 @@ class MainActivity : AppCompatActivity() {
         setupBackNavigation()
         monitorNetworkChanges()
 
-        // Check and prompt for incoming call permissions (Display Over Other Apps & Full Screen Intent)
+        // Check & prompt for instant call overlay permissions
         Handler(Looper.getMainLooper()).postDelayed({
             checkCallPermissions()
         }, 1200)
@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             nm.cancel(9999)
         }
 
-        // Load initial target URL or base store URL
+        // Load initial target URL or base admin URL
         val initialUrl = intent?.getStringExtra("target_url")
         loadStoreUrl(if (!initialUrl.isNullOrBlank()) initialUrl else storeBaseUrl)
     }
@@ -134,7 +134,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupWebView() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true       // Critical: Preserves login sessions and token storage
+        settings.domStorageEnabled = true       // Preserves Admin login sessions & localStorage
+        @Suppress("DEPRECATION")
         settings.databaseEnabled = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.allowFileAccess = true
@@ -145,15 +146,12 @@ class MainActivity : AppCompatActivity() {
         settings.displayZoomControls = false
         settings.mediaPlaybackRequiresUserGesture = false
 
-        // Configure persistent cookies across sessions
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        // Inject Native JavaScript Bridge
         webView.addJavascriptInterface(AndroidBridge(this), "AndroidBridge")
 
-        // Setup WebViewClient
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
@@ -170,15 +168,14 @@ class MainActivity : AppCompatActivity() {
                     showWebStoreView()
                 }
 
-                // Flush cookies to persistent disk storage
                 CookieManager.getInstance().flush()
 
                 // Notify web app with native FCM token if available
-                val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("abir_admin_prefs", Context.MODE_PRIVATE)
                 val token = prefs.getString("fcm_token", "")
                 if (!token.isNullOrBlank()) {
                     view?.evaluateJavascript(
-                        "if(window.ShopNotifications && typeof window.ShopNotifications.saveTokenToServer === 'function'){ window.ShopNotifications.saveTokenToServer('$token', 'android'); } else if(typeof window.onNativeFcmTokenReceived === 'function'){ window.onNativeFcmTokenReceived('$token'); }",
+                        "if(window.ShopNotifications && typeof window.ShopNotifications.saveTokenToServer === 'function'){ window.ShopNotifications.saveTokenToServer('$token', 'admin_android'); } else if(typeof window.onNativeFcmTokenReceived === 'function'){ window.onNativeFcmTokenReceived('$token'); }",
                         null
                     )
                 } else {
@@ -187,7 +184,7 @@ class MainActivity : AppCompatActivity() {
                             if (task.isSuccessful && !task.result.isNullOrBlank()) {
                                 val freshToken = task.result
                                 prefs.edit().putString("fcm_token", freshToken).apply()
-                                com.abirluxe.shop.fcm.AbirFirebaseMessagingService.sendTokenToBackend(applicationContext, freshToken)
+                                com.abirluxe.admin.fcm.AbirAdminFirebaseMessagingService.sendTokenToBackend(applicationContext, freshToken)
                             }
                         }
                     } catch (e: Exception) {
@@ -202,7 +199,6 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError?
             ) {
                 super.onReceivedError(view, request, error)
-                // Intercept main frame network loading failures and switch to animated offline view
                 if (request?.isForMainFrame == true) {
                     showAnimatedOfflineView()
                 }
@@ -214,7 +210,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Setup WebChromeClient
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
@@ -328,39 +323,55 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupOfflineView() {
         btnRetryOffline.setOnClickListener {
-            btnRetryOffline.text = ""
-            progressOfflineRetry.visibility = View.VISIBLE
-
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (NetworkUtils.isNetworkAvailable(this@MainActivity)) {
-                    showWebStoreView()
-                    webView.reload()
-                } else {
-                    btnRetryOffline.text = getString(R.string.btn_retry)
-                    progressOfflineRetry.visibility = View.GONE
-                    Toast.makeText(this@MainActivity, getString(R.string.offline_title), Toast.LENGTH_SHORT).show()
-                }
-            }, 600)
+            triggerManualRetry()
         }
     }
 
-    private fun showAnimatedOfflineView() {
-        isOfflineState = true
-        webView.visibility = View.GONE
-        layoutOffline.visibility = View.VISIBLE
-        btnRetryOffline.text = getString(R.string.btn_retry)
-        progressOfflineRetry.visibility = View.GONE
+    private fun triggerManualRetry() {
+        btnRetryOffline.text = getString(R.string.checking_connection)
+        progressOfflineRetry.visibility = View.VISIBLE
+        btnRetryOffline.isEnabled = false
 
-        // Start luxury radar pulse ripple animation
-        val rippleAnim = AnimationUtils.loadAnimation(this, R.anim.ripple_ring)
-        viewOfflineRipple.startAnimation(rippleAnim)
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (NetworkUtils.isNetworkAvailable(this)) {
+                showWebStoreView()
+                webView.reload()
+            } else {
+                btnRetryOffline.text = getString(R.string.btn_retry)
+                progressOfflineRetry.visibility = View.GONE
+                btnRetryOffline.isEnabled = true
+                Toast.makeText(this, "Connection still unavailable", Toast.LENGTH_SHORT).show()
+            }
+        }, 1200)
+    }
+
+    private fun showAnimatedOfflineView() {
+        if (isOfflineState) return
+        isOfflineState = true
+
+        runOnUiThread {
+            webView.visibility = View.GONE
+            layoutOffline.visibility = View.VISIBLE
+            swipeRefreshLayout.isRefreshing = false
+
+            val pulseAnim = AnimationUtils.loadAnimation(this, R.anim.pulse)
+            viewOfflineRipple.startAnimation(pulseAnim)
+
+            btnRetryOffline.text = getString(R.string.btn_retry)
+            progressOfflineRetry.visibility = View.GONE
+            btnRetryOffline.isEnabled = true
+        }
     }
 
     private fun showWebStoreView() {
+        if (!isOfflineState && webView.visibility == View.VISIBLE) return
         isOfflineState = false
-        viewOfflineRipple.clearAnimation()
-        layoutOffline.visibility = View.GONE
-        webView.visibility = View.VISIBLE
+
+        runOnUiThread {
+            viewOfflineRipple.clearAnimation()
+            layoutOffline.visibility = View.GONE
+            webView.visibility = View.VISIBLE
+        }
     }
 
     private fun loadStoreUrl(url: String) {
@@ -383,11 +394,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             },
-            onLost = {
-                runOnUiThread {
-                    // Only switch if web page isn't already fully active or user tries to navigate
-                }
-            }
+            onLost = {}
         )
     }
 
@@ -424,8 +431,17 @@ class MainActivity : AppCompatActivity() {
             nm.cancel(9999)
         }
         val targetUrl = intent?.getStringExtra("target_url")
+        val threadId = intent?.getStringExtra("thread_id") ?: ""
         if (!targetUrl.isNullOrBlank()) {
-            loadStoreUrl(targetUrl)
+            val currentWebUrl = webView.url ?: ""
+            if (currentWebUrl.contains("admin/live-chat.php") && targetUrl.contains("auto_answer=1")) {
+                webView.evaluateJavascript(
+                    "if(typeof handleAutoAnswerFlow === 'function'){ handleAutoAnswerFlow('$threadId'); } else { window.location.href = '$targetUrl'; }",
+                    null
+                )
+            } else {
+                loadStoreUrl(targetUrl)
+            }
         }
     }
 
@@ -437,7 +453,6 @@ class MainActivity : AppCompatActivity() {
     private fun checkCallPermissions() {
         if (isFinishing || isDestroyed) return
 
-        // 1. Check and request runtime permissions (Notifications, Microphone, Camera)
         val missingPermissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -462,13 +477,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
-            val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("abir_admin_prefs", Context.MODE_PRIVATE)
             val sessionPrompted = prefs.getBoolean("overlay_session_prompted", false)
             if (!sessionPrompted) {
                 prefs.edit().putBoolean("overlay_session_prompted", true).apply()
                 androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("📞 Enable Instant Call Screen")
-                    .setMessage("To allow store calls to ring and appear directly on your home screen and lock screen (just like WhatsApp), please enable 'Display over other apps'.")
+                    .setMessage("To allow customer support calls to ring and appear directly on your home screen and lock screen (just like WhatsApp), please enable 'Display over other apps'.")
                     .setCancelable(true)
                     .setPositiveButton("Enable Now") { _, _ ->
                         try {
@@ -505,3 +520,4 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
+

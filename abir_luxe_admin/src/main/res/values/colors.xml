@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Luxury Palette -->
+    <color name="brand_gold">#D4AF37</color>
+    <color name="brand_gold_dark">#B8860B</color>
+    <color name="brand_gold_light">#FFF9E6</color>
+    <color name="brand_gold_ripple">#33D4AF37</color>
+    
+    <color name="brand_black">#0F172A</color>
+    <color name="brand_dark_card">#1E293B</color>
+    <color name="brand_white">#FFFFFF</color>
+    
+    <!-- Splash & Background -->
+    <color name="bg_splash">#FFFFFF</color>
+    <color name="bg_main">#F8FAFC</color>
+    <color name="bg_offline">#FFFFFF</color>
+    
+    <!-- Incoming Call UI -->
+    <color name="bg_call">#0A0F1D</color>
+    <color name="call_accept">#10B981</color>
+    <color name="call_accept_ripple">#3310B981</color>
+    <color name="call_decline">#EF4444</color>
+    <color name="call_decline_ripple">#33EF4444</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_muted">#94A3B8</color>
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_call_sub">#94A3B8</color>
+    
+    <!-- Progress Bar & Dividers -->
+    <color name="progress_bar">#D4AF37</color>
+    <color name="divider">#E2E8F0</color>
+</resources>

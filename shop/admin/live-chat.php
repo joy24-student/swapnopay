@@ -9,6 +9,9 @@ $adminAvatarUrl = (!empty($_SESSION['user']['photo']) && file_exists(__DIR__ . '
 <link rel="stylesheet" href="css/live-chat-mobile.css?v=<?php echo time(); ?>">
 <script>
     document.body.classList.add('live-chat-page-body');
+    <?php if (!empty($_GET['thread_id'])): ?>
+    document.body.classList.add('mobile-chat-active');
+    <?php endif; ?>
 </script>
 
 <style>
@@ -129,6 +132,38 @@ body.live-chat-page-body.sidebar-collapse .content-wrapper {
         padding: 0 !important;
         padding-top: 0 !important;
         padding-bottom: 0 !important;
+    }
+
+    /* Active Conversation on Mobile: Remove top blank space completely */
+    body.live-chat-page-body.mobile-chat-active .main-header {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+    body.live-chat-page-body.mobile-chat-active .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active:not(.sidebar-collapse) .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active.sidebar-collapse .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active .content {
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        height: 100dvh !important;
+        height: 100vh !important;
+        height: 100% !important;
+        max-height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
     }
 }
 
@@ -865,47 +900,82 @@ img.sup-agent-avatar,
     border-color: #a7f3d0;
 }
 
-/* WhatsApp Message Input Bar */
+/* WhatsApp Message Input Bar (Universal & Pinned) */
 .wa-input-bar {
-    min-height: 56px;
-    background: #f0f2f5;
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
+    min-height: 54px;
+    background: #ffffff !important;
+    border-top: 1px solid #e2e8f0 !important;
+    padding: 8px 14px 10px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    z-index: 30 !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+.wa-clip-btn,
+.wa-icon-btn {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #64748b !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+    transition: all 0.15s ease !important;
+    flex-shrink: 0 !important;
+}
+.wa-clip-btn:hover,
+.wa-icon-btn:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
 }
 .wa-input-field {
-    flex: 1;
-    height: 40px;
-    border-radius: 8px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 10px 14px;
-    font-size: 14px;
-    color: #111b21;
-    outline: none;
+    flex: 1 !important;
+    height: 42px !important;
+    border-radius: 999px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 0 16px !important;
+    font-size: 14px !important;
+    color: #0f172a !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+    transition: border-color 0.15s ease, background 0.15s ease !important;
+}
+.wa-input-field:focus {
+    border-color: #fedb65 !important;
+    background: #ffffff !important;
 }
 .wa-input-field::placeholder {
-    color: #667781;
+    color: #94a3b8 !important;
 }
 .wa-send-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #00a884;
-    color: #ffffff;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 15px;
-    transition: background 0.15s ease;
-    flex-shrink: 0;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    background: #fedb65 !important;
+    color: #0f172a !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+    transition: transform 0.1s ease, box-shadow 0.15s ease !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 2px 8px rgba(254, 219, 101, 0.4) !important;
 }
-.wa-send-btn:hover {
-    background: #008f6f;
+.wa-send-btn:active {
+    transform: scale(0.92) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -1249,9 +1319,9 @@ img.sup-agent-avatar,
                     <!-- Rendered dynamically -->
                 </div>
 
-                <!-- Desktop Canned Responses / Quick Reply Toolbar (Desktop Only) -->
-                <div class="wa-quick-bar wa-scroll hidden-xs">
-                    <span style="font-size: 11px; font-weight: 700; color: #667781; margin-right: 4px;">QUICK:</span>
+                <!-- Quick Replies Toolbar (Always responsive, desktop and mobile) -->
+                <div class="wa-quick-bar wa-scroll" id="adminQuickBar">
+                    <span style="font-size: 11px; font-weight: 700; color: #667781; margin-right: 4px; flex-shrink: 0;">QUICK:</span>
                     <button type="button" onclick="insertQuickReply('Hello! How can I assist you with your order today?')" class="wa-canned-chip">👋 Greeting</button>
                     <button type="button" onclick="insertQuickReply('Let me check your order and shipping status right away.')" class="wa-canned-chip">📦 Check Order</button>
                     <button type="button" onclick="insertQuickReply('Delivery inside Dhaka takes 24-48 hours. Outside Dhaka takes 48-72 hours via courier.')" class="wa-canned-chip">🚚 Delivery Time</button>
@@ -1260,29 +1330,16 @@ img.sup-agent-avatar,
                     <button type="button" onclick="insertQuickReply('Thank you for shopping with us! Have a wonderful day.')" class="wa-canned-chip">🙏 Thank You</button>
                 </div>
 
-                <!-- Desktop WhatsApp Message Input Bar (Desktop Only) -->
-                <div class="wa-input-bar hidden-xs">
+                <!-- Unified WhatsApp Message Input Bar (Always pinned at bottom, never cut off) -->
+                <div class="wa-input-bar" id="adminInputBar">
                     <input type="file" id="adminFileInput" accept="image/*,application/pdf" style="display: none;" onchange="handleAdminFileUpload(this)">
-                    <button type="button" onclick="document.getElementById('adminFileInput').click()" class="wa-icon-btn" title="Attach file or photo">
+                    <button type="button" onclick="document.getElementById('adminFileInput').click()" class="wa-icon-btn wa-clip-btn" title="Attach file or photo">
                         <i class="fa fa-paperclip"></i>
                     </button>
                     <input type="text" id="adminReplyInput" class="wa-input-field" placeholder="Type a message to customer..." onkeypress="handleKeyPress(event)" autocomplete="off">
                     <button type="button" onclick="handleAdminSendReply()" class="wa-send-btn" title="Send message">
                         <i class="fa fa-paper-plane"></i>
                     </button>
-                </div>
-
-                <!-- Mobile Bottom Chat Controls Bar (Clean Input Row) -->
-                <div class="sup-mob-bottom-controls">
-                    <div class="sup-mob-input-row">
-                        <button type="button" class="sup-clip-btn" onclick="document.getElementById('adminFileInput').click()" title="Attach file or photo">
-                            <i class="fa fa-paperclip" style="font-size: 16px;"></i>
-                        </button>
-                        <input type="text" id="supMobReplyInput" class="sup-msg-input" placeholder="Type a message..." onkeypress="handleMobileKeyPress(event)" autocomplete="off">
-                        <button type="button" class="sup-send-btn" onclick="handleMobileSendReply()" title="Send">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#0F172A"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1656,7 +1713,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Background polling every 4 seconds
+    // Auto-answer incoming call if opened via notification answer action
+    if (params.get('auto_answer') === '1') {
+        const autoThreadId = params.get('thread_id');
+        setTimeout(() => {
+            handleAutoAnswerFlow(autoThreadId);
+        }, 350);
+    }
+
+    // Background polling every 3 seconds
     pollTimer = setInterval(() => {
         loadThreads(true);
         if (currentThreadId) {
@@ -2129,10 +2194,16 @@ function renderMessages(messages) {
         }
 
         if (isSystem) {
+            const sysText = m.message || '';
+            const isMissed = sysText.includes('Missed') || sysText.includes('declined') || sysText.includes('No answer');
+            const pillBg = isMissed ? '#fef2f2' : '#f0fdf4';
+            const pillBorder = isMissed ? '#fecaca' : '#bbf7d0';
+            const textColor = isMissed ? '#b91c1c' : '#15803d';
+
             container.innerHTML += `
-                <div style="text-align: center; margin: 6px 0;">
-                    <span style="display: inline-block; padding: 4px 12px; background: rgba(255,255,255,0.85); border-radius: 7.5px; font-size: 11px; color: #54656f; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13);">
-                        ${escapeHtml(m.message)}
+                <div style="display: flex; justify-content: center; margin: 8px 0; width: 100%;">
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: ${pillBg}; border: 1px solid ${pillBorder}; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: ${textColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                        ${escapeHtml(sysText)}
                     </span>
                 </div>
             `;
@@ -2728,9 +2799,24 @@ const adminRtcConfig = {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' }
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        {
+            urls: [
+                'turn:80.225.247.237:3478?transport=udp',
+                'turn:80.225.247.237:3478?transport=tcp'
+            ],
+            username: 'swapno',
+            credential: 'SwapnoWebRtcTurn2026!'
+        },
+        {
+            urls: [
+                'turn:openrelay.metered.ca:80',
+                'turn:openrelay.metered.ca:443',
+                'turn:openrelay.metered.ca:443?transport=tcp'
+            ],
+            username: 'openrelay',
+            credential: 'openrelay'
+        }
     ],
     iceCandidatePoolSize: 10
 };
@@ -3077,6 +3163,52 @@ async function drainQueuedAdminCandidates(pc) {
     }
 }
 
+async function handleAutoAnswerFlow(targetThreadId) {
+    console.log('[LiveChat Admin] Auto-answering incoming call for thread:', targetThreadId);
+    unlockAdminAudioPlayback();
+
+    const tid = targetThreadId ? parseInt(targetThreadId, 10) : 0;
+    if (tid > 0) {
+        await selectThread(tid);
+    }
+
+    try {
+        const queryUrl = `../live_chat_api.php?action=get_call_status${tid > 0 ? '&thread_id=' + tid : ''}`;
+        const res = await fetch(queryUrl);
+        const data = await res.json();
+
+        if (data.status === 'success' && data.has_call) {
+            const threadId = data.thread_id;
+            adminActiveCallThreadId = threadId;
+            adminCallType = data.call_type || 'audio';
+            if (data.offer) {
+                pendingAdminOfferSignal = data.offer;
+            }
+            if (!currentThreadId || currentThreadId !== threadId) {
+                await selectThread(threadId);
+            }
+
+            const custName = data.customer_name || (currentCustomerData && currentCustomerData.customer_name) || `Customer #${threadId}`;
+            const titleEl = document.getElementById('adminCallPeerTitle');
+            if (titleEl) {
+                titleEl.textContent = (adminCallType === 'video' ? 'Video Call with ' : 'Voice Call with ') + custName;
+            }
+
+            await acceptAdminIncomingCall();
+            return;
+        }
+    } catch (e) {
+        console.warn('[LiveChat Admin] get_call_status error in auto-answer flow:', e);
+    }
+
+    // Fallback: poll WebRTC signals and answer if incoming modal opened
+    await pollAdminWebRtcSignals();
+    const modal = document.getElementById('adminIncomingCallModal');
+    if (modal && modal.style.display !== 'none') {
+        acceptAdminIncomingCall();
+    }
+}
+
 async function acceptAdminIncomingCall() {
     unlockAdminAudioPlayback();
     stopAdminRingtone();
@@ -3146,6 +3278,17 @@ async function acceptAdminIncomingCall() {
             }
         };
 
+        if (!pendingAdminOfferSignal && (adminActiveCallThreadId || currentThreadId)) {
+            try {
+                const targetTid = adminActiveCallThreadId || currentThreadId;
+                const qRes = await fetch(`../live_chat_api.php?action=get_call_status&thread_id=${targetTid}`);
+                const qData = await qRes.json();
+                if (qData.status === 'success' && qData.offer) {
+                    pendingAdminOfferSignal = qData.offer;
+                }
+            } catch (e) {}
+        }
+
         if (pendingAdminOfferSignal) {
             await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(pendingAdminOfferSignal)));
             const answer = await adminPeer.createAnswer({
@@ -3155,6 +3298,9 @@ async function acceptAdminIncomingCall() {
             await adminPeer.setLocalDescription(answer);
             sendWebRtcSignal('answer', JSON.stringify(answer));
             await drainQueuedAdminCandidates(adminPeer);
+        } else {
+            console.log('[WebRTC Admin] Waiting for remote offer signal...');
+            startFastAdminSignalPolling();
         }
 
     } catch (e) {
@@ -3168,10 +3314,13 @@ function declineAdminIncomingCall() {
     stopAdminRingtone();
     stopFastAdminSignalPolling();
     document.getElementById('adminIncomingCallModal').style.display = 'none';
-    sendWebRtcSignal('call_end', 'declined');
+    sendWebRtcSignal('call_end', JSON.stringify({ status: 'declined' }));
     pendingAdminOfferSignal = null;
     queuedAdminCandidates = [];
     adminActiveCallThreadId = null;
+    if (currentThreadId) {
+        setTimeout(() => refreshActiveThread(true), 600);
+    }
 }
 
 function startCallTimer() {
@@ -3189,7 +3338,19 @@ function hangupAdminCall(notify = true) {
     stopAdminRingtone();
     stopFastAdminSignalPolling();
 
-    if (notify) sendWebRtcSignal('call_end', 'ended');
+    let callPayload = '';
+    if (adminCallStartTime) {
+        const elapsed = Math.floor((Date.now() - adminCallStartTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+        callPayload = JSON.stringify({ status: 'ended', duration: `${mins}:${secs}`, elapsed: elapsed });
+    } else {
+        callPayload = JSON.stringify({ status: 'cancelled' });
+    }
+
+    if (notify) sendWebRtcSignal('call_end', callPayload);
+    adminCallStartTime = null;
+
     if (adminCallTimerInterval) {
         clearInterval(adminCallTimerInterval);
         adminCallTimerInterval = null;
@@ -3222,6 +3383,10 @@ function hangupAdminCall(notify = true) {
 
     document.getElementById('adminIncomingCallModal').style.display = 'none';
     document.getElementById('adminCallModal').style.display = 'none';
+
+    if (currentThreadId) {
+        setTimeout(() => refreshActiveThread(true), 600);
+    }
 }
 
 function toggleAdminMic() {

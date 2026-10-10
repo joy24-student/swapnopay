@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Abir Luxe Admin</string>
+    <string name="store_url">https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/</string>
+    <string name="app_tagline">Store Management &amp; Realtime Operations</string>
+    
+    <!-- Push Notification Channels -->
+    <string name="channel_calls_name">Customer Support Calls</string>
+    <string name="channel_calls_desc">Instant incoming customer voice and video calls.</string>
+    <string name="channel_orders_name">New Orders &amp; Sales Alerts</string>
+    <string name="channel_orders_desc">Realtime notifications when a customer completes an order.</string>
+    <string name="channel_alerts_name">Admin Operations &amp; Inquiries</string>
+    <string name="channel_alerts_desc">Store operations, inventory alerts, and general customer messages.</string>
+    
+    <!-- Offline Animated Screen -->
+    <string name="offline_title">No Internet Connection</string>
+    <string name="offline_subtitle">Unable to reach Abir Luxe Admin. Please check your mobile data or Wi-Fi network.</string>
+    <string name="btn_retry">Retry Connection</string>
+    <string name="checking_connection">Connecting to Admin Portal…</string>
+    
+    <!-- Incoming Call Screen -->
+    <string name="incoming_call_title">Customer Support Call</string>
+    <string name="incoming_call_subtitle">Customer requested live support consultation…</string>
+    <string name="call_answer">Answer</string>
+    <string name="call_decline">Decline</string>
+    
+    <!-- Dialog & Errors -->
+    <string name="file_chooser_title">Choose File or Take Photo</string>
+    <string name="permission_notification_rationale">Abir Luxe Admin requires notification permission for instant order alerts and incoming customer calls.</string>
+</resources>

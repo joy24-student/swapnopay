@@ -1,4 +1,4 @@
-package com.abirluxe.shop.fcm
+package com.abirluxe.admin.fcm
 
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,10 +13,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.abirluxe.shop.AbirLuxeApp
-import com.abirluxe.shop.IncomingCallActivity
-import com.abirluxe.shop.MainActivity
-import com.abirluxe.shop.R
+import com.abirluxe.admin.AbirAdminApp
+import com.abirluxe.admin.IncomingCallActivity
+import com.abirluxe.admin.MainActivity
+import com.abirluxe.admin.R
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +29,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-class AbirFirebaseMessagingService : FirebaseMessagingService() {
+class AbirAdminFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val BACKEND_URL = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/save-fcm-token.php"
@@ -44,7 +44,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
                 try {
                     val json = JSONObject().apply {
                         put("token", token)
-                        put("device_type", "android")
+                        put("device_type", "admin_android")
                     }
                     val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
                     val request = Request.Builder()
@@ -52,9 +52,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
                         .post(body)
                         .build()
 
-                    httpClient.newCall(request).execute().use { response ->
-                        // Success or silently log
-                    }
+                    httpClient.newCall(request).execute().use { _ -> }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -64,7 +62,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("abir_admin_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString("fcm_token", token).apply()
         sendTokenToBackend(applicationContext, token)
     }
@@ -80,27 +78,42 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         val body = data["body"] ?: data["message"] ?: notification?.body ?: ""
         val targetUrl = data["url"] ?: data["target_url"] ?: ""
 
+        val threadId = data["thread_id"] ?: ""
         if (type.equals("call", ignoreCase = true) || data.containsKey("incoming_call")) {
-            // Instant Store Incoming Call trigger
-            triggerInstantIncomingCall(title, body, targetUrl)
+            // Instant Incoming Customer Call trigger (Direct screen wake + CallStyle heads-up)
+            triggerInstantIncomingCall(title, body, targetUrl, threadId)
+        } else if (type.equals("order", ignoreCase = true) || data.containsKey("order_id")) {
+            // Realtime New Order Alert
+            showNewOrderNotification(title, body, targetUrl)
         } else {
-            // Regular Instant Status Bar Push Notification
-            showStatusBarNotification(title, body, targetUrl)
+            // General Admin Status Bar Notification (Inquiries, Alerts)
+            showAdminAlertNotification(title, body, targetUrl)
         }
     }
 
-    private fun triggerInstantIncomingCall(callerName: String, callNote: String, targetUrl: String = "") {
-        // Wake the screen up even if phone is locked, asleep, or in pocket
+    private fun triggerInstantIncomingCall(callerName: String, callNote: String, targetUrl: String = "", threadId: String = "") {
+        // Wake the screen up even if phone is locked or asleep
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
             @Suppress("DEPRECATION")
             val wakeLock = powerManager?.newWakeLock(
                 PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                "abirluxe:IncomingCallWakeLock"
+                "abiradmin:IncomingCallWakeLock"
             )
-            wakeLock?.acquire(30000L) // 30 seconds wake lock to cover call ringing duration
+            wakeLock?.acquire(30000L)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+
+        val defaultCallUrl = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
+        var baseCallUrl = if (targetUrl.isNotBlank()) targetUrl else defaultCallUrl
+        if (threadId.isNotBlank() && !baseCallUrl.contains("thread_id=")) {
+            baseCallUrl += if (baseCallUrl.contains("?")) "&thread_id=$threadId" else "?thread_id=$threadId"
+        }
+        val resolvedCallUrl = if (!baseCallUrl.contains("auto_answer=")) {
+            if (baseCallUrl.contains("?")) "$baseCallUrl&auto_answer=1" else "$baseCallUrl?auto_answer=1"
+        } else {
+            baseCallUrl
         }
 
         val callIntent = Intent(this, IncomingCallActivity::class.java).apply {
@@ -110,41 +123,36 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
                     Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("caller_name", callerName)
             putExtra("call_note", callNote)
-            putExtra("target_url", targetUrl)
+            putExtra("thread_id", threadId)
+            putExtra("target_url", resolvedCallUrl)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
-            1001,
+            2001,
             callIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val declineIntent = Intent(this, CallActionReceiver::class.java).apply {
-            action = CallActionReceiver.ACTION_DECLINE_CALL
+        val declineIntent = Intent(this, AdminCallActionReceiver::class.java).apply {
+            action = AdminCallActionReceiver.ACTION_DECLINE_CALL
         }
         val declinePendingIntent = PendingIntent.getBroadcast(
             this,
-            1002,
+            2002,
             declineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val defaultCallUrl = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/messages.php?auto_answer=1"
-        val resolvedCallUrl = if (targetUrl.isNotBlank()) {
-            if (targetUrl.contains("?")) "$targetUrl&auto_answer=1" else "$targetUrl?auto_answer=1"
-        } else {
-            defaultCallUrl
-        }
-
         val answerCallIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("call_answered", true)
+            putExtra("thread_id", threadId)
             putExtra("target_url", resolvedCallUrl)
         }
         val answerPendingIntent = PendingIntent.getActivity(
             this,
-            1003,
+            2003,
             answerCallIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -168,9 +176,9 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             answerPendingIntent
         )
 
-        val inForeground = try { AbirLuxeApp.instance.isAppInForeground } catch (e: Exception) { false }
+        val inForeground = try { AbirAdminApp.instance.isAppInForeground } catch (e: Exception) { false }
 
-        val callNotificationBuilder = NotificationCompat.Builder(this, AbirLuxeApp.CHANNEL_ID_CALLS)
+        val callNotificationBuilder = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_CALLS)
             .setSmallIcon(R.drawable.ic_stat_shop)
             .setContentTitle(callerName)
             .setContentText(if (callNote.isNotBlank()) callNote else getString(R.string.incoming_call_subtitle))
@@ -186,7 +194,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
 
         if (!inForeground) {
             callNotificationBuilder.setSound(soundUri)
-            callNotificationBuilder.setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000))
+            callNotificationBuilder.setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000, 1000))
             callNotificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
             callNotificationBuilder.setContentIntent(fullScreenPendingIntent)
         } else {
@@ -197,10 +205,8 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             callNotificationBuilder.setLargeIcon(shopLogoBitmap)
         }
 
-        val callNotification = callNotificationBuilder.build()
-
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(9999, callNotification)
+        notificationManager.notify(9999, callNotificationBuilder.build())
 
         // Directly launch the activity ONLY when phone is asleep, locked, or app is in background
         if (!inForeground) {
@@ -214,12 +220,11 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun showStatusBarNotification(title: String, message: String, url: String) {
+    private fun showNewOrderNotification(title: String, message: String, url: String) {
+        val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/order.php"
         val clickIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            if (url.isNotBlank()) {
-                putExtra("target_url", url)
-            }
+            putExtra("target_url", destinationUrl)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -232,7 +237,44 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.app_logo)
 
-        val notification = NotificationCompat.Builder(this, AbirLuxeApp.CHANNEL_ID_ALERTS)
+        val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ORDERS)
+            .setSmallIcon(R.drawable.ic_stat_shop)
+            .setLargeIcon(largeIcon)
+            .setContentTitle(if (title.isNotBlank()) title else "🛍️ New Customer Order")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setAutoCancel(true)
+            .setSound(soundUri)
+            .setVibrate(longArrayOf(0, 300, 150, 300))
+            .setColor(ContextCompat.getColor(this, R.color.brand_gold))
+            .setContentIntent(pendingIntent)
+            .build()
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationId = (System.currentTimeMillis() % 100000).toInt()
+        notificationManager.notify(notificationId, notification)
+    }
+
+    private fun showAdminAlertNotification(title: String, message: String, url: String) {
+        val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
+        val clickIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("target_url", destinationUrl)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            System.currentTimeMillis().toInt(),
+            clickIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.app_logo)
+
+        val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_shop)
             .setLargeIcon(largeIcon)
             .setContentTitle(title)
@@ -242,7 +284,7 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
             .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 250, 250, 250))
+            .setVibrate(longArrayOf(0, 200, 200, 200))
             .setColor(ContextCompat.getColor(this, R.color.brand_gold))
             .setContentIntent(pendingIntent)
             .build()
@@ -252,3 +294,4 @@ class AbirFirebaseMessagingService : FirebaseMessagingService() {
         notificationManager.notify(notificationId, notification)
     }
 }
+

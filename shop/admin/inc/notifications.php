@@ -780,3 +780,44 @@ function timeAgoNotification(string $datetime): string {
     if ($diff < 604800) return floor($diff / 86400) . 'd ago';
     return date('M d, Y', $time);
 }
+
+/**
+ * Dispatch high-priority push notification directly to registered Admin Android devices.
+ */
+function sendAdminPushNotification(
+    PDO $pdo,
+    string $title,
+    string $body,
+    ?string $actionUrl = null,
+    array $extraData = []
+): array {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT fcm_token FROM tbl_fcm_tokens 
+            WHERE device_type = 'admin_android' OR device_type = 'admin'
+        ");
+        $stmt->execute();
+        $adminTokens = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        if (empty($adminTokens)) {
+            return ['success' => false, 'message' => 'No admin device tokens registered'];
+        }
+
+        $defaultAdminUrl = defined('BASE_URL') ? BASE_URL . 'admin/' : '/admin/';
+        $finalUrl = $actionUrl ?: $defaultAdminUrl;
+
+        return sendFCMPushNotification(
+            $pdo,
+            $adminTokens,
+            $title,
+            $body,
+            $finalUrl,
+            null,
+            $extraData
+        );
+    } catch (Throwable $e) {
+        error_log("sendAdminPushNotification error: " . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+

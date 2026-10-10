@@ -1,4 +1,4 @@
-package com.abirluxe.shop
+package com.abirluxe.admin
 
 import android.app.KeyguardManager
 import android.app.NotificationManager
@@ -90,7 +90,6 @@ class IncomingCallActivity : AppCompatActivity() {
 
     private fun startRingingAndVibration() {
         try {
-            // Ringtone
             val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ringtone = RingtoneManager.getRingtone(applicationContext, alertUri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -105,7 +104,6 @@ class IncomingCallActivity : AppCompatActivity() {
         }
 
         try {
-            // Vibration
             val pattern = longArrayOf(0, 1000, 1000, 1000, 1000, 1000)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -113,9 +111,9 @@ class IncomingCallActivity : AppCompatActivity() {
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 1)
+                v?.vibrate(pattern, 1)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -139,22 +137,27 @@ class IncomingCallActivity : AppCompatActivity() {
 
         handler.removeCallbacks(timeoutRunnable)
 
-        // Clear notification
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(9999)
     }
 
     private fun answerCall() {
         stopRingingAndVibration()
-        val rawUrl = intent.getStringExtra("target_url")
-        val finalUrl = if (!rawUrl.isNullOrBlank()) {
-            if (rawUrl.contains("?")) "$rawUrl&auto_answer=1" else "$rawUrl?auto_answer=1"
+        val threadId = intent.getStringExtra("thread_id") ?: ""
+        val defaultCallUrl = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
+        var baseCallUrl = intent.getStringExtra("target_url") ?: defaultCallUrl
+        if (threadId.isNotBlank() && !baseCallUrl.contains("thread_id=")) {
+            baseCallUrl += if (baseCallUrl.contains("?")) "&thread_id=$threadId" else "?thread_id=$threadId"
+        }
+        val finalUrl = if (!baseCallUrl.contains("auto_answer=")) {
+            if (baseCallUrl.contains("?")) "$baseCallUrl&auto_answer=1" else "$baseCallUrl?auto_answer=1"
         } else {
-            "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/messages.php?auto_answer=1"
+            baseCallUrl
         }
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("call_answered", true)
+            putExtra("thread_id", threadId)
             putExtra("target_url", finalUrl)
         }
         startActivity(intent)
@@ -171,3 +174,4 @@ class IncomingCallActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
+

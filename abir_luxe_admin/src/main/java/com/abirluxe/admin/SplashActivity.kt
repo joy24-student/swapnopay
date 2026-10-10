@@ -1,4 +1,4 @@
-package com.abirluxe.shop
+package com.abirluxe.admin
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -14,7 +14,7 @@ import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.abirluxe.shop.fcm.AbirFirebaseMessagingService
+import com.abirluxe.admin.fcm.AbirAdminFirebaseMessagingService
 import com.google.firebase.messaging.FirebaseMessaging
 
 @SuppressLint("CustomSplashScreen")
@@ -29,7 +29,6 @@ class SplashActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
 
-        // Subtle fade-in animation on big logo
         val logoView = findViewById<ImageView>(R.id.imgSplashLogo)
         val fadeIn = AlphaAnimation(0f, 1f).apply {
             duration = 800
@@ -37,10 +36,8 @@ class SplashActivity : AppCompatActivity() {
         }
         logoView.startAnimation(fadeIn)
 
-        // Initialize Firebase Messaging Token
         initFcmToken()
 
-        // Request notification permission if Android 13+
         Handler(Looper.getMainLooper()).postDelayed({
             checkNotificationPermissionAndProceed()
         }, 1200)
@@ -51,9 +48,9 @@ class SplashActivity : AppCompatActivity() {
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val token = task.result
-                    val prefs = getSharedPreferences("abir_luxe_prefs", Context.MODE_PRIVATE)
+                    val prefs = getSharedPreferences("abir_admin_prefs", Context.MODE_PRIVATE)
                     prefs.edit().putString("fcm_token", token).apply()
-                    AbirFirebaseMessagingService.sendTokenToBackend(applicationContext, token)
+                    AbirAdminFirebaseMessagingService.sendTokenToBackend(applicationContext, token)
                 }
             }
         } catch (e: Exception) {
@@ -96,7 +93,9 @@ class SplashActivity : AppCompatActivity() {
             }
         }
         startActivity(mainIntent)
+        @Suppress("DEPRECATION")
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 }
+
