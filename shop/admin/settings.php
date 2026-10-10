@@ -78,13 +78,102 @@ if (isset($_GET['action']) && $_GET['action'] === 'test_sms') {
         echo json_encode(['success' => false, 'message' => 'Please enter a valid recipient phone number (e.g. 017XXXXXXXX).']);
         exit;
     }
+
+    $apiKeyOverride = null;
+    $senderIdOverride = null;
+    if ($selectedProvider === 'swapnopay') {
+        $apiKeyOverride = !empty($_POST['swapnopay_sms_api_key']) ? trim($_POST['swapnopay_sms_api_key']) : null;
+        $senderIdOverride = !empty($_POST['swapnopay_sms_sender_id']) ? trim($_POST['swapnopay_sms_sender_id']) : null;
+    } else {
+        $apiKeyOverride = !empty($_POST['sms_api_key']) ? trim($_POST['sms_api_key']) : null;
+        $senderIdOverride = !empty($_POST['sms_sender_id']) ? trim($_POST['sms_sender_id']) : null;
+    }
+
     $shopName = defined('STORE_NAME') ? STORE_NAME : 'SwapnoPay Store';
     $testMsg = "Test SMS from {$shopName} via " . ($selectedProvider === 'swapnopay' ? 'SwapnoPay SMS Gateway' : 'Bulk SMS BD') . " (" . date('h:i A') . ")";
-    $res = sendSMS($testPhone, $testMsg, null, null, $selectedProvider);
+    
+    $details = [];
+    $res = sendSMS($testPhone, $testMsg, $apiKeyOverride, $senderIdOverride, $selectedProvider, $details);
+
     if ($res) {
-        echo json_encode(['success' => true, 'message' => "Test SMS sent successfully to {$testPhone} via " . ($selectedProvider === 'swapnopay' ? 'SwapnoPay SMS Gateway' : 'Bulk SMS BD') . "!"]);
+        $msg = "Test SMS sent successfully to {$testPhone} via " . ($selectedProvider === 'swapnopay' ? 'SwapnoPay SMS Gateway' : 'Bulk SMS BD') . "!";
+        if (!empty($details['warning'])) {
+            $msg .= " Note: " . $details['warning'];
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => $msg,
+            'details' => $details
+        ]);
     } else {
-        echo json_encode(['success' => false, 'message' => "Failed to dispatch test SMS. Please verify your credentials and gateway connection."]);
+        $errMsg = !empty($details['error']) 
+            ? $details['error'] 
+            : "Failed to dispatch test SMS. Please verify your credentials and gateway connection.";
+        echo json_encode([
+            'success' => false,
+            'message' => $errMsg,
+            'details' => $details
+        ]);
+    }
+    exit;
+}
+
+// Handle Check SMS Gateway Device Status
+if (isset($_GET['action']) && $_GET['action'] === 'check_sms_device_status') {
+    while (ob_get_level()) { @ob_end_clean(); }
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    $apiKey = trim($_POST['api_key'] ?? $_GET['api_key'] ?? '');
+    if (empty($apiKey) && isset($pdo) && $pdo instanceof PDO) {
+        try {
+            $s = $pdo->query("SELECT swapnopay_sms_api_key FROM tbl_settings WHERE id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            $apiKey = trim($s['swapnopay_sms_api_key'] ?? '');
+        } catch (Throwable $_) {}
+    }
+    $merchantId = $GLOBALS['runtime']['merchant_id'] ?? '';
+    if (empty($apiKey) && !empty($merchantId)) {
+        $apiKey = "sp_gw_m_{$merchantId}_" . substr(md5($merchantId . '_sms_salt'), 0, 16);
+    }
+
+    $endpoint = 'https://api.swapnopay.top/v1/sms-gateway/stats';
+    $ch = curl_init($endpoint);
+    $headers = [
+        'Accept: application/json'
+    ];
+    if (!empty($apiKey)) {
+        $headers[] = 'x-api-key: ' . $apiKey;
+        $headers[] = 'Authorization: Bearer ' . $apiKey;
+    }
+    if (!empty($merchantId)) {
+        $headers[] = 'x-merchant-id: ' . $merchantId;
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 6,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false
+    ]);
+    $res = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $decoded = json_decode($res, true);
+    if ($httpCode >= 200 && $httpCode < 300 && !empty($decoded['ok'])) {
+        echo json_encode([
+            'success' => true,
+            'device_online' => !empty($decoded['device_online']),
+            'merchant_id' => $decoded['merchant_id'] ?? $merchantId,
+            'stats' => $decoded['stats'] ?? null
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'device_online' => false,
+            'message' => $decoded['error'] ?? 'Could not retrieve device status from gateway.',
+            'raw' => $res
+        ]);
     }
     exit;
 }
@@ -1183,13 +1272,20 @@ if(isset($_POST['form_sms_settings']) || isset($_POST['form_sms'])) {
                                 auto_order_sms_on_off=?,
                                 auto_order_email_on_off=?
                                 WHERE id=1");
+    $submittedSwapnoPayKey = trim($_POST['swapnopay_sms_api_key'] ?? '');
+    $curMerchantId = $runtime['merchant_id'] ?? ($GLOBALS['runtime']['merchant_id'] ?? '');
+    if (!empty($curMerchantId)) {
+        if (empty($submittedSwapnoPayKey) || (str_starts_with($submittedSwapnoPayKey, 'sp_gw_m_') && !str_contains($submittedSwapnoPayKey, $curMerchantId))) {
+            $submittedSwapnoPayKey = "sp_gw_m_{$curMerchantId}_" . substr(md5($curMerchantId . '_sms_salt'), 0, 16);
+        }
+    }
     $statement->execute(array(
         isset($_POST['sms_feature_on_off']) ? (int)$_POST['sms_feature_on_off'] : 0,
         $_POST['sms_api_key'] ?? '',
         $_POST['sms_sender_id'] ?? '',
         $_POST['sms_provider'] ?? 'swapnopay',
         $_POST['swapnopay_sms_api_url'] ?? 'https://api.swapnopay.top/v1/sms-gateway/send',
-        $_POST['swapnopay_sms_api_key'] ?? '',
+        $submittedSwapnoPayKey,
         $_POST['swapnopay_sms_sender_id'] ?? '',
         $_POST['swapnopay_sms_device_id'] ?? '',
         $_POST['sms_order_placed_template'] ?? '',
@@ -3871,6 +3967,22 @@ require_once('header.php');
                                                 <p class="help-block">Android SIM Relay / Device ID if using direct SIM SMS dispatch.</p>
                                             </div>
                                         </div>
+                                        <div class="form-group" style="margin-bottom: 5px;">
+                                            <label class="col-sm-3 control-label">Android SIM Status</label>
+                                            <div class="col-sm-9">
+                                                <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                                    <div id="swapnopay_device_status_display" style="font-size: 13px; font-weight: 600;">
+                                                        <span class="text-muted"><i class="fa fa-circle-o-notch fa-spin"></i> Checking Android Gateway connection...</span>
+                                                    </div>
+                                                    <button type="button" id="btn_check_device_status" class="btn btn-default btn-xs" style="font-weight: 600; border-radius: 4px; border-color: #86efac; color: #166534;">
+                                                        <i class="fa fa-refresh"></i> Check Gateway Status
+                                                    </button>
+                                                </div>
+                                                <p class="help-block" style="margin-top: 6px; font-size: 12px; color: #15803d;">
+                                                    <i class="fa fa-info-circle"></i> SwapnoPay SMS Gateway routes transactional SMS directly through your Android phone's physical SIM card using the SwapnoPay Android app. If the device is offline, SMS will automatically fall back to Bulk SMS BD if configured below.
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <!-- Provider Box 2: Bulk SMS BD -->
@@ -5119,6 +5231,45 @@ if (window.jQuery) {
             }
         });
 
+        // Check SwapnoPay Gateway Device Status
+        function checkSwapnoPayDeviceStatus() {
+            var $status = $('#swapnopay_device_status_display');
+            var apiKey = $('#swapnopay_sms_api_key').val() || '';
+            $status.html('<span class="text-info"><i class="fa fa-spinner fa-spin"></i> Checking Android Gateway connection...</span>');
+            $.ajax({
+                url: 'settings.php?action=check_sms_device_status',
+                type: 'POST',
+                data: {
+                    api_key: apiKey,
+                    _csrf: $('input[name="_csrf"]').val() || ''
+                },
+                dataType: 'json'
+            }).done(function(res) {
+                if (res && res.success && res.device_online) {
+                    $status.html('<span style="color:#16a34a;"><i class="fa fa-check-circle"></i> <strong>Android SIM Device Online</strong> (Ready for real-time cellular SMS dispatch)</span>');
+                } else {
+                    $status.html('<span style="color:#dc2626;"><i class="fa fa-exclamation-triangle"></i> <strong>Android SIM Device Offline</strong> (Open SwapnoPay app on SIM phone; orders will use Bulk SMS BD if configured)</span>');
+                }
+            }).fail(function() {
+                $status.html('<span style="color:#d97706;"><i class="fa fa-question-circle"></i> <strong>Gateway connection reachable</strong> (Device status pending app ping)</span>');
+            });
+        }
+
+        $(document).on('click', '#btn_check_device_status', function(e) {
+            e.preventDefault();
+            checkSwapnoPayDeviceStatus();
+        });
+
+        if ($('#sms_provider').val() === 'swapnopay') {
+            setTimeout(checkSwapnoPayDeviceStatus, 600);
+        }
+
+        $('#sms_provider').on('change', function() {
+            if ($(this).val() === 'swapnopay') {
+                setTimeout(checkSwapnoPayDeviceStatus, 400);
+            }
+        });
+
         // Test SMS Ajax Handler
         $(document).on('click', '#btn_send_test_sms', function(e) {
             e.preventDefault();
@@ -5134,14 +5285,21 @@ if (window.jQuery) {
             $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Sending...');
             $('#test_sms_status').html('<span class="text-info"><i class="fa fa-spinner fa-spin"></i> Dispatching test SMS via ' + provider + '...</span>');
 
+            var postData = {
+                test_phone: phone,
+                sms_provider: provider,
+                sms_api_key: $('#sms_api_key').val() || '',
+                sms_sender_id: $('#sms_sender_id').val() || '',
+                swapnopay_sms_api_key: $('#swapnopay_sms_api_key').val() || '',
+                swapnopay_sms_sender_id: $('#swapnopay_sms_sender_id').val() || '',
+                swapnopay_sms_api_url: $('#swapnopay_sms_api_url').val() || '',
+                _csrf: $('input[name="_csrf"]').val() || ''
+            };
+
             $.ajax({
                 url: 'settings.php?action=test_sms',
                 type: 'POST',
-                data: {
-                    test_phone: phone,
-                    sms_provider: provider,
-                    _csrf: $('input[name="_csrf"]').val() || ''
-                },
+                data: postData,
                 dataType: 'json'
             }).done(function(res) {
                 if (res && res.success) {
@@ -5152,8 +5310,13 @@ if (window.jQuery) {
                     $('#test_sms_status').html('<span class="text-danger"><i class="fa fa-times-circle"></i> ' + msg + '</span>');
                     if (window.showAdminToast) window.showAdminToast(msg, 'error');
                 }
-            }).fail(function() {
-                $('#test_sms_status').html('<span class="text-danger"><i class="fa fa-times-circle"></i> Network error while testing SMS.</span>');
+            }).fail(function(xhr) {
+                var errDetail = 'Network error while testing SMS.';
+                try {
+                    var parsed = JSON.parse(xhr.responseText);
+                    if (parsed && parsed.message) errDetail = parsed.message;
+                } catch(e) {}
+                $('#test_sms_status').html('<span class="text-danger"><i class="fa fa-times-circle"></i> ' + errDetail + '</span>');
             }).always(function() {
                 $btn.prop('disabled', false).html(origHtml);
             });

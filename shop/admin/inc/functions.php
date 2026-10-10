@@ -257,16 +257,34 @@ if (!function_exists('formatCurrency')) {
  * Sends an SMS message using either SwapnoPay SMS Gateway or Bulk SMS BD.
  *
  * @param string $to The recipient's phone number (e.g., 01XXXXXXXXX, +8801XXXXXXXXX).
+/**
+ * Sends an SMS message to a phone number using either SwapnoPay SMS Gateway or Bulk SMS BD.
+ *
+ * @param string $to Recipient phone number (e.g. 017XXXXXXXX).
  * @param string $message The message content.
  * @param string|null $api_key Optional API Key override.
  * @param string|null $sender_id Optional Sender ID override.
  * @param string|null $provider Optional provider override ('swapnopay' or 'bulk').
+ * @param array|null &$details Optional output array for detailed result info.
  * @return bool True on success, false on failure.
  */
-function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = null) {
+function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = null, &$details = null) {
     global $pdo;
 
+    $details = [
+        'success' => false,
+        'provider' => '',
+        'error' => '',
+        'warning' => '',
+        'device_online' => false,
+        'job_id' => '',
+        'status' => '',
+        'raw_response' => '',
+        'http_code' => 0
+    ];
+
     if (empty($to) || empty($message)) {
+        $details['error'] = 'Recipient phone number or message content is empty.';
         error_log("[sendSMS] Recipient or message is empty.");
         return false;
     }
@@ -294,9 +312,12 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
     }
 
     $activeProvider = $provider ?: (!empty($settings['sms_provider']) ? $settings['sms_provider'] : 'swapnopay');
+    $details['provider'] = $activeProvider;
     $smsEnabled = isset($settings['sms_feature_on_off']) ? (int)$settings['sms_feature_on_off'] : 1;
 
-    if (!$smsEnabled) {
+    // Only skip if not explicitly overridden by a test dispatch call
+    if (!$smsEnabled && empty($provider)) {
+        $details['error'] = 'SMS notifications are disabled in Settings.';
         error_log("[sendSMS] SMS feature is turned off in settings. Skipping dispatch to {$phone}.");
         return false;
     }
@@ -306,14 +327,23 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
             ? trim($settings['swapnopay_sms_api_url'])
             : 'https://api.swapnopay.top/v1/sms-gateway/send';
 
+        $merchantId = $GLOBALS['runtime']['merchant_id'] ?? '';
+
         $apiKey = !empty($api_key)
-            ? $api_key
+            ? trim($api_key)
             : (!empty($settings['swapnopay_sms_api_key'])
                 ? trim($settings['swapnopay_sms_api_key'])
                 : ($GLOBALS['runtime']['gateway_api_key'] ?? ''));
 
+        // Auto-heal API key if it's empty or belongs to a mismatched merchant
+        if (!empty($merchantId)) {
+            if (empty($apiKey) || (str_starts_with($apiKey, 'sp_gw_m_') && !str_contains($apiKey, $merchantId))) {
+                $apiKey = "sp_gw_m_{$merchantId}_" . substr(md5($merchantId . '_sms_salt'), 0, 16);
+            }
+        }
+
         $senderId = !empty($sender_id)
-            ? $sender_id
+            ? trim($sender_id)
             : (!empty($settings['swapnopay_sms_sender_id'])
                 ? trim($settings['swapnopay_sms_sender_id'])
                 : ($GLOBALS['runtime']['store_name'] ?? 'SwapnoPay'));
@@ -338,6 +368,9 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
             $headers[] = 'x-api-key: ' . $apiKey;
             $headers[] = 'Authorization: Bearer ' . $apiKey;
         }
+        if (!empty($merchantId)) {
+            $headers[] = 'x-merchant-id: ' . $merchantId;
+        }
 
         $ch = curl_init($endpoint);
         curl_setopt_array($ch, [
@@ -356,26 +389,64 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
         $curlErr = curl_error($ch);
         curl_close($ch);
 
+        $details['http_code'] = $httpCode;
+        $details['raw_response'] = $response;
+
         if ($curlErr) {
+            $details['error'] = 'cURL error connecting to SwapnoPay Gateway: ' . $curlErr;
             error_log("[sendSMS][SwapnoPay] cURL error: " . $curlErr);
             return false;
         }
 
         $decoded = json_decode($response, true);
         if ($httpCode >= 200 && $httpCode < 300 && (!empty($decoded['ok']) || !empty($decoded['success']) || !empty($decoded['job_id']))) {
-            error_log("[sendSMS][SwapnoPay] SMS dispatched to {$phone}: Job " . ($decoded['job_id'] ?? 'OK'));
-            return true;
+            $jobId = $decoded['job_id'] ?? '';
+            $status = $decoded['status'] ?? 'QUEUED';
+            $deviceOnline = !empty($decoded['device_online']);
+
+            $details['job_id'] = $jobId;
+            $details['status'] = $status;
+            $details['device_online'] = $deviceOnline;
+
+            if ($deviceOnline) {
+                $details['success'] = true;
+                $details['message'] = "SMS dispatched to connected Android phone SIM slot! (Job: {$jobId})";
+                error_log("[sendSMS][SwapnoPay] SMS dispatched to {$phone}: Job " . ($jobId ?: 'OK'));
+                return true;
+            }
+
+            // Device is OFFLINE: check if store has Bulk SMS BD configured as backup
+            $bulkKey = !empty($settings['sms_api_key']) ? trim($settings['sms_api_key']) : '';
+            if (!empty($bulkKey)) {
+                error_log("[sendSMS][SwapnoPay] Android SIM device is OFFLINE. Attempting automatic fallback to Bulk SMS BD...");
+                $bulkDetails = [];
+                $bulkSuccess = sendSMS($to, $message, $bulkKey, $settings['sms_sender_id'] ?? '', 'bulk', $bulkDetails);
+                if ($bulkSuccess) {
+                    $details = $bulkDetails;
+                    $details['fallback_from'] = 'swapnopay';
+                    $details['warning'] = 'SwapnoPay Android device was offline; SMS sent successfully via Bulk SMS BD backup.';
+                    return true;
+                }
+            }
+
+            $details['success'] = false;
+            $details['error'] = "SMS queued on SwapnoPay Gateway (Job: {$jobId}), but NO Android SIM device is currently online. Open the SwapnoPay app on your Android phone with an active SIM card to dispatch, or switch to Bulk SMS BD for direct cloud delivery.";
+            error_log("[sendSMS][SwapnoPay] SMS queued (Job: {$jobId}), but device is offline.");
+            return false;
         }
 
+        $errMsg = !empty($decoded['error']) ? $decoded['error'] : ("HTTP {$httpCode} error from SwapnoPay gateway");
+        $details['error'] = "SwapnoPay Gateway error: {$errMsg}";
         error_log("[sendSMS][SwapnoPay] Failed (HTTP {$httpCode}): " . $response);
         return false;
 
     } else {
         // Bulk SMS BD (bulksmsbd.net)
-        $apiKey = !empty($api_key) ? $api_key : ($settings['sms_api_key'] ?? '');
-        $senderId = !empty($sender_id) ? $sender_id : ($settings['sms_sender_id'] ?? '');
+        $apiKey = !empty($api_key) ? trim($api_key) : (!empty($settings['sms_api_key']) ? trim($settings['sms_api_key']) : '');
+        $senderId = !empty($sender_id) ? trim($sender_id) : (!empty($settings['sms_sender_id']) ? trim($settings['sms_sender_id']) : '');
 
         if (empty($apiKey)) {
+            $details['error'] = 'Bulk SMS BD API key is empty. Please enter your API key in Settings -> SMS Configuration.';
             error_log("[sendSMS][BulkSMSBD] Missing API key.");
             return false;
         }
@@ -405,18 +476,44 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
         $curlErr = curl_error($ch);
         curl_close($ch);
 
+        $details['http_code'] = $httpCode;
+        $details['raw_response'] = $response;
+
         if ($curlErr) {
+            $details['error'] = 'cURL error connecting to Bulk SMS BD: ' . $curlErr;
             error_log("[sendSMS][BulkSMSBD] cURL error: " . $curlErr);
             return false;
         }
 
         $decoded = json_decode($response, true);
-        if ($httpCode >= 200 && $httpCode < 300 && (isset($decoded['response_code']) && ($decoded['response_code'] == 202 || $decoded['response_code'] == 200))) {
+        $respCode = isset($decoded['response_code']) ? (int)$decoded['response_code'] : 0;
+        $errorMsg = !empty($decoded['error_message']) ? trim($decoded['error_message']) : '';
+        $successMsg = !empty($decoded['success_message']) ? trim($decoded['success_message']) : (!empty($decoded['message']) ? trim($decoded['message']) : '');
+
+        if (($respCode === 202 || $respCode === 200) || (!empty($decoded['success']) && empty($errorMsg))) {
+            $details['success'] = true;
+            $details['message'] = $successMsg ?: 'SMS delivered successfully via Bulk SMS BD.';
             error_log("[sendSMS][BulkSMSBD] SMS sent successfully to {$phone}.");
             return true;
         }
 
-        error_log("[sendSMS][BulkSMSBD] Failed (HTTP {$httpCode}): " . $response);
+        $bulkErrors = [
+            1001 => 'Invalid API Key. Please verify your Bulk SMS BD API key.',
+            1002 => 'Sender ID is not valid or not approved by BTRC/Operators.',
+            1003 => 'Account is inactive or suspended.',
+            1004 => 'Message contains forbidden or spam keywords.',
+            1005 => 'Invalid mobile phone number format.',
+            1006 => 'SMS message text is empty.',
+            1007 => 'Insufficient balance in your Bulk SMS BD account. Please recharge.',
+            1008 => 'Sender ID does not match mask type.',
+            1010 => 'SMS route is temporarily blocked.',
+            1011 => 'Invalid API Key or user not found in Bulk SMS BD.'
+        ];
+
+        $errMsg = $errorMsg ?: ($bulkErrors[$respCode] ?? "Bulk SMS BD rejected dispatch (Response Code: {$respCode}).");
+        $details['error'] = $errMsg;
+        $details['response_code'] = $respCode;
+        error_log("[sendSMS][BulkSMSBD] Failed (HTTP {$httpCode}, Code {$respCode}): " . $response);
         return false;
     }
 }

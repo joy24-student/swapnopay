@@ -27,15 +27,44 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   }, 5 * 60 * 1000)
 
   // ── Authentication Middleware for External Websites ──
-  const authenticateGatewayApiKey = (req, res, next) => {
+  // ── Authentication Middleware for External Websites ──
+  const authenticateGatewayApiKey = async (req, res, next) => {
     const rawHeader = req.headers['x-api-key'] || req.headers['authorization'] || ''
     const apiKey = rawHeader.startsWith('Bearer ') ? rawHeader.slice(7).trim() : rawHeader.trim()
+    const headerMerchantId = req.headers['x-merchant-id'] ? String(req.headers['x-merchant-id']).trim() : null
 
     // If API key is present, extract or associate merchant
     if (apiKey) {
-      req.merchant_id = apiKey.startsWith('sp_gw_m_')
-        ? apiKey.replace('sp_gw_m_', '').split('_')[0]
-        : apiKey
+      if (apiKey.startsWith('sp_gw_m_')) {
+        req.merchant_id = apiKey.replace('sp_gw_m_', '').split('_')[0]
+        return next()
+      }
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (uuidRegex.test(apiKey)) {
+        req.merchant_id = apiKey
+        return next()
+      }
+
+      if (headerMerchantId && uuidRegex.test(headerMerchantId)) {
+        req.merchant_id = headerMerchantId
+        return next()
+      }
+
+      // Try resolving via validateApiKey
+      try {
+        const { validateApiKey } = await import('../services/adminSupabase.js')
+        const { apiKeyDigest } = await import('../utils/crypto.js')
+        const keyRecord = await validateApiKey(apiKeyDigest(apiKey), apiKey)
+        if (keyRecord && keyRecord.merchant_id) {
+          req.merchant_id = keyRecord.merchant_id
+          return next()
+        }
+      } catch (err) {
+        // non-fatal
+      }
+
+      req.merchant_id = apiKey
       return next()
     }
 
@@ -231,12 +260,30 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
         })
       }
 
+      // Check if Android SIM gateway device is connected / active
+      let isDeviceOnline = heartbeatMap.has(req.merchant_id) ||
+        Boolean(io && io.sockets?.adapter?.rooms?.get(`merchant:${req.merchant_id}`)?.size > 0)
+
+      if (!isDeviceOnline) {
+        try {
+          const { getMerchantDeviceStatus } = await import('../services/adminSupabase.js')
+          const devStatus = await getMerchantDeviceStatus(req.merchant_id, heartbeatMap)
+          if (devStatus?.active) {
+            isDeviceOnline = true
+          }
+        } catch (_) {}
+      }
+
       return res.status(200).json({
         ok: true,
         job_id: jobId,
         phone: cleanPhone,
-        status: 'QUEUED',
-        message: 'Message queued for SIM cellular dispatch',
+        status: isDeviceOnline ? 'QUEUED' : 'QUEUED_DEVICE_OFFLINE',
+        device_online: isDeviceOnline,
+        warning: isDeviceOnline ? null : `No active Android SIM gateway device is connected for merchant ${req.merchant_id}`,
+        message: isDeviceOnline
+          ? 'Message queued for SIM cellular dispatch'
+          : 'Message queued on SwapnoPay Gateway, but merchant Android SIM device is currently offline. SMS will be dispatched as soon as the Android device reconnects.',
       })
     } catch (err) {
       console.error('[sms-gateway] send error:', err)
@@ -318,7 +365,7 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
   // 6. GET /v1/sms-gateway/stats
   // Gateway throughput and device status summary
   // ────────────────────────────────────────────────────────────────────────────
-  router.get('/stats', authenticateGatewayApiKey, (req, res) => {
+  router.get('/stats', authenticateGatewayApiKey, async (req, res) => {
     let queued = 0
     let sent = 0
     let failed = 0
@@ -331,7 +378,16 @@ export function smsGatewayRouter(io, heartbeatMap = new Map()) {
       }
     }
 
-    const isOnline = heartbeatMap.has(req.merchant_id)
+    let isOnline = heartbeatMap.has(req.merchant_id) ||
+      Boolean(io && io.sockets?.adapter?.rooms?.get(`merchant:${req.merchant_id}`)?.size > 0)
+
+    if (!isOnline) {
+      try {
+        const { getMerchantDeviceStatus } = await import('../services/adminSupabase.js')
+        const devStatus = await getMerchantDeviceStatus(req.merchant_id, heartbeatMap)
+        if (devStatus?.active) isOnline = true
+      } catch (_) {}
+    }
 
     return res.status(200).json({
       ok: true,

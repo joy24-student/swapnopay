@@ -2485,23 +2485,24 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
                             Icon(Icons.Default.Download, null, tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFF0F172A), modifier = Modifier.size(18.dp))
                         }
 
-                        // Share CSV Button
+                        // Appeals Hub Button (Replaces Share button per user request)
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFF1F5F9))
-                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFE2E8F0)), CircleShape)
+                                .background(if (isDarkMode) Color(0xFF261D11) else Color(0xFFFFFBEB))
+                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF5A441B) else Color(0xFFFDE68A)), CircleShape)
                                 .clickable {
-                                    if (payments.isEmpty()) {
-                                        android.widget.Toast.makeText(context, "No transactions to share", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        viewModel.shareTransactionsCsv(context, filteredPayments)
-                                    }
+                                    viewModel.navigateTo("Appeals")
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Share, null, tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFF0F172A), modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Gavel,
+                                contentDescription = "Appeals Hub",
+                                tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFD97706),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
 
                         // Filter Button
@@ -9012,5 +9013,4468 @@ fun AiCopilotScreen(viewModel: AppViewModel) {
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                      
-... [truncated for diff preview]
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { configGeminiModel = m },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isModelSelected) {
+                                            if (isDarkMode) Color(0xFF1E293B) else Color(0xFFEEF2FF)
+                                        } else {
+                                            if (isDarkMode) Color(0xFF141724) else Color(0xFFF8FAFC)
+                                        },
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isModelSelected) Color(0xFF6366F1) else cardBorder
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = m,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isModelSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isModelSelected) Color(0xFF6366F1) else textMain
+                                            )
+                                            if (isModelSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF6366F1),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "OpenRouter API Key(s) (কমা দিয়ে একাধিক কি যুক্ত করতে পারেন):",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textMain
+                            )
+                            OutlinedTextField(
+                                value = configOpenRouterKeys,
+                                onValueChange = { configOpenRouterKeys = it },
+                                placeholder = { Text("sk-or-v1-..., sk-or-v1-...", fontSize = 12.sp, color = textMuted) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+
+                        // Auto-approve checkbox
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { configAutoApprove = !configAutoApprove }
+                        ) {
+                            Checkbox(
+                                checked = configAutoApprove,
+                                onCheckedChange = { configAutoApprove = it }
+                            )
+                            Column {
+                                Text(
+                                    text = "Auto-Approve AI Ledger Entries",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textMain
+                                )
+                                Text(
+                                    text = "খসড়া লেনদেন নিশ্চিতকরণ ছাড়াই সরাসরি লেজারে সংরক্ষণ করুন",
+                                    fontSize = 10.5.sp,
+                                    color = textMuted
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.setSelectedAiProvider(configProvider)
+                                viewModel.updateGeminiApiKey(configGeminiKey)
+                                viewModel.setSelectedGeminiModel(configGeminiModel)
+                                viewModel.updateOpenRouterKeys(configOpenRouterKeys)
+                                viewModel.setAutoApproveAiActions(configAutoApprove)
+                                showKeysDialog = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                        ) {
+                            Text("সংরক্ষণ করুন (Save Settings)", fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            // ── 6. NATIVE GEMINI LIVE AUDIO CALL MODAL (🎙️ BidiGenerateContent WebSocket) ──
+            if (showVoiceChatModal) {
+                EnterpriseGestureModal(
+                    onDismissRequest = {
+                        viewModel.stopGeminiLiveConversation()
+                        showVoiceChatModal = false
+                    },
+                    title = "Gemini Live",
+                    subtitle = null,
+                    icon = Icons.Default.GraphicEq
+                ) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "geminiLivePulse")
+                    val basePulse by infiniteTransition.animateFloat(
+                        initialValue = 0.96f,
+                        targetValue = 1.06f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "baseOrbPulse"
+                    )
+
+                    val activeAudioBoost = maxOf(liveInputLevel, liveOutputLevel) * 0.35f
+                    val dynamicOrbScale = when (liveConnectionState) {
+                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING,
+                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING ->
+                            (basePulse + activeAudioBoost).coerceIn(0.92f, 1.35f)
+                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING -> basePulse
+                        else -> 1f
+                    }
+
+                    val isCallActive = liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING ||
+                        liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING ||
+                        liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // 1. Native Gemini Live Audio Orb
+                        Box(
+                            modifier = Modifier
+                                .size(132.dp)
+                                .scale(dynamicOrbScale)
+                                .clip(CircleShape)
+                                .background(
+                                    when (liveConnectionState) {
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING ->
+                                            Brush.radialGradient(listOf(Color(0xFF10B981), Color(0xFF06B6D4), Color(0x3310B981)))
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING ->
+                                            if (liveMicMuted) {
+                                                Brush.radialGradient(listOf(Color(0xFFF59E0B), Color(0xFFD97706), Color(0x33F59E0B)))
+                                            } else {
+                                                Brush.radialGradient(listOf(Color(0xFF6366F1), Color(0xFF38BDF8), Color(0x336366F1)))
+                                            }
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING ->
+                                            Brush.radialGradient(listOf(Color(0xFFA855F7), Color(0xFFEC4899), Color(0x33A855F7)))
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR ->
+                                            Brush.radialGradient(listOf(Color(0xFFEF4444), Color(0xFFB91C1C), Color(0x33EF4444)))
+                                        else ->
+                                            Brush.radialGradient(listOf(Color(0xFF475569), Color(0xFF334155), Color(0x22475569)))
+                                    }
+                                )
+                                .clickable {
+                                    if (isCallActive) {
+                                        viewModel.geminiLiveSession.toggleMicMute()
+                                    } else {
+                                        startVoiceChatListening()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Live 5-Bar Equalizer Visualizer inside Orb when Connected
+                            if (liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING ||
+                                liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING
+                            ) {
+                                val level = maxOf(liveInputLevel, liveOutputLevel).coerceAtLeast(0.12f)
+                                val multipliers = listOf(0.55f, 0.85f, 1.0f, 0.8f, 0.5f)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    multipliers.forEach { mult ->
+                                        val barHeight = (16f + (level * mult * 46f)).coerceIn(14f, 62f)
+                                        Box(
+                                            modifier = Modifier
+                                                .width(6.dp)
+                                                .height(barHeight.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(Color.White)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = when (liveConnectionState) {
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING -> Icons.Default.Sync
+                                        com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR -> Icons.Default.ErrorOutline
+                                        else -> Icons.Default.GraphicEq
+                                    },
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                            }
+                        }
+
+                        // 2. Live Status Pill
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = when (liveConnectionState) {
+                                com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING -> Color(0xFF10B981).copy(alpha = 0.15f)
+                                com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING -> Color(0xFF6366F1).copy(alpha = 0.15f)
+                                com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING -> Color(0xFFA855F7).copy(alpha = 0.15f)
+                                com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR -> Color(0xFFEF4444).copy(alpha = 0.15f)
+                                else -> if (isDarkMode) Color(0xFF1E2333) else Color(0xFFF1F5F9)
+                            },
+                            border = BorderStroke(
+                                1.dp,
+                                when (liveConnectionState) {
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING -> Color(0xFF10B981)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING -> Color(0xFF6366F1)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING -> Color(0xFFA855F7)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR -> Color(0xFFEF4444)
+                                    else -> cardBorder
+                                }
+                            )
+                        ) {
+                            Text(
+                                text = liveStatusText,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when (liveConnectionState) {
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.AI_SPEAKING -> Color(0xFF10B981)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTED_LISTENING -> Color(0xFF6366F1)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.CONNECTING -> Color(0xFFA855F7)
+                                    com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR -> Color(0xFFEF4444)
+                                    else -> textMain
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        // 3. Inline API Key Setup if missing or error
+                        if (geminiKey.isBlank() || liveConnectionState == com.example.data.remote.GeminiLiveSessionManager.LiveConnectionState.ERROR) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isDarkMode) Color(0xFF1E1B2E) else Color(0xFFFFFBEB)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (!liveErrorMsg.isNullOrBlank()) {
+                                        Text(
+                                            text = "⚠️ $liveErrorMsg",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFEF4444)
+                                        )
+                                    }
+                                    OutlinedTextField(
+                                        value = inlineLiveApiKey,
+                                        onValueChange = { inlineLiveApiKey = it },
+                                        placeholder = { Text("Gemini API Key (AIzaSy...)", fontSize = 12.sp, color = textMuted) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (inlineLiveApiKey.isNotBlank()) {
+                                                viewModel.updateGeminiApiKey(inlineLiveApiKey.trim())
+                                                startVoiceChatListening()
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                                    ) {
+                                        Icon(Icons.Default.GraphicEq, null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("সংরক্ষণ ও শুরু করুন", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // 4. Compact Voice Selector Pills (Aoede, Puck, Kore, Fenrir, Charon)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                        ) {
+                            com.example.data.remote.GeminiLiveSessionManager.VOICE_OPTIONS.forEach { voiceOpt ->
+                                val isSelected = liveVoiceName == voiceOpt.id
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .clickable {
+                                            viewModel.geminiLiveSession.setVoiceName(voiceOpt.id)
+                                            if (isCallActive) {
+                                                startVoiceChatListening()
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = if (isSelected) Color(0xFF6366F1) else (if (isDarkMode) Color(0xFF181C2E) else Color(0xFFF1F5F9)),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF6366F1) else cardBorder)
+                                ) {
+                                    Text(
+                                        text = voiceOpt.id,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else textMain,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // 5. Live Function Tool Call Execution Feed (only when actions executed)
+                        if (liveActionLogs.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isDarkMode) Color(0xFF11221F) else Color(0xFFECFDF5)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    liveActionLogs.forEach { logItem ->
+                                        Text(
+                                            text = logItem,
+                                            fontSize = 12.sp,
+                                            color = textMain
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 6. Full-Duplex Call Controls (Mute / Show Live Photo / End or Start Call)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (isCallActive) {
+                                // Mute / Unmute Mic Button
+                                OutlinedButton(
+                                    onClick = { viewModel.geminiLiveSession.toggleMicMute() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, if (liveMicMuted) Color(0xFFF59E0B) else cardBorder)
+                                ) {
+                                    Icon(
+                                        imageVector = if (liveMicMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                                        contentDescription = "Mute",
+                                        tint = if (liveMicMuted) Color(0xFFF59E0B) else textMain,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (liveMicMuted) "আনমিউট" else "মিউট",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (liveMicMuted) Color(0xFFF59E0B) else textMain
+                                    )
+                                }
+
+                                // Show Live Photo / Receipt to Gemini Live
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.isExternalActivityExpected = true
+                                        liveCameraFrameLauncher.launch(null)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF6366F1).copy(alpha = 0.6f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Send Live Photo",
+                                        tint = Color(0xFF6366F1),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "ছবি",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6366F1)
+                                    )
+                                }
+
+                                // End Call Button
+                                Button(
+                                    onClick = {
+                                        viewModel.stopGeminiLiveConversation()
+                                        showVoiceChatModal = false
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                                ) {
+                                    Icon(Icons.Default.CallEnd, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("সমাপ্ত", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            } else {
+                                Button(
+                                    onClick = { startVoiceChatListening() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                                ) {
+                                    Icon(Icons.Default.GraphicEq, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "শুরু করুন",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 7. VOICE CONFIRMATION DIALOG ──────────────────────────────────────────
+            if (showVoiceConfirmDialog.value != null) {
+                val json = showVoiceConfirmDialog.value!!
+                var editName by remember { mutableStateOf(json.optString("name", json.optString("customer", "সাধারণ"))) }
+                var editPhone by remember { mutableStateOf(json.optString("phone", "")) }
+                var editProduct by remember { mutableStateOf(json.optString("product", "সাধারণ")) }
+                var editQty by remember { mutableStateOf(json.optString("qty", "1 pcs")) }
+                var editAmount by remember { mutableStateOf(json.optDouble("amount", 0.0).let { if (it > 0) it.toString() else "" }) }
+                var editType by remember { mutableStateOf(json.optString("type", "credit")) }
+                var editNote by remember { mutableStateOf(json.optString("note", "")) }
+                var validationError by remember { mutableStateOf("") }
+
+                EnterpriseGestureModal(
+                    onDismissRequest = { showVoiceConfirmDialog.value = null },
+                    title = "এআই ভয়েস এন্ট্রি নিশ্চিতকরণ",
+                    subtitle = "লেনদেনের তথ্যসমূহ যাচাই বা সংশোধন করুন",
+                    icon = Icons.Default.CheckCircle
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Transaction Type Selector
+                        Text("লেনদেনের ধরন (Transaction Type)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textMain)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf(
+                                "credit" to "বাকি",
+                                "payment" to "জমা",
+                                "expense" to "খরচ",
+                                "supplier_credit" to "মহাজন বাকি"
+                            ).forEach { (typeVal, typeLabel) ->
+                                val selected = editType == typeVal
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { editType = typeVal },
+                                    label = { Text(typeLabel, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { editName = it; validationError = "" },
+                            label = {
+                                Text(
+                                    when (editType) {
+                                        "expense" -> "খরচের খাত / শিরোনাম (Expense Category)"
+                                        "supplier_credit", "supplier_payment" -> "মহাজনের নাম (Supplier Name)"
+                                        else -> "গ্রাহকের নাম (Customer Name)"
+                                    }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (editType != "expense") {
+                            OutlinedTextField(
+                                value = editPhone,
+                                onValueChange = { v ->
+                                    editPhone = v.filter { it.isDigit() }.take(11)
+                                    validationError = ""
+                                },
+                                label = { Text("মোবাইল নম্বর (Customer Mobile)") },
+                                placeholder = { Text("01712345678") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        if (editType != "expense") {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = editProduct,
+                                    onValueChange = { editProduct = it },
+                                    label = { Text("পণ্যের নাম (Product)") },
+                                    modifier = Modifier.weight(1.3f)
+                                )
+                                OutlinedTextField(
+                                    value = editQty,
+                                    onValueChange = { editQty = it },
+                                    label = { Text("পরিমাণ (Qty)") },
+                                    modifier = Modifier.weight(0.9f)
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = editAmount,
+                            onValueChange = { editAmount = it; validationError = "" },
+                            label = { Text("টাকার পরিমাণ (Amount BDT)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = editNote,
+                            onValueChange = { editNote = it },
+                            label = { Text("বিবরণ / মন্তব্য (Note)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (validationError.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Warning, null, tint = ErrorRed, modifier = Modifier.size(14.dp))
+                                Text(validationError, color = ErrorRed, fontSize = 11.5.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Button(
+                            onClick = {
+                                val finalAmount = editAmount.toDoubleOrNull() ?: 0.0
+                                if (finalAmount <= 0.0) {
+                                    validationError = "অনুগ্রহ করে সঠিক টাকার পরিমাণ দিন।"
+                                    return@Button
+                                }
+                                validationError = ""
+
+                                if (editType == "expense") {
+                                    viewModel.addExpense(
+                                        category = editName.ifBlank { "সাধারণ খরচ" },
+                                        amount = finalAmount,
+                                        description = editNote.ifBlank { "ভয়েস এন্ট্রি: $editName" }
+                                    )
+                                } else if (editType == "supplier_credit" || editType == "supplier_payment") {
+                                    val cleanPhone = editPhone.filter { it.isDigit() }
+                                    val matchedSup = viewModel.suppliers.value.find {
+                                        it.name.equals(editName, ignoreCase = true) ||
+                                        (cleanPhone.isNotEmpty() && it.phone == cleanPhone)
+                                    }
+                                    val supplierId = matchedSup?.id ?: run {
+                                        val newId = java.util.UUID.randomUUID().toString()
+                                        val supPhone = if (cleanPhone.length >= 10) cleanPhone else "01800000000"
+                                        viewModel.addSupplier(name = editName.ifBlank { "মহাজন" }, phone = supPhone, initialBalance = 0.0, id = newId)
+                                        newId
+                                    }
+                                    val supType = if (editType == "supplier_credit") "credit" else "payment"
+                                    viewModel.addLedgerTransaction(
+                                        customerId = null,
+                                        supplierId = supplierId,
+                                        type = supType,
+                                        amount = finalAmount,
+                                        note = editNote.ifBlank { "$editProduct ($editQty) parsed via voice input." },
+                                        isVoice = true
+                                    )
+                                } else {
+                                    // Customer credit or payment
+                                    val cleanPhone = editPhone.filter { it.isDigit() }
+                                    val matchedCust = viewModel.customers.value.find {
+                                        it.name.equals(editName, ignoreCase = true) ||
+                                        (cleanPhone.isNotEmpty() && it.phone == cleanPhone)
+                                    }
+                                    val customerId = matchedCust?.id ?: run {
+                                        val newId = java.util.UUID.randomUUID().toString()
+                                        if (cleanPhone.length < 10) {
+                                            validationError = "নতুন গ্রাহকের জন্য ১১ সংখ্যার সঠিক মোবাইল নম্বর দিন।"
+                                            return@Button
+                                        }
+                                        viewModel.addCustomer(name = editName.ifBlank { "গ্রাহক" }, phone = cleanPhone, initialBalance = 0.0, id = newId)
+                                        newId
+                                    }
+                                    viewModel.addLedgerTransaction(
+                                        customerId = customerId,
+                                        supplierId = null,
+                                        type = editType,
+                                        amount = finalAmount,
+                                        note = editNote.ifBlank { "$editProduct ($editQty) parsed via voice input." },
+                                        isVoice = true
+                                    )
+
+                                    if (editType == "credit") {
+                                        val matchedProd = viewModel.products.value.find { it.name.equals(editProduct, ignoreCase = true) }
+                                        if (matchedProd != null) {
+                                            val qtyVal = editQty.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 1.0
+                                            viewModel.recordStockChange(matchedProd.id, "out", qtyVal, matchedProd.salePrice)
+                                        }
+                                    }
+                                }
+                                showVoiceConfirmDialog.value = null
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+                        ) {
+                            Text("খতিয়ানে সংরক্ষণ করুন", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            // ── 8. MULTIMODAL ATTACHMENT MODAL (Photo & Document to AI) ────────────
+            if (showAttachModal) {
+                EnterpriseGestureModal(
+                    onDismissRequest = { showAttachModal = false },
+                    title = "এআই ফটো ও ফাইল আপলোড",
+                    subtitle = "রসিদ, ভাউচার, পণ্যের ছবি বা হিসাবের ডকুমেন্ট পাঠান",
+                    icon = Icons.Default.AttachFile
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Current attachment status if any
+                        if (attachedImageBitmap != null || attachedFileName != null) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isDarkMode) Color(0xFF161F38) else Color(0xFFEFF6FF)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        if (attachedImageBitmap != null) {
+                                            Image(
+                                                bitmap = attachedImageBitmap!!.asImageBitmap(),
+                                                contentDescription = "Thumbnail",
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .clip(RoundedCornerShape(8.dp)),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.Description,
+                                                contentDescription = null,
+                                                tint = Color(0xFF3B82F6),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = attachedFileName ?: "সংযুক্ত ফাইল",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textMain,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "পাঠানোর জন্য প্রস্তুত 🚀",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF10B981)
+                                            )
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            attachedImageBase64 = null
+                                            attachedImageBitmap = null
+                                            attachedImageMimeType = "image/jpeg"
+                                            attachedFileName = null
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = textMuted,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3 Primary Upload Action Cards
+                        // 1. Camera
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showAttachModal = false
+                                    viewModel.isExternalActivityExpected = true
+                                    cameraPhotoLauncher.launch(null)
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDarkMode) Color(0xFF141829) else Color(0xFFF8FAFC)
+                            ),
+                            border = BorderStroke(1.dp, cardBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = Color(0xFF3B82F6),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "📸 ক্যামেরা দিয়ে ছবি তুলুন (Take Photo)",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textMain
+                                    )
+                                    Text(
+                                        text = "রসিদ, ভাউচার বা পণ্যের সরাসরি ছবি তুলুন",
+                                        fontSize = 11.sp,
+                                        color = textMuted
+                                    )
+                                }
+
+                                Icon(Icons.Default.ChevronRight, null, tint = textMuted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // 2. Gallery
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showAttachModal = false
+                                    viewModel.isExternalActivityExpected = true
+                                    galleryPhotoLauncher.launch("image/*")
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDarkMode) Color(0xFF141829) else Color(0xFFF8FAFC)
+                            ),
+                            border = BorderStroke(1.dp, cardBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF10B981).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Collections,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "🖼️ গ্যালারি থেকে ছবি নিন (Choose Image)",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textMain
+                                    )
+                                    Text(
+                                        text = "গ্যালারিতে সংরক্ষিত যেকোনো চালান বা বিল নির্বাচন করুন",
+                                        fontSize = 11.sp,
+                                        color = textMuted
+                                    )
+                                }
+
+                                Icon(Icons.Default.ChevronRight, null, tint = textMuted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // 3. Document / PDF
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showAttachModal = false
+                                    viewModel.isExternalActivityExpected = true
+                                    fileDocLauncher.launch("*/*")
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDarkMode) Color(0xFF141829) else Color(0xFFF8FAFC)
+                            ),
+                            border = BorderStroke(1.dp, cardBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFFF59E0B).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureAsPdf,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "📄 পিডিএফ বা টেক্সট ডকুমেন্ট (PDF / Text File)",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textMain
+                                    )
+                                    Text(
+                                        text = "সাপ্লায়ার ইনভয়েস, পিডিএফ রিপোর্ট বা নোট ফাইল",
+                                        fontSize = 11.sp,
+                                        color = textMuted
+                                    )
+                                }
+
+                                Icon(Icons.Default.ChevronRight, null, tint = textMuted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // Fast Sample Invoices for Instant Testing
+                        Text(
+                            text = "💡 দ্রুত পরীক্ষার জন্য নমুনা মেমো (Quick Sample Invoices):",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textMuted
+                        )
+
+                        val sampleInvoices = listOf(
+                            "পাইকারি মুদি মেমো" to "মেসার্স ভাই ভাই এন্টারপ্রাইজ (পাইকারি আড়ৎ)\nচাল মিনিকেট ২৫ কেজি - ১৮০০ টাকা\nমশুর ডাল ৫ কেজি - ৬৫০ টাকা\nচিনি ১০ কেজি - ১৩৫০ টাকা\nমোট প্রদেয়: ৩৮০০ টাকা",
+                            "ডিলার ক্যাশ মেমো" to "মেসার্স মেঘনা ডিস্ট্রিবিউশন\nফ্রেশ সয়াবিন তেল ২০ লিটার - ৩৪০০ টাকা\nময়দা ২ বস্তা - ২৬০০ টাকা\nমোট টাকা: ৬০০০ টাকা",
+                            "দোকান ভাড়া ও বিদ্যুৎ" to "দোকান ভাড়া ও বিদ্যুৎ বিল\nতারিখ: চলতি মাস\nবিল নং: DPDC-88421\nমোট টাকা: ৪৫০০ টাকা"
+                        )
+
+                        sampleInvoices.forEach { (label, content) ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        userText = "এই রসিদটি বিশ্লেষণ করে হিসাব ও কেনাকাটার তালিকা দিন:\n$content"
+                                        showAttachModal = false
+                                    },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isDarkMode) Color(0xFF161B2E) else Color(0xFFF1F5F9),
+                                border = BorderStroke(0.8.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "🧾 $label",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = textMain
+                                    )
+                                    Text(
+                                        text = "টেস্ট করুন →",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF6366F1),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 8B. AI MEMORY MANAGER MODAL (ব্যবসায়িক মেমোরি) ──────────────────────────
+            if (showMemoryModal) {
+                EnterpriseGestureModal(
+                    onDismissRequest = { showMemoryModal = false },
+                    title = "স্বপ্ন এআই মেমোরি (AI Memory)",
+                    subtitle = "আপনার ব্যবসার নিয়ম ও বিশেষ তথ্য যা এআই মনে রাখবে",
+                    icon = Icons.Default.Psychology
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Input new memory row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newMemoryText,
+                                onValueChange = { newMemoryText = it },
+                                placeholder = {
+                                    Text(
+                                        text = "যেমন: শুক্রবার দোকান বন্ধ থাকে / নগদ বিক্রয়ে ২% ছাড়",
+                                        fontSize = 11.5.sp,
+                                        color = textMuted
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                maxLines = 2
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (newMemoryText.isNotBlank()) {
+                                        viewModel.addAiMemoryItem(newMemoryText.trim())
+                                        newMemoryText = ""
+                                        Toast.makeText(context, "নতুন তথ্য মেমোরিতে যোগ হয়েছে! 🧠", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                                modifier = Modifier.height(52.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add")
+                            }
+                        }
+
+                        // Preset Memory Suggestions
+                        Text(
+                            text = "💡 দ্রুত যুক্ত করার জন্য প্রস্তুত তথ্য (Quick Presets):",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textMuted
+                        )
+
+                        val presetMemories = listOf(
+                            "দোকানের সাপ্তাহিক ছুটি শুক্রবার",
+                            "বাকি দেওয়ার সর্বোচ্চ সীমা ৫,০০০ টাকা",
+                            "নগদ পরিশোধে ২% বিশেষ ছাড় প্রযোজ্য",
+                            "চাল ও সয়াবিন তেল সবচেয়ে দ্রুত বিক্রি হওয়া পণ্য"
+                        )
+
+                        presetMemories.forEach { preset ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        viewModel.addAiMemoryItem(preset)
+                                        Toast.makeText(context, "মেমোরিতে যুক্ত হয়েছে 🧠", Toast.LENGTH_SHORT).show()
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isDarkMode) Color(0xFF161B2E) else Color(0xFFF1F5F9),
+                                border = BorderStroke(0.8.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "➕ $preset",
+                                        fontSize = 11.5.sp,
+                                        color = textMain
+                                    )
+                                    Text(
+                                        text = "যোগ করুন",
+                                        fontSize = 10.5.sp,
+                                        color = Color(0xFF6366F1),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Saved Memory List Header
+                        val memoryItems = remember(aiMemory) { viewModel.getAiMemoryItems() }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🧠 সংরক্ষিত মেমোরিসমূহ (${memoryItems.size})",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textMain
+                            )
+
+                            if (memoryItems.isNotEmpty()) {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.clearAiMemory()
+                                        Toast.makeText(context, "সব মেমোরি মোছা হয়েছে", Toast.LENGTH_SHORT).show()
+                                    }
+                                ) {
+                                    Text("সব মুছুন", fontSize = 11.5.sp, color = Color.Red)
+                                }
+                            }
+                        }
+
+                        // Memory List Items
+                        if (memoryItems.isEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isDarkMode) Color(0xFF141829) else Color(0xFFF8FAFC)
+                                ),
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Psychology,
+                                        contentDescription = null,
+                                        tint = textMuted,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "বর্তমানে কোনো বিশেষ মেমোরি সংরক্ষিত নেই",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = textMain
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "দোকানের নিয়ম বা গুরুত্বপূর্ণ তথ্য যোগ করুন। জেমিনাই কথোপকথনের সময় এগুলো মনে রাখবে।",
+                                        fontSize = 11.sp,
+                                        color = textMuted,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            memoryItems.forEachIndexed { idx, mem ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isDarkMode) Color(0xFF161F38) else Color(0xFFF8FAFC)
+                                    ),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text("🧠", fontSize = 14.sp)
+                                            Text(
+                                                text = mem,
+                                                fontSize = 12.5.sp,
+                                                color = textMain,
+                                                lineHeight = 16.sp
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.removeAiMemoryItem(idx)
+                                                Toast.makeText(context, "মেমোরি মোছা হয়েছে", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DeleteOutline,
+                                                contentDescription = "Delete Memory",
+                                                tint = textMuted,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 9. SLIDING SIDE DRAWER FOR HISTORY & NAVIGATION MENU ─────────────────
+            if (showHistoryDrawer) {
+                // Semi-transparent Scrim Backdrop
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { showHistoryDrawer = false }
+                )
+
+                // Sliding Sidebar Drawer Content from Left Side
+                AnimatedVisibility(
+                    visible = showHistoryDrawer,
+                    enter = slideInHorizontally(initialOffsetX = { -it }),
+                    exit = slideOutHorizontally(targetOffsetX = { -it }),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(310.dp),
+                        color = if (isDarkMode) Color(0xFF0D1224) else Color.White,
+                        shadowElevation = 16.dp,
+                        border = BorderStroke(1.dp, cardBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                                .padding(16.dp)
+                        ) {
+                            // Drawer Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(Color(0xFF6366F1), Color(0xFFA855F7))
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "AI Copilot Hub",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textMain
+                                        )
+                                        Text(
+                                            text = "ইতিহাস ও অপশনসমূহ",
+                                            fontSize = 11.sp,
+                                            color = textMuted
+                                        )
+                                    }
+                                }
+
+                                IconButton(onClick = { showHistoryDrawer = false }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = textMuted
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Quick Menu Options
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "নেভিগেশন ও শর্টকাট (Quick Actions)",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textMuted
+                                )
+
+                                // Create Action
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.clearChat()
+                                            showHistoryDrawer = false
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isDarkMode) Color(0xFF161F38) else Color(0xFFF1F5F9)
+                                    ),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = Color(0xFF6366F1),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "নতুন বার্তা (Create New Prompt)",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = textMain
+                                            )
+                                            Text(
+                                                text = "নতুন এআই বিশ্লেষণ বা প্রশ্ন শুরু করুন",
+                                                fontSize = 10.5.sp,
+                                                color = textMuted
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Devices & Hardware Shortcut
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showHistoryDrawer = false
+                                            viewModel.navigateTo("DeviceManager")
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isDarkMode) Color(0xFF161F38) else Color(0xFFF1F5F9)
+                                    ),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Devices,
+                                            contentDescription = null,
+                                            tint = Color(0xFF8B5CF6),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Devices & POS (ডিভাইস)",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = textMain
+                                            )
+                                            Text(
+                                                text = "প্রিন্টার, POS ও কার্ড রিডার সেটিংস",
+                                                fontSize = 10.5.sp,
+                                                color = textMuted
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // History Search Bar
+                            OutlinedTextField(
+                                value = historySearchQuery,
+                                onValueChange = { historySearchQuery = it },
+                                placeholder = { Text("ইতিহাস বা প্রশ্ন খুঁজুন...", fontSize = 12.sp, color = textMuted) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = textMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (historySearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { historySearchQuery = "" }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Clear,
+                                                contentDescription = null,
+                                                tint = textMuted,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = if (isDarkMode) Color(0xFF131A2E) else Color(0xFFF8FAFC),
+                                    unfocusedContainerColor = if (isDarkMode) Color(0xFF131A2E) else Color(0xFFF8FAFC),
+                                    focusedBorderColor = Color(0xFF6366F1),
+                                    unfocusedBorderColor = cardBorder
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🕒 সংরক্ষিত আলোচনা (Chat Windows)",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textMain
+                                )
+                                Text(
+                                    text = "${savedChatSessions.size} Windows",
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF6366F1),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // History Item List (Full Chat Windows)
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val filteredSessions = savedChatSessions.filter { session ->
+                                    historySearchQuery.isEmpty() ||
+                                        session.title.contains(historySearchQuery, ignoreCase = true) ||
+                                        session.messages.any { (it["content"] ?: "").contains(historySearchQuery, ignoreCase = true) }
+                                }
+
+                                if (filteredSessions.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(28.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (historySearchQuery.isEmpty()) "কোনো সংরক্ষিত চ্যাট উইন্ডো নেই" else "কোনো মিল পাওয়া যায়নি",
+                                                fontSize = 12.sp,
+                                                color = textMuted
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    items(filteredSessions, key = { it.id }) { session ->
+                                        val isActive = session.id == currentSessionId
+                                        val dateStr = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(session.timestamp))
+
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.loadChatSession(session.id)
+                                                    showHistoryDrawer = false
+                                                },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isActive) (if (isDarkMode) Color(0xFF1E243A) else Color(0xFFEEF2FF)) else (if (isDarkMode) Color(0xFF131A2E) else Color(0xFFF8FAFC))
+                                            ),
+                                            border = BorderStroke(if (isActive) 1.2.dp else 0.8.dp, if (isActive) Color(0xFF6366F1) else cardBorder)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (isActive) Color(0xFF6366F1) else (if (isDarkMode) Color(0xFF232B3E) else Color(0xFFE2E8F0))),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.ChatBubbleOutline,
+                                                        contentDescription = null,
+                                                        tint = if (isActive) Color.White else (if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF64748B)),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = session.title,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = textMain,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.weight(1f, fill = false)
+                                                        )
+                                                        if (isActive) {
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = Color(0xFF6366F1)
+                                                            ) {
+                                                                Text(
+                                                                    text = "Open",
+                                                                    fontSize = 9.sp,
+                                                                    color = Color.White,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Spacer(modifier = Modifier.height(3.dp))
+
+                                                    Text(
+                                                        text = "$dateStr • ${session.messages.size} Messages",
+                                                        fontSize = 11.sp,
+                                                        color = textMuted
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { viewModel.deleteChatSession(session.id) },
+                                                    modifier = Modifier.size(26.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Close,
+                                                        contentDescription = "Delete window",
+                                                        tint = textMuted,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Drawer Footer Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { viewModel.clearAllChatSessions() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Clear All", fontSize = 11.sp, color = Color(0xFFEF4444))
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.startNewChatSession()
+                                        showHistoryDrawer = false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("New Window", fontSize = 11.sp, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActionConfirmationCard(
+    actionJsonStr: String,
+    isDarkMode: Boolean,
+    viewModel: AppViewModel
+) {
+    var isConfirmed by remember { mutableStateOf(false) }
+    var isCancelled by remember { mutableStateOf(false) }
+    var statusText by remember { mutableStateOf("") }
+    
+    val obj = remember(actionJsonStr) {
+        try {
+            JSONObject(actionJsonStr)
+        } catch(e: Exception) {
+            null
+        }
+    }
+    
+    if (obj == null) return
+    
+    val action = obj.optString("action")
+    val params = obj.optJSONObject("parameters") ?: JSONObject()
+    
+    if (isCancelled) {
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1E1418) else Color(0xFFFFECEF)),
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Text(
+                text = "❌ বাতিল করা হয়েছে",
+                modifier = Modifier.padding(12.dp),
+                fontSize = 11.sp,
+                color = ErrorRed,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        return
+    }
+    
+    if (isConfirmed) {
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF10261A) else Color(0xFFEBFDF2)),
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Text(
+                text = if (statusText.isNotEmpty()) "✅ $statusText" else "✅ সম্পন্ন করা হয়েছে",
+                modifier = Modifier.padding(12.dp),
+                fontSize = 11.sp,
+                color = SuccessGreen,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        return
+    }
+    
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, BrandPurple.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1B1832) else Color(0xFFF3EFFF)),
+        modifier = Modifier.widthIn(max = 280.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "🤖 এআই খসড়া এন্ট্রি (AI Draft Action)",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                color = BrandPurple,
+                letterSpacing = 0.5.sp
+            )
+            
+            var nameVal by remember {
+                mutableStateOf(params.optString("name", params.optString("customer_name", params.optString("product_name", params.optString("supplier_name", "")))))
+            }
+            var phoneVal by remember { mutableStateOf(params.optString("phone", params.optString("recipient_phone", ""))) }
+            var amountVal by remember {
+                mutableStateOf(params.optDouble("amount", params.optDouble("sale_price", params.optDouble("price", 0.0))).toString())
+            }
+            var noteVal by remember {
+                mutableStateOf(params.optString("note", params.optString("message", params.optString("description", params.optString("product_name", "")))))
+            }
+            
+            when (action) {
+                "add_customer" -> {
+                    Text("গ্রাহক যোগ (Add Customer): $nameVal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    if (phoneVal.isNotBlank()) Text("মোবাইল: $phoneVal", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_supplier" -> {
+                    Text("মহাজন/সাপ্লায়ার যোগ (Add Supplier): $nameVal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    if (phoneVal.isNotBlank()) Text("মোবাইল: $phoneVal", color = BrandPurple, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_product" -> {
+                    val stock = params.optDouble("stock", params.optDouble("quantity", 0.0))
+                    val unit = params.optString("unit", "pcs")
+                    Text("পণ্য যোগ (Add Product): $nameVal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("স্টক: $stock $unit | বিক্রয় মূল্য: ৳$amountVal", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_inventory", "update_inventory", "record_stock" -> {
+                    val pName = params.optString("product_name", nameVal)
+                    val qty = params.optDouble("quantity", params.optDouble("stock", 0.0))
+                    val type = if (params.optString("type", "in") == "out") "স্টক আউট (-)" else "স্টক ইন (+)"
+                    Text("ইনভেন্টরি আপডেট: $pName", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("প্রকার: $type | পরিমাণ: $qty", color = BrandPurple, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "complete_sale", "create_sale", "new_sale" -> {
+                    val pName = params.optString("product_name", "General Sale")
+                    val payType = params.optString("payment_type", "Cash")
+                    Text("নতুন বিক্রয় (POS Sale): $pName", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("পেমেন্ট টাইপ: $payType | পরিমাণ: ৳$amountVal", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "send_sms", "send_due_sms", "send_offer_sms" -> {
+                    val smsType = params.optString("type", "individual").uppercase()
+                    Text("এসএমএস পাঠানো ($smsType SMS): $phoneVal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                "resolve_appeal", "approve_appeal", "reject_appeal" -> {
+                    val aId = params.optString("appeal_id").take(8)
+                    val aStatus = if (action == "reject_appeal" || params.optString("status").uppercase() == "REJECTED") "REJECTED" else "APPROVED"
+                    Text("পেমেন্ট আপিল নিষ্পত্তি: #$aId", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("সিদ্ধান্ত: $aStatus (গ্রাহককে ইমেইল পাঠানো হবে)", color = if (aStatus == "APPROVED") SuccessGreen else ErrorRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_customer_credit", "add_customer_payment" -> {
+                    val name = params.optString("customer_name", nameVal)
+                    val typeLabel = if (action == "add_customer_credit") "বাকি (Credit)" else "জমা (Payment)"
+                    Text("গ্রাহক: $name", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("প্রকার: $typeLabel", color = if (action == "add_customer_credit") ErrorRed else SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_supplier_credit", "add_supplier_payment" -> {
+                    val name = params.optString("supplier_name", nameVal)
+                    val typeLabel = if (action == "add_supplier_credit") "বাকি (Payable)" else "জমা (Paid)"
+                    Text("মহাজন: $name", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("প্রকার: $typeLabel", color = if (action == "add_supplier_credit") ErrorRed else SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                "add_expense" -> {
+                    val category = params.optString("expense_category", params.optString("category", "Others"))
+                    Text("খরচের ক্যাটাগরি: $category", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+            
+            OutlinedTextField(
+                value = amountVal,
+                onValueChange = { amountVal = it },
+                label = { Text("টাকার পরিমাণ / মূল্য (Amount/Price)", fontSize = 10.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                textStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            )
+            OutlinedTextField(
+                value = noteVal,
+                onValueChange = { noteVal = it },
+                label = { Text("নোট / বিবরণ / বার্তা (Note/Message)", fontSize = 10.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                textStyle = TextStyle(fontSize = 11.sp)
+            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = { isCancelled = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                ) {
+                    Text("বাতিল", fontSize = 11.sp)
+                }
+                Button(
+                    onClick = {
+                        try {
+                            val parsedAmt = amountVal.toDoubleOrNull() ?: 0.0
+                            params.put("amount", parsedAmt)
+                            params.put("sale_price", parsedAmt)
+                            params.put("price", parsedAmt)
+                            params.put("note", noteVal)
+                            params.put("message", noteVal)
+                            params.put("description", noteVal)
+                            if (nameVal.isNotBlank()) {
+                                params.put("name", nameVal)
+                                params.put("customer_name", nameVal)
+                                params.put("supplier_name", nameVal)
+                                params.put("product_name", nameVal)
+                            }
+                            if (phoneVal.isNotBlank()) {
+                                params.put("phone", phoneVal)
+                                params.put("recipient_phone", phoneVal)
+                            }
+                            obj.put("parameters", params)
+                        } catch(e: Exception) {}
+                        
+                        viewModel.executeCopilotAction(obj.toString()) { result ->
+                            statusText = result
+                            isConfirmed = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("নিশ্চিত", fontSize = 11.sp, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GoldFeaturesScreen(viewModel: AppViewModel) {
+    val languageState by viewModel.language.collectAsState()
+
+    Scaffold(
+        containerColor = AppScreenBg,
+        topBar = {
+            GradientTopBar(
+                title = "SwapnoPay Gold Features",
+                subtitle = "Premium benefits & multi-business support",
+                onBack = { viewModel.goBack() },
+                gradient = GradPrimary
+            )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            EnterpriseCard(gradient = GradPrimary) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("SwapnoPay Gold 🌟", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = AppTextPrimary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("স্মার্ট ব্যবসার ডিজিটাল খতিয়ান ও এআই সহকারী", fontSize = 12.sp, color = AppTextSecondary)
+                }
+            }
+
+            Text("গোল্ড প্ল্যানের সুবিধাসমূহ (Premium Benefits):", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AppTextPrimary)
+
+            listOf(
+                "১. আনলিমিটেড মাল্টি-বিজনেস অ্যাকাউন্ট (Gold Multi-business)",
+                "২. উন্নত স্টক ও ইনভেন্টরি এলার্ট (Advanced Inventory)",
+                "৩. আনলিমিটেড এআই ভয়েস বুকিং ও রসিদ স্ক্যানিং",
+                "৪. গ্রাহকদের অটোমেটিক তাগাদা রিমাইন্ডার ও পেমেন্ট লিংক",
+                "৫. পিডিএফ ও এক্সেল রিপোর্ট ডাউনলোড এবং শেয়ার করার সুবিধা",
+                "৬. ক্লাউডে অটোমেটিক ১০০% ডাটা ব্যাকআপ ও রিকভারি"
+            ).forEach { feat ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppCardBg)
+                ) {
+                    Text(feat, modifier = Modifier.padding(12.dp), fontSize = 13.sp, color = AppTextPrimary)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            
+            Button(
+                onClick = { viewModel.navigateTo("Subscription") },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
+            ) {
+                Text(
+                    if (languageState == "Bangla" || languageState == "bn") "গোল্ড প্ল্যান চালু করুন — সাবস্ক্রিপশন দেখুন" else "Upgrade to Gold — View Plans",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REAL CAMERA QR SCANNER COMPONENT (ML KIT + CAMERAX)
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+fun RealQrCameraScanner(
+    onQrScanned: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var lastScannedCode by remember { mutableStateOf("") }
+    var lastScanTime by remember { mutableStateOf(0L) }
+    var manualQrInput by remember { mutableStateOf("") }
+
+    val executor = remember { java.util.concurrent.Executors.newSingleThreadExecutor() }
+    val barcodeScanner = remember { com.google.mlkit.vision.barcode.BarcodeScanning.getClient() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            executor.shutdown()
+            barcodeScanner.close()
+        }
+    }
+
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (!isGranted) {
+            android.widget.Toast.makeText(context, "Camera permission is required to scan QR & barcodes", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(android.Manifest.permission.CAMERA)
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "scanner_laser")
+    val laserOffsetY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 180f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "laser_y"
+    )
+
+    Box(modifier = modifier.clip(RoundedCornerShape(16.dp)).background(Color.Black)) {
+        if (!hasCameraPermission) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFC800).copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Camera Permission",
+                        tint = Color(0xFFFFC800),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Camera Permission Needed",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Please allow camera access to scan QR codes and product barcodes in real-time.",
+                    fontSize = 12.5.sp,
+                    color = Color.LightGray,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = { permissionLauncher.launch(android.Manifest.permission.CAMERA) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC800)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Grant Camera Permission", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            AndroidView(
+                factory = { ctx ->
+                    val previewView = PreviewView(ctx).apply {
+                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    }
+                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+                    cameraProviderFuture.addListener({
+                        try {
+                            val cameraProvider = cameraProviderFuture.get()
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+
+                            val imageAnalysis = ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+
+                            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                @Suppress("UnsafeOptInUsageError")
+                                val mediaImage = imageProxy.image
+                                if (mediaImage != null) {
+                                    val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                                    barcodeScanner.process(image)
+                                        .addOnSuccessListener { barcodes ->
+                                            for (barcode in barcodes) {
+                                                val rawValue = barcode.rawValue
+                                                if (!rawValue.isNullOrEmpty()) {
+                                                    val now = System.currentTimeMillis()
+                                                    if (rawValue != lastScannedCode || (now - lastScanTime > 2000)) {
+                                                        lastScannedCode = rawValue
+                                                        lastScanTime = now
+                                                        onQrScanned(rawValue)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .addOnCompleteListener {
+                                            imageProxy.close()
+                                        }
+                                } else {
+                                    imageProxy.close()
+                                }
+                            }
+
+                            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                            cameraProvider.unbindAll()
+                            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis)
+                        } catch (e: Exception) {
+                            android.util.Log.e("RealQrCameraScanner", "Camera binding failed", e)
+                        }
+                    }, ContextCompat.getMainExecutor(ctx))
+
+                    previewView
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Viewfinder reticle frame with animated laser line
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .align(Alignment.Center)
+                    .border(BorderStroke(2.5.dp, Color(0xFFFFC800)), RoundedCornerShape(16.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .offset(y = laserOffsetY.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color(0xFF10B981), Color(0xFFFFC800), Color(0xFF10B981), Color.Transparent)
+                            )
+                        )
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(Color.Black.copy(alpha = 0.85f))
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color(0xFFFFC800), modifier = Modifier.size(14.dp))
+                Text("Real Camera & Barcode Scanner Active", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            Text("Align QR / Barcode within yellow target line", color = Color.LightGray, fontSize = 10.sp)
+            
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .background(Color(0xFF1E2235), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF475569), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (manualQrInput.isEmpty()) {
+                        Text(
+                            text = "Enter barcode or product code...",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = manualQrInput,
+                        onValueChange = { manualQrInput = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 12.5.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFFC800)),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = {
+                                if (manualQrInput.isNotEmpty()) {
+                                    onQrScanned(manualQrInput.trim())
+                                    manualQrInput = ""
+                                }
+                            }
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Button(
+                    onClick = {
+                        if (manualQrInput.isNotEmpty()) {
+                            onQrScanned(manualQrInput.trim())
+                            manualQrInput = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC800)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(46.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    Text("Scan", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REAL QR CODE & BARCODE SCANNER SCREEN
+// ═══════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QrScannerScreen(viewModel: AppViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val languageState by viewModel.language.collectAsState()
+    val isBangla = languageState == "Bangla"
+    val products by viewModel.products.collectAsState()
+
+    var scannedPayload by remember { mutableStateOf<String?>(null) }
+    var matchedProduct by remember { mutableStateOf<ProductItemEntity?>(null) }
+    var showResultModal by remember { mutableStateOf(false) }
+
+    val bg = if (isDarkMode) Color(0xFF0F111A) else Color(0xFFF8FAFC)
+    val cardBg = if (isDarkMode) Color(0xFF1E2235) else Color.White
+    val cardBorder = if (isDarkMode) Color(0xFF2E334D) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDarkMode) Color.White else Color(0xFF0F172A)
+    val textSecondary = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF64748B)
+    val goldAccent = Color(0xFFF59E0B)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bg)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(cardBg)
+                            .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
+                            .clickable { viewModel.goBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = if (isBangla) "কিউআর ও বারকোড স্ক্যানার" else "QR & Barcode Scanner",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = if (isBangla) "ক্যামেরা দিয়ে স্ক্যান করুন" else "Point camera at any QR or Barcode",
+                            fontSize = 12.sp,
+                            color = textSecondary
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(cardBg)
+                        .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
+                        .clickable {
+                            Toast.makeText(context, "Scanning active with ML Kit camera engine", Toast.LENGTH_SHORT).show()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CenterFocusStrong,
+                        contentDescription = "Focus",
+                        tint = goldAccent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Real Camera Scanner Container
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.5.dp, cardBorder, RoundedCornerShape(20.dp))
+            ) {
+                RealQrCameraScanner(
+                    onQrScanned = { rawCode ->
+                        val trimmed = rawCode.trim()
+                        if (trimmed.isNotEmpty()) {
+                            scannedPayload = trimmed
+                            val matched = products.firstOrNull {
+                                (it.code != null && it.code.equals(trimmed, ignoreCase = true)) ||
+                                (it.qrCode != null && it.qrCode.equals(trimmed, ignoreCase = true)) ||
+                                it.id.equals(trimmed, ignoreCase = true)
+                            }
+                            matchedProduct = matched
+                            viewModel.scanQrCodeToPosCart(trimmed)
+                            showResultModal = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Quick Info Footer
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = BorderStroke(1.dp, cardBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCodeScanner,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = if (isBangla) "স্বয়ংক্রিয় স্মার্ট শনাক্তকরণ" else "Smart Instant Detection",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = if (isBangla) "পণ্য স্ক্যান করার সাথে সাথে নিউ সেল কার্টে যোগ হয়ে যায়" else "Scanned products are automatically added to POS Cart",
+                            fontSize = 11.sp,
+                            color = textSecondary
+                        )
+                    }
+                }
+            }
+        }
+
+        // Result Bottom Sheet Modal
+        if (showResultModal && scannedPayload != null) {
+            val payload = scannedPayload!!
+            val product = matchedProduct
+
+            androidx.compose.ui.window.Dialog(onDismissRequest = {
+                showResultModal = false
+                scannedPayload = null
+                matchedProduct = null
+            }) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = cardBg,
+                    border = BorderStroke(1.dp, cardBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (product != null) Icons.Default.CheckCircle else Icons.Default.QrCode,
+                                    contentDescription = null,
+                                    tint = if (product != null) Color(0xFF10B981) else goldAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = if (product != null) "Added to POS Cart!" else "Scan Result",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary
+                                )
+                            }
+
+                            IconButton(onClick = {
+                                showResultModal = false
+                                scannedPayload = null
+                                matchedProduct = null
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = textSecondary)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        if (product != null) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF131B2E) else Color(0xFFF1F5F9)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(product.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("Price: ৳${product.salePrice} • Stock: ${product.stockQuantity} ${product.unit}", fontSize = 12.sp, color = textSecondary)
+                                    Text("Barcode/QR: $payload", fontSize = 11.sp, color = goldAccent)
+                                }
+                            }
+                        } else {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF131B2E) else Color(0xFFF1F5F9)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Scanned Code Payload:", fontSize = 11.sp, color = textSecondary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(payload, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                    Text("Added to Cart as Scanned Item", fontSize = 11.sp, color = Color(0xFF10B981))
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Action Buttons
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    showResultModal = false
+                                    viewModel.navigateTo("PosCheckout")
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = goldAccent, contentColor = Color.Black),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Go to New Sale (Checkout)", fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    showResultModal = false
+                                    scannedPayload = null
+                                    matchedProduct = null
+                                    Toast.makeText(context, "Item added! Ready for next scan.", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFF1E2235) else Color(0xFFE2E8F0), contentColor = textPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Scan Next Item", fontWeight = FontWeight.Bold)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Scanned QR", payload)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Copied to clipboard: $payload", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Copy Code Text", color = textPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STOCK IN QR SCREEN (RECEIVE FROM SUPPLIER, PRICING & VARIANTS)
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+fun StockInQrScreen(viewModel: AppViewModel) {
+    val suppliers by viewModel.suppliers.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+
+    var selectedCategory by remember { mutableStateOf("Apparel") }
+    val categories = listOf("Apparel", "Grocery", "Electronics", "Cosmetics", "Footwear", "Others")
+
+    var productName by remember { mutableStateOf("") }
+    var selectedSupplierId by remember { mutableStateOf<String?>(null) }
+    var selectedSupplierName by remember { mutableStateOf("None / Cash Supplier") }
+    var showSupplierDropdown by remember { mutableStateOf(false) }
+
+    // Dynamic Variants List: Triple<VariantName, StockQty, Triple<CostPrice, AskingPrice, SellingPrice>>
+    var variantsList by remember {
+        mutableStateOf(
+            listOf(
+                Triple("Standard Size", 10.0, Triple(400.0, 700.0, 600.0))
+            )
+        )
+    }
+
+    var newVariantName by remember { mutableStateOf("") }
+    var newCostPrice by remember { mutableStateOf("") }
+    var newAskingPrice by remember { mutableStateOf("") }
+    var newSellingPrice by remember { mutableStateOf("") }
+    var newQty by remember { mutableStateOf("") }
+
+    var showQrLabelsCard by remember { mutableStateOf(false) }
+    var createdProductSummary by remember { mutableStateOf<String?>(null) }
+    val screenBg = if (isDarkMode) Color(0xFF090806) else Color(0xFFF8FAFC)
+
+    Scaffold(
+        containerColor = screenBg,
+        topBar = {
+            GradientTopBar(
+                title = "QR Code Stock In (পণ্য স্টক-ইন)",
+                subtitle = "মহাজন থেকে মাল গ্রহণ, ভ্যারিয়েন্ট ও কিউআর জেনারেশন",
+                onBack = { viewModel.goBack() },
+                gradient = GradPrimary
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Category Selection
+            Text("১. পণ্যের ক্যাটাগরি নির্বাচন করুন (Category):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AppTextPrimary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(categories) { cat ->
+                    FilterChip(
+                        selected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        label = { Text(cat, fontSize = 11.sp, color = if (selectedCategory == cat) Color.Black else AppTextPrimary) },
+                        leadingIcon = if (selectedCategory == cat) {
+                            { Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(14.dp)) }
+                        } else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFF5C518),
+                            selectedLabelColor = Color.Black,
+                            selectedLeadingIconColor = Color.Black
+                        )
+                    )
+                }
+            }
+
+            // Product & Supplier Info Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppCardBg),
+                border = BorderStroke(1.dp, AppCardBorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("২. পণ্যের বিবরণ ও মহাজন (Product & Supplier):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AppTextPrimary)
+                    
+                    OutlinedTextField(
+                        value = productName,
+                        onValueChange = { productName = it },
+                        label = { Text("পণ্যের নাম (e.g. Polo Shirt, Miniket Rice)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = selectedSupplierName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("মহাজন নির্বাচন করুন (Supplier)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            trailingIcon = {
+                                IconButton(onClick = { showSupplierDropdown = true }) {
+                                    Icon(Icons.Default.ArrowDropDown, null)
+                                }
+                            }
+                        )
+                        DropdownMenu(
+                            expanded = showSupplierDropdown,
+                            onDismissRequest = { showSupplierDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None / Cash Supplier") },
+                                onClick = {
+                                    selectedSupplierId = null
+                                    selectedSupplierName = "None / Cash Supplier"
+                                    showSupplierDropdown = false
+                                }
+                            )
+                            suppliers.forEach { supp ->
+                                DropdownMenuItem(
+                                    text = { Text(supp.name) },
+                                    onClick = {
+                                        selectedSupplierId = supp.id
+                                        selectedSupplierName = supp.name
+                                        showSupplierDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Product Variants & Differential Pricing Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppCardBg),
+                border = BorderStroke(1.dp, AppCardBorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("৩. ভ্যারিয়েন্ট ও বিভিন্ন দাম সেট করুন (Variants & Pricing):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AppTextPrimary)
+                    Text("একই পণ্যের সাইজ, রঙ বা ব্যাচ অনুযায়ী আলাদা কেনা দাম, গায়ে লেখা দাম ও বিক্রি দাম হতে পারে।", fontSize = 11.sp, color = AppTextSecondary)
+
+                    // Form to add a new variant
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF1E1F2E) else Color(0xFFF8FAFC)),
+                        border = BorderStroke(1.dp, AppCardBorderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("নতুন ভ্যারিয়েন্ট যুক্ত করুন:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = BrandPurple)
+                            
+                            OutlinedTextField(
+                                value = newVariantName,
+                                onValueChange = { newVariantName = it },
+                                label = { Text("ভ্যারিয়েন্ট নাম (e.g. Size L / Red / 1kg)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedTextField(
+                                    value = newCostPrice,
+                                    onValueChange = { newCostPrice = it },
+                                    label = { Text("কেনা দাম (Cost)", fontSize = 10.sp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                OutlinedTextField(
+                                    value = newAskingPrice,
+                                    onValueChange = { newAskingPrice = it },
+                                    label = { Text("গায়ে লেখা দাম (Tag)", fontSize = 10.sp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedTextField(
+                                    value = newSellingPrice,
+                                    onValueChange = { newSellingPrice = it },
+                                    label = { Text("বিক্রি দাম (Selling)", fontSize = 10.sp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                OutlinedTextField(
+                                    value = newQty,
+                                    onValueChange = { newQty = it },
+                                    label = { Text("স্টক পরিমাণ (Qty)", fontSize = 10.sp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (newVariantName.isNotEmpty()) {
+                                        val cP = newCostPrice.toDoubleOrNull() ?: 0.0
+                                        val aP = newAskingPrice.toDoubleOrNull() ?: cP
+                                        val sP = newSellingPrice.toDoubleOrNull() ?: aP
+                                        val q = newQty.toDoubleOrNull() ?: 1.0
+
+                                        val current = variantsList.toMutableList()
+                                        current.add(Triple(newVariantName, q, Triple(cP, aP, sP)))
+                                        variantsList = current.toList()
+
+                                        newVariantName = ""
+                                        newCostPrice = ""
+                                        newAskingPrice = ""
+                                        newSellingPrice = ""
+                                        newQty = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("ভ্যারিয়েন্ট যোগ করুন", fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    // Existing Variants List Table
+                    Text("ভ্যারিয়েন্ট তালিকা (${variantsList.size}):", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AppTextPrimary)
+                    variantsList.forEachIndexed { idx, (vName, qty, prices) ->
+                        val (cP, aP, sP) = prices
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (isDarkMode) Color(0xFF161726) else Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(vName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AppTextPrimary)
+                                Text("কেনা: ৳$cP | ট্যাগ: ৳$aP | বিক্রি: ৳$sP | পরিমাণ: ${qty.toInt()} টি", fontSize = 10.sp, color = AppTextSecondary)
+                            }
+                            IconButton(onClick = {
+                                val current = variantsList.toMutableList()
+                                current.removeAt(idx)
+                                variantsList = current.toList()
+                            }) {
+                                Icon(Icons.Default.Delete, null, tint = ErrorRed, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Generate QR Code Labels & Stock In Action
+            Button(
+                onClick = {
+                    if (productName.isNotEmpty() && variantsList.isNotEmpty()) {
+                        viewModel.stockInProductWithVariants(
+                            productName = productName,
+                            category = selectedCategory,
+                            supplierId = selectedSupplierId,
+                            variantsList = variantsList
+                        )
+                        createdProductSummary = "$productName (${variantsList.size} ভ্যারিয়েন্ট)"
+                        showQrLabelsCard = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+            ) {
+                Icon(Icons.Default.QrCode, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("স্টক-ইন ও কিউআর কোড জেনারেট করুন", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            if (showQrLabelsCard && createdProductSummary != null) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF12241A) else Color(0xFFECFDF5)),
+                    border = BorderStroke(1.dp, SuccessGreen),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("স্টক-ইন সফল! কিউআর কোড প্রস্তুত:", fontWeight = FontWeight.Bold, color = SuccessGreen, fontSize = 13.sp)
+                        }
+                        Text("পণ্য: $createdProductSummary", fontSize = 12.sp, color = AppTextPrimary)
+                        Text("প্রিন্ট লেবেল প্রিভিউ: পণ্যের গায়ে লাগানোর জন্য QR কোড লেবেল জেনারেট হয়েছে।", fontSize = 10.sp, color = AppTextSecondary)
+                        
+                        Button(
+                            onClick = { viewModel.navigateTo("PosCheckout") },
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("POS চেকআউট স্ক্রিনে যান", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OFFLINE POS CHECKOUT SCREEN (NewSale) — PIXEL PERFECT DARK GOLD DESIGN
+// ═══════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
+// NOTE: PosCheckoutScreen is now modularized into PosCheckoutScreen.kt to stay within JVM 64KB bytecode limits.
+
+@Composable
+fun YouTubeVideoGuidelineCard(
+    title: String = "SwapnoPay & Supabase Setup Video Guide",
+    videoUrl: String = "https://www.youtube.com/watch?v=YOUR_VIDEO_GUIDE_ID",
+    onOpenVideo: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+        border = BorderStroke(1.dp, Color(0xFF334155)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFEF4444), modifier = Modifier.size(24.dp))
+                Text("YOUTUBE VIDEO GUIDELINE", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Watch step-by-step video instructions to set up Database Schema, Edge Functions, and Database Webhooks.", color = Color.LightGray, fontSize = 12.sp, lineHeight = 16.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
+                    .clickable { onOpenVideo() },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier.size(48.dp).background(Color(0xFFEF4444), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Click to Play Setup Video", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORM BUILDER STUDIO SCREEN defined in FormBuilderScreens.kt
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. BUSINESS LOANS & FINANCING SCREEN (LoansScreen)
+// ═══════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LegacyLoansScreen(viewModel: AppViewModel) {
+    val context = LocalContext.current
+    val loans by viewModel.loans.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+
+    var selectedTab by remember { mutableStateOf("DPS") } // "DPS" or "Loan"
+    var showCalculatorDialog by remember { mutableStateOf(false) }
+    var showNewDialog by remember { mutableStateOf(false) }
+
+    // DPS interactive states
+    var isPaidThisMonth by remember { mutableStateOf(false) }
+    var enableReminder by remember { mutableStateOf(true) }
+    var selectedReminderDay by remember { mutableStateOf("1 Day") }
+    var selectedReminderTime by remember { mutableStateOf("09:30 AM") }
+    var selectedFrequency by remember { mutableStateOf("Every Month") }
+    var selectedRecurringDay by remember { mutableStateOf("05") }
+
+    // Theme Colors supporting both Light and Dark mode
+    val bgCanvas = if (isDarkMode) Color(0xFF070707) else Color(0xFFFAFAFC)
+    val cardBg = if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFFFFFFF)
+    val containerBg = if (isDarkMode) Color(0xFF13100A) else Color(0xFFF8FAFC)
+    val goldAccent = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFD97706)
+    val goldBorder = if (isDarkMode) Color(0xFF382A0B) else Color(0xFFE2E8F0)
+    val goldPillBg = if (isDarkMode) Color(0xFF261D07) else Color(0xFFFEF3C7)
+    val primaryText = if (isDarkMode) Color(0xFFF3F4F6) else Color(0xFF0F172A)
+    val secondaryText = if (isDarkMode) Color(0xFF9CA3AF) else Color(0xFF64748B)
+    val greenReturn = if (isDarkMode) Color(0xFF22C55E) else Color(0xFF16A34A)
+    val greenReturnBg = if (isDarkMode) Color(0xFF062C12) else Color(0xFFDCFCE7)
+
+    Scaffold(
+        containerColor = bgCanvas
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(bgCanvas)
+        ) {
+            // ── TOP HEADER BAR ───────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Back Button
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(cardBg)
+                        .border(1.dp, goldBorder, CircleShape)
+                        .clickable { viewModel.goBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = goldAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Title
+                Text(
+                    text = "DPS & Loan Manager",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryText,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Header Action Buttons (Calculator + New)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Calculator Icon Button
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(cardBg)
+                            .border(1.dp, goldBorder, RoundedCornerShape(12.dp))
+                            .clickable { showCalculatorDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Calculate,
+                            contentDescription = "Calculator",
+                            tint = goldAccent,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // + New Button
+                    Surface(
+                        modifier = Modifier
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showNewDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = goldPillBg,
+                        border = BorderStroke(1.dp, goldAccent)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = goldAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "New",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = goldAccent
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── DPS vs LOAN TAB TOGGLE ───────────────────────────────
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = containerBg),
+                border = BorderStroke(1.dp, goldBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp)
+                ) {
+                    // DPS Tab Button
+                    val isDpsSelected = selectedTab == "DPS"
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDpsSelected) goldPillBg else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (isDpsSelected) goldAccent else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedTab = "DPS" },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Savings,
+                                contentDescription = null,
+                                tint = if (isDpsSelected) goldAccent else secondaryText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "DPS",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDpsSelected) goldAccent else secondaryText
+                            )
+                        }
+                    }
+
+                    // Loan Tab Button
+                    val isLoanSelected = selectedTab == "Loan"
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isLoanSelected) goldPillBg else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (isLoanSelected) goldAccent else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedTab = "Loan" },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalance,
+                                contentDescription = null,
+                                tint = if (isLoanSelected) goldAccent else secondaryText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Loan",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isLoanSelected) goldAccent else secondaryText
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── SCREEN BODY CONTENT ──────────────────────────────────
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
+                if (selectedTab == "DPS") {
+                    // ── 1. MAIN ACTIVE DPS CARD ───────────────────────
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            border = BorderStroke(1.dp, goldBorder),
+                            elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Header Row: Bank Icon, Title, ID, Active Badge, Monthly Deposit
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(goldPillBg)
+                                                .border(1.dp, goldBorder, RoundedCornerShape(12.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.AccountBalance,
+                                                contentDescription = null,
+                                                tint = goldAccent,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = "ABC Bank DPS",
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = primaryText
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "DPS ID: DPS-2026-001",
+                                                    fontSize = 11.sp,
+                                                    color = secondaryText
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = goldPillBg,
+                                                    border = BorderStroke(1.dp, goldBorder)
+                                                ) {
+                                                    Text(
+                                                        text = "Active",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = goldAccent,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "Monthly Deposit",
+                                            fontSize = 11.sp,
+                                            color = secondaryText
+                                        )
+                                        Text(
+                                            text = "৳5,000",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = goldAccent
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                HorizontalDivider(color = goldBorder.copy(alpha = 0.6f), thickness = 0.8.dp)
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // ── 2x2 GRID STATS ──
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Row 1: Next Deposit & Maturity Amount
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        // 1. Next Deposit
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.CalendarToday, null, tint = goldAccent, modifier = Modifier.size(13.dp))
+                                                Text("Next Deposit", fontSize = 11.sp, color = secondaryText, maxLines = 1)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("05 Aug 2026", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                            Text("(in 12 Days)", fontSize = 10.sp, color = goldAccent, fontWeight = FontWeight.Medium)
+                                        }
+
+                                        // 2. Maturity Amount
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.CardGiftcard, null, tint = goldAccent, modifier = Modifier.size(13.dp))
+                                                Text("Maturity Amount", fontSize = 11.sp, color = secondaryText, maxLines = 1)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("৳364,996", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                        }
+                                    }
+
+                                    // Row 2: Total Months & Completed
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        // 3. Total Months
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.EventRepeat, null, tint = goldAccent, modifier = Modifier.size(13.dp))
+                                                Text("Total Months", fontSize = 11.sp, color = secondaryText, maxLines = 1)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("60 Months", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                        }
+
+                                        // 4. Completed
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.CheckCircle, null, tint = goldAccent, modifier = Modifier.size(13.dp))
+                                                Text("Completed", fontSize = 11.sp, color = secondaryText, maxLines = 1)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("18 Months", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // ── SUMMARY STATS GRID (2x2) ──
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = containerBg),
+                                    border = BorderStroke(1.dp, goldBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // Row 1: Total Deposited & Total Remaining
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Total Deposited
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(goldPillBg),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Outlined.AccountBalanceWallet, null, tint = goldAccent, modifier = Modifier.size(16.dp))
+                                                }
+                                                Column {
+                                                    Text("Total Deposited", fontSize = 10.sp, color = secondaryText, maxLines = 1)
+                                                    Text("৳90,000", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                                }
+                                            }
+
+                                            // Total Remaining
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(goldPillBg),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Outlined.CheckCircle, null, tint = goldAccent, modifier = Modifier.size(16.dp))
+                                                }
+                                                Column {
+                                                    Text("Total Remaining", fontSize = 10.sp, color = secondaryText, maxLines = 1)
+                                                    Text("৳210,000", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                                }
+                                            }
+                                        }
+
+                                        HorizontalDivider(color = goldBorder.copy(alpha = 0.4f), thickness = 0.8.dp)
+
+                                        // Row 2: Maturity Amount & Return (Est.)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Maturity Amount
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(goldPillBg),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Outlined.CardGiftcard, null, tint = goldAccent, modifier = Modifier.size(16.dp))
+                                                }
+                                                Column {
+                                                    Text("Maturity Amount", fontSize = 10.sp, color = secondaryText, maxLines = 1)
+                                                    Text("৳364,996", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                                }
+                                            }
+
+                                            // Return (Est.)
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(greenReturnBg),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Outlined.BarChart, null, tint = greenReturn, modifier = Modifier.size(16.dp))
+                                                }
+                                                Column {
+                                                    Text("Return (Est.)", fontSize = 10.sp, color = secondaryText, maxLines = 1)
+                                                    Text("৳64,996", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = greenReturn)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // ── PROGRESS BAR SECTION ───────────────────────
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Progress", fontSize = 12.sp, color = secondaryText)
+                                        Text("18 of 60 Months", fontSize = 12.sp, color = secondaryText)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(CircleShape)
+                                            .background(containerBg)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(0.30f)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    Brush.horizontalGradient(
+                                                        listOf(goldAccent, Color(0xFFD97706))
+                                                    )
+                                                )
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("30% Completed", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Action Buttons Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Reminder Settings Button — Opens DPS accounts & management in DepositScreen
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.navigateTo("Deposits")
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, goldBorder),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = goldAccent)
+                                    ) {
+                                        Icon(Icons.Outlined.Notifications, null, modifier = Modifier.size(16.dp), tint = goldAccent)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Manage DPS", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+
+                                    // Mark This Month Paid Button — Redirects to DepositScreen for real payment
+                                    Button(
+                                        onClick = {
+                                            viewModel.navigateTo("Deposits")
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = goldAccent,
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Pay Installment", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── 2. INSTALLMENT SCHEDULE SECTION ────────────────
+                    item {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Installment Schedule",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = primaryText
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { }
+                                ) {
+                                    Text("View All", fontSize = 12.5.sp, color = goldAccent, fontWeight = FontWeight.SemiBold)
+                                    Icon(Icons.Default.ChevronRight, null, tint = goldAccent, modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Horizontal Schedule Cards
+                            val installments = listOf(
+                                Triple("05 Apr 2026", "৳5,000", "Paid"),
+                                Triple("05 May 2026", "৳5,000", "Paid"),
+                                Triple("05 Jun 2026", "৳5,000", "Paid"),
+                                Triple("05 Jul 2026", "৳5,000", "Paid"),
+                                Triple("05 Aug 2026", "৳5,000", if (isPaidThisMonth) "Paid" else "Upcoming"),
+                                Triple("05 Sep 2026", "৳5,000", "Pending")
+                            )
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(installments) { (date, amount, status) ->
+                                    val isUpcoming = status == "Upcoming"
+                                    val isPaid = status == "Paid"
+
+                                    Card(
+                                        modifier = Modifier.width(110.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isUpcoming) goldPillBg else cardBg
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isUpcoming) goldAccent else goldBorder
+                                        ),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 1.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            // Icon
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isPaid) greenReturnBg
+                                                        else if (isUpcoming) goldPillBg
+                                                        else containerBg
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPaid) Icons.Default.CheckCircle
+                                                    else if (isUpcoming) Icons.Default.AccessTime
+                                                    else Icons.Outlined.Circle,
+                                                    contentDescription = null,
+                                                    tint = if (isPaid) greenReturn else if (isUpcoming) goldAccent else secondaryText,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(date, fontSize = 10.5.sp, color = secondaryText)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(amount, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = status,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isPaid) greenReturn else if (isUpcoming) goldAccent else secondaryText
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── 3. SETTINGS 2-COLUMN CARDS ROW ─────────────────
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Card 1: Reminder Settings
+                            Card(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = cardBg),
+                                border = BorderStroke(1.dp, goldBorder),
+                                elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.Notifications, null, tint = goldAccent, modifier = Modifier.size(18.dp))
+                                        Text("Reminder Settings", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Enable Reminder Switch
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Enable Reminder", fontSize = 11.5.sp, color = secondaryText)
+                                        Switch(
+                                            checked = enableReminder,
+                                            onCheckedChange = { enableReminder = it },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = goldAccent,
+                                                uncheckedThumbColor = secondaryText,
+                                                uncheckedTrackColor = containerBg
+                                            )
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Remind Me Before", fontSize = 11.sp, color = secondaryText)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Day Options Pill Row
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        listOf("Same Day", "1 Day", "3 Days", "7 Days").forEach { dayOpt ->
+                                            val isSel = selectedReminderDay == dayOpt
+                                            Surface(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable { selectedReminderDay = dayOpt },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isSel) goldPillBg else containerBg,
+                                                border = BorderStroke(1.dp, if (isSel) goldAccent else goldBorder)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(vertical = 6.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = dayOpt,
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (isSel) goldAccent else secondaryText
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("Reminder Time", fontSize = 11.sp, color = secondaryText)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Time Selector Box
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = containerBg,
+                                        border = BorderStroke(1.dp, goldBorder)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.AccessTime, null, tint = goldAccent, modifier = Modifier.size(16.dp))
+                                                Text(selectedReminderTime, fontSize = 12.sp, color = primaryText, fontWeight = FontWeight.Medium)
+                                            }
+                                            Icon(Icons.Default.ArrowDropDown, null, tint = goldAccent, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Card 2: Recurring Schedule
+                            Card(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = cardBg),
+                                border = BorderStroke(1.dp, goldBorder),
+                                elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.CalendarToday, null, tint = goldAccent, modifier = Modifier.size(18.dp))
+                                        Text("Recurring Schedule", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Text("Frequency", fontSize = 11.5.sp, color = secondaryText)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Frequency Selector Dropdown
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = containerBg,
+                                        border = BorderStroke(1.dp, goldBorder)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(selectedFrequency, fontSize = 12.sp, color = primaryText, fontWeight = FontWeight.Medium)
+                                            Icon(Icons.Default.ArrowDropDown, null, tint = goldAccent, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Text("Recurring Date (Day)", fontSize = 11.5.sp, color = secondaryText)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Recurring Day Selector Dropdown
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = containerBg,
+                                        border = BorderStroke(1.dp, goldBorder)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(selectedRecurringDay, fontSize = 12.sp, color = primaryText, fontWeight = FontWeight.Medium)
+                                            Icon(Icons.Default.ArrowDropDown, null, tint = goldAccent, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // ── LOAN TAB PAGE CONTENT ────────────────────────
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            border = BorderStroke(1.dp, goldBorder),
+                            elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(goldPillBg)
+                                                .border(1.dp, goldBorder, RoundedCornerShape(12.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.AccountBalance,
+                                                contentDescription = null,
+                                                tint = goldAccent,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = "SME Business Loan",
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = primaryText
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Loan ID: LN-2026-882",
+                                                    fontSize = 11.sp,
+                                                    color = secondaryText
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = goldPillBg,
+                                                    border = BorderStroke(1.dp, goldBorder)
+                                                ) {
+                                                    Text(
+                                                        text = "Active",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = goldAccent,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "Monthly EMI",
+                                            fontSize = 11.sp,
+                                            color = secondaryText
+                                        )
+                                        Text(
+                                            text = "৳12,500",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = goldAccent
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                HorizontalDivider(color = goldBorder.copy(alpha = 0.6f), thickness = 0.8.dp)
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // 4-Column Grid
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        Text("Next EMI Due", fontSize = 10.5.sp, color = secondaryText)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("10 Aug 2026", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                        Text("(in 14 Days)", fontSize = 10.sp, color = goldAccent)
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Total Loan", fontSize = 10.5.sp, color = secondaryText)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("৳250,000", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Tenure", fontSize = 10.5.sp, color = secondaryText)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("24 Months", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                    }
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        Text("Interest Rate", fontSize = 10.5.sp, color = secondaryText)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("9.5% p.a.", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Loan Summary Card Row
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = containerBg),
+                                    border = BorderStroke(1.dp, goldBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Principal", fontSize = 9.5.sp, color = secondaryText)
+                                            Text("৳250,000", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                        }
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(goldBorder))
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Outstanding", fontSize = 9.5.sp, color = secondaryText)
+                                            Text("৳150,000", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                        }
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(goldBorder))
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Total Paid", fontSize = 9.5.sp, color = secondaryText)
+                                            Text("৳100,000", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                        }
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(goldBorder))
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Interest Paid", fontSize = 9.5.sp, color = secondaryText)
+                                            Text("৳14,250", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = greenReturn)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Progress Bar Section
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Repayment Progress", fontSize = 12.sp, color = secondaryText)
+                                        Text("8 of 24 Months Paid", fontSize = 12.sp, color = secondaryText)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(CircleShape)
+                                            .background(containerBg)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(0.33f)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    Brush.horizontalGradient(
+                                                        listOf(goldAccent, Color(0xFFD97706))
+                                                    )
+                                                )
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("33% Repaid", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Pay EMI — Navigate to FinanceManager which has real installment payment
+                                    Button(
+                                        onClick = {
+                                            viewModel.navigateTo("Loans")
+                                        },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = goldAccent, contentColor = Color.White)
+                                    ) {
+                                        Text("Pay EMI Now", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    // Loan Statement — Share as text via Android share intent
+                                    OutlinedButton(
+                                        onClick = {
+                                            val loanSummary = loans.firstOrNull()
+                                            val statementText = if (loanSummary != null) {
+                                                "Loan Statement\n" +
+                                                "Provider: ${loanSummary.providerName}\n" +
+                                                "Reference: ${loanSummary.accountReference}\n" +
+                                                "Principal: ৳${String.format("%,.2f", loanSummary.principalAmount)}\n" +
+                                                "Interest Rate: ${loanSummary.interestRate}% p.a.\n" +
+                                                "Duration: ${loanSummary.durationMonths} months\n" +
+                                                "Generated: ${java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date())}"
+                                            } else {
+                                                "No loan account found. Add one from Finance Manager."
+                                            }
+                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Loan Statement")
+                                                putExtra(android.content.Intent.EXTRA_TEXT, statementText)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Loan Statement"))
+                                        },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, goldBorder),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = goldAccent)
+                                    ) {
+                                        Text("Loan Statement", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Loan EMI Schedule
+                    item {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("EMI Repayment Schedule", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            val emiList = listOf(
+                                Triple("10 Apr 2026", "৳12,500", "Paid"),
+                                Triple("10 May 2026", "৳12,500", "Paid"),
+                                Triple("10 Jun 2026", "৳12,500", "Paid"),
+                                Triple("10 Jul 2026", "৳12,500", "Paid"),
+                                Triple("10 Aug 2026", "৳12,500", "Upcoming"),
+                                Triple("10 Sep 2026", "৳12,500", "Pending")
+                            )
+
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(emiList) { (date, amt, status) ->
+                                    val isUpcoming = status == "Upcoming"
+                                    val isPaid = status == "Paid"
+                                    Card(
+                                        modifier = Modifier.width(110.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = if (isUpcoming) goldPillBg else cardBg),
+                                        border = BorderStroke(1.dp, if (isUpcoming) goldAccent else goldBorder),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = if (isDarkMode) 0.dp else 1.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Box(
+                                                modifier = Modifier.size(28.dp).clip(CircleShape).background(if (isPaid) greenReturnBg else if (isUpcoming) goldPillBg else containerBg),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPaid) Icons.Default.CheckCircle else if (isUpcoming) Icons.Default.AccessTime else Icons.Outlined.Circle,
+                                                    contentDescription = null,
+                                                    tint = if (isPaid) greenReturn else if (isUpcoming) goldAccent else secondaryText,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(date, fontSize = 10.5.sp, color = secondaryText)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(amt, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = primaryText)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(status, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isPaid) greenReturn else if (isUpcoming) goldAccent else secondaryText)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── DPS & LOAN CALCULATOR DIALOG ────────────────────────────────
+    if (showCalculatorDialog) {
+        DpsAndLoanCalculatorDialog(
+            isDarkMode = isDarkMode,
+            onDismiss = { showCalculatorDialog = false }
+        )
+    }
+
+    // ── NEW DPS / LOAN ENTRY DIALOG ─────────────────────────────────
+    if (showNewDialog) {
+        NewDpsOrLoanDialog(
+            initialTab = selectedTab,
+            isDarkMode = isDarkMode,
+            viewModel = viewModel,
+            onDismiss = { showNewDialog = false }
+        )
+    }
+}
+
+@Composable
+fun DpsAndLoanCalculatorDialog(isDarkMode: Boolean = true, onDismiss: () -> Unit) {
+    var mode by remember { mutableStateOf("DPS") } // "DPS" or "LOAN"
+    var monthlyDeposit by remember { mutableFloatStateOf(5000f) }
+    var loanPrincipal by remember { mutableFloatStateOf(250000f) }
+    var interestRate by remember { mutableFloatStateOf(8.5f) }
+    var durationMonths by remember { mutableFloatStateOf(60f) }
+
+    val goldAccent = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFD97706)
+    val goldBorder = if (isDarkMode) Color(0xFF382A0B) else Color(0xFFE2E8F0)
+    val containerDark = if (isDarkMode) Color(0xFF13100A) else Color(0xFFF8FAFC)
+    val cardBg = if (isDarkMode) Color(0xFF0D0B07) else Color(0xFFFFFFFF)
+    val textPrimary = if (isDarkMode) Color(0xFFF3F4F6) else Color(0xFF0F172A)
+    val textMuted = if (isDarkMode) Color(0xFF9CA3AF) else Color(0xFF64748B)
+
+    EnterpriseGestureModal(
+        onDismissRequest = onDismiss,
+        title = "DPS & Loan Calculator",
+        subtitle = "Swipe down or drag handle to dismiss",
+        icon = Icons.Outlined.Calculate
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Toggle mode
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(containerDark, RoundedCornerShape(10.dp))
+                    .padding(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (mode == "DPS") (if (isDarkMode) Color(0xFF261D07) else Color(0xFFFEF3C7)) else Color.Transparent)
+                        .clickable { mode = "DPS" },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("DPS Maturity", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (mode == "DPS") goldAccent else textMuted)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (mode == "LOAN") (if (isDarkMode) Color(0xFF261D07) else Color(0xFFFEF3C7)) else Color.Transparent)
+                        .clickable { mode = "LOAN" },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Loan EMI", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (mode == "LOAN") goldAccent else textMuted)
+                }
+            }
+
+            if (mode == "DPS") {
+                Text("Monthly Deposit: ৳ ${monthlyDeposit.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = monthlyDeposit,
+                    onValueChange = { monthlyDeposit = it },
+                    valueRange = 1000f..50000f,
+                    steps = 49,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                Text("Interest Rate: ${String.format("%.1f", interestRate)}% p.a.", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = interestRate,
+                    onValueChange = { interestRate = it },
+                    valueRange = 3f..15f,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                Text("Tenure: ${durationMonths.toInt()} Months (${(durationMonths / 12).toInt()} Yrs)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = durationMonths,
+                    onValueChange = { durationMonths = it },
+                    valueRange = 12f..120f,
+                    steps = 8,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                val totalDeposit = monthlyDeposit * durationMonths
+                val estReturn = totalDeposit * (interestRate / 100f) * (durationMonths / 12f) * 0.55f
+                val maturity = totalDeposit + estReturn
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, goldBorder)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Deposited:", fontSize = 12.sp, color = textMuted)
+                            Text("৳ ${String.format("%,.0f", totalDeposit)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Est. Interest Return:", fontSize = 12.sp, color = textMuted)
+                            Text("৳ ${String.format("%,.0f", estReturn)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
+                        }
+                        HorizontalDivider(color = goldBorder)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Maturity Value:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                            Text("৳ ${String.format("%,.0f", maturity)}", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = goldAccent)
+                        }
+                    }
+                }
+            } else {
+                Text("Loan Amount: ৳ ${loanPrincipal.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = loanPrincipal,
+                    onValueChange = { loanPrincipal = it },
+                    valueRange = 10000f..1000000f,
+                    steps = 99,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                Text("Interest Rate: ${String.format("%.1f", interestRate)}% p.a.", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = interestRate,
+                    onValueChange = { interestRate = it },
+                    valueRange = 5f..20f,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                Text("Tenure: ${durationMonths.toInt()} Months", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                Slider(
+                    value = durationMonths,
+                    onValueChange = { durationMonths = it },
+                    valueRange = 6f..60f,
+                    steps = 8,
+                    colors = SliderDefaults.colors(thumbColor = goldAccent, activeTrackColor = goldAccent, inactiveTrackColor = containerDark)
+                )
+
+                val r = (interestRate / 100f) / 12f
+                val n = durationMonths
+                val emi = if (r > 0) (loanPrincipal * r * Math.pow((1 + r).toDouble(), n.toDouble()) / (Math.pow((1 + r).toDouble(), n.toDouble()) - 1)).toFloat() else loanPrincipal / n
+                val totalPayable = emi * n
+                val totalInterest = totalPayable - loanPrincipal
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, goldBorder)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Monthly EMI:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = goldAccent)
+                            Text("৳ ${String.format("%,.0f", emi)}", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = goldAccent)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Interest:", fontSize = 12.sp, color = textMuted)
+                            Text("৳ ${String.format("%,.0f", totalInterest)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Payable Amount:", fontSize = 12.sp, color = textMuted)
+                            Text("৳ ${String.format("%,.0f", totalPayable)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewDpsOrLoanDialog(
+    initialTab: String,
+    isDarkMode: Boolean = true,
+    viewModel: AppViewModel? = null,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var name by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var duration by remember { mutableStateOf("60") }
+
+    val goldAccent = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFD97706)
+    val goldBorder = if (isDarkMode) Color(0xFF382A0B) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDarkMode) Color(0xFFF3F4F6) else Color(0xFF0F172A)
+
+    EnterpriseGestureModal(
+        onDismissRequest = onDismiss,
+        title = "Add New $initialTab Account",
+        subtitle = "Swipe down or drag handle to dismiss",
+        icon = Icons.Outlined.AccountBalance
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Bank / Provider Name") },
+                placeholder = { Text("e.g., City Bank $initialTab") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = goldAccent,
+                    unfocusedBorderColor = goldBorder,
+                    focusedTextColor = textPrimary,
+                    unfocusedTextColor = textPrimary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text(if (initialTab == "DPS") "Monthly Deposit Amount (৳)" else "Total Loan Amount (৳)") },
+                placeholder = { Text("e.g. 5000") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = goldAccent,
+                    unfocusedBorderColor = goldBorder,
+                    focusedTextColor = textPrimary,
+                    unfocusedTextColor = textPrimary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = duration,
+                onValueChange = { duration = it },
+                label = { Text("Tenure (Months)") },
+                placeholder = { Text("60") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = goldAccent,
+                    unfocusedBorderColor = goldBorder,
+                    focusedTextColor = textPrimary,
+                    unfocusedTextColor = textPrimary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    val amt = amount.toDoubleOrNull() ?: 5000.0
+                    val dur = duration.toIntOrNull() ?: 60
+                    if (initialTab == "DPS") {
+                        viewModel?.addDpsAccount(
+                            providerName = name.ifBlank { "DPS Savings" },
+                            accountReference = "DPS-${java.util.UUID.randomUUID().toString().take(8).uppercase()}",
+                            monthlyDeposit = amt,
+                            interestRate = 8.5,
+                            months = dur,
+                            startDate = System.currentTimeMillis()
+                        )
+                    } else {
+                        viewModel?.addLoanAccount(
+                            providerName = name.ifBlank { "External lender" },
+                            accountReference = "LOAN-${java.util.UUID.randomUUID().toString().take(8).uppercase()}",
+                            amount = amt,
+                            rate = 8.5,
+                            type = "Reducing",
+                            months = dur,
+                            startDate = System.currentTimeMillis()
+                        )
+                    }
+                    android.widget.Toast.makeText(context, "New $initialTab account created successfully!", android.widget.Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = goldAccent, contentColor = Color.White),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Text("Save $initialTab Account", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun ReportsScreen(viewModel: AppViewModel) {
+    ReportsMainScreen(viewModel)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INVOICE & BILL PRINT SCREEN
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun LegacyInvoiceScreen(viewModel: AppViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val activeProfile by viewModel.activeProfile.collectAsState()
+    val payments by viewModel.payments.collectAsState()
+    val latestPayment = payments.firstOrNull()
+
+    val invNumber = remember { "INV-" + (100000..999999).random() }
+    val dateStr = remember { java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH).format(java.util.Date()) }
+
+    val bgCanvas = if (isDarkMode) Color(0xFF0F172A) else Color(0xFFF8FAFC)
+    val paperBg = if (isDarkMode) Color(0xFF1E293B) else Color.White
+    val textPrimary = if (isDarkMode) Color.White else Color(0xFF0F172A)
+    val textSecondary = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF64748B)
+
+    Scaffold(
+        containerColor = bgCanvas,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .background(paperBg)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconButton(onClick = { viewModel.goBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textPrimary)
+                    }
+                    Text("Official Invoice", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = {
+                        try {
+                            val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
+                            val jobName = "Invoice #$invNumber — ${activeProfile.businessName}"
+                            val printDocAdapter = object : android.print.PrintDocumentAdapter() {
+                                override fun onLayout(oldAttrs: android.print.PrintAttributes?, newAttrs: android.print.PrintAttributes, cancellationSignal: android.os.CancellationSignal?, callback: LayoutResultCallback, extras: android.os.Bundle?) {
+                                    if (cancellationSignal?.isCanceled == true) { callback.onLayoutCancelled(); return }
+                                    callback.onLayoutFinished(android.print.PrintDocumentInfo.Builder(jobName).setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true)
+                                }
+                                override fun onWrite(pages: Array<out android.print.PageRange>?, destination: android.os.ParcelFileDescriptor?, cancellationSignal: android.os.CancellationSignal?, callback: WriteResultCallback) {
+                                    callback.onWriteFailed("Use Share to export invoice as text")
+                                }
+                            }
+                            printManager.print(jobName, printDocAdapter, android.print.PrintAttributes.Builder().build())
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Print error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Default.Print, contentDescription = "Print", tint = Color(0xFFFFC800))
+                    }
+                    IconButton(onClick = {
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Invoice #$invNumber from ${activeProfile.businessName}")
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Invoice #$invNumber\nBusiness: ${activeProfile.businessName}\nDate: $dateStr\nAmount: ৳${latestPayment?.amount ?: 1250.0}\nThank you for your business!")
+                        }
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Invoice"))
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color(0xFF3B82F6))
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = paperBg,
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF334155) else Color(0xFFE2E8F0))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column {
+                            Text(activeProfile.businessName, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                            Text("Merchant ID: " + activeProfile.id, fontSize = 11.sp, color = textSecondary)
+                            Text(activeProfile.email, fontSize = 11.sp, color = textSecondary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Surface(
+                                color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("PAID", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(invNumber, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                            Text(dateStr, fontSize = 10.sp, color = textSecondary)
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = if (isDarkMode) Color(0xFF334155) else Color(0xFFE2E8F0))
+
+                    Text("BILLED TO", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                    Text(latestPayment?.sender ?: "Walk-in Customer", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                    Text("Payment Method: " + (latestPayment?.method ?: "bKash / Cash"), fontSize = 12.sp, color = textSecondary)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isDarkMode) Color(0xFF0F172A) else Color(0xFFF1F5F9))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Item / Description", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, modifier = Modifier.weight(2f))
+                        Text("Qty", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, modifier = Modifier.weight(0.6f))
+                        Text("Amount", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, modifier = Modifier.weight(1f))
+                    }
+
+                    val amountVal = latestPayment?.amount ?: 1250.0
+                    val subTotal = amountVal * 0.95
+                    val vatVal = amountVal * 0.05
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Retail Checkout Items", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textPrimary, modifier = Modifier.weight(2f))
+                        Text("1", fontSize = 12.sp, color = textPrimary, modifier = Modifier.weight(0.6f))
+                        Text("৳${String.format("%.2f", subTotal)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary, modifier = Modifier.weight(1f))
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = if (isDarkMode) Color(0xFF334155) else Color(0xFFE2E8F0))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Row(modifier = Modifier.width(200.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Subtotal:", fontSize = 12.sp, color = textSecondary)
+                            Text("৳${String.format("%.2f", subTotal)}", fontSize = 12.sp, color = textPrimary)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(modifier = Modifier.width(200.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("VAT / Tax (5%):", fontSize = 12.sp, color = textSecondary)
+                            Text("৳${String.format("%.2f", vatVal)}", fontSize = 12.sp, color = textPrimary)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.width(200.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Grand Total:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                            Text("৳${String.format("%.2f", amountVal)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFC800))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Thank you for shopping with ${activeProfile.businessName}!", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textSecondary)
+                        Text("Powered by SwapnoPay • Digital Payment Gateway & Ledger POS", fontSize = 10.sp, color = textSecondary.copy(alpha = 0.7f))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = {
+                    try {
+                        val amtVal = latestPayment?.amount ?: 1250.0
+                        val subTotal = amtVal * 0.95
+                        val vatVal = amtVal * 0.05
+                        val invoiceText = buildString {
+                            appendLine("========== INVOICE ==========")
+                            appendLine("Invoice #: $invNumber")
+                            appendLine("Date: $dateStr")
+                            appendLine("")
+                            appendLine("From: ${activeProfile.businessName}")
+                            appendLine("Merchant ID: ${activeProfile.id}")
+                            appendLine("Email: ${activeProfile.email}")
+                            appendLine("")
+                            appendLine("Billed To: ${latestPayment?.sender ?: "Walk-in Customer"}")
+                            appendLine("Payment Method: ${latestPayment?.method ?: "bKash / Cash"}")
+                            appendLine("")
+                            appendLine("-----------------------------")
+                            appendLine("Item: Retail Checkout Items")
+                            appendLine("Subtotal: ৳${String.format("%.2f", subTotal)}")
+                            appendLine("VAT (5%): ৳${String.format("%.2f", vatVal)}")
+                            appendLine("Grand Total: ৳${String.format("%.2f", amtVal)}")
+                            appendLine("==============================")
+                            appendLine("Thank you for shopping with ${activeProfile.businessName}!")
+                            appendLine("Powered by SwapnoPay")
+                        }
+                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val invoiceFile = java.io.File(downloadsDir, "$invNumber.txt")
+                        invoiceFile.writeText(invoiceText)
+                        android.widget.Toast.makeText(context, "Invoice saved to Downloads/$invNumber.txt", android.widget.Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        // Fallback: Share as text if file write fails
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Invoice #$invNumber")
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Invoice #$invNumber\n${activeProfile.businessName}\nDate: $dateStr\nAmount: ৳${latestPayment?.amount ?: 1250.0}")
+                        }
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Save Invoice"))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC800), contentColor = Color.Black)
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Download Invoice Receipt", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+    }
+
+}
