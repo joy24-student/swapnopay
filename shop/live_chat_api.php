@@ -778,10 +778,6 @@ switch ($action) {
         exit;
     }
 
-        echo json_encode(['status' => 'success', 'signals' => $signals]);
-        exit;
-    }
-
     // ---------------------- ADMIN SPECIFIC ENDPOINTS ---------------------- //
     case 'admin_ping': {
         // Track admin activity timestamp
