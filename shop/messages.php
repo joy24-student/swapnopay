@@ -1607,6 +1607,8 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 console.warn('[WebRTC Cust] Candidate add error:', e);
             }
         }
+    }
+
     async function handleAutoAnswerFlowCustomer() {
         console.log('[WebRTC Cust] Auto-answering incoming call...');
         unlockCustAudioPlayback();
