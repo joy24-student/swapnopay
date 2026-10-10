@@ -1221,6 +1221,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
     });
 
     // Background message & signal poller
+    let signalIdleTimer = null;
     function startPolling() {
         if (pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(async () => {
@@ -1237,11 +1238,12 @@ if (!empty($_SESSION['cart_p_qty'])) {
                     });
                     scrollChatToBottom();
                 }
-
-                // 2. Fetch incoming WebRTC signals
-                pollWebRtcSignals();
             } catch (e) {}
         }, 3000);
+
+        // Fast background signal detection (1200ms) so admin calls ring almost instantly
+        if (signalIdleTimer) clearInterval(signalIdleTimer);
+        signalIdleTimer = setInterval(pollWebRtcSignals, 1200);
     }
 
     // ==========================================
@@ -1270,20 +1272,20 @@ if (!empty($_SESSION['cart_p_qty'])) {
             { urls: 'stun:stun.cloudflare.com:3478' },
             {
                 urls: [
-                    'turn:80.225.247.237:3478?transport=udp',
-                    'turn:80.225.247.237:3478?transport=tcp'
-                ],
-                username: 'swapno',
-                credential: 'SwapnoWebRtcTurn2026!'
-            },
-            {
-                urls: [
                     'turn:openrelay.metered.ca:80',
                     'turn:openrelay.metered.ca:443',
                     'turn:openrelay.metered.ca:443?transport=tcp'
                 ],
                 username: 'openrelay',
                 credential: 'openrelay'
+            },
+            {
+                urls: [
+                    'turn:80.225.247.237:3478?transport=udp',
+                    'turn:80.225.247.237:3478?transport=tcp'
+                ],
+                username: 'swapno',
+                credential: 'SwapnoWebRtcTurn2026!'
             }
         ],
         iceCandidatePoolSize: 10
@@ -1480,6 +1482,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
                         remoteVid.srcObject = videoStream;
+                        remoteVid.muted = true;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }
@@ -1541,11 +1544,20 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
     async function handleIncomingSignal(sig) {
         if (sig.signal_type === 'call_start') {
+            if (peerConnection && (peerConnection.connectionState === 'connected' || peerConnection.iceConnectionState === 'connected')) {
+                console.log('[WebRTC Cust] Already connected in call, ignoring duplicate call_start');
+                return;
+            }
+            const modal = document.getElementById('incomingCallModal');
+            if (modal && !modal.classList.contains('hidden')) {
+                console.log('[WebRTC Cust] Incoming call modal already open, ignoring duplicate');
+                return;
+            }
+
             currentCallType = sig.call_type || 'audio';
             startFastSignalPolling();
             playCallRingtone();
 
-            const modal = document.getElementById('incomingCallModal');
             if (modal) {
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
@@ -1555,6 +1567,10 @@ if (!empty($_SESSION['cart_p_qty'])) {
         } else if (sig.signal_type === 'offer') {
             pendingOfferSignal = sig.payload;
             if (peerConnection && peerConnection.signalingState !== 'closed') {
+                if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                    console.log('[WebRTC Cust] Remote description already set, ignoring duplicate offer');
+                    return;
+                }
                 try {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
                     const answer = await peerConnection.createAnswer({
@@ -1686,6 +1702,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
                     const remoteVid = document.getElementById('remoteVideo');
                     if (remoteVid) {
                         remoteVid.srcObject = videoStream;
+                        remoteVid.muted = true;
                         remoteVid.play().catch(e => console.warn('Video play request:', e));
                     }
                 }

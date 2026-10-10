@@ -2802,20 +2802,20 @@ const adminRtcConfig = {
         { urls: 'stun:stun.cloudflare.com:3478' },
         {
             urls: [
-                'turn:80.225.247.237:3478?transport=udp',
-                'turn:80.225.247.237:3478?transport=tcp'
-            ],
-            username: 'swapno',
-            credential: 'SwapnoWebRtcTurn2026!'
-        },
-        {
-            urls: [
                 'turn:openrelay.metered.ca:80',
                 'turn:openrelay.metered.ca:443',
                 'turn:openrelay.metered.ca:443?transport=tcp'
             ],
             username: 'openrelay',
             credential: 'openrelay'
+        },
+        {
+            urls: [
+                'turn:80.225.247.237:3478?transport=udp',
+                'turn:80.225.247.237:3478?transport=tcp'
+            ],
+            username: 'swapno',
+            credential: 'SwapnoWebRtcTurn2026!'
         }
     ],
     iceCandidatePoolSize: 10
@@ -3092,6 +3092,20 @@ async function pollAdminWebRtcSignals() {
 
 async function handleAdminIncomingSignal(sig) {
     if (sig.signal_type === 'call_start') {
+        // Guard 1: If admin is already in an active connected call, ignore duplicate call_start
+        if (adminPeer && (adminPeer.connectionState === 'connected' || adminPeer.iceConnectionState === 'connected')) {
+            console.log('[WebRTC Admin] Already connected in call, ignoring duplicate call_start');
+            return;
+        }
+
+        // Guard 2: If the incoming modal is already displayed for this thread, do not re-trigger selectThread or play ringtone again
+        const incomingModal = document.getElementById('adminIncomingCallModal');
+        const isModalVisible = incomingModal && incomingModal.style.display === 'flex';
+        if (isModalVisible && adminActiveCallThreadId === sig.thread_id) {
+            console.log('[WebRTC Admin] Incoming modal already visible for this thread, ignoring duplicate');
+            return;
+        }
+
         adminActiveCallThreadId = sig.thread_id;
         if (sig.thread_id && (!currentThreadId || currentThreadId !== sig.thread_id)) {
             await selectThread(sig.thread_id);
@@ -3109,6 +3123,11 @@ async function handleAdminIncomingSignal(sig) {
     } else if (sig.signal_type === 'offer') {
         pendingAdminOfferSignal = sig.payload;
         if (adminPeer && adminPeer.signalingState !== 'closed') {
+            // Guard: If adminPeer already has remoteDescription set, ignore duplicate offer
+            if (adminPeer.remoteDescription && adminPeer.remoteDescription.type) {
+                console.log('[WebRTC Admin] Remote description already set, ignoring duplicate offer');
+                return;
+            }
             try {
                 await adminPeer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
                 const answer = await adminPeer.createAnswer({
@@ -3405,6 +3424,14 @@ function toggleAdminCam() {
         track.enabled = !track.enabled;
         document.getElementById('adminCamIcon').className = track.enabled ? 'fa fa-video-camera' : 'fa fa-video-camera text-danger';
     }
+}
+
+function triggerTopVideoCall() {
+    startAdminWebRtcCall('video');
+}
+
+function triggerTopVoiceCall() {
+    startAdminWebRtcCall('audio');
 }
 </script>
 

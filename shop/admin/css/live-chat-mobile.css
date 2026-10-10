@@ -100,16 +100,38 @@
 
     /* Hide standard bottom navigation bar and admin header when inside active conversation */
     body.mobile-chat-active .sn-mobile-bottom-dock,
-    body.mobile-chat-active .main-header {
+    body.mobile-chat-active .main-header,
+    body.live-chat-page-body.mobile-chat-active .main-header {
         display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
     }
 
     body.mobile-chat-active .content-wrapper,
-    body.mobile-chat-active .content {
+    body.mobile-chat-active .content,
+    body.live-chat-page-body.mobile-chat-active .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active:not(.sidebar-collapse) .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active.sidebar-collapse .content-wrapper,
+    body.live-chat-page-body.mobile-chat-active .content {
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        margin: 0 !important;
         margin-top: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        height: 100dvh !important;
         height: 100vh !important;
+        height: 100% !important;
+        max-height: 100dvh !important;
         max-height: 100vh !important;
-        min-height: 100vh !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
     }
 
     /* Mobile Admin Header in View 1 (Warm Yellow #FEDB65) */
@@ -501,6 +523,8 @@
         flex-direction: column !important;
         height: 100% !important;
         width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         overflow: hidden !important;
     }
 
@@ -512,6 +536,10 @@
     /* Custom Mobile Chat Header (Warm Yellow #FEDB65) */
     .sup-chat-header-bar {
         height: 58px !important;
+        min-height: 58px !important;
+        max-height: 58px !important;
+        margin: 0 !important;
+        top: 0 !important;
         background: #FEDB65 !important;
         border-bottom: 1px solid #EAB308 !important;
         display: flex !important;
@@ -901,27 +929,47 @@
         font-weight: 800 !important;
     }
 
-    /* Bottom Chat Controls Bar (Clean single input row - No chips / No AI mode switcher) */
+    /* Canned Quick Replies Strip (Mobile Responsive) */
+    .wa-quick-bar {
+        padding: 6px 14px !important;
+        background: #F8FAFC !important;
+        border-top: 1px solid #E2E8F0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        z-index: 25 !important;
+    }
+
+    .wa-quick-bar::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    /* WhatsApp Unified Message Input Bar (Mobile Pinned Bottom Row) */
+    .wa-input-bar,
     .sup-mob-bottom-controls {
         background: #FFFFFF !important;
         border-top: 1px solid #F1F5F9 !important;
-        padding: 10px 14px 12px 14px !important;
-        display: flex !important;
-        align-items: center !important;
-        flex-shrink: 0 !important;
-        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04) !important;
-        z-index: 30 !important;
-    }
-
-    /* Input Row */
-    .sup-mob-input-row {
+        padding: 8px 12px 10px 12px !important;
         display: flex !important;
         align-items: center !important;
         gap: 8px !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04) !important;
+        z-index: 30 !important;
+        position: relative !important;
+        bottom: 0 !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
 
-    .sup-clip-btn {
+    .wa-clip-btn,
+    .sup-clip-btn,
+    .wa-icon-btn {
         width: 38px !important;
         height: 38px !important;
         border-radius: 50% !important;
@@ -935,6 +983,7 @@
         flex-shrink: 0 !important;
     }
 
+    .wa-input-field,
     .sup-msg-input {
         flex: 1 !important;
         height: 42px !important;
@@ -945,13 +994,16 @@
         font-size: 13.5px !important;
         color: #0F172A !important;
         outline: none !important;
+        box-sizing: border-box !important;
     }
 
+    .wa-input-field:focus,
     .sup-msg-input:focus {
         border-color: #FEDB65 !important;
         background: #FFFFFF !important;
     }
 
+    .wa-send-btn,
     .sup-send-btn {
         width: 42px !important;
         height: 42px !important;
@@ -968,14 +1020,9 @@
         transition: transform 0.1s ease !important;
     }
 
+    .wa-send-btn:active,
     .sup-send-btn:active {
         transform: scale(0.92) !important;
-    }
-
-    /* Hide desktop WhatsApp message input bar and desktop canned response chips on mobile (< 768px) */
-    .wa-input-bar,
-    .wa-quick-bar {
-        display: none !important;
     }
 }
 

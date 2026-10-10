@@ -408,6 +408,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_submit_checkou
             // Clear cart
             unset($_SESSION['cart_p_id'], $_SESSION['cart_size_id'], $_SESSION['cart_size_name'], $_SESSION['cart_color_id'], $_SESSION['cart_color_name'], $_SESSION['cart_p_qty'], $_SESSION['cart_p_current_price'], $_SESSION['cart_p_name'], $_SESSION['cart_p_featured_photo'], $_SESSION['coupon']);
 
+            // Realtime FCM Push Alert to Admin Device
+            try {
+                require_once __DIR__ . '/admin/inc/notifications.php';
+                $adminOrderUrl = (defined('BASE_URL') ? BASE_URL : '') . 'admin/order.php';
+                sendAdminPushNotification(
+                    $pdo,
+                    '🛍️ New Order: #' . $order_id,
+                    $full_name . ' placed an order of ৳ ' . number_format((float)$submitted_final_total, 2) . ' (Cash on Delivery)',
+                    $adminOrderUrl,
+                    [
+                        'type' => 'order',
+                        'action' => 'order',
+                        'order_id' => (string)$order_id,
+                        'payment_id' => (string)$payment_id,
+                        'customer_name' => (string)$full_name,
+                        'total_amount' => (string)$submitted_final_total,
+                        'url' => $adminOrderUrl,
+                        'target_url' => $adminOrderUrl
+                    ]
+                );
+            } catch (Throwable $notifErr) {
+                error_log("Order admin notification error: " . $notifErr->getMessage());
+            }
+
             header("Location: payment_success.php?method=cod&payment_id=" . urlencode($payment_id));
             exit;
         } catch (Exception $e) {
