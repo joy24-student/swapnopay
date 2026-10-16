@@ -1444,14 +1444,6 @@ body.shopnext-theme {
         padding: 0 6px !important;
         font-size: 11.5px !important;
     }
-    .sn-scan-btn {
-        background: none;
-        border: none;
-        padding: 4px 6px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-    }
     .sn-search-btn {
         background: #fab802 !important;
         color: #111827 !important;

@@ -831,11 +831,6 @@
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                     <input type="text" name="search_text" id="sn-search-input" class="sn-search-input" placeholder="Search for products, brands and more..." autocomplete="off">
-                    <button type="button" class="sn-scan-btn" title="Scan Barcode / Product" onclick="openShopAiModal()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
                     <button type="submit" class="sn-search-btn" aria-label="Search">Search</button>
                 </div>
                 <div class="sn-search-suggestions" id="sn-search-suggestions"></div>
@@ -1040,46 +1035,7 @@
             </a>
             </div>
 
-    <!-- ============================================================
-         GLOBAL SHOPPING AI ASSISTANT MODAL (TRIGGERED BY CENTER DOCK)
-         ============================================================ -->
-    <div class="sn-global-ai-backdrop" id="snGlobalAiModal" style="display:none;">
-        <div class="sn-global-ai-card">
-            <div class="sn-global-ai-header">
-                <div class="sn-global-ai-title-wrap">
-                    <div class="sn-global-ai-icon">✨</div>
-                    <div>
-                        <div class="sn-global-ai-title">ShopNext AI Shopping Assistant</div>
-                        <div class="sn-global-ai-sub">Smart deal finder & product recommendations</div>
-                    </div>
-                </div>
-                <button type="button" class="sn-global-ai-close" onclick="closeShopAiModal()">&times;</button>
-            </div>
 
-            <!-- Suggestion Chips Bar -->
-            <div class="sn-global-ai-chips">
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are today\'s best flash sale deals and payday discounts?')">⚡ Top Deals Today</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Recommend the best laptop under ৳ 70,000 for work and study')">💻 Best Laptops</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are the latest smartphones available with discount?')">📱 Smartphones</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Tell me about free shipping threshold and delivery times')">🚚 Shipping Policy</button>
-            </div>
-
-            <!-- Messages Stream -->
-            <div class="sn-global-ai-chat" id="snGlobalAiMessages">
-                <div class="sn-ai-bubble ai">
-                    👋 Hi there! I'm your <strong>ShopNext AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
-                </div>
-            </div>
-
-            <!-- Input Bar -->
-            <div class="sn-global-ai-input-wrap">
-                <input type="text" id="snGlobalAiInput" class="sn-global-ai-input" placeholder="Ask about deals, products, specifications..." onkeydown="if(event.key==='Enter') sendShopAiMessage()">
-                <button type="button" class="sn-global-ai-send" onclick="sendShopAiMessage()" aria-label="Send">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-            </div>
-        </div>
-    </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -1416,79 +1372,7 @@ document.addEventListener("DOMContentLoaded", function(){
             localStorage.setItem('popupShown', 'true');
         }
     }
-// Global AI Assistant Modal Logic
-window.openShopAiModal = function() {
-    const modal = document.getElementById('snGlobalAiModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        setTimeout(() => {
-            const inp = document.getElementById('snGlobalAiInput');
-            if (inp) inp.focus();
-        }, 150);
-    }
-};
 
-window.closeShopAiModal = function() {
-    const modal = document.getElementById('snGlobalAiModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-    }
-};
-
-window.sendAiQuickPrompt = function(promptText) {
-    const inp = document.getElementById('snGlobalAiInput');
-    if (inp) inp.value = promptText;
-    sendShopAiMessage();
-};
-
-window.sendShopAiMessage = function() {
-    const inp = document.getElementById('snGlobalAiInput');
-    const msgBox = document.getElementById('snGlobalAiMessages');
-    if (!inp || !msgBox) return;
-    const text = inp.value.trim();
-    if (!text) return;
-
-    // Append user message
-    const userDiv = document.createElement('div');
-    userDiv.className = 'sn-ai-bubble user';
-    userDiv.innerText = text;
-    msgBox.appendChild(userDiv);
-    inp.value = '';
-    msgBox.scrollTop = msgBox.scrollHeight;
-
-    // Loading indicator
-    const aiDiv = document.createElement('div');
-    aiDiv.className = 'sn-ai-bubble ai loading';
-    aiDiv.innerHTML = '<span class="sn-ai-dots"><span>.</span><span>.</span><span>.</span></span> Finding best recommendations...';
-    msgBox.appendChild(aiDiv);
-    msgBox.scrollTop = msgBox.scrollHeight;
-
-    const fd = new FormData();
-    fd.append('prompt', text);
-    fd.append('product_id', '0');
-
-    fetch('http://localhost:8000/gemini_chat.php', {
-        method: 'POST',
-        body: fd
-    })
-    .then(r => r.json())
-    .then(d => {
-        aiDiv.classList.remove('loading');
-        if (d.status === 'success' && d.response) {
-            aiDiv.innerHTML = d.response;
-        } else {
-            aiDiv.innerHTML = "Sorry, I couldn't process your request right now. Please try again!";
-        }
-        msgBox.scrollTop = msgBox.scrollHeight;
-    })
-    .catch(err => {
-        aiDiv.classList.remove('loading');
-        aiDiv.innerHTML = "Error connecting to AI service. Please check connection.";
-        msgBox.scrollTop = msgBox.scrollHeight;
-    });
-};
 </script>
 
     <button onclick="topFunction()" id="scrollTopBtn" title="Go to top"><i class="fas fa-arrow-up"></i></button>

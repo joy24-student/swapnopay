@@ -1264,25 +1264,6 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
             flex-shrink: 0 !important;
             stroke: currentColor !important;
         }
-        .sn-scan-btn {
-            background: none !important;
-            border: none !important;
-            padding: 0 6px !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            cursor: pointer !important;
-            flex-shrink: 0 !important;
-        }
-        .sn-scan-btn svg {
-            display: block !important;
-            width: 16px !important;
-            height: 16px !important;
-            min-width: 16px !important;
-            min-height: 16px !important;
-            flex-shrink: 0 !important;
-            stroke: #64748b !important;
-        }
         .sn-search-clear-btn {
             background: #e2e8f0 !important;
             border: none !important;
@@ -2071,11 +2052,6 @@ body.sn-popup-open {
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
-                    <button type="button" class="sn-scan-btn" title="Scan Barcode / Product" onclick="openShopAiModal()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
                     <button type="submit" class="sn-search-btn" aria-label="Search">
                         <svg class="sn-search-btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -2452,49 +2428,6 @@ window.snOpenMobileSearch = function(e) {
                 <span>Account</span>
             </a>
         <?php endif; ?>
-    </div>
-
-    <!-- ============================================================
-         GLOBAL SHOPPING AI ASSISTANT MODAL (TRIGGERED BY CENTER DOCK)
-         ============================================================ -->
-    <div class="sn-global-ai-backdrop" id="snGlobalAiModal" style="display:none;">
-        <div class="sn-global-ai-card">
-            <div class="sn-global-ai-header">
-                <div class="sn-global-ai-title-wrap">
-                    <div class="sn-global-ai-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
-                    </div>
-                    <div>
-                        <div class="sn-global-ai-title"><?php echo htmlspecialchars($store_name); ?> AI Shopping Assistant</div>
-                        <div class="sn-global-ai-sub">Smart deal finder & product recommendations</div>
-                    </div>
-                </div>
-                <button type="button" class="sn-global-ai-close" onclick="closeShopAiModal()">&times;</button>
-            </div>
-
-            <!-- Suggestion Chips Bar -->
-            <div class="sn-global-ai-chips">
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are today\'s best flash sale deals and payday discounts?')"><svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Top Deals Today</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Recommend the best laptop under ৳ 70,000 for work and study')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="20" x2="22" y2="20"></line></svg>Best Laptops</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('What are the latest smartphones available with discount?')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>Smartphones</button>
-                <button type="button" class="sn-ai-chip" onclick="sendAiQuickPrompt('Tell me about free shipping threshold and delivery times')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>Shipping Policy</button>
-            </div>
-
-            <!-- Messages Stream -->
-            <div class="sn-global-ai-chat" id="snGlobalAiMessages">
-                <div class="sn-ai-bubble ai">
-                    Welcome! I'm your <strong><?php echo htmlspecialchars($store_name); ?> AI Shopping Assistant</strong>.<br>Ask me anything about today's deals, flash discounts, gadget specs, or order shipping!
-                </div>
-            </div>
-
-            <!-- Input Bar -->
-            <div class="sn-global-ai-input-wrap">
-                <input type="text" id="snGlobalAiInput" class="sn-global-ai-input" placeholder="Ask about deals, products, specifications..." onkeydown="if(event.key==='Enter') sendShopAiMessage()">
-                <button type="button" class="sn-global-ai-send" onclick="sendShopAiMessage()" aria-label="Send">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-            </div>
-        </div>
     </div>
 
 <script>
@@ -3268,80 +3201,6 @@ document.addEventListener("DOMContentLoaded", function(){
         });
     }
     <?php endif; ?>
-});
-// Global AI Assistant Modal Logic
-window.openShopAiModal = function() {
-    const modal = document.getElementById('snGlobalAiModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        setTimeout(() => {
-            const inp = document.getElementById('snGlobalAiInput');
-            if (inp) inp.focus();
-        }, 150);
-    }
-};
-
-window.closeShopAiModal = function() {
-    const modal = document.getElementById('snGlobalAiModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-    }
-};
-
-window.sendAiQuickPrompt = function(promptText) {
-    const inp = document.getElementById('snGlobalAiInput');
-    if (inp) inp.value = promptText;
-    sendShopAiMessage();
-};
-
-window.sendShopAiMessage = function() {
-    const inp = document.getElementById('snGlobalAiInput');
-    const msgBox = document.getElementById('snGlobalAiMessages');
-    if (!inp || !msgBox) return;
-    const text = inp.value.trim();
-    if (!text) return;
-
-    // Append user message
-    const userDiv = document.createElement('div');
-    userDiv.className = 'sn-ai-bubble user';
-    userDiv.innerText = text;
-    msgBox.appendChild(userDiv);
-    inp.value = '';
-    msgBox.scrollTop = msgBox.scrollHeight;
-
-    // Loading indicator
-    const aiDiv = document.createElement('div');
-    aiDiv.className = 'sn-ai-bubble ai loading';
-    aiDiv.innerHTML = '<span class="sn-ai-dots"><span>.</span><span>.</span><span>.</span></span> Finding best recommendations...';
-    msgBox.appendChild(aiDiv);
-    msgBox.scrollTop = msgBox.scrollHeight;
-
-    const fd = new FormData();
-    fd.append('prompt', text);
-    fd.append('product_id', '0');
-
-    fetch('<?php echo BASE_URL; ?>gemini_chat.php', {
-        method: 'POST',
-        body: fd
-    })
-    .then(r => r.json())
-    .then(d => {
-        aiDiv.classList.remove('loading');
-        if (d.status === 'success' && d.response) {
-            aiDiv.innerHTML = d.response;
-        } else {
-            aiDiv.innerHTML = "Sorry, I couldn't process your request right now. Please try again!";
-        }
-        msgBox.scrollTop = msgBox.scrollHeight;
-    })
-    .catch(err => {
-        aiDiv.classList.remove('loading');
-        aiDiv.innerHTML = "Error connecting to AI service. Please check connection.";
-        msgBox.scrollTop = msgBox.scrollHeight;
-    });
-};
 </script>
 
 <?php if(($settings['show_scroll_top_btn']??0) == 1): ?>
