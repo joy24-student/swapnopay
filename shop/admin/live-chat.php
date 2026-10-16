@@ -1626,7 +1626,7 @@ function playMessageChime() {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, ctx.currentTime);
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.setValueAtTime(0.035, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.35);
@@ -1641,17 +1641,20 @@ function playRingtone() {
             const o1 = ctx.createOscillator();
             const o2 = ctx.createOscillator();
             const g = ctx.createGain();
-            o1.frequency.setValueAtTime(440, ctx.currentTime);
-            o2.frequency.setValueAtTime(480, ctx.currentTime);
+            o1.type = 'sine';
+            o2.type = 'sine';
+            o1.frequency.setValueAtTime(523.25, ctx.currentTime);
+            o2.frequency.setValueAtTime(659.25, ctx.currentTime);
             o1.connect(g);
             o2.connect(g);
             g.connect(ctx.destination);
-            g.gain.setValueAtTime(0.04, ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+            g.gain.setValueAtTime(0.0001, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.025, ctx.currentTime + 0.04);
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.9);
             o1.start(ctx.currentTime);
             o2.start(ctx.currentTime);
-            o1.stop(ctx.currentTime + 1.2);
-            o2.stop(ctx.currentTime + 1.2);
+            o1.stop(ctx.currentTime + 0.95);
+            o2.stop(ctx.currentTime + 0.95);
         } catch(e) {}
     }, 2800);
 }
@@ -2848,7 +2851,7 @@ function unlockAdminAudioPlayback() {
     }
 }
 
-// Web Audio API Ringtone for Admin (Single-instance, zero memory leak)
+// Web Audio API Ringtone for Admin (Pleasant, soft harmonic chime, zero ear fatigue)
 function playAdminRingtone() {
     stopAdminRingtone();
     const triggerTone = () => {
@@ -2862,29 +2865,33 @@ function playAdminRingtone() {
 
             osc1.type = 'sine';
             osc2.type = 'sine';
-            osc1.frequency.setValueAtTime(440, now);
-            osc2.frequency.setValueAtTime(480, now);
+            // C5 (523.25Hz) + E5 (659.25Hz): Gentle, friendly major-third chime
+            osc1.frequency.setValueAtTime(523.25, now);
+            osc2.frequency.setValueAtTime(659.25, now);
 
             osc1.connect(gain);
             osc2.connect(gain);
             gain.connect(ctx.destination);
 
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.setValueAtTime(0.12, now + 0.4);
-            gain.gain.setValueAtTime(0, now + 0.45);
-            gain.gain.setValueAtTime(0.12, now + 0.65);
-            gain.gain.setValueAtTime(0.12, now + 1.05);
-            gain.gain.setValueAtTime(0, now + 1.1);
+            // First chime tone (soft attack & gentle decay)
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.025, now + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+
+            // Second chime tone
+            gain.gain.setValueAtTime(0.0001, now + 0.44);
+            gain.gain.exponentialRampToValueAtTime(0.025, now + 0.48);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
 
             osc1.start(now);
             osc2.start(now);
-            osc1.stop(now + 1.15);
-            osc2.stop(now + 1.15);
+            osc1.stop(now + 1.0);
+            osc2.stop(now + 1.0);
         } catch (e) {}
     };
 
     triggerTone();
-    adminCallRingtoneInterval = setInterval(triggerTone, 2200);
+    adminCallRingtoneInterval = setInterval(triggerTone, 2600);
 }
 
 function stopAdminRingtone() {
@@ -2936,7 +2943,7 @@ function attachAdminRemoteAudio(stream) {
     if (remoteAudio) {
         remoteAudio.srcObject = stream;
         remoteAudio.muted = false;
-        remoteAudio.volume = 1.0;
+        remoteAudio.volume = 0.70;
         const playPromise = remoteAudio.play();
         if (playPromise !== undefined) {
             playPromise.then(() => {
@@ -2951,8 +2958,11 @@ function attachAdminRemoteAudio(stream) {
                             try { adminRemoteAudioSourceNode.disconnect(); } catch (e) {}
                         }
                         adminRemoteAudioSourceNode = ctx.createMediaStreamSource(stream);
-                        adminRemoteAudioSourceNode.connect(ctx.destination);
-                        console.log('[WebRTC Admin] Web Audio route connected successfully.');
+                        const gainNode = ctx.createGain();
+                        gainNode.gain.setValueAtTime(0.70, ctx.currentTime);
+                        adminRemoteAudioSourceNode.connect(gainNode);
+                        gainNode.connect(ctx.destination);
+                        console.log('[WebRTC Admin] Web Audio route connected successfully with gain control.');
                     }
                 } catch (webaudioErr) {
                     console.error('[WebRTC Admin] Web Audio fallback failed:', webaudioErr);

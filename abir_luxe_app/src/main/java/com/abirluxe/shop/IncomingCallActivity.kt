@@ -28,12 +28,16 @@ class IncomingCallActivity : AppCompatActivity() {
     private val timeoutRunnable = Runnable { declineCall() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        turnScreenOnAndUnlock()
         super.onCreate(savedInstanceState)
+        turnScreenOnAndUnlock()
         setContentView(R.layout.activity_incoming_call)
 
-        setupUI()
-        startRingingAndVibration()
+        try {
+            setupUI()
+            startRingingAndVibration()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // 35-second call timeout
         handler.postDelayed(timeoutRunnable, 35000)
@@ -50,40 +54,50 @@ class IncomingCallActivity : AppCompatActivity() {
     }
 
     private fun turnScreenOnAndUnlock() {
-        @Suppress("DEPRECATION")
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-            keyguardManager?.requestDismissKeyguard(this, null)
+        try {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+                val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                keyguardManager?.requestDismissKeyguard(this, null)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     private fun setupUI() {
-        val callerName = intent.getStringExtra("caller_name") ?: getString(R.string.incoming_call_title)
-        val callNote = intent.getStringExtra("call_note") ?: getString(R.string.incoming_call_subtitle)
+        val callerName = intent?.getStringExtra("caller_name") ?: getString(R.string.incoming_call_title)
+        val callNote = intent?.getStringExtra("call_note") ?: getString(R.string.incoming_call_subtitle)
 
-        findViewById<TextView>(R.id.tvCallerName).text = callerName
-        findViewById<TextView>(R.id.tvCallStatus).text = callNote
+        findViewById<TextView>(R.id.tvCallerName)?.text = callerName
+        findViewById<TextView>(R.id.tvCallStatus)?.text = callNote
 
-        // Start wave animation on avatar
-        val waveView = findViewById<android.view.View>(R.id.viewCallWave)
-        val waveAnimation = AnimationUtils.loadAnimation(this, R.anim.ripple_ring)
-        waveView.startAnimation(waveAnimation)
+        // Start wave animation on avatar safely
+        try {
+            val waveView = findViewById<android.view.View>(R.id.viewCallWave)
+            if (waveView != null) {
+                val waveAnimation = AnimationUtils.loadAnimation(this, R.anim.ripple_ring)
+                waveView.startAnimation(waveAnimation)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Decline Button
-        findViewById<ImageButton>(R.id.btnDeclineCall).setOnClickListener {
+        findViewById<ImageButton>(R.id.btnDeclineCall)?.setOnClickListener {
             declineCall()
         }
 
         // Answer Button
-        findViewById<ImageButton>(R.id.btnAnswerCall).setOnClickListener {
+        findViewById<ImageButton>(R.id.btnAnswerCall)?.setOnClickListener {
             answerCall()
         }
     }
@@ -98,6 +112,9 @@ class IncomingCallActivity : AppCompatActivity() {
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone?.volume = 0.35f
             }
             ringtone?.play()
         } catch (e: Exception) {
@@ -139,31 +156,45 @@ class IncomingCallActivity : AppCompatActivity() {
 
         handler.removeCallbacks(timeoutRunnable)
 
-        // Clear notification
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(9999)
+        // Clear notification safely
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            notificationManager?.cancel(9999)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun answerCall() {
-        stopRingingAndVibration()
-        val rawUrl = intent.getStringExtra("target_url")
-        val finalUrl = if (!rawUrl.isNullOrBlank()) {
-            if (rawUrl.contains("?")) "$rawUrl&auto_answer=1" else "$rawUrl?auto_answer=1"
-        } else {
-            "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/messages.php?auto_answer=1"
+        try {
+            stopRingingAndVibration()
+            val rawUrl = intent?.getStringExtra("target_url")
+            val finalUrl = if (!rawUrl.isNullOrBlank()) {
+                if (rawUrl.contains("?")) "$rawUrl&auto_answer=1" else "$rawUrl?auto_answer=1"
+            } else {
+                "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/messages.php?auto_answer=1"
+            }
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("call_answered", true)
+                putExtra("target_url", finalUrl)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            finish()
         }
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("call_answered", true)
-            putExtra("target_url", finalUrl)
-        }
-        startActivity(intent)
-        finish()
     }
 
     private fun declineCall() {
-        stopRingingAndVibration()
-        finish()
+        try {
+            stopRingingAndVibration()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            finish()
+        }
     }
 
     override fun onDestroy() {

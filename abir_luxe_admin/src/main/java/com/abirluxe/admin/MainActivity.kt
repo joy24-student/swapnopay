@@ -307,6 +307,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSwipeRefresh() {
+        // Disable gesture interception by default to restore 100% native 60fps/120fps scrolling
+        // and eliminate lag/touch-stealing when scrolling up through admin tables, orders, and chat
+        swipeRefreshLayout.isEnabled = false
         swipeRefreshLayout.setColorSchemeColors(
             ContextCompat.getColor(this, R.color.brand_gold),
             ContextCompat.getColor(this, R.color.brand_gold_dark)

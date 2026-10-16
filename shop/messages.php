@@ -1318,7 +1318,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
     }
 
-    // Single-instance Web Audio Ringtone Generator (100% reliable, zero asset dependencies)
+    // Single-instance Web Audio Ringtone Generator (Pleasant, soft harmonic chime, zero ear fatigue)
     function playCallRingtone() {
         stopCallRingtone();
         const triggerTone = () => {
@@ -1332,29 +1332,33 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
                 osc1.type = 'sine';
                 osc2.type = 'sine';
-                osc1.frequency.setValueAtTime(440, now);
-                osc2.frequency.setValueAtTime(480, now);
+                // C5 (523.25Hz) + E5 (659.25Hz): Gentle, friendly major-third chime
+                osc1.frequency.setValueAtTime(523.25, now);
+                osc2.frequency.setValueAtTime(659.25, now);
 
                 osc1.connect(gain);
                 osc2.connect(gain);
                 gain.connect(ctx.destination);
 
-                gain.gain.setValueAtTime(0.12, now);
-                gain.gain.setValueAtTime(0.12, now + 0.4);
-                gain.gain.setValueAtTime(0, now + 0.45);
-                gain.gain.setValueAtTime(0.12, now + 0.65);
-                gain.gain.setValueAtTime(0.12, now + 1.05);
-                gain.gain.setValueAtTime(0, now + 1.1);
+                // First chime tone (soft attack & gentle decay)
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.exponentialRampToValueAtTime(0.025, now + 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+
+                // Second chime tone
+                gain.gain.setValueAtTime(0.0001, now + 0.44);
+                gain.gain.exponentialRampToValueAtTime(0.025, now + 0.48);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
 
                 osc1.start(now);
                 osc2.start(now);
-                osc1.stop(now + 1.15);
-                osc2.stop(now + 1.15);
+                osc1.stop(now + 1.0);
+                osc2.stop(now + 1.0);
             } catch (e) {}
         };
 
         triggerTone();
-        callRingtoneInterval = setInterval(triggerTone, 2200);
+        callRingtoneInterval = setInterval(triggerTone, 2600);
     }
 
     function stopCallRingtone() {
@@ -1406,7 +1410,7 @@ if (!empty($_SESSION['cart_p_qty'])) {
         if (remoteAudio) {
             remoteAudio.srcObject = stream;
             remoteAudio.muted = false;
-            remoteAudio.volume = 1.0;
+            remoteAudio.volume = 0.70;
             const playPromise = remoteAudio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
@@ -1421,8 +1425,11 @@ if (!empty($_SESSION['cart_p_qty'])) {
                                 try { custRemoteAudioSourceNode.disconnect(); } catch (e) {}
                             }
                             custRemoteAudioSourceNode = ctx.createMediaStreamSource(stream);
-                            custRemoteAudioSourceNode.connect(ctx.destination);
-                            console.log('[WebRTC Cust] Web Audio route connected successfully.');
+                            const gainNode = ctx.createGain();
+                            gainNode.gain.setValueAtTime(0.70, ctx.currentTime);
+                            custRemoteAudioSourceNode.connect(gainNode);
+                            gainNode.connect(ctx.destination);
+                            console.log('[WebRTC Cust] Web Audio route connected successfully with gain control.');
                         }
                     } catch (webaudioErr) {
                         console.error('[WebRTC Cust] Web Audio fallback failed:', webaudioErr);
@@ -1561,8 +1568,10 @@ if (!empty($_SESSION['cart_p_qty'])) {
             if (modal) {
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
-                document.getElementById('incomingCallIcon').className = currentCallType === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
-                document.getElementById('incomingCallSubtitle').textContent = `Incoming ${currentCallType} call from Store Support...`;
+                const callIconElem = document.getElementById('incomingCallIcon');
+                if (callIconElem) callIconElem.className = currentCallType === 'video' ? 'fa-solid fa-video' : 'fa-solid fa-phone';
+                const callSubElem = document.getElementById('incomingCallSubtitle');
+                if (callSubElem) callSubElem.textContent = `Incoming ${currentCallType} call from Store Support...`;
             }
         } else if (sig.signal_type === 'offer') {
             pendingOfferSignal = sig.payload;
