@@ -4,6 +4,33 @@
  * Provides continuous scroll product fetching with multi-factor personalization
  */
 
+// -------------------------------------------------------------
+// 0. SUB-MILLISECOND MICROCACHE BYPASS (0ms DB LATENCY)
+// -------------------------------------------------------------
+$rawUri = $_SERVER['REQUEST_URI'] ?? '';
+$pathParts = explode('/', trim(strtok($rawUri, '?'), '/'));
+$slug = !empty($_GET['slug']) ? preg_replace('/[^a-zA-Z0-9_-]/', '_', trim($_GET['slug'])) : (!empty($_GET['store']) ? preg_replace('/[^a-zA-Z0-9_-]/', '_', trim($_GET['store'])) : ((!empty($pathParts[0]) && $pathParts[0] !== 'fetch_home_feed.php' && $pathParts[0] !== 'shop') ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $pathParts[0]) : 'default'));
+$tab = isset($_GET['tab']) ? trim($_GET['tab']) : 'for_you';
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$limit = isset($_GET['limit']) ? min(30, max(4, (int)$_GET['limit'])) : 10;
+$excludeParam = isset($_GET['exclude']) ? trim($_GET['exclude']) : '';
+$recentParam = isset($_GET['recent']) ? trim($_GET['recent']) : '';
+
+$isCacheEligible = empty($excludeParam) && empty($recentParam) && empty($_COOKIE['sn_recently_viewed']);
+if ($isCacheEligible) {
+    $earlyCacheFile = __DIR__ . '/admin/inc/cache_' . $slug . '_feed_' . $tab . '_p' . $page . '_l' . $limit . '.json';
+    if (file_exists($earlyCacheFile) && (time() - filemtime($earlyCacheFile) < 120)) {
+        $cachedPayload = @file_get_contents($earlyCacheFile);
+        if ($cachedPayload) {
+            header('Content-Type: application/json; charset=UTF-8');
+            header('X-Cache: EARLY-HIT');
+            header('Cache-Control: public, max-age=60, stale-while-revalidate=120');
+            echo $cachedPayload;
+            exit;
+        }
+    }
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -13,7 +40,6 @@ require_once(__DIR__ . '/admin/inc/seo_helpers.php');
 require_once(__DIR__ . '/inc_feed_card.php');
 
 header('Content-Type: application/json; charset=UTF-8');
-header('Cache-Control: no-cache, must-revalidate');
 
 try {
     $tab = isset($_GET['tab']) ? trim($_GET['tab']) : 'for_you';
@@ -31,6 +57,22 @@ try {
     if (!empty($excludeParam)) {
         $excludeIds = array_unique(array_filter(array_map('intval', explode(',', $excludeParam))));
     }
+
+    // High-speed Microcache check for default feeds (serves in <1ms)
+    $isDefaultFeed = empty($excludeIds) && empty($_GET['recent']) && empty($_SESSION['customer']['cust_id']) && empty($_SESSION['cart_p_id']);
+    $feedCacheKey = 'feed_' . $tab . '_p' . $page . '_l' . $limit;
+    $feedCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile($feedCacheKey) : (__DIR__ . '/admin/inc/cache_' . $feedCacheKey . '.json');
+
+    if ($isDefaultFeed && file_exists($feedCacheFile) && (time() - filemtime($feedCacheFile) < 120)) {
+        $cachedPayload = @file_get_contents($feedCacheFile);
+        if ($cachedPayload) {
+            header('X-Cache: HIT');
+            header('Cache-Control: public, max-age=60, stale-while-revalidate=120');
+            echo $cachedPayload;
+            exit;
+        }
+    }
+    header('Cache-Control: no-cache, must-revalidate');
 
     // -------------------------------------------------------------
     // 1. GATHER PERSONALIZATION SIGNALS
@@ -223,7 +265,7 @@ try {
 
     $hasMore = count($products) === $limit;
 
-    echo json_encode([
+    $jsonResult = json_encode([
         'success'      => true,
         'tab'          => $tab,
         'page'         => $page,
@@ -233,6 +275,12 @@ try {
         'html'         => $html,
         'product_ids'  => $returnedIds
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    if (!empty($isDefaultFeed) && !empty($feedCacheFile)) {
+        @file_put_contents($feedCacheFile, $jsonResult);
+    }
+
+    echo $jsonResult;
 
 } catch (Throwable $e) {
     http_response_code(500);

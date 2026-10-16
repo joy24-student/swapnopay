@@ -23,6 +23,11 @@ $requestPath = strtok($rawUri, '?');
 $pathTrimmed = trim($requestPath, '/');
 $segments = explode('/', $pathTrimmed);
 $candidateSlug = !empty($segments[0]) ? strtolower($segments[0]) : '';
+if ((empty($candidateSlug) || $candidateSlug === 'fetch_home_feed.php' || $candidateSlug === 'shop') && !empty($_GET['slug'])) {
+    $candidateSlug = strtolower(trim($_GET['slug']));
+} elseif ((empty($candidateSlug) || $candidateSlug === 'fetch_home_feed.php' || $candidateSlug === 'shop') && !empty($_GET['store'])) {
+    $candidateSlug = strtolower(trim($_GET['store']));
+}
 
 // 1. Bare platform domain visit redirect (e.g. https://shop.swapnopay.top/)
 if (empty($candidateSlug) && ($rawHost === 'shop.swapnopay.top' || $rawHost === 'shops.swapnopay.top')) {
@@ -253,16 +258,16 @@ try {
     if (($db['host'] === '127.0.0.1' || $db['host'] === 'localhost') && $effectiveSslMode === 'require') {
         $effectiveSslMode = 'disable';
     }
-    $dsn = 'pgsql:host=' . $db['host'] . ';port=' . $db['port'] . ';dbname=' . $db['database'] . ';sslmode=' . $effectiveSslMode;
+    $schemaOption = (!empty($db['schema']) && preg_match('/\A[a-z0-9_]+\z/', (string)$db['schema']))
+        ? ";options='--search_path=" . $db['schema'] . ",public,pg_catalog'"
+        : '';
+    $dsn = 'pgsql:host=' . $db['host'] . ';port=' . $db['port'] . ';dbname=' . $db['database'] . $schemaOption . ';sslmode=' . $effectiveSslMode;
     $pdo = new PDO($dsn,$db['user'],$db['password'],[
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => true,
-        PDO::ATTR_PERSISTENT => false
+        PDO::ATTR_PERSISTENT => true
     ]);
-    if (!empty($db['schema']) && preg_match('/\A[a-z0-9_]+\z/', (string)$db['schema'])) {
-        $pdo->exec('SET search_path TO "' . $db['schema'] . '", public, pg_catalog');
-    }
 } catch (Throwable $error) {
     error_log('Store database unavailable: ' . $error->getMessage());
     http_response_code(503); header('Retry-After: 30'); exit('The store is temporarily unavailable. Please try again shortly. (Database error: ' . htmlspecialchars($error->getMessage()) . ')');

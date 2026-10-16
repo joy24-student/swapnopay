@@ -197,6 +197,11 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <!-- Primary Web Fonts (font-display: swap for instant FCP) -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 
+    <?php if (!empty($logo_url)): ?>
+    <!-- Preload brand logo for instant LCP -->
+    <link rel="preload" as="image" href="<?php echo htmlspecialchars($logo_url); ?>" fetchpriority="high">
+    <?php endif; ?>
+
     <!-- Core Storefront Stylesheets -->
     <link rel="stylesheet" href="assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"> 
@@ -2039,7 +2044,7 @@ body.sn-popup-open {
             <!-- Brand Logo & Shop Name -->
             <a href="<?php echo BASE_URL; ?>" class="sn-brand-logo" title="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>">
                 <?php if (!empty($logo_url)): ?>
-                    <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>" class="sn-brand-logo-img">
+                    <img src="<?php echo htmlspecialchars($logo_url); ?>" alt="<?php echo htmlspecialchars(clean_store_name($store_name)); ?>" class="sn-brand-logo-img" fetchpriority="high" loading="eager">
                 <?php else: ?>
                     <span class="sn-brand-icon-fallback">
                         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2163,6 +2168,7 @@ body.sn-popup-open {
                     $menuData = ['tcat' => [], 'mcat' => [], 'ecat' => []];
                 }
             }
+            $GLOBALS['STORE_MENU_DATA'] = $menuData;
             $navCategories = array_slice($menuData['tcat'] ?? [], 0, 12);
             ?>
 

@@ -383,14 +383,14 @@
         const hasFreshCache = isUrlCacheable && cached && (Date.now() - cached.time < CACHE_TTL_MS);
 
         if (!hasFreshCache) {
-            // Render contextual shimmer skeleton within 30ms for instant visual feedback
+            // Render contextual shimmer skeleton only on slow loads (>280ms) to avoid jarring flashes
             skeletonTimeout = setTimeout(() => {
                 const container = document.getElementById('sn-page-container') || document.querySelector('.content-wrapper-main');
                 if (container) {
                     container.innerHTML = getSkeletonHtml(targetClean);
                     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
                 }
-            }, 30);
+            }, 280);
         }
 
         try {

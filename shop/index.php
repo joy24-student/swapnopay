@@ -25,6 +25,11 @@ if (preg_match('#/(?:[a-zA-Z0-9_-]+/)?page/([0-9]+)/?$#', $path, $m)) {
 
 $cur_page = 'index.php';
 require_once(__DIR__ . '/header.php'); 
+
+if (!headers_sent() && empty($_SESSION['customer']) && empty($_SESSION['cart_p_id']) && (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET')) {
+    header('Cache-Control: public, max-age=15, stale-while-revalidate=60');
+}
+
 if (file_exists(__DIR__ . '/inc_feed_card.php')) {
     require_once(__DIR__ . '/inc_feed_card.php');
 }
@@ -91,7 +96,7 @@ $heroSlides = null;
 if (file_exists($slidesCacheFile) && (time() - filemtime($slidesCacheFile) < 120)) {
     $heroSlides = json_decode(file_get_contents($slidesCacheFile), true);
 }
-if (!$heroSlides) {
+if ($heroSlides === null) {
     try {
         $heroSlides = $pdo->query("SELECT * FROM tbl_slider WHERE is_active = 1 ORDER BY slide_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $_) {
@@ -101,7 +106,7 @@ if (!$heroSlides) {
             $heroSlides = [];
         }
     }
-    if (!empty($heroSlides)) {
+    if (is_array($heroSlides)) {
         @file_put_contents($slidesCacheFile, json_encode($heroSlides));
     }
 }
@@ -114,8 +119,9 @@ if (empty($heroSlides)) {
 $categories_title = !empty($s['categories_title']) ? $s['categories_title'] : 'Shop by Category';
 $categories_subtitle = !empty($s['categories_subtitle']) ? $s['categories_subtitle'] : '';
 $categories = [];
-if (!empty($GLOBALS['all_tcat']) && is_array($GLOBALS['all_tcat'])) {
-    foreach ($GLOBALS['all_tcat'] as $tc) {
+$topCatSource = $GLOBALS['STORE_MENU_DATA']['tcat'] ?? ($GLOBALS['all_tcat'] ?? null);
+if (!empty($topCatSource) && is_array($topCatSource)) {
+    foreach ($topCatSource as $tc) {
         if (strtolower($tc['tcat_name'] ?? '') !== 'shop') {
             $categories[] = $tc;
             if (count($categories) >= 10) break;
@@ -123,14 +129,20 @@ if (!empty($GLOBALS['all_tcat']) && is_array($GLOBALS['all_tcat'])) {
     }
 }
 if (empty($categories)) {
-    try {
-        $catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 AND LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
-        $categories = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-        if (empty($categories)) {
-            $catStmt2 = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_id ASC LIMIT 10");
-            $categories = $catStmt2 ? ($catStmt2->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-        }
-    } catch (Throwable $_) {}
+    $catCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('home_cats') : (__DIR__ . '/admin/inc/cache_home_cats.json');
+    if (file_exists($catCacheFile) && (time() - filemtime($catCacheFile) < 300)) {
+        $categories = json_decode(file_get_contents($catCacheFile), true) ?: [];
+    } else {
+        try {
+            $catStmt = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE show_on_menu = 1 AND LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 10");
+            $categories = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+            if (empty($categories)) {
+                $catStmt2 = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_id ASC LIMIT 10");
+                $categories = $catStmt2 ? ($catStmt2->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (Throwable $_) {}
+        @file_put_contents($catCacheFile, json_encode($categories));
+    }
 }
 
 // Dual Promo Banners Defaults
@@ -187,14 +199,15 @@ $featuredProducts = null;
 if (!empty($_SESSION[$homeFeedKey]) && is_array($_SESSION[$homeFeedKey]) && !empty($_SESSION[$homeFeedKey]['_t']) && (time() - $_SESSION[$homeFeedKey]['_t'] < 120)) {
     $featuredProducts = $_SESSION[$homeFeedKey]['data'];
 }
-if (!$featuredProducts && empty($ssrSignalIds) && file_exists($feedCacheFile) && (time() - filemtime($feedCacheFile) < 120)) {
-    $featuredProducts = json_decode(file_get_contents($feedCacheFile), true);
-    if (!empty($featuredProducts) && is_array($featuredProducts)) {
+if ($featuredProducts === null && empty($ssrSignalIds) && file_exists($feedCacheFile) && (time() - filemtime($feedCacheFile) < 120)) {
+    $cachedFeed = json_decode(file_get_contents($feedCacheFile), true);
+    if (is_array($cachedFeed)) {
+        $featuredProducts = $cachedFeed;
         $_SESSION[$homeFeedKey] = ['_t' => time(), 'data' => $featuredProducts];
     }
 }
 
-if (!$featuredProducts) {
+if ($featuredProducts === null) {
     $preferredEcats = [];
     $preferredMcats = [];
     $preferredTcats = [];
@@ -266,7 +279,7 @@ if (!$featuredProducts) {
         }
     }
 
-    if (!empty($featuredProducts)) {
+    if (is_array($featuredProducts)) {
         $_SESSION[$homeFeedKey] = ['_t' => time(), 'data' => $featuredProducts];
         if (empty($ssrSignalIds)) {
             @file_put_contents($feedCacheFile, json_encode($featuredProducts));
@@ -1727,15 +1740,27 @@ body {
 }
 
 .sn-skeleton-box {
-    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-    background-size: 200% 100%;
-    animation: snSkeletonShimmer 1.5s infinite;
+    background: #f1f5f9;
     border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.sn-skeleton-box::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, rgba(241, 245, 249, 0) 0%, rgba(226, 232, 240, 0.7) 50%, rgba(241, 245, 249, 0) 100%);
+    animation: snSkeletonShimmer 1.4s infinite;
+    will-change: transform;
 }
 
 @keyframes snSkeletonShimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    100% { transform: translateX(100%); }
 }
 
 .sn-btn-feed-more {
@@ -2925,37 +2950,45 @@ body {
             <div class="sn-carousel-container">
                 <div class="sn-flash-scroll" id="snFlashScroll">
                     <?php
-                    // Fetch dynamic flash sale items from active products in the store's database
-                    $dbFlash = [];
-                    try {
-                        $flashQuery = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active=1 ORDER BY p_id DESC LIMIT 12");
-                        if ($flashQuery) $dbFlash = $flashQuery->fetchAll(PDO::FETCH_ASSOC);
-                    } catch (Throwable $e) {}
+                    // Fetch dynamic flash sale items from active products in the store's database (microcached)
+                    $flashCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('flash_deals') : (__DIR__ . '/admin/inc/cache_flash_deals.json');
+                    $flashItems = null;
+                    if (file_exists($flashCacheFile) && (time() - filemtime($flashCacheFile) < 180)) {
+                        $flashItems = json_decode(file_get_contents($flashCacheFile), true);
+                    }
+                    if (!is_array($flashItems)) {
+                        $dbFlash = [];
+                        try {
+                            $flashQuery = $pdo->query("SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo FROM tbl_product WHERE p_is_active=1 ORDER BY p_id DESC LIMIT 12");
+                            if ($flashQuery) $dbFlash = $flashQuery->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Throwable $e) {}
 
-                    $flashItems = [];
-                    if (!empty($dbFlash)) {
-                        foreach ($dbFlash as $prod) {
-                            $curr = (float)str_replace(',', '', (string)$prod['p_current_price']);
-                            $old = (float)str_replace(',', '', (string)($prod['p_old_price'] ?? '0'));
-                            $discountStr = ($old > $curr && $old > 0) ? '-' . round((($old - $curr) / $old) * 100) . '%' : 'HOT';
-                            $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
-                            $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : BASE_URL . 'assets/uploads/' . $photo) : BASE_URL . 'assets/images/no-image.png';
-                            
-                            // Calculate realistic claimed percentage
-                            $pidInt = (int)$prod['p_id'];
-                            $soldPct = 55 + (($pidInt * 19) % 40); // 55% - 94%
+                        $flashItems = [];
+                        if (!empty($dbFlash)) {
+                            foreach ($dbFlash as $prod) {
+                                $curr = (float)str_replace(',', '', (string)$prod['p_current_price']);
+                                $old = (float)str_replace(',', '', (string)($prod['p_old_price'] ?? '0'));
+                                $discountStr = ($old > $curr && $old > 0) ? '-' . round((($old - $curr) / $old) * 100) . '%' : 'HOT';
+                                $photo = !empty($prod['p_featured_photo']) ? $prod['p_featured_photo'] : '';
+                                $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : BASE_URL . 'assets/uploads/' . $photo) : BASE_URL . 'assets/images/no-image.png';
+                                
+                                // Calculate realistic claimed percentage
+                                $pidInt = (int)$prod['p_id'];
+                                $soldPct = 55 + (($pidInt * 19) % 40); // 55% - 94%
 
-                            $flashItems[] = [
-                                'id' => $pidInt,
-                                'name' => $prod['p_name'],
-                                'curr' => number_format($curr, 2),
-                                'old' => ($old > $curr && $old > 0) ? number_format($old, 2) : '',
-                                'discount' => $discountStr,
-                                'sold' => $soldPct,
-                                'img' => $imgUrl,
-                                'fallback' => BASE_URL . 'assets/images/no-image.png'
-                            ];
+                                $flashItems[] = [
+                                    'id' => $pidInt,
+                                    'name' => $prod['p_name'],
+                                    'curr' => number_format($curr, 2),
+                                    'old' => ($old > $curr && $old > 0) ? number_format($old, 2) : '',
+                                    'discount' => $discountStr,
+                                    'sold' => $soldPct,
+                                    'img' => $imgUrl,
+                                    'fallback' => BASE_URL . 'assets/images/no-image.png'
+                                ];
+                            }
                         }
+                        @file_put_contents($flashCacheFile, json_encode($flashItems));
                     }
 
                     foreach ($flashItems as $fi):
@@ -3028,41 +3061,49 @@ body {
             <div class="sn-carousel-container">
                 <div class="sn-shira-grid" id="snShiraGrid">
                     <?php
-                    $shiraDeals = [];
-                    try {
-                        $sdCats = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($sdCats as $sc) {
-                            $cPhoto = !empty($sc['photo']) ? $sc['photo'] : 'cat_all.jpg';
-                            if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
-                                $cPhoto = 'assets/uploads/' . $cPhoto;
-                            }
-                            $shiraDeals[] = [
-                                'name' => $sc['tcat_name'],
-                                'badge' => 'Featured',
-                                'img' => $cPhoto,
-                                'url' => BASE_URL . 'categories.php?cat_id=' . $sc['tcat_id']
-                            ];
-                        }
-                    } catch (Throwable $_) {}
-
-                    if (empty($shiraDeals) || count($shiraDeals) < 4) {
+                    $shiraCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('super_deals') : (__DIR__ . '/admin/inc/cache_super_deals.json');
+                    $shiraDeals = null;
+                    if (file_exists($shiraCacheFile) && (time() - filemtime($shiraCacheFile) < 180)) {
+                        $shiraDeals = json_decode(file_get_contents($shiraCacheFile), true);
+                    }
+                    if (!is_array($shiraDeals)) {
+                        $shiraDeals = [];
                         try {
-                            $pDeals = $pdo->query("SELECT p_id, p_name, p_featured_photo, p_current_price, p_old_price FROM tbl_product WHERE p_is_active = 1 ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), p_id DESC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
-                            foreach ($pDeals as $pd) {
-                                $rPhoto = $pd['p_featured_photo'] ?? '';
-                                $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
-                                $pOld = (float)($pd['p_old_price'] ?? 0);
-                                $pCurr = (float)($pd['p_current_price'] ?? 0);
-                                $badge = ($pOld > $pCurr && $pOld > 0) ? ('-' . round((($pOld - $pCurr) / $pOld) * 100) . '%') : 'Hot Deal';
-                                $pSlugUrl = function_exists('getProductURL') ? getProductURL($pd['p_id'], $pd['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $pd['p_id'];
+                            $sdCats = $pdo->query("SELECT tcat_id, tcat_name, photo FROM tbl_top_category WHERE LOWER(tcat_name) != 'shop' ORDER BY tcat_order ASC, tcat_id ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($sdCats as $sc) {
+                                $cPhoto = !empty($sc['photo']) ? $sc['photo'] : 'cat_all.jpg';
+                                if (!str_starts_with($cPhoto, 'http') && !file_exists(__DIR__ . '/' . $cPhoto)) {
+                                    $cPhoto = 'assets/uploads/' . $cPhoto;
+                                }
                                 $shiraDeals[] = [
-                                    'name' => $pd['p_name'],
-                                    'badge' => $badge,
-                                    'img' => $rPhotoUrl,
-                                    'url' => $pSlugUrl
+                                    'name' => $sc['tcat_name'],
+                                    'badge' => 'Featured',
+                                    'img' => $cPhoto,
+                                    'url' => BASE_URL . 'categories.php?cat_id=' . $sc['tcat_id']
                                 ];
                             }
                         } catch (Throwable $_) {}
+
+                        if (empty($shiraDeals) || count($shiraDeals) < 4) {
+                            try {
+                                $pDeals = $pdo->query("SELECT p_id, p_name, p_featured_photo, p_current_price, p_old_price FROM tbl_product WHERE p_is_active = 1 ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), p_id DESC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+                                foreach ($pDeals as $pd) {
+                                    $rPhoto = $pd['p_featured_photo'] ?? '';
+                                    $rPhotoUrl = !empty($rPhoto) ? (str_starts_with($rPhoto, 'http') ? $rPhoto : (function_exists('get_media_url') ? get_media_url($rPhoto) : BASE_URL . 'assets/uploads/' . $rPhoto)) : BASE_URL . 'assets/images/no-image.png';
+                                    $pOld = (float)($pd['p_old_price'] ?? 0);
+                                    $pCurr = (float)($pd['p_current_price'] ?? 0);
+                                    $badge = ($pOld > $pCurr && $pOld > 0) ? ('-' . round((($pOld - $pCurr) / $pOld) * 100) . '%') : 'Hot Deal';
+                                    $pSlugUrl = function_exists('getProductURL') ? getProductURL($pd['p_id'], $pd['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $pd['p_id'];
+                                    $shiraDeals[] = [
+                                        'name' => $pd['p_name'],
+                                        'badge' => $badge,
+                                        'img' => $rPhotoUrl,
+                                        'url' => $pSlugUrl
+                                    ];
+                                }
+                            } catch (Throwable $_) {}
+                        }
+                        @file_put_contents($shiraCacheFile, json_encode($shiraDeals));
                     }
 
                     foreach ($shiraDeals as $sd):
@@ -3138,6 +3179,14 @@ body {
                         $initialIds[] = (int)$p['p_id'];
                         echo renderAliProductCard($p, $currencySymbol);
                     }
+                } else {
+                    echo '<div class="sn-feed-empty" style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; background: #ffffff; border-radius: 16px; border: 1px dashed #e2e8f0; margin: 12px 0;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; background: #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #d97706;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <h4 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: #1e293b;">New Products Coming Soon!</h4>
+                        <p style="margin: 0; font-size: 13px; color: #64748b;">We\'re currently stocking our latest catalog. Check back shortly for exclusive deals!</p>
+                    </div>';
                 }
                 ?>
             </div>
@@ -3162,7 +3211,7 @@ body {
 
             <!-- Manual Load More button fallback -->
             <div class="sn-feed-actions-row" id="snFeedActionsRow" style="text-align: center; margin: 18px 0 10px 0;">
-                <button type="button" class="sn-btn-feed-more" id="snFeedMoreBtn" onclick="triggerFeedLoadMore()">
+                <button type="button" class="sn-btn-feed-more" id="snFeedMoreBtn" onclick="triggerFeedLoadMore()" style="display: <?php echo (!empty($featuredProducts) && count($featuredProducts) >= $featured_limit) ? 'inline-flex' : 'none'; ?>;">
                     <span>Load More Deals</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
@@ -3506,7 +3555,7 @@ function updateCartBadges(count) {
 var snFeedTab = 'for_you';
 var snFeedPage = 1;
 var snFeedLoading = false;
-var snFeedHasMore = true;
+var snFeedHasMore = <?php echo (!empty($featuredProducts) && count($featuredProducts) >= $featured_limit) ? 'true' : 'false'; ?>;
 var snLoadedIds = new Set(<?php echo json_encode($initialIds ?? []); ?>);
 
 function getClientRecentViewedIds() {
