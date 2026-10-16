@@ -2,19 +2,30 @@
 <?php require_once('header.php'); ?>
 
 <?php
-try {
-    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS business_id integer DEFAULT NULL");
-    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_total_view integer DEFAULT 0");
-    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS cust_id integer DEFAULT 0");
-    $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_video_link text DEFAULT ''");
-    $pdo->exec("CREATE TABLE IF NOT EXISTS tbl_businesses (business_id SERIAL PRIMARY KEY, business_name varchar(255), owner_user_id integer)");
-} catch (Throwable $e) {}
+$prodInitFile = sys_get_temp_dir() . '/.prod_schema_init_' . md5(($runtime['merchant_id'] ?? 'def'));
+if (!is_file($prodInitFile)) {
+    try {
+        $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS business_id integer DEFAULT NULL");
+        $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_total_view integer DEFAULT 0");
+        $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS cust_id integer DEFAULT 0");
+        $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS p_video_link text DEFAULT ''");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tbl_businesses (business_id SERIAL PRIMARY KEY, business_name varchar(255), owner_user_id integer)");
+        @file_put_contents($prodInitFile, '1');
+    } catch (Throwable $e) {}
+}
 
 $cat_list = [];
-try {
-    $catStmt = $pdo->query("SELECT DISTINCT tcat_name FROM tbl_top_category WHERE tcat_name IS NOT NULL AND tcat_name != '' ORDER BY tcat_name ASC");
-    $cat_list = $catStmt->fetchAll(PDO::FETCH_COLUMN);
-} catch (Throwable $e) {}
+if (!empty($GLOBALS['STORE_MENU_DATA']['tcat'])) {
+    foreach ($GLOBALS['STORE_MENU_DATA']['tcat'] as $tc) {
+        if (!empty($tc['tcat_name'])) $cat_list[] = $tc['tcat_name'];
+    }
+}
+if (empty($cat_list)) {
+    try {
+        $catStmt = $pdo->query("SELECT DISTINCT tcat_name FROM tbl_top_category WHERE tcat_name IS NOT NULL AND tcat_name != '' ORDER BY tcat_name ASC");
+        $cat_list = $catStmt ? ($catStmt->fetchAll(PDO::FETCH_COLUMN) ?: []) : [];
+    } catch (Throwable $e) {}
+}
 
 $statement = $pdo->prepare("SELECT
 							t1.p_id,

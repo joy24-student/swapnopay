@@ -4,11 +4,25 @@
 
 	<?php
 	$dockPendingOrders = 0;
-	try {
-	    if (isset($pdo)) {
-	        $dockPendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled'")->fetchColumn();
-	    }
-	} catch (Throwable $e) {}
+	if (isset($dash_pending_orders)) {
+	    $dockPendingOrders = (int)$dash_pending_orders;
+	    $_SESSION['dock_pending_orders'] = $dockPendingOrders;
+	    $_SESSION['dock_pending_time'] = time();
+	} elseif (isset($tabCounts['pending'])) {
+	    $dockPendingOrders = (int)$tabCounts['pending'];
+	    $_SESSION['dock_pending_orders'] = $dockPendingOrders;
+	    $_SESSION['dock_pending_time'] = time();
+	} elseif (!empty($_SESSION['dock_pending_time']) && (time() - $_SESSION['dock_pending_time'] < 60)) {
+	    $dockPendingOrders = (int)($_SESSION['dock_pending_orders'] ?? 0);
+	} else {
+	    try {
+	        if (isset($pdo)) {
+	            $dockPendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM tbl_payment WHERE (shipping_status = 'Pending' OR payment_status = 'Pending') AND payment_status != 'Cancelled'")->fetchColumn();
+	            $_SESSION['dock_pending_orders'] = $dockPendingOrders;
+	            $_SESSION['dock_pending_time'] = time();
+	        }
+	    } catch (Throwable $e) {}
+	}
 	?>
 	<nav class="sn-mobile-bottom-dock visible-xs" aria-label="Mobile Navigation">
 	    <a href="index.php" class="sn-dock-item <?= ($cur_page == 'index.php') ? 'active' : '' ?>">

@@ -2,10 +2,14 @@
 require_once __DIR__ . '/inc/guard.php';
 require_once __DIR__ . '/header.php';
 
-try {
-    $pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_country integer DEFAULT 0");
-    $pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_status smallint DEFAULT 1");
-} catch (Throwable $e) {}
+$custInitFile = sys_get_temp_dir() . '/.cust_schema_init_' . md5(($runtime['merchant_id'] ?? 'def'));
+if (!is_file($custInitFile)) {
+    try {
+        $pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_country integer DEFAULT 0");
+        $pdo->exec("ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_status smallint DEFAULT 1");
+        @file_put_contents($custInitFile, '1');
+    } catch (Throwable $e) {}
+}
 
 $page = max(1, min(100000, (int)($_GET['page'] ?? 1)));
 $tab = strtolower(trim((string)($_GET['tab'] ?? 'all')));
@@ -74,24 +78,40 @@ try {
     }
 } catch (Throwable $e) {}
 
-// Counts for badges
-$allCount = (int)$pdo->query("SELECT count(*) FROM tbl_customer")->fetchColumn();
-$activeCount = (int)$pdo->query("SELECT count(*) FROM tbl_customer WHERE cust_status = 1")->fetchColumn();
-$inactiveCount = (int)$pdo->query("SELECT count(*) FROM tbl_customer WHERE (cust_status = 0 OR cust_status IS NULL)")->fetchColumn();
-$blockedCount = (int)$pdo->query("SELECT count(*) FROM tbl_customer WHERE cust_status = 2 OR cust_status = -1")->fetchColumn();
+// Counts for badges & KPI metrics consolidated into 1 single round-trip
+$custAggRow = [];
+try {
+    $cAggStmt = $pdo->query("
+        SELECT
+            COUNT(*) AS total_all,
+            COUNT(*) FILTER (WHERE cust_status = 1) AS total_active,
+            COUNT(*) FILTER (WHERE cust_status = 0 OR cust_status IS NULL) AS total_inactive,
+            COUNT(*) FILTER (WHERE cust_status = 2 OR cust_status = -1) AS total_blocked,
+            COUNT(DISTINCT cust_country) FILTER (WHERE cust_country > 0) AS total_countries
+        FROM tbl_customer
+    ");
+    if ($cAggStmt) {
+        $custAggRow = $cAggStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+} catch (Throwable $_) {}
+
+$allCount = (int)($custAggRow['total_all'] ?? 0);
+$activeCount = (int)($custAggRow['total_active'] ?? 0);
+$inactiveCount = (int)($custAggRow['total_inactive'] ?? 0);
+$blockedCount = (int)($custAggRow['total_blocked'] ?? 0);
 
 $tabCounts = [
-    'all' => $allCount > 0 ? $allCount : 248,
-    'active' => $activeCount > 0 ? $activeCount : 212,
-    'inactive' => $inactiveCount > 0 ? $inactiveCount : 24,
-    'blocked' => $blockedCount > 0 ? $blockedCount : 12,
+    'all'      => $allCount,
+    'active'   => $activeCount,
+    'inactive' => $inactiveCount,
+    'blocked'  => $blockedCount,
 ];
 
 // Minimal KPI Metrics
 $kpiTotal = $tabCounts['all'];
 $kpiActive = $tabCounts['active'];
 $kpiInactive = $tabCounts['inactive'];
-$kpiCountries = (int)$pdo->query("SELECT count(DISTINCT cust_country) FROM tbl_customer WHERE cust_country > 0")->fetchColumn();
+$kpiCountries = (int)($custAggRow['total_countries'] ?? 0);
 
 function custEsc($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');

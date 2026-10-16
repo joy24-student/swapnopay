@@ -57,20 +57,39 @@ $query = $pdo->prepare('SELECT * FROM tbl_payment' . $whereSql . ' ORDER BY id D
 $query->execute($params);
 $orders = $query->fetchAll(PDO::FETCH_ASSOC);
 
-// Real-time tab counts for badges
+// Real-time tab counts and KPI metrics consolidated into 1 single round-trip
+$aggRow = [];
+try {
+    $aggStmt = $pdo->query("
+        SELECT
+            COUNT(*) AS total_all,
+            COUNT(*) FILTER (WHERE shipping_status = 'Pending' AND payment_status != 'Cancelled') AS total_pending,
+            COUNT(*) FILTER (WHERE shipping_status = 'Processing') AS total_processing,
+            COUNT(*) FILTER (WHERE shipping_status = 'Shipped') AS total_shipped,
+            COUNT(*) FILTER (WHERE shipping_status = 'Delivered') AS total_delivered,
+            COUNT(*) FILTER (WHERE shipping_status = 'Cancelled' OR payment_status = 'Cancelled') AS total_cancelled,
+            COALESCE(SUM(paid_amount) FILTER (WHERE payment_status = 'Completed'), 0) AS kpi_revenue,
+            COUNT(*) FILTER (WHERE shipping_status IN ('Pending', 'Processing') AND payment_status != 'Cancelled') AS kpi_awaiting
+        FROM tbl_payment
+    ");
+    if ($aggStmt) {
+        $aggRow = $aggStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+} catch (Throwable $_) {}
+
 $tabCounts = [
-    'all' => (int)$pdo->query("SELECT count(*) FROM tbl_payment")->fetchColumn(),
-    'pending' => (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE (shipping_status = 'Pending' AND payment_status != 'Cancelled')")->fetchColumn(),
-    'processing' => (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE shipping_status = 'Processing'")->fetchColumn(),
-    'shipped' => (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE shipping_status = 'Shipped'")->fetchColumn(),
-    'delivered' => (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE shipping_status = 'Delivered'")->fetchColumn(),
-    'cancelled' => (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE (shipping_status = 'Cancelled' OR payment_status = 'Cancelled')")->fetchColumn(),
+    'all'        => (int)($aggRow['total_all'] ?? 0),
+    'pending'    => (int)($aggRow['total_pending'] ?? 0),
+    'processing' => (int)($aggRow['total_processing'] ?? 0),
+    'shipped'    => (int)($aggRow['total_shipped'] ?? 0),
+    'delivered'  => (int)($aggRow['total_delivered'] ?? 0),
+    'cancelled'  => (int)($aggRow['total_cancelled'] ?? 0),
 ];
 
 // Minimal KPI Metrics
 $kpiTotal = $tabCounts['all'];
-$kpiRevenue = (float)$pdo->query("SELECT coalesce(sum(paid_amount), 0) FROM tbl_payment WHERE payment_status = 'Completed'")->fetchColumn();
-$kpiAwaiting = (int)$pdo->query("SELECT count(*) FROM tbl_payment WHERE shipping_status IN ('Pending', 'Processing') AND payment_status != 'Cancelled'")->fetchColumn();
+$kpiRevenue = (float)($aggRow['kpi_revenue'] ?? 0);
+$kpiAwaiting = (int)($aggRow['kpi_awaiting'] ?? 0);
 $kpiDelivered = $tabCounts['delivered'];
 
 function orderEsc($value) {

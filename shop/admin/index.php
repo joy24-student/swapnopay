@@ -31,7 +31,8 @@ $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-6 days'));
 $fourteenDaysAgo = date('Y-m-d 00:00:00', strtotime('-13 days'));
 $sevenDaysEnd = date('Y-m-d 23:59:59', strtotime('-7 days'));
 
-if (is_file($dashCacheFile) && (time() - filemtime($dashCacheFile)) < 20) {
+$forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+if (!$forceRefresh && is_file($dashCacheFile) && (time() - filemtime($dashCacheFile)) < 60) {
     $dashData = json_decode(@file_get_contents($dashCacheFile), true);
 }
 
@@ -103,6 +104,61 @@ if (!is_array($dashData) || empty($dashData)) {
         $dashData = array_merge($dashData, $cgRow);
     } catch (Throwable $_) {}
 
+    // 4. Recent notifications & broadcasts
+    try {
+        $dashData['recent_broadcasts'] = $pdo->query("SELECT * FROM tbl_notifications ORDER BY created_at DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $_) {
+        $dashData['recent_broadcasts'] = [];
+    }
+
+    // 5. Daily sales chart rows for last 7 days
+    try {
+        $chartStmt = $pdo->prepare("
+            SELECT payment_date, paid_amount 
+            FROM tbl_payment 
+            WHERE payment_status = 'Completed' AND payment_date >= ?
+        ");
+        $chartStmt->execute([$sevenDaysAgo]);
+        $dashData['chart_rows'] = $chartStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $dashData['chart_rows'] = [];
+    }
+
+    // 6. Recent orders and order items
+    try {
+        $rStmt = $pdo->query("
+            SELECT id, payment_id, customer_name, customer_email, paid_amount, shipping_status, payment_status, payment_date
+            FROM tbl_payment
+            ORDER BY id DESC
+            LIMIT 5
+        ");
+        $db_recent_orders = $rStmt ? ($rStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        $recentOrderItems = [];
+        if (!empty($db_recent_orders)) {
+            $pIds = array_filter(array_column($db_recent_orders, 'payment_id'));
+            if (!empty($pIds)) {
+                $inQuery = implode(',', array_fill(0, count($pIds), '?'));
+                $iStmt = $pdo->prepare("
+                    SELECT o.payment_id, o.product_name, o.quantity, o.unit_price, p.p_featured_photo
+                    FROM tbl_order o
+                    LEFT JOIN tbl_product p ON o.product_id = p.p_id
+                    WHERE o.payment_id IN ($inQuery)
+                    ORDER BY o.id ASC
+                ");
+                $iStmt->execute(array_values($pIds));
+                $iRows = $iStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                foreach ($iRows as $ir) {
+                    $recentOrderItems[$ir['payment_id']][] = $ir;
+                }
+            }
+        }
+        $dashData['recent_orders'] = $db_recent_orders;
+        $dashData['recent_order_items'] = $recentOrderItems;
+    } catch (Throwable $e) {
+        $dashData['recent_orders'] = [];
+        $dashData['recent_order_items'] = [];
+    }
+
     if (!empty($dashData)) {
         @file_put_contents($dashCacheFile, json_encode($dashData));
     }
@@ -123,10 +179,7 @@ $total_order_complete_shipping_pending = (int)($dashData['total_order_complete_s
 
 $total_notifications_sent = (int)($dashData['total_notifications_sent'] ?? 0);
 $total_fcm_devices = (int)($dashData['total_fcm_devices'] ?? 0);
-$recent_broadcasts = [];
-try {
-    $recent_broadcasts = $pdo->query("SELECT * FROM tbl_notifications ORDER BY created_at DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-} catch (Throwable $_) {}
+$recent_broadcasts = $dashData['recent_broadcasts'] ?? [];
 
 $dash_revenue = (float)($dashData['dash_revenue'] ?? 0);
 $dash_total_orders = (int)($dashData['dash_total_orders'] ?? 0);
@@ -179,21 +232,13 @@ for ($d = 6; $d >= 0; $d--) {
     $chart_daily_sales[$dayKey] = 0.0;
 }
 
-try {
-    $chartStmt = $pdo->prepare("
-        SELECT payment_date, paid_amount 
-        FROM tbl_payment 
-        WHERE payment_status = 'Completed' AND payment_date >= ?
-    ");
-    $chartStmt->execute([$sevenDaysAgo]);
-    $chartRows = $chartStmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($chartRows as $cr) {
-        $pDate = date('Y-m-d', strtotime($cr['payment_date']));
-        if (isset($chart_daily_sales[$pDate])) {
-            $chart_daily_sales[$pDate] += (float)$cr['paid_amount'];
-        }
+$chartRows = $dashData['chart_rows'] ?? [];
+foreach ($chartRows as $cr) {
+    $pDate = date('Y-m-d', strtotime($cr['payment_date']));
+    if (isset($chart_daily_sales[$pDate])) {
+        $chart_daily_sales[$pDate] += (float)$cr['paid_amount'];
     }
-} catch (Throwable $e) {}
+}
 
 $chartVals = array_values($chart_daily_sales);
 $maxDailyVal = max($chartVals);
@@ -233,37 +278,9 @@ function fmtChartAxis($num) {
     return (string)round($num);
 }
 
-// 7. Query Real Recent Orders (Limit 5)
-$db_recent_orders = [];
-$recentOrderItems = [];
-try {
-    $rStmt = $pdo->query("
-        SELECT id, payment_id, customer_name, customer_email, paid_amount, shipping_status, payment_status, payment_date
-        FROM tbl_payment
-        ORDER BY id DESC
-        LIMIT 5
-    ");
-    $db_recent_orders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    if (!empty($db_recent_orders)) {
-        $pIds = array_filter(array_column($db_recent_orders, 'payment_id'));
-        if (!empty($pIds)) {
-            $inQuery = implode(',', array_fill(0, count($pIds), '?'));
-            $iStmt = $pdo->prepare("
-                SELECT o.payment_id, o.product_name, o.quantity, o.unit_price, p.p_featured_photo
-                FROM tbl_order o
-                LEFT JOIN tbl_product p ON o.product_id = p.p_id
-                WHERE o.payment_id IN ($inQuery)
-                ORDER BY o.id ASC
-            ");
-            $iStmt->execute(array_values($pIds));
-            $iRows = $iStmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($iRows as $ir) {
-                $recentOrderItems[$ir['payment_id']][] = $ir;
-            }
-        }
-    }
-} catch (Throwable $e) {}
+// 7. Recent Orders & Items (from cached $dashData)
+$db_recent_orders = $dashData['recent_orders'] ?? [];
+$recentOrderItems = $dashData['recent_order_items'] ?? [];
 
 function dashFormatRelativeTime($dateStr) {
     if (empty($dateStr)) return '-';

@@ -5,16 +5,37 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/CSRF_Protect.php';
 $csrf=new CSRF_Protect();
 header('Cache-Control: no-store');
-if(empty($_SESSION['user']['id'])) { header('Location: ' . BASE_URL . 'admin/login.php');exit; }
-$adminQuery=$pdo->prepare("SELECT * FROM tbl_user WHERE id=? AND status='Active'");
-$adminQuery->execute([$_SESSION['user']['id']]);$adminUser=$adminQuery->fetch();
-if(!$adminUser || !in_array($adminUser['role'],['Top Admin','Admin'],true)) { http_response_code(403);exit('Administrator access is required.'); }
-if(!$adminUser || !in_array($adminUser['role'],['Top Admin','Admin','Super Admin'],true)) { http_response_code(403);exit('Administrator access is required.'); }
-$passwordVersion=hash('sha256',$adminUser['password']);
-if(isset($_SESSION['shop_admin_version']) && !hash_equals($_SESSION['shop_admin_version'],$passwordVersion)) {
-    unset($_SESSION['user'],$_SESSION['shop_admin_version']);header('Location: ' . BASE_URL . 'admin/login.php');exit;
+$userId = (int)($_SESSION['user']['id'] ?? 0);
+if ($userId <= 0) {
+    header('Location: ' . BASE_URL . 'admin/login.php');
+    exit;
 }
-$_SESSION['shop_admin_version']=$passwordVersion;
+
+$adminUser = null;
+if (!empty($_SESSION['guard_user_data']) && !empty($_SESSION['guard_user_time']) && (time() - $_SESSION['guard_user_time'] < 60) && ((int)($_SESSION['guard_user_data']['id'] ?? 0) === $userId)) {
+    $adminUser = $_SESSION['guard_user_data'];
+} else {
+    $adminQuery = $pdo->prepare("SELECT * FROM tbl_user WHERE id = ? AND status = 'Active'");
+    $adminQuery->execute([$userId]);
+    $adminUser = $adminQuery->fetch(PDO::FETCH_ASSOC);
+    if ($adminUser) {
+        $_SESSION['guard_user_data'] = $adminUser;
+        $_SESSION['guard_user_time'] = time();
+    }
+}
+
+if (!$adminUser || !in_array($adminUser['role'], ['Top Admin', 'Admin', 'Super Admin'], true)) {
+    http_response_code(403);
+    exit('Administrator access is required.');
+}
+
+$passwordVersion = hash('sha256', $adminUser['password']);
+if (isset($_SESSION['shop_admin_version']) && !hash_equals($_SESSION['shop_admin_version'], $passwordVersion)) {
+    unset($_SESSION['user'], $_SESSION['shop_admin_version'], $_SESSION['guard_user_data'], $_SESSION['guard_user_time']);
+    header('Location: ' . BASE_URL . 'admin/login.php');
+    exit;
+}
+$_SESSION['shop_admin_version'] = $passwordVersion;
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $adminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $ajaxReadOnly = in_array($adminPage, ['get-mid-category.php', 'get-end-category.php', 'fetch_sorted_products.php', 'ai-product-writer.php', 'broadcast-ajax.php'], true);

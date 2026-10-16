@@ -85,9 +85,11 @@ function humanTimeDiff($datetime) {
 // =========================================================================
 if ($action === 'get_notifications') {
     $notifCacheFile = sys_get_temp_dir() . '/.notif_cache_' . md5($adminId . '_' . ($runtime['merchant_id'] ?? 'def')) . '.json';
-    if (is_file($notifCacheFile) && (time() - filemtime($notifCacheFile)) < 6) {
+    if (is_file($notifCacheFile) && (time() - filemtime($notifCacheFile)) < 20) {
         $cached = @file_get_contents($notifCacheFile);
         if ($cached) {
+            header('X-Cache: HIT');
+            header('Cache-Control: private, max-age=15');
             echo $cached;
             exit;
         }
@@ -373,6 +375,9 @@ if ($action === 'mark_read') {
         $stmt_up->execute([$key]);
     } catch (Throwable $e) {}
 
+    $notifCacheFile = sys_get_temp_dir() . '/.notif_cache_' . md5($adminId . '_' . ($runtime['merchant_id'] ?? 'def')) . '.json';
+    @unlink($notifCacheFile);
+
     echo json_encode(['status' => 'success', 'marked_key' => $key]);
     exit;
 }
@@ -416,6 +421,9 @@ if ($action === 'mark_all_read') {
         }
         $pdo->exec("UPDATE tbl_admin_notifications SET is_read = 1");
     } catch (Throwable $e) {}
+
+    $notifCacheFile = sys_get_temp_dir() . '/.notif_cache_' . md5($adminId . '_' . ($runtime['merchant_id'] ?? 'def')) . '.json';
+    @unlink($notifCacheFile);
 
     echo json_encode(['status' => 'success', 'unread_count' => 0]);
     exit;
