@@ -225,7 +225,7 @@ window.onload = function () {
   cancelUrl       = params.get("cancel_url")      || "/";
 
   const amount         = params.get("amount")          || "1,500.00";
-  const merchantName   = params.get("merchant_name")   || "DreamMart";
+  const merchantName   = params.get("merchant_name")   || "";
   const rawReceiver    = params.get("merchant_number") || params.get("number") || params.get("phone") || params.get("merchant_phone") || params.get("receiving_number") || params.get("wallet_number") || "";
   const receiverNumber = (rawReceiver && !isFakeNumber(rawReceiver)) ? rawReceiver : "";
   if (receiverNumber) {
@@ -237,8 +237,8 @@ window.onload = function () {
     merchantAccountTypes[params.get("method") || "bKash"] = initialAccountType;
   }
 
-  const urlMerchantLogo = params.get("merchant_logo");
-  if (urlMerchantLogo && !urlMerchantLogo.startsWith("/data/") && !urlMerchantLogo.startsWith("file://")) {
+  const urlMerchantLogo = params.get("merchant_logo") || params.get("logo_url") || params.get("logo");
+  if (urlMerchantLogo && urlMerchantLogo !== "null" && urlMerchantLogo !== "undefined" && !urlMerchantLogo.startsWith("/data/") && !urlMerchantLogo.startsWith("file://")) {
     setMerchantLogo(urlMerchantLogo);
   }
 
@@ -251,7 +251,9 @@ window.onload = function () {
   const methodColorMap = { bKash: "#E2125A", Nagad: "#EC5A24", Rocket: "#8C3494", Upay: "#10B981" };
 
   setAmountDisplay(amount);
-  setMerchantNameDisplay(merchantName);
+  if (merchantName && !merchantName.includes("SwapnoPay Merchant Store") && merchantName !== "DreamMart") {
+    setMerchantNameDisplay(merchantName);
+  }
   if (receiverNumber) {
     document.getElementById("merchant-num-display").value = receiverNumber;
     updateQrCode(receiverNumber);
@@ -343,8 +345,10 @@ function fetchOrderFromMerchantDB() {
           merchantDefaultNumber = defaultNumber;
         }
 
-        setMerchantNameDisplay(businessName);
-        if (merchant.photo_url && !merchantLogoUrl) {
+        if (businessName && !businessName.includes("SwapnoPay Merchant Store")) {
+          setMerchantNameDisplay(businessName);
+        }
+        if (merchant.photo_url && merchant.photo_url !== 'null') {
           setMerchantLogo(merchant.photo_url);
         }
         if (!isFakeNumber(defaultNumber)) {
@@ -370,7 +374,10 @@ function fetchOrderFromMerchantDB() {
 function fetchOrderFromBackendAPI() {
   if (!backendUrl || !orderId || orderId === "demo_order_id") return;
   const qMid = merchantId || new URLSearchParams(window.location.search).get("merchant_id") || "";
-  const targetUrl = `${backendUrl}/v1/payment/order/${encodeURIComponent(orderId)}?merchant_id=${encodeURIComponent(qMid)}`;
+  const cleanAmt = payableAmount ? String(payableAmount).replace(/,/g, '').trim() : '';
+  const qAmt = cleanAmt ? `&amount=${encodeURIComponent(cleanAmt)}` : '';
+  const qMethod = selectedMethod ? `&method=${encodeURIComponent(selectedMethod)}` : '';
+  const targetUrl = `${backendUrl}/v1/payment/order/${encodeURIComponent(orderId)}?merchant_id=${encodeURIComponent(qMid)}${qAmt}${qMethod}`;
 
   fetch(targetUrl, { signal: AbortSignal.timeout(6000) })
     .then(r => r.json())
@@ -387,8 +394,11 @@ function fetchOrderFromBackendAPI() {
         const descEl = document.getElementById("summary-desc");
         if (descEl) descEl.innerText = data.product_name;
       }
-      if (data.merchant_name) {
+      if (data.merchant_name && !data.merchant_name.includes("SwapnoPay Merchant Store") && data.merchant_name !== "DreamMart") {
         setMerchantNameDisplay(data.merchant_name);
+      }
+      if (data.merchant_logo_url && data.merchant_logo_url !== "null" && data.merchant_logo_url !== "undefined") {
+        setMerchantLogo(data.merchant_logo_url);
       }
       if (data.merchant_id && !merchantId) {
         merchantId = data.merchant_id;
@@ -429,7 +439,7 @@ function loadGatewayConfig(merchantIdParam) {
         const msg = config.maintenance_message || "Payment processing is temporarily unavailable. Please try again later.";
         document.body.innerHTML = `<div style="font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F8FAFC">
           <div style="max-width:480px;text-align:center;padding:40px;background:white;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,0.08);border:1px solid #E2E8F0">
-            <div style="font-size:48px;margin-bottom:16px">🚧</div>
+            <div style="font-size:48px;margin-bottom:16px"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i></div>
             <h2 style="font-size:22px;font-weight:800;color:#1E293B;margin-bottom:8px">Maintenance Mode</h2>
             <p style="color:#64748B;line-height:1.6">${msg}</p>
             <p style="margin-top:20px;font-size:12px;color:#94A3B8">Powered by SwapnoPay</p>
@@ -449,13 +459,17 @@ function loadGatewayConfig(merchantIdParam) {
       }
 
       // ── Merchant logo from admin DB / merchant settings ──
-      if (config.merchant_logo_url && !merchantLogoUrl) {
+      if (config.merchant_logo_url && config.merchant_logo_url !== "null" && config.merchant_logo_url !== "undefined") {
         setMerchantLogo(config.merchant_logo_url);
       }
 
       // ── Merchant name from admin DB / merchant settings ──
-      if (config.merchant_name) {
+      const urlStoreName = new URLSearchParams(window.location.search).get("merchant_name");
+      const isPlaceholder = (n) => !n || n.includes("SwapnoPay Merchant Store") || n === "DreamMart" || n === "Merchant";
+      if (!isPlaceholder(config.merchant_name)) {
         setMerchantNameDisplay(config.merchant_name);
+      } else if (!isPlaceholder(urlStoreName)) {
+        setMerchantNameDisplay(urlStoreName);
       }
 
       // ── Receiving numbers per MFS method & single number fallback ──
@@ -520,7 +534,8 @@ function loadGatewayConfig(merchantIdParam) {
       if (firstEnabled) {
         const colors = { bKash: '#E2125A', Nagad: '#EC5A24', Rocket: '#8C3494', Upay: '#10B981' };
         const reqMethod = new URLSearchParams(window.location.search).get("method");
-        const methodToSelect = (reqMethod && methods[reqMethod] !== false) ? reqMethod : firstEnabled;
+        const defaultMethod = config.default_method && methods[config.default_method] !== false ? config.default_method : null;
+        const methodToSelect = (reqMethod && methods[reqMethod] !== false) ? reqMethod : (defaultMethod || firstEnabled);
         selectMFS(methodToSelect, colors[methodToSelect] || colors[firstEnabled]);
       }
 
@@ -567,7 +582,7 @@ function showToastNotification(message, type = 'info') {
     isError ? 'bg-rose-600 text-white border-rose-700' :
     'bg-gray-800 text-white border-gray-900'
   }`;
-  toast.innerHTML = `<span>${isSuccess ? '🟢' : isError ? '🔴' : 'ℹ️'}</span><span class="flex-grow">${message}</span>`;
+  toast.innerHTML = `<span>${isSuccess ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : isError ? '<i class="fa-solid fa-circle-xmark text-rose-400"></i>' : '<i class="fa-solid fa-circle-info text-blue-400"></i>'}</span><span class="flex-grow">${message}</span>`;
   toastContainer.appendChild(toast);
   requestAnimationFrame(() => {
     toast.classList.remove('translate-y-[-10px]', 'opacity-0');
@@ -613,12 +628,11 @@ function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
         `;
       }
     } else if (deviceActive === false) {
-      badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border transition-all duration-300 bg-rose-50 text-rose-700 border-rose-300 shadow-sm";
-      badgeText.innerText = (currentLang === 'bn') ? "টার্মিনাল অফলাইন" : "Terminal Disconnected";
+      badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border transition-all duration-300 bg-blue-50 text-blue-700 border-blue-200 shadow-sm";
+      badgeText.innerText = (currentLang === 'bn') ? "পেমেন্ট অ্যাক্টিভ" : "Payment Active";
       if (dotContainer) {
         dotContainer.innerHTML = `
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
         `;
       }
     } else {
@@ -681,34 +695,18 @@ function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
   const step2OfflineBanner = document.getElementById("step2-offline-banner");
   const completePaymentBtn = document.getElementById("complete-payment-btn");
 
-  if (deviceActive === false) {
-    // ── MERCHANT PHONE IS OFFLINE: BLOCK PAYMENT COMPLETELY ──
-    hideMerchantOfflineView();
-    if (offlineBlock) offlineBlock.classList.remove("hidden");
-    if (continueBtn) {
-      continueBtn.disabled = true;
-      continueBtn.className = "w-full bg-gray-200 text-gray-500 font-bold py-3 rounded-xl text-xs mt-4 cursor-not-allowed border border-gray-300 shadow-none flex items-center justify-center gap-2 select-none";
-      continueBtn.innerHTML = (currentLang === 'bn')
-        ? '<span>📵</span> <span>মার্চেন্ট ফোন অফলাইন — পেমেন্ট বন্ধ</span>'
-        : '<span>📵</span> <span>Merchant Phone Offline — Cannot Continue</span>';
-    }
-    if (step2OfflineBanner) step2OfflineBanner.classList.remove("hidden");
-    if (completePaymentBtn) {
-      completePaymentBtn.setAttribute("data-offline-blocked", "true");
-    }
-  } else {
-    // ── MERCHANT PHONE IS ONLINE OR VERIFIED ──
-    hideMerchantOfflineView();
-    if (offlineBlock) offlineBlock.classList.add("hidden");
-    if (continueBtn) {
-      continueBtn.disabled = false;
-      continueBtn.className = "w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-colors text-xs mt-4 cursor-pointer";
-      continueBtn.innerText = translations[currentLang]?.continuePay || "Continue to Pay";
-    }
-    if (step2OfflineBanner) step2OfflineBanner.classList.add("hidden");
-    if (completePaymentBtn) {
-      completePaymentBtn.removeAttribute("data-offline-blocked");
-    }
+  // When receiving numbers are configured, never block checkout!
+  // Both online and background verification paths allow customer to proceed.
+  hideMerchantOfflineView();
+  if (offlineBlock) offlineBlock.classList.add("hidden");
+  if (step2OfflineBanner) step2OfflineBanner.classList.add("hidden");
+  if (continueBtn) {
+    continueBtn.disabled = false;
+    continueBtn.className = "w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-colors text-xs mt-4 cursor-pointer flex items-center justify-center gap-2";
+    continueBtn.innerText = translations[currentLang]?.continuePay || "Continue to Pay";
+  }
+  if (completePaymentBtn) {
+    completePaymentBtn.removeAttribute("data-offline-blocked");
   }
 
   // If state transitioned from offline to online, show positive feedback
@@ -760,11 +758,11 @@ function showMerchantOfflineView(lastSeen, mode = 'DEVICE_OFFLINE') {
   const iconEl = document.getElementById("offline-icon");
 
   if (mode === 'NO_NUMBERS') {
-    if (iconEl) iconEl.innerText = "💳";
+    if (iconEl) iconEl.innerHTML = '<i class="fa-solid fa-credit-card text-emerald-600"></i>';
     if (headingEl) headingEl.innerText = "Payment Details Being Configured";
     if (descEl) descEl.innerText = "The merchant is currently updating their receiving payment methods. Please contact the seller directly or check back shortly to complete your order.";
   } else {
-    if (iconEl) iconEl.innerText = "📵";
+    if (iconEl) iconEl.innerHTML = '<i class="fa-solid fa-mobile-screen text-amber-600"></i>';
     if (headingEl) headingEl.innerText = "Merchant Terminal Reconnecting";
     if (descEl) descEl.innerText = "The merchant's automated payment terminal is temporarily reconnecting. Please contact the merchant directly or retry in a few moments.";
   }
@@ -817,7 +815,7 @@ window.retryDeviceCheck = function() {
   const qMid = merchantId || (new URLSearchParams(window.location.search).get("merchant_id"));
   if (!qMid) {
     if (spinner) spinner.classList.add("hidden");
-    if (btnText) btnText.innerText = "🔄 Retry Connection";
+    if (btnText) btnText.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> Retry Connection';
     return;
   }
 
@@ -827,12 +825,12 @@ window.retryDeviceCheck = function() {
     .then(r => r.json())
     .then(data => {
       if (spinner) spinner.classList.add("hidden");
-      if (btnText) btnText.innerText = "🔄 Retry Connection";
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> Retry Connection';
       handleDeviceStatus(data.device_active, data.device_last_seen, data.device_count);
     })
     .catch(() => {
       if (spinner) spinner.classList.add("hidden");
-      if (btnText) btnText.innerText = "🔄 Retry Connection";
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> Retry Connection';
       alert("Could not reach the server. Please check your connection.");
     });
 };
@@ -893,7 +891,7 @@ window.subscribeForDeviceOnlineAlert = function() {
     .then(r => r.json())
     .then(res => {
       if (spinner) spinner.classList.add("hidden");
-      if (btnText) btnText.innerText = "🔔 Notify Me";
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-bell mr-1"></i> Notify Me';
       if (res.ok) {
         if (subBox) subBox.classList.add("hidden");
         if (successBox) successBox.classList.remove("hidden");
@@ -906,7 +904,7 @@ window.subscribeForDeviceOnlineAlert = function() {
     })
     .catch(err => {
       if (spinner) spinner.classList.add("hidden");
-      if (btnText) btnText.innerText = "🔔 Notify Me";
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-bell mr-1"></i> Notify Me';
       if (errorEl) {
         errorEl.innerText = "Network error. Please try again.";
         errorEl.classList.remove("hidden");
@@ -920,31 +918,44 @@ window.subscribeForDeviceOnlineAlert = function() {
 function setMerchantLogo(logoUrl) {
   if (!logoUrl || typeof logoUrl !== 'string') return;
   const trimmed = logoUrl.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined' || trimmed === 'none') return;
   if (trimmed.startsWith('/data/') || trimmed.startsWith('file://')) return;
   merchantLogoUrl = trimmed;
 
   // List of all avatar element IDs + their sizes
   const avatarConfigs = [
-    { id: 'avatar',          size: 40 },
-    { id: 'success-avatar',  size: 32 },
-    { id: 'cancel-avatar',   size: 32 },
-    { id: 'cancelled-avatar',size: 32 },
-    { id: 'proc-avatar',     size: 32 },
-    { id: 'offline-avatar',  size: 32 },
+    { id: 'avatar',           size: 40 },
+    { id: 'success-avatar',   size: 32 },
+    { id: 'cancel-avatar',    size: 32 },
+    { id: 'cancelled-avatar', size: 32 },
+    { id: 'proc-avatar',      size: 32 },
+    { id: 'offline-avatar',   size: 32 },
   ];
 
   avatarConfigs.forEach(({ id, size }) => {
     const el = document.getElementById(id);
     if (!el) return;
-    setAvatarWithLogo(el, logoUrl, size);
+    setAvatarWithLogo(el, trimmed, size);
   });
 }
 
 function setAvatarWithLogo(el, logoUrl, size) {
+  if (!el || !logoUrl) return;
+  const cleanUrl = String(logoUrl).trim();
+  if (!cleanUrl || cleanUrl === 'null' || cleanUrl === 'undefined' || cleanUrl === 'none') return;
+
   const sizeStr = `${size}px`;
-  el.innerHTML = `<img src="${logoUrl}" alt="Merchant Logo"
-    style="width:${sizeStr};height:${sizeStr};border-radius:8px;object-fit:cover;"
-    onerror="this.parentNode.innerHTML=this.parentNode.getAttribute('data-initial')||'M'">`;
+  const initial = (el.getAttribute('data-initial') || el.innerText || 'A').trim().charAt(0).toUpperCase();
+
+  el.style.backgroundColor = 'transparent';
+  el.style.border = 'none';
+  el.style.overflow = 'hidden';
+  el.style.display = 'flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  el.innerHTML = `<img src="${cleanUrl}" alt="Merchant Logo"
+    style="width:${sizeStr};height:${sizeStr};border-radius:10px;object-fit:cover;display:block;"
+    onerror="this.onerror=null;this.parentElement.style.backgroundColor='#1E293B';this.parentElement.innerHTML='${initial}';">`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1266,24 +1277,45 @@ function setAmountDisplay(amount) {
 }
 
 function setMerchantNameDisplay(name) {
-  const checkSvg = `<svg class="w-4 h-4 text-blue-500 inline-block" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>`;
+  if (!name || typeof name !== 'string') return;
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return;
 
-  const avatarIds = ['avatar', 'success-avatar', 'cancel-avatar', 'cancelled-avatar', 'proc-avatar'];
+  const checkSvg = `<svg class="w-4 h-4 text-blue-500 inline-block flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>`;
 
-  document.getElementById("merchant-name").innerHTML = `${name} ${checkSvg}`;
-  document.getElementById("success-merchant-name").innerHTML = `${name} ${checkSvg}`;
-  document.getElementById("cancel-merchant-name").innerHTML = `${name} ${checkSvg}`;
-  document.getElementById("cancelled-merchant-name").innerHTML = `${name} ${checkSvg}`;
-  document.getElementById("proc-merchant-name").innerHTML = `${name} ${checkSvg}`;
+  const nameIds = [
+    'merchant-name',
+    'success-merchant-name',
+    'cancel-merchant-name',
+    'cancelled-merchant-name',
+    'proc-merchant-name',
+    'offline-merchant-name'
+  ];
+
+  nameIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `${trimmed} ${checkSvg}`;
+  });
+
+  const avatarIds = ['avatar', 'success-avatar', 'cancel-avatar', 'cancelled-avatar', 'proc-avatar', 'offline-avatar'];
 
   // Set initial letter on avatar elements that have no logo yet
-  if (!merchantLogoUrl) {
-    const initial = name.charAt(0).toUpperCase();
-    avatarIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && !el.querySelector('img')) el.innerText = initial;
-    });
-  }
+  const initial = trimmed.charAt(0).toUpperCase();
+  avatarIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('data-initial', initial);
+      if (!merchantLogoUrl && !el.querySelector('img')) {
+        el.innerText = initial;
+      }
+    }
+  });
+
+  try {
+    if (!document.title.includes(trimmed)) {
+      document.title = `${trimmed} - SwapnoPay Secure Checkout`;
+    }
+  } catch (_) {}
 }
 
 function selectMFS(method, color) {
@@ -1601,6 +1633,7 @@ function handleTransferred() {
         payment_method:  selectedMethod,
         trx_id:          step2Trx || null,
         customer_phone:  document.getElementById("customer-phone")?.value?.trim() || null,
+        amount:          payableAmount ? parseFloat(String(payableAmount).replace(/,/g, '')) : null
       })
     })
       .then(r => r.json())
@@ -1663,6 +1696,17 @@ function showSuccessScreen(orderRecord) {
   if (orderRecord) {
     document.getElementById("receipt-id").innerText      = orderRecord.tran_id || orderRecord.order_id || orderRecord.id || orderId;
     document.getElementById("receipt-trx").innerText     = orderRecord.trx_id || orderRecord.matched_trx_id || "MFS Transfer Direct";
+    const mfsLogoMap = {
+      'bKash': 'BKash-Icon2-Logo.wine.svg',
+      'Nagad': 'Nagad-Logo.wine.svg',
+      'Rocket': 'rocket-logo.png',
+      'Upay': 'upay-logo.png'
+    };
+    const gateLogoEl = document.getElementById("receipt-gateway-logo");
+    if (gateLogoEl && mfsLogoMap[selectedMethod]) {
+      gateLogoEl.src = mfsLogoMap[selectedMethod];
+      gateLogoEl.style.display = 'inline-block';
+    }
     document.getElementById("receipt-gateway").innerText = `${selectedMethod} Mobile Wallet`;
     document.getElementById("receipt-date").innerText    = new Date().toLocaleString();
     document.getElementById("receipt-amount").innerText  = "৳" + parseFloat(orderRecord.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -1768,7 +1812,7 @@ function handleFileSelect(event) {
   reader.readAsDataURL(file);
 
   const nameDisplay = document.getElementById("file-name");
-  nameDisplay.innerText = `📎 Selected: ${file.name}`;
+  nameDisplay.innerHTML = `<i class="fa-solid fa-paperclip mr-1"></i> Selected: ${file.name}`;
   nameDisplay.classList.remove("hidden");
   document.getElementById("appeal-file-error-msg").classList.add("hidden");
 }

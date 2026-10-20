@@ -977,7 +977,7 @@ require_once('header.php');
                                     <div class="sn-radio-dot"></div>
                                 </div>
                                 <div class="sn-pay-icon-box swapnopay-icon-bg">
-                                    <img src="assets/uploads/swapnopay-logo.png" alt="SwapnoPay Official" class="sn-pay-logo-img" onerror="this.onerror=null; this.src='assets/uploads/logo_branding.png';">
+                                    <img src="assets/uploads/swapnopay-app-icon.png" alt="SwapnoPay Official" class="sn-pay-logo-img" onerror="this.onerror=null; this.src='assets/uploads/swapnopay-logo.png';">
                                 </div>
                                 <div class="sn-pay-title-col">
                                     <div class="sn-pay-name">
@@ -988,9 +988,10 @@ require_once('header.php');
                                     <div class="sn-pay-desc sn-pay-desc-mobile">bKash, Nagad, Rocket, Upay &amp; Cards</div>
                                 </div>
                                 <div class="sn-mfs-badges">
-                                    <span class="sn-mfs-tag bkash">bKash</span>
-                                    <span class="sn-mfs-tag nagad">Nagad</span>
-                                    <span class="sn-mfs-tag rocket">Rocket</span>
+                                    <span class="sn-mfs-tag bkash"><img src="assets/logos/bkash.png" alt="bKash" class="sn-tag-mini-logo"> bKash</span>
+                                    <span class="sn-mfs-tag nagad"><img src="assets/logos/nagad.png" alt="Nagad" class="sn-tag-mini-logo"> Nagad</span>
+                                    <span class="sn-mfs-tag rocket"><img src="assets/logos/rocket.png" alt="Rocket" class="sn-tag-mini-logo"> Rocket</span>
+                                    <span class="sn-mfs-tag upay"><img src="assets/logos/upay.png" alt="Upay" class="sn-tag-mini-logo"> Upay</span>
                                 </div>
                             </div>
 
@@ -1004,22 +1005,22 @@ require_once('header.php');
                                 <div class="sn-mfs-grid">
                                     <div class="sn-mfs-option active" id="mfsBkash" onclick="selectMfsProvider('bKash')" data-method="bKash">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
-                                        <div class="sn-mfs-color-bar" style="background: #e2136e;"></div>
+                                        <img src="assets/logos/bkash.png" alt="bKash" class="sn-mfs-brand-logo" onerror="this.onerror=null; this.src='assets/logos/bkash.svg';">
                                         <span class="sn-mfs-label">bKash</span>
                                     </div>
                                     <div class="sn-mfs-option" id="mfsNagad" onclick="selectMfsProvider('Nagad')" data-method="Nagad">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
-                                        <div class="sn-mfs-color-bar" style="background: #f7941d;"></div>
+                                        <img src="assets/logos/nagad.png" alt="Nagad" class="sn-mfs-brand-logo" onerror="this.onerror=null; this.src='assets/logos/nagad.svg';">
                                         <span class="sn-mfs-label">Nagad</span>
                                     </div>
                                     <div class="sn-mfs-option" id="mfsRocket" onclick="selectMfsProvider('Rocket')" data-method="Rocket">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
-                                        <div class="sn-mfs-color-bar" style="background: #8c3494;"></div>
+                                        <img src="assets/logos/rocket.png" alt="Rocket" class="sn-mfs-brand-logo">
                                         <span class="sn-mfs-label">Rocket</span>
                                     </div>
                                     <div class="sn-mfs-option" id="mfsUpay" onclick="selectMfsProvider('Upay')" data-method="Upay">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
-                                        <div class="sn-mfs-color-bar" style="background: #ffcb05;"></div>
+                                        <img src="assets/logos/upay.png" alt="Upay" class="sn-mfs-brand-logo">
                                         <span class="sn-mfs-label">Upay</span>
                                     </div>
                                 </div>
@@ -2442,6 +2443,57 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
 .sn-mfs-option.active .sn-mfs-radio-dot {
     background: #0f172a;
 }
+.sn-tag-mini-logo {
+    height: 11px;
+    width: auto;
+    max-width: 15px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+.sn-mfs-tag.upay { color: #0284C7; background: #E0F2FE; }
+
+.sn-mfs-brand-logo {
+    height: 18px;
+    width: auto;
+    max-width: 26px;
+    object-fit: contain;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.sn-mfs-option.active#mfsBkash {
+    border-color: #e2136e !important;
+    background: #fdf2f8 !important;
+}
+.sn-mfs-option.active#mfsBkash .sn-mfs-label { color: #e2136e !important; }
+.sn-mfs-option.active#mfsBkash .sn-mfs-radio { border-color: #e2136e !important; }
+.sn-mfs-option.active#mfsBkash .sn-mfs-radio-dot { background: #e2136e !important; }
+
+.sn-mfs-option.active#mfsNagad {
+    border-color: #f7941d !important;
+    background: #fff7ed !important;
+}
+.sn-mfs-option.active#mfsNagad .sn-mfs-label { color: #ea580c !important; }
+.sn-mfs-option.active#mfsNagad .sn-mfs-radio { border-color: #f7941d !important; }
+.sn-mfs-option.active#mfsNagad .sn-mfs-radio-dot { background: #f7941d !important; }
+
+.sn-mfs-option.active#mfsRocket {
+    border-color: #8c3494 !important;
+    background: #faf5ff !important;
+}
+.sn-mfs-option.active#mfsRocket .sn-mfs-label { color: #8c3494 !important; }
+.sn-mfs-option.active#mfsRocket .sn-mfs-radio { border-color: #8c3494 !important; }
+.sn-mfs-option.active#mfsRocket .sn-mfs-radio-dot { background: #8c3494 !important; }
+
+.sn-mfs-option.active#mfsUpay {
+    border-color: #0054a6 !important;
+    background: #eff6ff !important;
+}
+.sn-mfs-option.active#mfsUpay .sn-mfs-label { color: #0054a6 !important; }
+.sn-mfs-option.active#mfsUpay .sn-mfs-radio { border-color: #0054a6 !important; }
+.sn-mfs-option.active#mfsUpay .sn-mfs-radio-dot { background: #0054a6 !important; }
+
 .sn-mfs-color-bar {
     width: 4px;
     height: 22px;
@@ -3013,6 +3065,15 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
 
     .sn-mfs-radio {
         display: none !important;
+    }
+
+    .sn-mfs-brand-logo {
+        height: 15px !important;
+        width: auto !important;
+        max-width: 22px !important;
+        object-fit: contain !important;
+        display: inline-block !important;
+        flex-shrink: 0 !important;
     }
 
     .sn-mfs-color-bar {

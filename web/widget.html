@@ -15,6 +15,7 @@
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   <style>
     body {
@@ -237,7 +238,7 @@
             <div id="terminal-offline-block" class="hidden mb-4 bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 shadow-sm text-left">
               <div class="flex items-start gap-3">
                 <div class="w-9 h-9 rounded-xl bg-rose-100 border border-rose-300 flex items-center justify-center flex-shrink-0 text-lg mt-0.5">
-                  📵
+                  <i class="fa-solid fa-mobile-screen-button"></i>
                 </div>
                 <div class="flex-grow">
                   <div class="flex items-center justify-between">
@@ -251,10 +252,10 @@
                   </p>
                   <div class="mt-3 flex items-center gap-2">
                     <button type="button" onclick="retryDeviceCheck()" class="inline-flex items-center gap-1 text-[11px] font-black bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl shadow transition-all cursor-pointer">
-                      <span>🔄 Check Again</span>
+                      <span><i class="fa-solid fa-rotate mr-1"></i> Check Again</span>
                     </button>
                     <a id="offline-call-merchant-btn" href="#" class="inline-flex items-center gap-1 text-[11px] font-bold bg-white border border-rose-300 text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-xl transition-all">
-                      <span>📞 Call Merchant</span>
+                      <span><i class="fa-solid fa-phone mr-1"></i> Call Merchant</span>
                     </a>
                   </div>
                 </div>
@@ -313,7 +314,7 @@
             <!-- Step 2 Terminal Offline Warning Banner -->
             <div id="step2-offline-banner" class="hidden mb-3 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between shadow-sm">
               <div class="flex items-center gap-2">
-                <span class="text-base">📵</span>
+                <span class="text-base"><i class="fa-solid fa-mobile-screen-button"></i></span>
                 <div>
                   <p class="font-extrabold text-[11px] text-rose-900 leading-none">Merchant Phone Disconnected</p>
                   <p class="text-[10px] text-rose-700 mt-0.5">Payment verification will resume once merchant terminal reconnects.</p>
@@ -502,7 +503,7 @@
 
         <div class="flex flex-col items-center justify-center text-center flex-grow py-4">
           <div class="w-16 h-16 bg-amber-50 border-2 border-amber-200 rounded-full flex items-center justify-center mb-4 offline-pulse" id="offline-icon-box">
-            <span class="text-3xl" id="offline-icon">📵</span>
+            <span class="text-3xl" id="offline-icon"><i class="fa-solid fa-mobile-screen-button"></i></span>
           </div>
           <h2 class="text-base font-black text-gray-900 mb-2" id="offline-heading">Merchant Device Offline</h2>
           <p class="text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6" id="offline-desc">
@@ -512,16 +513,16 @@
           <div class="w-full bg-amber-50 border border-amber-100 rounded-xl p-4 text-left mb-4">
             <h3 class="text-[11px] font-bold text-amber-900 mb-2">What you can do:</h3>
             <ul class="space-y-1.5 text-[11px] text-amber-700">
-              <li class="flex items-center gap-1.5"><span>📞</span> Contact the merchant directly to confirm the payment</li>
-              <li class="flex items-center gap-1.5"><span>🔄</span> Try again in a few minutes when the device comes online</li>
-              <li class="flex items-center gap-1.5"><span>⚖️</span> Submit an appeal with your transaction screenshot</li>
+              <li class="flex items-center gap-1.5"><i class="fa-solid fa-phone text-blue-500 w-4"></i> Contact the merchant directly to confirm the payment</li>
+              <li class="flex items-center gap-1.5"><i class="fa-solid fa-rotate text-emerald-500 w-4"></i> Try again in a few minutes when the device comes online</li>
+              <li class="flex items-center gap-1.5"><i class="fa-solid fa-scale-balanced text-amber-600 w-4"></i> Submit an appeal with your transaction screenshot</li>
             </ul>
           </div>
 
           <!-- Interactive "Notify Me When Online" card -->
           <div class="w-full bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 text-left mb-4 shadow-sm">
             <div class="flex items-center gap-1.5 mb-1.5">
-              <span class="text-blue-600 text-sm">🔔</span>
+              <i class="fa-solid fa-bell text-blue-600 text-sm"></i>
               <h3 class="text-[11px] font-bold text-blue-900">Get Notified When Merchant is Back Online</h3>
             </div>
             <p class="text-[10px] text-blue-700 mb-2.5 leading-relaxed">
@@ -531,7 +532,7 @@
               <div class="flex flex-col sm:flex-row gap-1.5">
                 <input type="email" id="device-alert-customer-email" placeholder="Enter your email (e.g. name@mail.com)" class="flex-grow text-[11px] px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-800" />
                 <button id="btn-subscribe-device-alert" onclick="subscribeForDeviceOnlineAlert()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-lg text-[11px] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shadow-sm">
-                  <span id="alert-sub-btn-text">🔔 Notify Me</span>
+                  <span id="alert-sub-btn-text"><i class="fa-solid fa-bell mr-1"></i> Notify Me</span>
                   <div id="alert-sub-spinner" class="hidden w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 </button>
               </div>
@@ -539,7 +540,7 @@
             </div>
             <div id="device-alert-success-box" class="hidden text-center py-1.5 bg-green-50 border border-green-200 rounded-lg mt-2">
               <span class="text-green-700 font-bold text-[11px] flex items-center justify-center gap-1">
-                <span>✅</span> Subscribed! We will email you the moment the merchant is online.
+                <i class="fa-solid fa-circle-check text-green-600 mr-1"></i> Subscribed! We will email you the moment the merchant is online.
               </span>
             </div>
           </div>
@@ -549,11 +550,11 @@
 
         <div class="space-y-2 w-full">
           <button onclick="retryDeviceCheck()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors text-xs flex items-center justify-center gap-2">
-            <span id="retry-btn-text">🔄 Retry Connection</span>
+            <span id="retry-btn-text"><i class="fa-solid fa-rotate mr-1"></i> Retry Connection</span>
             <div class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" id="retry-spinner"></div>
           </button>
           <a id="offline-contact-btn" href="#" class="block w-full py-3 text-center text-amber-600 font-bold border border-amber-200 rounded-xl hover:bg-amber-50 transition-colors text-xs">
-            📞 Call Merchant
+            <i class="fa-solid fa-phone mr-1"></i> Call Merchant
           </a>
           <button onclick="proceedDespiteOffline()" class="w-full py-2.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
             <span>Continue to Pay (Manual Verification)</span>
@@ -611,7 +612,7 @@
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500" data-translate="receiptGate">Payment Gateway</span>
-              <span class="font-semibold text-gray-800" id="receipt-gateway">bKash Mobile Wallet</span>
+              <span class="font-semibold text-gray-800 flex items-center gap-1.5" id="receipt-gateway-wrap"><img id="receipt-gateway-logo" src="BKash-Icon2-Logo.wine.svg" alt="MFS Logo" class="w-4 h-4 object-contain inline-block" /><span id="receipt-gateway">bKash Mobile Wallet</span></span>
             </div>
             <div class="flex justify-between pt-2 border-t border-dashed border-gray-200 mt-2">
               <span class="font-bold text-gray-800 text-xs" data-translate="amtPaid">Amount Paid</span>
