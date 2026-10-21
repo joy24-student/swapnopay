@@ -88,6 +88,7 @@ if ($prodBundle && !empty($prodBundle['product_data'])) {
     $reviews_list        = $prodBundle['reviews_list'] ?? [];
     $cat_row             = $prodBundle['cat_row'] ?? [];
     $related_products    = $prodBundle['related_products'] ?? [];
+    $active_coupon       = $prodBundle['active_coupon'] ?? null;
 } else {
     // Fetch product details from DB
     $statement = $pdo->prepare("SELECT * FROM tbl_product WHERE p_id=? AND p_is_active=1");
@@ -428,8 +429,9 @@ $estimated_delivery_time_international = $settings_data['estimated_delivery_time
 $gemini_api_key = $settings_data['gemini_api_key'] ?? '';
 
 // Check for real coupon communicating with tbl_coupon
-$active_coupon = null;
-$prod_coupon_code = trim((string)($product_data['coupon_code'] ?? ''));
+if (!isset($active_coupon)) {
+    $active_coupon = null;
+    $prod_coupon_code = trim((string)($product_data['coupon_code'] ?? ''));
 if ($prod_coupon_code !== '') {
     try {
         $cStmt = $pdo->prepare("SELECT * FROM tbl_coupon WHERE coupon_code = ? AND status = 'active' AND (end_date >= CURRENT_DATE OR end_date IS NULL) LIMIT 1");
@@ -443,6 +445,7 @@ if (!$active_coupon) {
         $cStmt->execute();
         $active_coupon = $cStmt->fetch(PDO::FETCH_ASSOC);
     } catch (Throwable $_) {}
+    }
 }
 
 $related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
@@ -620,7 +623,7 @@ if ($p_old_price > $p_current_price && $p_current_price > 0) {
 $emi_monthly = round($p_current_price / 12);
 
 // Fetch Related Products (same end category first, or active products in store)
-if (!isset($related_products) || empty($related_products)) {
+if (!isset($related_products)) {
     $related_products = [];
     try {
         if ($ecat_id > 0) {
@@ -665,7 +668,8 @@ if (!$prodBundle && !empty($product_data)) {
         'total_reviews_count' => $total_reviews_count ?? 0,
         'reviews_list'        => $reviews_list ?? [],
         'cat_row'             => $cat_row ?? [],
-        'related_products'    => $related_products ?? []
+        'related_products'    => $related_products ?? [],
+        'active_coupon'       => $active_coupon ?? null
     ];
     $_SESSION[$prodCacheKey] = $prodBundle;
     @file_put_contents($prodCacheFile, json_encode($prodBundle));

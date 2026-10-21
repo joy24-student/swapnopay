@@ -50,13 +50,21 @@ function extractIdFromSlug($slug) {
  * Get product ID by slug
  */
 function getProductIdBySlug($slug, $pdo) {
+    static $slugCache = [];
+    if (isset($slugCache[$slug])) {
+        return $slugCache[$slug];
+    }
+    if (!empty($_SESSION['sn_slug_id_' . $slug])) {
+        return $slugCache[$slug] = (int)$_SESSION['sn_slug_id_' . $slug];
+    }
     $id = extractIdFromSlug($slug);
     
     if ($id) {
         $statement = $pdo->prepare("SELECT p_id FROM tbl_product WHERE p_id=? AND p_is_active=1");
         $statement->execute(array($id));
         if ($statement->rowCount() > 0) {
-            return $id;
+            $_SESSION['sn_slug_id_' . $slug] = (int)$id;
+            return $slugCache[$slug] = (int)$id;
         }
     }
     
@@ -65,7 +73,8 @@ function getProductIdBySlug($slug, $pdo) {
         $statement = $pdo->prepare("SELECT p_id FROM tbl_product WHERE p_id=? AND p_is_active=1");
         $statement->execute([(int)$slug]);
         if ($statement->rowCount() > 0) {
-            return (int)$slug;
+            $_SESSION['sn_slug_id_' . $slug] = (int)$slug;
+            return $slugCache[$slug] = (int)$slug;
         }
     }
 
@@ -74,7 +83,10 @@ function getProductIdBySlug($slug, $pdo) {
         $stmt = $pdo->prepare("SELECT p_id FROM tbl_product WHERE slug=? AND p_is_active=1 LIMIT 1");
         $stmt->execute([$slug]);
         $found = $stmt->fetchColumn();
-        if ($found) return (int)$found;
+        if ($found) {
+            $_SESSION['sn_slug_id_' . $slug] = (int)$found;
+            return $slugCache[$slug] = (int)$found;
+        }
     } catch (Throwable $e) {}
 
     return false;
