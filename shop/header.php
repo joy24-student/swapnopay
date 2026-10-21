@@ -1,12 +1,10 @@
 <?php
 ob_start();
-// Check if session is already active before starting
+// Include database config and functions first to establish tenant-isolated session
+require_once("admin/inc/config.php");
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// Include database config and functions using require_once to prevent redeclaration errors
-require_once("admin/inc/config.php");
 require_once("admin/inc/functions.php"); 
 require_once("admin/inc/CSRF_Protect.php");
 require_once("admin/inc/seo_helpers.php");
@@ -222,6 +220,8 @@ if ($cur_page == 'product.php' && isset($_REQUEST['id'])) {
     <link rel="stylesheet" href="assets/css/spa-skeleton.css?v=<?php echo file_exists(__DIR__ . '/assets/css/spa-skeleton.css') ? filemtime(__DIR__ . '/assets/css/spa-skeleton.css') : '1'; ?>">
     <?php if ($cur_page === 'product.php'): ?>
     <link rel="stylesheet" href="assets/css/product_modern.css?v=<?php echo file_exists(__DIR__ . '/assets/css/product_modern.css') ? filemtime(__DIR__ . '/assets/css/product_modern.css') : '1'; ?>">
+    <?php elseif ($cur_page === 'categories.php'): ?>
+    <link rel="stylesheet" href="assets/css/categories.css?v=<?php echo file_exists(__DIR__ . '/assets/css/categories.css') ? filemtime(__DIR__ . '/assets/css/categories.css') : '1'; ?>">
     <?php endif; ?>
     <link rel="stylesheet" href="assets/css/notifications.css?v=<?php echo file_exists(__DIR__ . '/assets/css/notifications.css') ? filemtime(__DIR__ . '/assets/css/notifications.css') : '1'; ?>">
 

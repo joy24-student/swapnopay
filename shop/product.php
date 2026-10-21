@@ -58,6 +58,10 @@ if (isset($_REQUEST['slug'])) {
     exit;
 }
 
+if (!headers_sent() && empty($_SESSION['customer']) && empty($_SESSION['cart_p_id']) && (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET')) {
+    header('Cache-Control: public, max-age=15, stale-while-revalidate=60');
+}
+
 // Session & Microcache Product Bundle
 $prodCacheKey = 'sn_pc_' . $p_id;
 $prodCacheFile = function_exists('getShopCacheFile') ? getShopCacheFile('prod_' . $p_id) : __DIR__ . '/admin/inc/cache_prod_' . $p_id . '.json';
@@ -78,6 +82,7 @@ if ($prodBundle && !empty($prodBundle['product_data'])) {
     $photo_rows          = $prodBundle['photo_rows'] ?? [];
     $product_sizes       = $prodBundle['product_sizes'] ?? [];
     $product_colors      = $prodBundle['product_colors'] ?? [];
+    $product_variants    = $prodBundle['product_variants'] ?? [];
     $avg_rating          = $prodBundle['avg_rating'] ?? 0;
     $total_reviews_count = $prodBundle['total_reviews_count'] ?? 0;
     $reviews_list        = $prodBundle['reviews_list'] ?? [];
@@ -158,7 +163,47 @@ if (isset($_POST['form_add_to_cart']) || isset($_POST['form_buy_now'])) {
     $color_id_added = (int)($_POST['color_id'] ?? 0);
     $color_name_added = trim($_POST['color_name'] ?? '');
 
-    if ($p_qty_added <= 0 || ($p_qty > 0 && $p_qty_added > $p_qty)) {
+    // Check for dynamic variant price & variant stock
+    $effective_price = (float)$p_current_price;
+    $effective_qty = (int)$p_qty;
+
+    if ($size_id_added > 0 || $color_id_added > 0) {
+        try {
+            $vStmt = $pdo->prepare("
+                SELECT variant_price, variant_qty 
+                FROM tbl_product_variants 
+                WHERE p_id = ? 
+                  AND (
+                    (size_id = ? AND color_id = ?)
+                    OR (size_id = ? AND color_id = 0)
+                    OR (size_id = 0 AND color_id = ?)
+                  )
+                ORDER BY 
+                  (size_id = ? AND color_id = ?) DESC,
+                  (size_id = ?) DESC,
+                  (color_id = ?) DESC
+                LIMIT 1
+            ");
+            $vStmt->execute([
+                $p_id,
+                $size_id_added, $color_id_added,
+                $size_id_added,
+                $color_id_added,
+                $size_id_added, $color_id_added,
+                $size_id_added,
+                $color_id_added
+            ]);
+            $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
+            if ($variant && (float)$variant['variant_price'] > 0) {
+                $effective_price = (float)$variant['variant_price'];
+                if ($variant['variant_qty'] !== null && $variant['variant_qty'] !== '') {
+                    $effective_qty = (int)$variant['variant_qty'];
+                }
+            }
+        } catch (Throwable $_) {}
+    }
+
+    if ($p_qty_added <= 0 || ($effective_qty > 0 && $p_qty_added > $effective_qty)) {
         $valid = 0;
         $error_message = 'Invalid quantity or quantity exceeds stock available.';
     }
@@ -180,10 +225,11 @@ if (isset($_POST['form_add_to_cart']) || isset($_POST['form_buy_now'])) {
         }
 
         if ($item_found) {
-            if (($_SESSION['cart_p_qty'][$existing_index] + $p_qty_added) > $p_qty && $p_qty > 0) {
+            if (($_SESSION['cart_p_qty'][$existing_index] + $p_qty_added) > $effective_qty && $effective_qty > 0) {
                 $error_message = 'Adding this quantity would exceed available stock.';
             } else {
                 $_SESSION['cart_p_qty'][$existing_index] += $p_qty_added;
+                $_SESSION['cart_p_current_price'][$existing_index] = $effective_price;
                 if (isset($_SESSION['customer']['cust_id'])) {
                     updateCartItemQuantity($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id_added, $color_id_added, $_SESSION['cart_p_qty'][$existing_index]);
                 }
@@ -201,12 +247,12 @@ if (isset($_POST['form_add_to_cart']) || isset($_POST['form_buy_now'])) {
             $_SESSION['cart_color_id'][$next_index] = $color_id_added;
             $_SESSION['cart_color_name'][$next_index] = $color_name_added;
             $_SESSION['cart_p_qty'][$next_index] = $p_qty_added;
-            $_SESSION['cart_p_current_price'][$next_index] = $p_current_price;
+            $_SESSION['cart_p_current_price'][$next_index] = $effective_price;
             $_SESSION['cart_p_name'][$next_index] = $p_name;
             $_SESSION['cart_p_featured_photo'][$next_index] = $p_featured_photo;
 
             if (isset($_SESSION['customer']['cust_id'])) {
-                addOrUpdateCartItem($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id_added, $size_name_added, $color_id_added, $color_name_added, $p_qty_added, $p_current_price, $p_name, $p_featured_photo);
+                addOrUpdateCartItem($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id_added, $size_name_added, $color_id_added, $color_name_added, $p_qty_added, $effective_price, $p_name, $p_featured_photo);
             }
             $success_message = 'Product added to cart successfully!';
         }
@@ -329,17 +375,35 @@ foreach ($gallery_items as $gi) {
     $gallery_photos[] = $gi['thumb'];
 }
 
-// Fetch Product Sizes & Colors (Cached in bundle)
+// Fetch Product Sizes, Colors & Variants (Cached in bundle)
 if (!isset($product_sizes)) {
-    $stmt_size = $pdo->prepare("SELECT s.size_id, s.size_name FROM tbl_product_size ps JOIN tbl_size s ON ps.size_id = s.size_id WHERE ps.p_id = ?");
-    $stmt_size->execute([$p_id]);
-    $product_sizes = $stmt_size->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt_size = $pdo->prepare("SELECT s.size_id, s.size_name FROM tbl_product_size ps JOIN tbl_size s ON ps.size_id = s.size_id WHERE ps.p_id = ? ORDER BY ps.id ASC");
+        $stmt_size->execute([$p_id]);
+        $product_sizes = $stmt_size->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {
+        $product_sizes = [];
+    }
 }
 
 if (!isset($product_colors)) {
-    $stmt_color = $pdo->prepare("SELECT c.color_id, c.color_name FROM tbl_product_color pc JOIN tbl_color c ON pc.color_id = c.color_id WHERE pc.p_id = ?");
-    $stmt_color->execute([$p_id]);
-    $product_colors = $stmt_color->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt_color = $pdo->prepare("SELECT c.color_id, c.color_name, c.color_code FROM tbl_product_color pc JOIN tbl_color c ON pc.color_id = c.color_id WHERE pc.p_id = ? ORDER BY pc.id ASC");
+        $stmt_color->execute([$p_id]);
+        $product_colors = $stmt_color->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {
+        $product_colors = [];
+    }
+}
+
+if (!isset($product_variants)) {
+    try {
+        $stmt_var = $pdo->prepare("SELECT variant_id, p_id, size_id, color_id, variant_price, variant_qty FROM tbl_product_variants WHERE p_id = ?");
+        $stmt_var->execute([$p_id]);
+        $product_variants = $stmt_var->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {
+        $product_variants = [];
+    }
 }
 
 // Fetch Settings from Global Microcache (0 SQL queries)
@@ -362,8 +426,25 @@ $review_feature_on_off = $settings_data['review_feature_on_off'] ?? 1;
 $estimated_delivery_time_local = $settings_data['estimated_delivery_time_local'] ?? '2-3 business days';
 $estimated_delivery_time_international = $settings_data['estimated_delivery_time_international'] ?? '7-14 business days';
 $gemini_api_key = $settings_data['gemini_api_key'] ?? '';
-$product_voucher_code = !empty($settings_data['product_voucher_code']) ? $settings_data['product_voucher_code'] : 'WELCOME10';
-$product_voucher_discount = !empty($settings_data['product_voucher_discount']) ? (float)$settings_data['product_voucher_discount'] : 10.00;
+
+// Check for real coupon communicating with tbl_coupon
+$active_coupon = null;
+$prod_coupon_code = trim((string)($product_data['coupon_code'] ?? ''));
+if ($prod_coupon_code !== '') {
+    try {
+        $cStmt = $pdo->prepare("SELECT * FROM tbl_coupon WHERE coupon_code = ? AND status = 'active' AND (end_date >= CURRENT_DATE OR end_date IS NULL) LIMIT 1");
+        $cStmt->execute([$prod_coupon_code]);
+        $active_coupon = $cStmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
+if (!$active_coupon) {
+    try {
+        $cStmt = $pdo->prepare("SELECT * FROM tbl_coupon WHERE status = 'active' AND (end_date >= CURRENT_DATE OR end_date IS NULL) ORDER BY discount_value DESC LIMIT 1");
+        $cStmt->execute();
+        $active_coupon = $cStmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
+
 $related_products_on_off = isset($settings_data['related_products_on_off']) ? (int)$settings_data['related_products_on_off'] : 1;
 $mobile_footer_on_off = isset($settings_data['mobile_footer_on_off']) ? (int)$settings_data['mobile_footer_on_off'] : 0;
 
@@ -432,44 +513,90 @@ if (!empty($cat_row)) {
     if (!empty($cat_row['ecat_name'])) $ecat_name = $cat_row['ecat_name'];
 }
 
-// Parse Specification Highlights for Cards
+if (!function_exists('render_rich_spec_content')) {
+    function render_rich_spec_content($content) {
+        if (empty($content)) return '';
+        if (preg_match('/<[a-z][\s\S]*>/i', $content)) {
+            return strip_tags($content, '<ul><ol><li><p><strong><b><em><span><br>');
+        }
+        return nl2br(htmlspecialchars($content));
+    }
+}
+
+// Parse Specification Highlights for Cards & Specifications Table
 $spec_cards = [];
 if (!empty($p_feature)) {
-    $lines = explode("\n", $p_feature);
-    foreach ($lines as $line) {
+    $raw_items = [];
+    if (stripos($p_feature, '<li') !== false) {
+        if (preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $p_feature, $matches)) {
+            $raw_items = $matches[1];
+        }
+    }
+    
+    if (empty($raw_items)) {
+        $cleaned_text = preg_replace('/<\/?(p|div|br)[^>]*>/i', "\n", $p_feature);
+        $raw_items = explode("\n", $cleaned_text);
+    }
+    
+    foreach ($raw_items as $line) {
         $line = trim($line);
         if (empty($line)) continue;
-        $parts = explode(":", $line, 2);
-        if (count($parts) == 2) {
+        
+        $title = '';
+        $sub = '';
+        
+        if (preg_match('/<(strong|b)[^>]*>(.*?)<\/\1>(.*)/is', $line, $m)) {
+            $title = trim(strip_tags($m[2]));
+            $title = rtrim($title, ": \t\n\r\0\x0B");
+            $sub = trim(strip_tags($m[3]));
+            $sub = ltrim($sub, ": \t\n\r\0\x0B");
+        } elseif (strpos($line, ':') !== false) {
+            $parts = explode(":", strip_tags($line), 2);
             $title = trim($parts[0]);
-            $sub = trim($parts[1]);
-            
-            $icon = 'fas fa-microchip';
-            $lower = strtolower($title . ' ' . $sub);
-            if (str_contains($lower, 'core') || str_contains($lower, 'intel') || str_contains($lower, 'ryzen') || str_contains($lower, 'cpu') || str_contains($lower, 'processor')) {
-                $icon = 'fas fa-microchip';
-            } elseif (str_contains($lower, 'ram') || str_contains($lower, 'ddr') || str_contains($lower, 'memory')) {
-                $icon = 'fas fa-memory';
-            } elseif (str_contains($lower, 'ssd') || str_contains($lower, 'nvme') || str_contains($lower, 'storage') || str_contains($lower, 'hdd') || str_contains($lower, 'gb') && str_contains($lower, 'ssd')) {
-                $icon = 'fas fa-hdd';
-            } elseif (str_contains($lower, 'display') || str_contains($lower, 'fhd') || str_contains($lower, 'screen') || str_contains($lower, 'ips') || str_contains($lower, 'inch') || str_contains($lower, '"')) {
-                $icon = 'fas fa-desktop';
-            } elseif (str_contains($lower, 'graphics') || str_contains($lower, 'gpu') || str_contains($lower, 'iris') || str_contains($lower, 'rtx') || str_contains($lower, 'geforce')) {
-                $icon = 'fas fa-gamepad';
-            } elseif (str_contains($lower, 'windows') || str_contains($lower, 'os') || str_contains($lower, 'mac') || str_contains($lower, 'system')) {
-                $icon = 'fab fa-windows';
-            } elseif (str_contains($lower, 'kg') || str_contains($lower, 'weight') || str_contains($lower, 'gram')) {
-                $icon = 'fas fa-weight-hanging';
-            } elseif (str_contains($lower, 'battery') || str_contains($lower, 'hour') || str_contains($lower, 'mah')) {
-                $icon = 'fas fa-battery-three-quarters';
-            }
-            
-            $spec_cards[] = [
-                'icon' => $icon,
-                'title' => $title,
-                'sub' => $sub
-            ];
+            $sub = trim($parts[1] ?? '');
+        } else {
+            $title = 'Feature';
+            $sub = trim(strip_tags($line));
         }
+        
+        if ($title === '' && $sub === '') continue;
+        if ($title === '' && $sub !== '') {
+            $title = 'Feature';
+        }
+        
+        $icon = 'fas fa-microchip';
+        $lower = strtolower($title . ' ' . $sub);
+        if (str_contains($lower, 'core') || str_contains($lower, 'intel') || str_contains($lower, 'ryzen') || str_contains($lower, 'cpu') || str_contains($lower, 'processor')) {
+            $icon = 'fas fa-microchip';
+        } elseif (str_contains($lower, 'ram') || str_contains($lower, 'ddr') || str_contains($lower, 'memory')) {
+            $icon = 'fas fa-memory';
+        } elseif (str_contains($lower, 'ssd') || str_contains($lower, 'nvme') || str_contains($lower, 'storage') || str_contains($lower, 'hdd') || (str_contains($lower, 'gb') && str_contains($lower, 'ssd'))) {
+            $icon = 'fas fa-hdd';
+        } elseif (str_contains($lower, 'display') || str_contains($lower, 'fhd') || str_contains($lower, 'screen') || str_contains($lower, 'ips') || str_contains($lower, 'inch') || str_contains($lower, '"') || str_contains($lower, 'amoled')) {
+            $icon = 'fas fa-desktop';
+        } elseif (str_contains($lower, 'graphics') || str_contains($lower, 'gpu') || str_contains($lower, 'iris') || str_contains($lower, 'rtx') || str_contains($lower, 'geforce')) {
+            $icon = 'fas fa-gamepad';
+        } elseif (str_contains($lower, 'windows') || str_contains($lower, 'os') || str_contains($lower, 'mac') || str_contains($lower, 'system') || str_contains($lower, 'android') || str_contains($lower, 'ios')) {
+            $icon = 'fab fa-windows';
+        } elseif (str_contains($lower, 'kg') || str_contains($lower, 'weight') || str_contains($lower, 'gram')) {
+            $icon = 'fas fa-weight-hanging';
+        } elseif (str_contains($lower, 'battery') || str_contains($lower, 'hour') || str_contains($lower, 'mah')) {
+            $icon = 'fas fa-battery-three-quarters';
+        } elseif (str_contains($lower, 'camera') || str_contains($lower, 'lens') || str_contains($lower, 'mp') || str_contains($lower, 'sensor')) {
+            $icon = 'fas fa-camera';
+        } elseif (str_contains($lower, 'connectivity') || str_contains($lower, 'wifi') || str_contains($lower, 'bluetooth') || str_contains($lower, '5g')) {
+            $icon = 'fas fa-wifi';
+        } elseif (str_contains($lower, 'design') || str_contains($lower, 'build') || str_contains($lower, 'কোয়ালিটি') || str_contains($lower, 'ডিজাইন')) {
+            $icon = 'fas fa-shield-alt';
+        } elseif (str_contains($lower, 'performance') || str_contains($lower, 'স্পিড') || str_contains($lower, 'কার্যক্ষমতা')) {
+            $icon = 'fas fa-tachometer-alt';
+        }
+        
+        $spec_cards[] = [
+            'icon' => $icon,
+            'title' => $title,
+            'sub' => $sub
+        ];
     }
 }
 
@@ -533,6 +660,7 @@ if (!$prodBundle && !empty($product_data)) {
         'photo_rows'          => $photo_rows ?? [],
         'product_sizes'       => $product_sizes ?? [],
         'product_colors'      => $product_colors ?? [],
+        'product_variants'    => $product_variants ?? [],
         'avg_rating'          => $avg_rating ?? 0,
         'total_reviews_count' => $total_reviews_count ?? 0,
         'reviews_list'        => $reviews_list ?? [],
@@ -752,10 +880,72 @@ require_once('header.php');
     .sn-specs-highlights-grid {
         order: 9 !important;
         display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
         gap: 8px !important;
         margin: 0 0 16px 0 !important;
         width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .sn-spec-highlight-card {
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        padding: 10px 6px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        min-height: 68px !important;
+    }
+    .sn-spec-highlight-card:nth-child(n+4) {
+        display: none !important;
+    }
+    .sn-spec-highlight-icon {
+        font-size: 14px !important;
+        color: #0f172a !important;
+        margin-bottom: 5px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .sn-spec-highlight-title {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        line-height: 1.25 !important;
+        margin-bottom: 2px !important;
+        word-break: break-word !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        white-space: normal !important;
+        max-width: 100% !important;
+    }
+    .sn-spec-highlight-sub {
+        font-size: 10px !important;
+        color: #64748b !important;
+        line-height: 1.2 !important;
+        word-break: break-word !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        white-space: normal !important;
+        max-width: 100% !important;
+    }
+    .sn-specs-table td.sn-spec-val ul,
+    .sn-specs-table td.sn-spec-val ol {
+        margin: 4px 0 0 0;
+        padding-left: 18px;
+        list-style-type: disc;
+    }
+    .sn-specs-table td.sn-spec-val li {
+        margin-bottom: 4px;
+        line-height: 1.4;
     }
 
     /* 10. Tabs Container */
@@ -1385,8 +1575,14 @@ require_once('header.php');
                                 </tr>
                                 <tr>
                                     <td class="sn-spec-label">Condition</td>
-                                    <td class="sn-spec-val"><?php echo htmlspecialchars($p_condition ?: 'Brand New (Sealed)'); ?></td>
+                                    <td class="sn-spec-val"><?php echo render_rich_spec_content($p_condition ?: 'Brand New (Sealed)'); ?></td>
                                 </tr>
+                                <?php if (!empty($p_return_policy)): ?>
+                                <tr>
+                                    <td class="sn-spec-label">Return Policy</td>
+                                    <td class="sn-spec-val"><?php echo render_rich_spec_content($p_return_policy); ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <tr>
                                     <td class="sn-spec-label">Stock Availability</td>
                                     <td class="sn-spec-val"><?php echo $p_qty > 0 ? $p_qty . ' units in stock' : 'Out of stock'; ?></td>
@@ -1665,22 +1861,60 @@ require_once('header.php');
                 <input type="hidden" name="p_current_price" value="<?php echo htmlspecialchars($p_current_price); ?>">
                 <input type="hidden" name="p_featured_photo" value="<?php echo htmlspecialchars($p_featured_photo); ?>">
 
-                <!-- Color Selection (Exact match with reference design) -->
-                <div class="sn-option-row">
+                <!-- Dynamic Color Selection (Rendered ONLY if product has colors) -->
+                <?php if (!empty($product_colors)): 
+                    $firstColor = $product_colors[0];
+                ?>
+                <div class="sn-option-row" id="snColorOptionRow">
                     <div class="sn-option-header-mob">
                         <span class="sn-option-label-mob">Color</span>
-                        <span class="sn-selected-val-mob" id="selectedColorName">Black <i class="fas fa-chevron-right" style="font-size: 10px;"></i></span>
+                        <span class="sn-selected-val-mob" id="selectedColorName"><?php echo htmlspecialchars($firstColor['color_name']); ?> <i class="fas fa-chevron-right" style="font-size: 10px;"></i></span>
                     </div>
                     <div class="sn-swatches-wrap">
-                        <div class="sn-color-swatch-mob active" data-color-id="1" data-color-name="Black" style="background-color: #0f172a;" title="Black"></div>
-                        <div class="sn-color-swatch-mob" data-color-id="2" data-color-name="Silver" style="background-color: #cbd5e1;" title="Silver"></div>
-                        <div class="sn-color-swatch-mob" data-color-id="3" data-color-name="Lavender" style="background-color: #a78bfa;" title="Lavender"></div>
+                        <?php foreach ($product_colors as $cIdx => $c): 
+                            $cName = $c['color_name'];
+                            $cCode = !empty($c['color_code']) ? $c['color_code'] : get_color_swatch_css($cName);
+                            $isWhite = (strtolower(trim($cName)) === 'white' || strtolower(trim((string)$cCode)) === '#ffffff');
+                            $bgStyle = str_starts_with($cCode, 'linear-gradient') ? "background: $cCode;" : "background-color: $cCode;";
+                            if ($isWhite) $bgStyle .= ' border: 1.5px solid #cbd5e1;';
+                        ?>
+                            <div class="sn-color-swatch-mob <?php echo $cIdx === 0 ? 'active' : ''; ?>" 
+                                 data-color-id="<?php echo (int)$c['color_id']; ?>" 
+                                 data-color-name="<?php echo htmlspecialchars($cName); ?>" 
+                                 style="<?php echo $bgStyle; ?>" 
+                                 title="<?php echo htmlspecialchars($cName); ?>">
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                    <input type="hidden" name="color_id" id="hiddenColorId" value="1">
-                    <input type="hidden" name="color_name" id="hiddenColorName" value="Black">
-                    <input type="hidden" name="size_id" id="hiddenSizeId" value="1">
-                    <input type="hidden" name="size_name" id="hiddenSizeName" value="Standard">
                 </div>
+                <?php endif; ?>
+
+                <!-- Dynamic Size Selection (Rendered ONLY if product has sizes; hidden gracefully if no size) -->
+                <?php if (!empty($product_sizes)): 
+                    $firstSize = $product_sizes[0];
+                ?>
+                <div class="sn-option-row" id="snSizeOptionRow">
+                    <div class="sn-option-header-mob">
+                        <span class="sn-option-label-mob">Size</span>
+                        <span class="sn-selected-val-mob" id="selectedSizeName"><?php echo htmlspecialchars($firstSize['size_name']); ?> <i class="fas fa-chevron-right" style="font-size: 10px;"></i></span>
+                    </div>
+                    <div class="sn-pills-wrap sn-sizes-wrap">
+                        <?php foreach ($product_sizes as $sIdx => $s): ?>
+                            <button type="button" 
+                                    class="sn-option-pill sn-size-pill-mob <?php echo $sIdx === 0 ? 'active' : ''; ?>" 
+                                    data-size-id="<?php echo (int)$s['size_id']; ?>" 
+                                    data-size-name="<?php echo htmlspecialchars($s['size_name']); ?>">
+                                <?php echo htmlspecialchars($s['size_name']); ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <input type="hidden" name="color_id" id="hiddenColorId" value="<?php echo !empty($product_colors) ? (int)$product_colors[0]['color_id'] : 0; ?>">
+                <input type="hidden" name="color_name" id="hiddenColorName" value="<?php echo !empty($product_colors) ? htmlspecialchars($product_colors[0]['color_name']) : ''; ?>">
+                <input type="hidden" name="size_id" id="hiddenSizeId" value="<?php echo !empty($product_sizes) ? (int)$product_sizes[0]['size_id'] : 0; ?>">
+                <input type="hidden" name="size_name" id="hiddenSizeName" value="<?php echo !empty($product_sizes) ? htmlspecialchars($product_sizes[0]['size_name']) : ''; ?>">
 
                 <!-- Quantity Row (Exact match with reference design) -->
                 <div class="sn-mob-qty-row">
@@ -1712,18 +1946,29 @@ require_once('header.php');
             </form>
 
             <!-- Coupon / Voucher Card -->
+            <?php if (!empty($active_coupon)): 
+                $cCode = htmlspecialchars($active_coupon['coupon_code']);
+                $cVal = (float)$active_coupon['discount_value'];
+                $cText = ($active_coupon['discount_type'] === 'percentage') 
+                    ? "Get " . (int)$cVal . "% off" 
+                    : "Get " . LANG_VALUE_1 . number_format($cVal) . " off";
+                if (!empty($active_coupon['minimum_order']) && (float)$active_coupon['minimum_order'] > 0) {
+                    $cText .= " on orders over " . LANG_VALUE_1 . number_format((float)$active_coupon['minimum_order']);
+                }
+            ?>
             <div class="sn-coupon-card">
                 <div class="sn-coupon-left">
-                    <div class="sn-coupon-percent-badge">%</div>
+                    <div class="sn-coupon-percent-badge"><?php echo ($active_coupon['discount_type'] === 'percentage') ? '%' : LANG_VALUE_1; ?></div>
                     <div>
-                        <div class="sn-coupon-title">Use Code: <span id="couponCodeText"><?php echo htmlspecialchars($product_voucher_code); ?></span></div>
-                        <div class="sn-coupon-sub">Get <?php echo (int)$product_voucher_discount; ?>% off on your first purchase!</div>
+                        <div class="sn-coupon-title">Use Code: <span id="couponCodeText"><?php echo $cCode; ?></span></div>
+                        <div class="sn-coupon-sub"><?php echo htmlspecialchars($cText); ?>!</div>
                     </div>
                 </div>
                 <button type="button" class="sn-btn-copy-code" id="btnCopyCoupon">
                     Copy Code
                 </button>
             </div>
+            <?php endif; ?>
 
             <!-- Customer Reviews Preview Card -->
             <?php if (!empty($reviews_list)): 
@@ -2473,7 +2718,110 @@ function initProductPage() {
     // Initial check on load
     handleWindowScroll();
 
-    // 3. Option Selection (Color Swatches)
+    // 3. Option Selection (Color Swatches & Size Pills) & Dynamic Variant Price Updates
+    window.productVariants = <?php echo json_encode($product_variants ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?> || [];
+    window.baseProductPrice = <?php echo (float)$p_current_price; ?>;
+    window.baseProductOldPrice = <?php echo (float)$p_old_price; ?>;
+    window.baseProductQty = <?php echo (int)$p_qty; ?>;
+
+    function updateProductVariantPrice() {
+        const curColorId = parseInt(document.getElementById('hiddenColorId')?.value || '0', 10);
+        const curSizeId = parseInt(document.getElementById('hiddenSizeId')?.value || '0', 10);
+        const variants = window.productVariants || [];
+        
+        let matchedVariant = null;
+        
+        if (variants.length > 0) {
+            // 1. Try exact match on (size_id, color_id)
+            if (curSizeId > 0 && curColorId > 0) {
+                matchedVariant = variants.find(v => parseInt(v.size_id, 10) === curSizeId && parseInt(v.color_id, 10) === curColorId);
+            }
+            // 2. Try match on size_id if color_id is 0 or unmatched
+            if (!matchedVariant && curSizeId > 0) {
+                matchedVariant = variants.find(v => parseInt(v.size_id, 10) === curSizeId && (parseInt(v.color_id, 10) === 0 || !v.color_id));
+            }
+            // 3. Try match on color_id if size_id is 0 or unmatched
+            if (!matchedVariant && curColorId > 0) {
+                matchedVariant = variants.find(v => parseInt(v.color_id, 10) === curColorId && (parseInt(v.size_id, 10) === 0 || !v.size_id));
+            }
+            // 4. Try any variant matching size_id or color_id
+            if (!matchedVariant && curSizeId > 0) {
+                matchedVariant = variants.find(v => parseInt(v.size_id, 10) === curSizeId);
+            }
+            if (!matchedVariant && curColorId > 0) {
+                matchedVariant = variants.find(v => parseInt(v.color_id, 10) === curColorId);
+            }
+        }
+        
+        let currentPrice = window.baseProductPrice;
+        let currentQty = window.baseProductQty;
+        
+        if (matchedVariant && parseFloat(matchedVariant.variant_price) > 0) {
+            currentPrice = parseFloat(matchedVariant.variant_price);
+            if (matchedVariant.variant_qty !== undefined && matchedVariant.variant_qty !== null && matchedVariant.variant_qty !== '') {
+                currentQty = parseInt(matchedVariant.variant_qty, 10);
+            }
+        }
+        
+        // Update hidden price input
+        const hiddenPriceInput = document.querySelector('input[name="p_current_price"]');
+        if (hiddenPriceInput) {
+            hiddenPriceInput.value = currentPrice.toFixed(2);
+        }
+        
+        // Update displayed price in DOM
+        const formattedPrice = '৳ ' + Math.round(currentPrice).toLocaleString();
+        document.querySelectorAll('.sn-current-price, .sn-price-curr, .sn-mob-curr-price, #snProductPrice, #snStickyPrice').forEach(el => {
+            el.textContent = formattedPrice;
+        });
+        
+        // Update discount percentage pill if old price exists
+        const oldPrice = window.baseProductOldPrice;
+        if (oldPrice > currentPrice && oldPrice > 0) {
+            const discountPct = Math.round(((oldPrice - currentPrice) / oldPrice) * 100);
+            document.querySelectorAll('.sn-discount-pill, .sn-mob-discount-tag, .sn-price-discount-tag').forEach(el => {
+                el.textContent = `-${discountPct}% OFF`;
+                el.style.display = '';
+            });
+        }
+        
+        // Update stock badge and action buttons
+        const stockBadges = document.querySelectorAll('.sn-stock-badge-tag');
+        const addToCartBtn = document.getElementById('btnAddToCart');
+        const buyNowBtn = document.getElementById('btnBuyNow');
+        const stickyCartBtn = document.getElementById('snStickyCartBtn');
+        const stickyBuyBtn = document.getElementById('snStickyBuyBtn');
+        const qtyInput = document.getElementById('snQtyInput');
+        
+        if (currentQty <= 0) {
+            stockBadges.forEach(b => {
+                b.className = 'sn-stock-badge-tag out-stock';
+                b.innerHTML = '<i class="fas fa-times-circle" style="color:#ef4444;margin-right:4px;"></i> Out of Stock';
+            });
+            if (addToCartBtn) addToCartBtn.disabled = true;
+            if (buyNowBtn) buyNowBtn.disabled = true;
+            if (stickyCartBtn) stickyCartBtn.disabled = true;
+            if (stickyBuyBtn) stickyBuyBtn.disabled = true;
+            if (qtyInput) {
+                qtyInput.value = 1;
+                qtyInput.max = 1;
+            }
+        } else {
+            stockBadges.forEach(b => {
+                b.className = 'sn-stock-badge-tag in-stock';
+                b.innerHTML = `<i class="fas fa-check-circle" style="color:#10b981;margin-right:4px;"></i> In Stock (${currentQty} units)`;
+            });
+            if (addToCartBtn) addToCartBtn.disabled = false;
+            if (buyNowBtn) buyNowBtn.disabled = false;
+            if (stickyCartBtn) stickyCartBtn.disabled = false;
+            if (stickyBuyBtn) stickyBuyBtn.disabled = false;
+            if (qtyInput) {
+                qtyInput.max = currentQty;
+            }
+        }
+    }
+
+    // Color Swatches Selection
     const swatches = document.querySelectorAll('.sn-color-swatch, .sn-color-swatch-mob');
     const colorText = document.getElementById('selectedColorName');
     const hiddenColorId = document.getElementById('hiddenColorId');
@@ -2488,8 +2836,31 @@ function initProductPage() {
             if (colorText) colorText.innerHTML = `${name} <i class="fas fa-chevron-right" style="font-size: 10px;"></i>`;
             if (hiddenColorId) hiddenColorId.value = id;
             if (hiddenColorName) hiddenColorName.value = name;
+            updateProductVariantPrice();
         });
     });
+
+    // Size Pills Selection
+    const sizePills = document.querySelectorAll('.sn-size-pill, .sn-size-pill-mob, .sn-option-pill');
+    const sizeText = document.getElementById('selectedSizeName');
+    const hiddenSizeId = document.getElementById('hiddenSizeId');
+    const hiddenSizeName = document.getElementById('hiddenSizeName');
+
+    sizePills.forEach(pill => {
+        pill.addEventListener('click', function() {
+            sizePills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            const name = this.dataset.sizeName;
+            const id = this.dataset.sizeId;
+            if (sizeText) sizeText.innerHTML = `${name} <i class="fas fa-chevron-right" style="font-size: 10px;"></i>`;
+            if (hiddenSizeId) hiddenSizeId.value = id;
+            if (hiddenSizeName) hiddenSizeName.value = name;
+            updateProductVariantPrice();
+        });
+    });
+
+    // Run initial variant price calculation on load
+    updateProductVariantPrice();
 
     // 4. Quantity Controls
     const qtyInput = document.getElementById('snQtyInput');

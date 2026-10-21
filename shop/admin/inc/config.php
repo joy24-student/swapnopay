@@ -218,17 +218,36 @@ if (!$runtime || empty($runtime['merchant_id']) || empty($runtime['db'])) {
 // Tenant-isolated session
 $GLOBALS['runtime'] = $runtime;
 $merchantId = $runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: 'default-merchant');
-$sessionCookieName = 'SP_SESS_' . substr(md5($merchantId . '_' . ($runtime['shop_slug'] ?? '')), 0, 12);
+$shopSlug = $runtime['shop_slug'] ?? '';
+$sessionCookieName = 'SP_SESS_' . substr(md5($merchantId . '_' . $shopSlug), 0, 12);
+
+if (session_status() === PHP_SESSION_ACTIVE && session_name() !== $sessionCookieName) {
+    session_write_close();
+}
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name($sessionCookieName);
+    $cookiePath = !empty($shopSlug) ? '/' . $shopSlug . '/' : '/';
+    if (!empty($_SERVER['HTTP_HOST']) && str_contains($_SERVER['HTTP_HOST'], '.')) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => $cookiePath,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    }
     session_start();
 }
+
 if (session_status() === PHP_SESSION_ACTIVE) {
-    if (($_SESSION['shop_merchant_id'] ?? '') !== $merchantId) {
+    if (isset($_SESSION['shop_merchant_id']) && $_SESSION['shop_merchant_id'] !== $merchantId) {
         $_SESSION = [];
         session_regenerate_id(true);
     }
     $_SESSION['shop_merchant_id'] = $merchantId;
+    if ($shopSlug !== '') {
+        $_SESSION['shop_slug'] = $shopSlug;
+    }
 }
 
 $db_driver = 'pgsql';
@@ -296,9 +315,32 @@ if (empty($resolved_supabase_url)) {
     $resolved_supabase_anon = getenv('SUPABASE_ANON_KEY') ?: getenv('ADMIN_SUPABASE_ANON_KEY') ?: '';
 }
 
+$resolved_supabase_service = !empty($runtime['supabase_service_key'])
+    ? $runtime['supabase_service_key']
+    : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: getenv('ADMIN_SUPABASE_SERVICE_ROLE_KEY') ?: getenv('SUPABASE_SERVICE_KEY') ?: '');
+
+if (empty($resolved_supabase_service)) {
+    $backendEnv = dirname(__DIR__, 3) . '/swapnopay-backend/.env';
+    if (is_file($backendEnv) && is_readable($backendEnv)) {
+        $lines = @file($backendEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                $trimLine = trim($line);
+                if (str_starts_with($trimLine, '#') || !str_contains($trimLine, '=')) continue;
+                [$k, $v] = explode('=', $trimLine, 2);
+                $cleanK = trim($k);
+                if ($cleanK === 'ADMIN_SUPABASE_SERVICE_ROLE_KEY' || $cleanK === 'SUPABASE_SERVICE_ROLE_KEY') {
+                    $resolved_supabase_service = trim($v, " \t\n\r\0\x0B\"'");
+                    break;
+                }
+            }
+        }
+    }
+}
+
 if (!defined('SUPABASE_URL')) define('SUPABASE_URL', rtrim((string)$resolved_supabase_url, '/'));
 if (!defined('SUPABASE_ANON_KEY')) define('SUPABASE_ANON_KEY', (string)$resolved_supabase_anon);
-if (!defined('SUPABASE_SERVICE_KEY')) define('SUPABASE_SERVICE_KEY', $runtime ? '' : (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+if (!defined('SUPABASE_SERVICE_KEY')) define('SUPABASE_SERVICE_KEY', (string)$resolved_supabase_service);
 if (!defined('MERCHANT_ID')) define('MERCHANT_ID',$runtime['merchant_id'] ?? (getenv('MERCHANT_ID') ?: ''));
 if (!defined('SWAPNOPAY_API_URL')) define('SWAPNOPAY_API_URL',rtrim($runtime['backend_url'] ?? $runtime['api_url'] ?? (getenv('SWAPNOPAY_API_URL') ?: 'https://api.swapnopay.top'),'/'));
 $BASE_URL = $runtime['base_url'] ?? (getenv('STORE_BASE_URL') ?: '');

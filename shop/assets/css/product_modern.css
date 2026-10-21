@@ -935,12 +935,37 @@ a, button {
     background: #f8fafc;
 }
 
-.sn-option-pill.active {
-    border-color: #0f172a;
-    background: #f8fafc;
+.sn-option-pill.active,
+.sn-size-pill-mob.active {
+    border-color: #fab802;
+    background: #fffbeb;
     color: #0f172a;
     font-weight: 700;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0 0 1px #fab802;
+}
+
+.sn-size-pill-mob {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.sn-size-pill-mob:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+.sn-sizes-wrap {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 /* Actions Row: Qty, Add to Cart, Wishlist */
@@ -2224,13 +2249,16 @@ a, button {
         background: #f8fafc !important;
         border: 1px solid #e2e8f0 !important;
         border-radius: 12px !important;
-        padding: 9px 6px !important;
+        padding: 10px 6px !important;
         display: flex !important;
+        flex-direction: column !important;
         align-items: center !important;
-        gap: 6px !important;
-        min-height: 52px !important;
+        justify-content: center !important;
+        text-align: center !important;
+        min-width: 0 !important;
+        min-height: 68px !important;
         box-shadow: none !important;
-        box-sizing: border-box;
+        box-sizing: border-box !important;
     }
 
     .sn-spec-highlight-icon {
@@ -2244,20 +2272,35 @@ a, button {
         align-items: center !important;
         justify-content: center !important;
         flex-shrink: 0 !important;
+        margin-bottom: 4px !important;
     }
 
     .sn-spec-highlight-title {
         font-size: 11px !important;
         font-weight: 700 !important;
         color: #0f172a !important;
-        line-height: 1.2 !important;
+        line-height: 1.25 !important;
+        word-break: break-word !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        white-space: normal !important;
+        max-width: 100% !important;
     }
 
     .sn-spec-highlight-sub {
-        font-size: 9.5px !important;
+        font-size: 10px !important;
         color: #64748b !important;
         line-height: 1.2 !important;
-        margin-top: 1px !important;
+        margin-top: 2px !important;
+        word-break: break-word !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        white-space: normal !important;
+        max-width: 100% !important;
     }
 
     /* 8. Color Selection & Quantity Stepper */
@@ -2302,6 +2345,40 @@ a, button {
 
     .sn-color-swatch-mob.active {
         box-shadow: 0 0 0 2px #ffffff, 0 0 0 4.5px #fab802 !important;
+    }
+
+    .sn-sizes-wrap {
+        display: flex !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+    }
+
+    .sn-size-pill-mob {
+        background: #ffffff !important;
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        padding: 6px 14px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #334155 !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        outline: none !important;
+        line-height: 1.2 !important;
+    }
+
+    .sn-size-pill-mob:hover {
+        border-color: #cbd5e1 !important;
+        background: #f8fafc !important;
+    }
+
+    .sn-size-pill-mob.active {
+        border-color: #fab802 !important;
+        background: #fffbeb !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        box-shadow: 0 0 0 1px #fab802 !important;
     }
 
     .sn-mob-qty-row {

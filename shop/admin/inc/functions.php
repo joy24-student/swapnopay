@@ -540,70 +540,198 @@ function sendSMS($to, $message, $api_key = null, $sender_id = null, $provider = 
  */
 if (!function_exists('send_email')) {
     function send_email($to_email, $to_name, $subject, $message_body) {
-        global $pdo; // Access the PDO object from the global scope
+        global $pdo;
 
-        if (!$pdo) {
-            error_log("PDO object not available for send_email function.");
+        // Ensure PHPMailer classes are available
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+            $autoloadCandidates = [
+                dirname(__DIR__, 2) . '/vendor/autoload.php',
+                dirname(__DIR__, 3) . '/shop/vendor/autoload.php',
+                dirname(__DIR__, 3) . '/vendor/autoload.php',
+                '/var/www/swapnopay/shop/vendor/autoload.php'
+            ];
+            foreach ($autoloadCandidates as $ap) {
+                if (is_file($ap)) {
+                    require_once $ap;
+                    break;
+                }
+            }
+        }
+
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+            error_log("PHPMailer class could not be loaded for send_email.");
             return false;
         }
 
-        try {
-            // Fetch SMTP settings from tbl_settings
-            $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
-            $statement->execute();
-            $settings_data = $statement->fetch(PDO::FETCH_ASSOC);
-
-            $smtp_host = $settings_data['smtp_host'] ?? '';
-            $smtp_username = $settings_data['smtp_username'] ?? '';
-            $smtp_password = $settings_data['smtp_password'] ?? '';
-            $smtp_encryption = $settings_data['smtp_encryption'] ?? 'NONE'; // 'ssl', 'tls', or 'NONE'
-            $smtp_port = $settings_data['smtp_port'] ?? 587;
-            $smtp_from_email = $settings_data['smtp_from_email'] ?? 'no-reply@yourdomain.com';
-            $smtp_from_name = $settings_data['smtp_from_name'] ?? 'Your Website Name';
-
-            // Initialize PHPMailer
-            $mail = new PHPMailer(true); // Enable exceptions
-
-            $mail->isSMTP();
-            $mail->Host = $smtp_host;
-            $mail->SMTPAuth = true;
-            $mail->Username = $smtp_username;
-            $mail->Password = $smtp_password;
-
-            if (strtolower($smtp_encryption) === 'ssl') {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            } elseif (strtolower($smtp_encryption) === 'tls') {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            } else {
-                $mail->SMTPSecure = false; // No encryption
-            }
-            $mail->Port = $smtp_port;
-
-            // Allow self-signed certificates (if needed for localhost/testing, but avoid in production)
-            $mail->SMTPOptions = array(
-                'ssl' => array(
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true
-                )
-            );
-
-            // Recipients
-            $mail->setFrom($smtp_from_email, $smtp_from_name);
-            $mail->addAddress($to_email, $to_name);
-
-            // Content
-            $mail->isHTML(true);
-            $mail->Subject = $subject;
-            $mail->Body = $message_body;
-
-            $mail->send();
-            return true; // Email sent successfully
-
-        } catch (Exception $e) {
-            error_log("PHPMailer Error in send_email function: {$mail->ErrorInfo} - {$e->getMessage()}");
-            return false; // Email sending failed
+        // 1. Fetch store settings
+        $settings_data = [];
+        if ($pdo) {
+            try {
+                $statement = $pdo->prepare("SELECT * FROM tbl_settings WHERE id=1");
+                $statement->execute();
+                $settings_data = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+            } catch (Exception $e) {}
         }
+
+        $store_smtp_host  = trim($settings_data['smtp_host'] ?? '');
+        $store_smtp_user  = trim($settings_data['smtp_username'] ?? '');
+        $store_smtp_pass  = trim($settings_data['smtp_password'] ?? '');
+        $store_smtp_enc   = strtolower(trim($settings_data['smtp_encryption'] ?? 'NONE'));
+        $store_smtp_port  = (int)($settings_data['smtp_port'] ?? 587);
+        $store_from_email = trim($settings_data['smtp_from_email'] ?? '');
+        $store_from_name  = trim($settings_data['smtp_from_name'] ?? '');
+
+        // 2. Fetch platform fallback SMTP credentials from env or swapnopay-backend/.env
+        $platformHost   = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+        $platformUser   = getenv('SMTP_USER') ?: 'payswapno@gmail.com';
+        $platformPass   = getenv('SMTP_PASS') ?: 'pzdyxervfkvpkdmh';
+        $platformPort   = (int)(getenv('SMTP_PORT') ?: 465);
+        $platformFrom   = getenv('SMTP_FROM') ?: 'payment@swapnopay.top';
+        $platformSecure = (getenv('SMTP_SECURE') === 'true' || $platformPort === 465) ? 'ssl' : 'tls';
+
+        $backendEnv = dirname(__DIR__, 3) . '/swapnopay-backend/.env';
+        if (is_file($backendEnv) && is_readable($backendEnv)) {
+            $lines = @file($backendEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if (str_starts_with($line, '#') || !str_contains($line, '=')) continue;
+                    [$k, $v] = explode('=', $line, 2);
+                    $k = trim($k);
+                    $v = trim($v, " \t\n\r\0\x0B\"'");
+                    if ($k === 'SMTP_HOST') $platformHost = $v;
+                    elseif ($k === 'SMTP_USER') $platformUser = $v;
+                    elseif ($k === 'SMTP_PASS') $platformPass = $v;
+                    elseif ($k === 'SMTP_PORT') $platformPort = (int)$v;
+                    elseif ($k === 'SMTP_FROM') $platformFrom = $v;
+                    elseif ($k === 'SMTP_SECURE') $platformSecure = ($v === 'true' || (int)$platformPort === 465) ? 'ssl' : 'tls';
+                }
+            }
+        }
+
+        $dummyPasswords = ['testpassword123', 'password', '123456', 'changeme', 'secret', 'test'];
+        $isStoreSmtpValid = !empty($store_smtp_host) && !empty($store_smtp_user) && !empty($store_smtp_pass) && !in_array(strtolower($store_smtp_pass), $dummyPasswords, true);
+
+        $senderCandidates = [];
+        if ($isStoreSmtpValid) {
+            $senderCandidates[] = [
+                'type'       => 'store',
+                'host'       => $store_smtp_host,
+                'user'       => $store_smtp_user,
+                'pass'       => $store_smtp_pass,
+                'port'       => $store_smtp_port,
+                'enc'        => $store_smtp_enc,
+                'from_email' => $store_from_email ?: $store_smtp_user,
+                'from_name'  => $store_from_name ?: 'Online Store',
+                'reply_to'   => $store_from_email ?: $store_smtp_user
+            ];
+        }
+
+        // Always add platform fallback candidate
+        if (!empty($platformHost) && !empty($platformUser) && !empty($platformPass)) {
+            $senderCandidates[] = [
+                'type'       => 'platform',
+                'host'       => $platformHost,
+                'user'       => $platformUser,
+                'pass'       => $platformPass,
+                'port'       => $platformPort,
+                'enc'        => $platformSecure,
+                'from_email' => $platformFrom,
+                'from_name'  => !empty($store_from_name) ? $store_from_name : 'SwapnoPay Shop',
+                'reply_to'   => !empty($store_from_email) ? $store_from_email : $platformFrom
+            ];
+        }
+
+        $lastError = '';
+        foreach ($senderCandidates as $cfg) {
+            try {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host     = $cfg['host'];
+                $mail->SMTPAuth = true;
+                $mail->Username = $cfg['user'];
+                $mail->Password = $cfg['pass'];
+
+                if ($cfg['enc'] === 'ssl' || $cfg['port'] === 465) {
+                    $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+                } elseif ($cfg['enc'] === 'tls' || $cfg['port'] === 587) {
+                    $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                } else {
+                    $mail->SMTPSecure  = false;
+                    $mail->SMTPAutoTLS = false;
+                }
+                $mail->Port    = $cfg['port'];
+                $mail->Timeout = 12;
+
+                $mail->SMTPOptions = array(
+                    'ssl' => array(
+                        'verify_peer'       => false,
+                        'verify_peer_name'  => false,
+                        'allow_self_signed' => true
+                    )
+                );
+
+                $mail->setFrom($cfg['from_email'], $cfg['from_name']);
+                if (!empty($cfg['reply_to']) && $cfg['reply_to'] !== $cfg['from_email']) {
+                    $mail->addReplyTo($cfg['reply_to'], $cfg['from_name']);
+                }
+                $mail->addAddress($to_email, $to_name ?: 'Customer');
+
+                $mail->isHTML(true);
+                $mail->CharSet = 'UTF-8';
+                $mail->Subject = $subject;
+                $mail->Body    = $message_body;
+
+                $mail->send();
+                return true; // Sent successfully!
+            } catch (\Exception $e) {
+                $lastError = ($mail->ErrorInfo ?? '') . ' - ' . $e->getMessage();
+                error_log("PHPMailer attempt ({$cfg['type']}) failed for {$to_email}: {$lastError}");
+            }
+        }
+
+        // Native PHP mail fallback
+        try {
+            $headers  = "MIME-Version: 1.0\r\n";
+            $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+            $fromAddr = !empty($store_from_email) ? $store_from_email : 'payment@swapnopay.top';
+            $fromNm   = !empty($store_from_name) ? $store_from_name : 'Online Store';
+            $headers .= "From: {$fromNm} <{$fromAddr}>\r\n";
+            if (@mail($to_email, $subject, $message_body, $headers)) {
+                return true;
+            }
+        } catch (\Exception $e) {}
+
+        error_log("All mail methods failed for {$to_email}. Last error: {$lastError}");
+        return false;
+    }
+}
+
+if (!function_exists('get_color_swatch_css')) {
+    /**
+     * Resolves a color name or stored hex/gradient code to a valid CSS background style.
+     */
+    function get_color_swatch_css($color_name, $color_code = null) {
+        if (!empty($color_code)) {
+            $code = trim($color_code);
+            if (str_starts_with($code, 'linear-gradient') || str_starts_with($code, '#') || str_starts_with($code, 'rgb')) {
+                return $code;
+            }
+            return '#' . ltrim($code, '#');
+        }
+        $map = [
+            'red' => '#ef4444', 'black' => '#0f172a', 'blue' => '#3b82f6', 'yellow' => '#eab308',
+            'green' => '#22c55e', 'white' => '#ffffff', 'orange' => '#f97316', 'brown' => '#78350f',
+            'tan' => '#d2b48c', 'pink' => '#ec4899', 'mixed' => 'linear-gradient(135deg, #6366f1, #ec4899, #f59e0b)',
+            'lightblue' => '#38bdf8', 'light blue' => '#38bdf8', 'violet' => '#8b5cf6', 'purple' => '#a855f7',
+            'light purple' => '#c084fc', 'salmon' => '#fa8072', 'gold' => '#eab308', 'gray' => '#6b7280',
+            'grey' => '#6b7280', 'ash' => '#9ca3af', 'maroon' => '#800000', 'silver' => '#cbd5e1',
+            'dark clay' => '#5c4033', 'cognac' => '#9e472a', 'coffee' => '#6f4e37', 'charcoal' => '#374151',
+            'navy' => '#1e3a8a', 'fuchsia' => '#d946ef', 'olive' => '#84cc16', 'burgundy' => '#881337',
+            'midnight blue' => '#1e1b4b', 'lavender' => '#a78bfa'
+        ];
+        $clean = strtolower(trim((string)$color_name));
+        return $map[$clean] ?? '#64748b';
     }
 }
 ?>

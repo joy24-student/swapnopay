@@ -932,6 +932,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
         <!-- FOOTER SWITCH -->
         <div class="footer-note">
             Don't have an account? <a href="registration.php">Sign up</a>
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-color); font-size: 13px;">
+                Ordered as a guest? <a href="order-tracking.php" style="color: #4f46e5; font-weight: 700; text-decoration: none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px; margin-right:4px;"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>Track your order</a>
+            </div>
         </div>
     </div>
 
@@ -1099,6 +1102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['form_login']) || iss
         <!-- FOOTER SWITCH -->
         <div class="m-footer-switch">
             Don't have an account? <a href="registration.php">Sign Up</a>
+            <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 13px;">
+                Ordered as a guest? <a href="order-tracking.php" style="color: #4f46e5; font-weight: 700; text-decoration: none;">Track Order &rarr;</a>
+            </div>
         </div>
     </div>
 

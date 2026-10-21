@@ -295,9 +295,19 @@ try {
                                     <?php endif; ?>
 
                                     <!-- Color Swatch Row -->
-                                    <?php if (!empty($p_color) && $p_color !== 'Default'): ?>
+                                    <?php if (!empty($p_color) && $p_color !== 'Default' && $p_color !== '0'): ?>
                                     <div class="sn-item-variant-swatches">
                                         <span class="sn-swatch-label">Color: <strong class="sn-active-color-name"><?php echo htmlspecialchars($p_color); ?></strong></span>
+                                    </div>
+                                    <?php endif; ?>
+
+                                    <!-- Size Row -->
+                                    <?php 
+                                    $p_size = $cart_size_names[$i] ?? '';
+                                    if (!empty($p_size) && $p_size !== 'Standard' && $p_size !== 'Default' && $p_size !== '0'): 
+                                    ?>
+                                    <div class="sn-item-variant-swatches" style="margin-top:2px;">
+                                        <span class="sn-swatch-label">Size: <strong class="sn-active-color-name"><?php echo htmlspecialchars($p_size); ?></strong></span>
                                     </div>
                                     <?php endif; ?>
 
@@ -419,24 +429,36 @@ try {
                         </div>
 
                         <!-- Have a Promo Code? Box -->
-                        <div class="sn-promo-card">
+                        <div class="sn-cart-promo-box">
                             <div class="sn-promo-header">
                                 <div class="sn-promo-tag-icon">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.2">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
                                         <line x1="7" y1="7" x2="7.01" y2="7"></line>
                                     </svg>
                                 </div>
-                                <div>
+                                <div class="sn-promo-header-text">
                                     <div class="sn-promo-title">Have a Promo Code?</div>
                                     <div class="sn-promo-sub">Enter your code to get discounts</div>
                                 </div>
                             </div>
 
-                            <div class="sn-promo-input-row">
-                                <input type="text" id="promoInput" class="sn-promo-input" placeholder="Enter promo code" value="<?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?>">
+                            <div class="sn-promo-input-row" id="promoInputRow" style="<?php echo !empty($applied_coupon) ? 'display:none;' : 'display:flex;'; ?>">
+                                <input type="text" id="promoInput" class="sn-promo-input" placeholder="Enter promo code" value="<?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?>" onkeydown="if(event.key==='Enter'){event.preventDefault();handleApplyPromo();}">
                                 <button type="button" class="sn-promo-btn" id="promoApplyBtn" onclick="handleApplyPromo()">Apply</button>
                             </div>
+
+                            <div class="sn-promo-applied-pill" id="promoAppliedWrap" style="<?php echo !empty($applied_coupon) ? 'display:flex;' : 'display:none;'; ?>">
+                                <div class="sn-applied-left">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <span class="sn-applied-code" id="promoAppliedCodeText"><?php echo htmlspecialchars($applied_coupon['code'] ?? ''); ?></span>
+                                    <span class="sn-applied-label">Applied</span>
+                                </div>
+                                <button type="button" class="sn-applied-remove-btn" onclick="handleRemovePromo()" title="Remove coupon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                </button>
+                            </div>
+
                             <div class="sn-promo-alert" id="promoAlertBox"></div>
                         </div>
 
@@ -453,46 +475,6 @@ try {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                             </button>
                         </form>
-
-                        <!-- OR Divider -->
-                        <div class="sn-or-divider">
-                            <span>OR</span>
-                        </div>
-
-                        <!-- Payment Methods Logos -->
-                        <div class="sn-payment-icons-row">
-                            <!-- Apple Pay -->
-                            <div class="sn-pay-pill" title="Apple Pay">
-                                <svg width="34" height="16" viewBox="0 0 40 20" fill="#111827">
-                                    <path d="M10.8 11.2c-.3 2.1-1.8 4.2-3.8 4.1-1-.1-1.9-.7-2.6-.7-.8 0-1.7.7-2.7.7-2 0-3.6-2.1-3.6-4.5 0-3 1.9-4.6 3.8-4.6 1 0 1.9.7 2.5.7.6 0 1.6-.7 2.8-.7 1 .1 2.3.6 3 1.6-2 1.2-1.7 3.9.6 4.7zm-2.8-7.7c.5-.7.9-1.6.8-2.5-.8 0-1.8.6-2.3 1.2-.5.6-.9 1.5-.8 2.4.9.1 1.8-.4 2.3-1.1zM18.5 4.8h3.3v10.4h-1.5v-1.6c-.6 1.1-1.7 1.8-2.8 1.8-2.3 0-3.7-1.8-3.7-4.4 0-2.6 1.5-4.4 3.7-4.4 1.1 0 2.1.6 2.7 1.7v-3.5zm-1.4 9.1c1.5 0 2.4-1.2 2.4-3.1 0-1.8-.9-3.1-2.4-3.1-1.5 0-2.4 1.2-2.4 3.1 0 1.8.9 3.1 2.4 3.1zM28.8 13.9c-.4.9-1.2 1.5-2.2 1.5-1.5 0-2.4-1.1-2.4-2.8 0-1.7 1-2.8 2.4-2.8.9 0 1.8.6 2.2 1.5v2.6zm0-5.1c-.6-.7-1.4-1.1-2.3-1.1-2.2 0-3.8 1.8-3.8 4.3 0 2.6 1.5 4.3 3.8 4.3 1 0 1.8-.5 2.3-1.2v1.1h1.5V7.9h-1.5v.9zM34.8 7.9l-2.4 6.7h-1.5l.9-2.2-2.3-4.5h1.7l1.4 3.2 1.4-3.2h1.8z"/>
-                                </svg>
-                            </div>
-                            <!-- Google Pay -->
-                            <div class="sn-pay-pill" title="Google Pay">
-                                <svg width="34" height="16" viewBox="0 0 40 20">
-                                    <path d="M12.4 10.3c0-.3 0-.7-.1-1H6v2.1h3.6c-.2.9-.7 1.7-1.5 2.2v1.8h2.4c1.4-1.3 2.2-3.2 2.2-5.1z" fill="#4285F4"/>
-                                    <path d="M6 16.8c1.9 0 3.6-.6 4.7-1.7l-2.4-1.8c-.6.4-1.4.7-2.3.7-1.8 0-3.3-1.2-3.8-2.9H-.1v1.9C1.1 15.3 3.4 16.8 6 16.8z" fill="#34A853"/>
-                                    <path d="M2.2 11.1c-.2-.7-.2-1.5 0-2.2V7H-.1C-.6 8.3-.6 9.7-.1 11.1l2.3-1.8z" fill="#FBBC05"/>
-                                    <path d="M6 5.4c1 0 2 .4 2.7 1.1l2-2C9.4 3.3 7.8 2.6 6 2.6 3.4 2.6 1.1 4.1-.1 6.5l2.3 1.8c.5-1.7 2-2.9 3.8-2.9z" fill="#EA4335"/>
-                                    <path d="M18.8 5.6h3.4v7.4h-1.5v-1.1c-.4.8-1.3 1.3-2.2 1.3-1.8 0-3-1.3-3-3.1 0-1.8 1.2-3.1 3-3.1.9 0 1.7.4 2.2 1.2V5.6zm-.9 6.5c1.1 0 1.8-.8 1.8-2.2 0-1.3-.7-2.1-1.8-2.1-1.1 0-1.8.8-1.8 2.1 0 1.4.7 2.2 1.8 2.2zM28.4 11.2l-2.1 4.8h-1.5l.8-1.8-2-4.8h1.6l1.2 3.1 1.2-3.1h1.6z" fill="#5F6368"/>
-                                </svg>
-                            </div>
-                            <!-- VISA -->
-                            <div class="sn-pay-pill" title="VISA">
-                                <span class="sn-visa-text">VISA</span>
-                            </div>
-                            <!-- Mastercard -->
-                            <div class="sn-pay-pill" title="Mastercard">
-                                <span class="sn-mc-circles">
-                                    <span class="mc-circle red"></span>
-                                    <span class="mc-circle yellow"></span>
-                                </span>
-                            </div>
-                            <!-- bKash -->
-                            <div class="sn-pay-pill bkash-pill" title="bKash">
-                                <span class="sn-bkash-text">bKash</span>
-                            </div>
-                        </div>
 
                         <!-- 256-bit SSL Security text -->
                         <div class="sn-ssl-guarantee">
@@ -1286,76 +1268,187 @@ body.shopnext-theme {
     font-weight: 800;
 }
 
-/* Have a Promo Code? Box */
-.sn-promo-card {
-    background: #fffdf5;
-    border: 1px solid #fef3c7;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 20px;
+/* Have a Promo Code? Box (Cart Order Summary) */
+.sn-order-summary-card .sn-cart-promo-box,
+.sn-order-summary-card .sn-promo-card,
+.sn-cart-promo-box {
+    background: #fffdf5 !important;
+    border: 1px solid #fef3c7 !important;
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
+    margin-bottom: 20px !important;
+    min-height: auto !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    position: static !important;
+    overflow: visible !important;
+    transition: none !important;
 }
+
+.sn-order-summary-card .sn-cart-promo-box:hover,
+.sn-order-summary-card .sn-promo-card:hover,
+.sn-cart-promo-box:hover {
+    transform: none !important;
+}
+
 .sn-promo-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
 }
+
 .sn-promo-tag-icon {
-    margin-top: 2px;
+    margin-top: 1px !important;
+    flex-shrink: 0 !important;
+    color: #b45309 !important;
 }
+
+.sn-promo-header-text {
+    flex: 1 1 auto !important;
+}
+
 .sn-promo-title {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #78350f;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: #78350f !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
 }
+
 .sn-promo-sub {
-    font-size: 11.5px;
-    color: #92400e;
+    font-size: 11.5px !important;
+    color: #92400e !important;
+    line-height: 1.3 !important;
+    margin-top: 2px !important;
 }
+
 .sn-promo-input-row {
-    display: flex;
-    gap: 8px;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
+
 .sn-promo-input {
-    flex: 1;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 9px 12px;
-    font-size: 13px;
-    color: var(--sn-dark);
-    outline: none;
-    transition: border-color 0.15s;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    color: var(--sn-dark) !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+    height: 38px !important;
+    transition: border-color 0.15s !important;
 }
+
 .sn-promo-input:focus {
-    border-color: #f59e0b;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15) !important;
 }
+
 .sn-promo-btn {
-    background: #fde047;
-    border: 1px solid #facc15;
-    color: #713f12;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 0 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
+    flex-shrink: 0 !important;
+    background: #fde047 !important;
+    border: 1px solid #facc15 !important;
+    color: #713f12 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 0 16px !important;
+    height: 38px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
+
 .sn-promo-btn:hover {
-    background: #eab308;
+    background: #eab308 !important;
 }
+
+.sn-promo-applied-pill {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.sn-applied-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #065f46 !important;
+}
+
+.sn-applied-code {
+    background: #d1fae5 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    letter-spacing: 0.5px !important;
+}
+
+.sn-applied-label {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #047857 !important;
+}
+
+.sn-applied-remove-btn {
+    background: none !important;
+    border: none !important;
+    color: #991b1b !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background 0.15s !important;
+}
+
+.sn-applied-remove-btn:hover {
+    background: #fee2e2 !important;
+}
+
 .sn-promo-alert {
-    font-size: 12px;
-    margin-top: 8px;
+    font-size: 12px !important;
+    margin-top: 8px !important;
     display: none;
+    line-height: 1.3 !important;
 }
+
 .sn-promo-alert.success {
-    display: block;
-    color: #059669;
+    display: block !important;
+    color: #059669 !important;
+    font-weight: 600 !important;
 }
+
 .sn-promo-alert.error {
-    display: block;
-    color: #dc2626;
+    display: block !important;
+    color: #dc2626 !important;
+    font-weight: 600 !important;
 }
 
 /* Proceed to Checkout Button */
@@ -1376,81 +1469,23 @@ body.shopnext-theme {
     box-shadow: 0 4px 12px rgba(250, 184, 2, 0.35);
     transition: all 0.2s ease;
 }
+
 .sn-btn-checkout:hover {
     background: #e5a700;
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(250, 184, 2, 0.45);
 }
+
 .sn-btn-checkout:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
 }
 
-/* OR divider */
-.sn-or-divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 20px 0 16px 0;
-    color: #94a3b8;
-    font-size: 11.5px;
-    font-weight: 600;
-}
-.sn-or-divider::before, .sn-or-divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #f1f5f9;
-}
-.sn-or-divider span {
-    padding: 0 10px;
-}
-
-/* Payment Icons Row */
+/* Remove payment provider card after checkout button */
+.sn-or-divider,
 .sn-payment-icons-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-.sn-pay-pill {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 6px 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 32px;
-    min-width: 48px;
-}
-.sn-visa-text {
-    font-size: 13px;
-    font-weight: 900;
-    color: #1e3a8a;
-    letter-spacing: 0.5px;
-}
-.sn-mc-circles {
-    display: flex;
-    align-items: center;
-}
-.mc-circle {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-}
-.mc-circle.red { background: #ef4444; }
-.mc-circle.yellow { background: #f59e0b; margin-left: -5px; }
-.bkash-pill {
-    background: #fdf2f8;
-    border-color: #fbcfe8;
-}
-.sn-bkash-text {
-    font-size: 12px;
-    font-weight: 800;
-    color: #e11d48;
+    display: none !important;
 }
 
 /* 256-bit SSL guarantee note */
@@ -1460,13 +1495,16 @@ body.shopnext-theme {
     gap: 10px;
     font-size: 11.5px;
     color: var(--sn-muted);
-    border-top: 1px solid #f8fafc;
+    border-top: 1px solid #f1f5f9;
     padding-top: 14px;
+    margin-top: 16px;
 }
+
 .ssl-main {
     font-weight: 600;
     color: var(--sn-dark);
 }
+
 .ssl-sub {
     font-size: 11px;
 }
@@ -2776,6 +2814,7 @@ function handleApplyPromo(manualCode = null) {
         if (alertBox) {
             alertBox.className = 'sn-promo-alert error';
             alertBox.textContent = 'Please enter a promo code.';
+            alertBox.style.display = 'block';
         }
         return;
     }
@@ -2796,6 +2835,7 @@ function handleApplyPromo(manualCode = null) {
             if (alertBox) {
                 alertBox.className = 'sn-promo-alert success';
                 alertBox.textContent = data.message;
+                alertBox.style.display = 'block';
             }
             showToast(data.message, 'success');
 
@@ -2806,13 +2846,59 @@ function handleApplyPromo(manualCode = null) {
             if (couponCodeLabel) couponCodeLabel.textContent = code;
             if (couponDiscountVal) couponDiscountVal.textContent = '- ' + formatCurrency(appliedDiscount);
 
+            const promoAppliedWrap = document.getElementById('promoAppliedWrap');
+            const promoInputRow = document.getElementById('promoInputRow');
+            const promoAppliedCodeText = document.getElementById('promoAppliedCodeText');
+            if (promoAppliedCodeText) promoAppliedCodeText.textContent = code;
+            if (promoAppliedWrap) promoAppliedWrap.style.display = 'flex';
+            if (promoInputRow) promoInputRow.style.display = 'none';
+
             recalculateCart();
         } else {
             if (alertBox) {
                 alertBox.className = 'sn-promo-alert error';
                 alertBox.textContent = data.message;
+                alertBox.style.display = 'block';
             }
             showToast(data.message, 'error');
+        }
+    });
+}
+
+function handleRemovePromo() {
+    const formData = new FormData();
+    formData.append('action', 'remove_coupon');
+
+    fetch('cart-ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            appliedCouponCode = null;
+            appliedDiscount = 0;
+
+            const input = document.getElementById('promoInput');
+            if (input) input.value = '';
+
+            const alertBox = document.getElementById('promoAlertBox');
+            if (alertBox) {
+                alertBox.className = 'sn-promo-alert';
+                alertBox.textContent = '';
+                alertBox.style.display = 'none';
+            }
+
+            const couponRow = document.getElementById('summaryCouponRow');
+            if (couponRow) couponRow.classList.remove('active');
+
+            const promoAppliedWrap = document.getElementById('promoAppliedWrap');
+            const promoInputRow = document.getElementById('promoInputRow');
+            if (promoAppliedWrap) promoAppliedWrap.style.display = 'none';
+            if (promoInputRow) promoInputRow.style.display = 'flex';
+
+            showToast('Coupon removed.', 'info');
+            recalculateCart();
         }
     });
 }

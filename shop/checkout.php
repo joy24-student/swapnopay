@@ -73,8 +73,8 @@ if (!empty($_POST['selected_indexes'])) {
                 $filtered_p_current_price[$k] = array_values($_SESSION['cart_p_current_price'])[$idx] ?? 0;
                 $filtered_p_name[$k] = array_values($_SESSION['cart_p_name'])[$idx] ?? '';
                 $filtered_p_featured_photo[$k] = array_values($_SESSION['cart_p_featured_photo'])[$idx] ?? '';
-                $filtered_p_old_price[$k] = array_values($_SESSION['cart_p_old_price'])[$idx] ?? 0;
-                $filtered_p_subtitle[$k] = array_values($_SESSION['cart_p_subtitle'])[$idx] ?? '';
+                $filtered_p_old_price[$k] = (isset($_SESSION['cart_p_old_price']) && is_array($_SESSION['cart_p_old_price'])) ? (array_values($_SESSION['cart_p_old_price'])[$idx] ?? 0) : 0;
+                $filtered_p_subtitle[$k] = (isset($_SESSION['cart_p_subtitle']) && is_array($_SESSION['cart_p_subtitle'])) ? (array_values($_SESSION['cart_p_subtitle'])[$idx] ?? '') : '';
                 $k++;
             }
         }
@@ -984,14 +984,12 @@ require_once('header.php');
                                         <span>SwapnoPay Gateway</span>
                                         <span class="sn-official-badge">Official</span>
                                     </div>
-                                    <div class="sn-pay-desc sn-pay-desc-desktop">bKash, Nagad, Rocket, Upay, Cards &amp; Net Banking</div>
-                                    <div class="sn-pay-desc sn-pay-desc-mobile">bKash, Nagad, Rocket, Upay &amp; Cards</div>
                                 </div>
                                 <div class="sn-mfs-badges">
-                                    <span class="sn-mfs-tag bkash"><img src="assets/logos/bkash.png" alt="bKash" class="sn-tag-mini-logo"> bKash</span>
-                                    <span class="sn-mfs-tag nagad"><img src="assets/logos/nagad.png" alt="Nagad" class="sn-tag-mini-logo"> Nagad</span>
-                                    <span class="sn-mfs-tag rocket"><img src="assets/logos/rocket.png" alt="Rocket" class="sn-tag-mini-logo"> Rocket</span>
-                                    <span class="sn-mfs-tag upay"><img src="assets/logos/upay.png" alt="Upay" class="sn-tag-mini-logo"> Upay</span>
+                                    <span class="sn-mfs-tag bkash" title="bKash"><img src="assets/logos/bkash.png" alt="bKash" class="sn-tag-mini-logo" onerror="this.onerror=null; this.src='assets/logos/bkash.svg';"></span>
+                                    <span class="sn-mfs-tag nagad" title="Nagad"><img src="assets/logos/nagad.png" alt="Nagad" class="sn-tag-mini-logo" onerror="this.onerror=null; this.src='assets/logos/nagad.svg';"></span>
+                                    <span class="sn-mfs-tag rocket" title="Rocket"><img src="assets/logos/rocket.png" alt="Rocket" class="sn-tag-mini-logo"></span>
+                                    <span class="sn-mfs-tag upay" title="Upay"><img src="assets/logos/upay.png" alt="Upay" class="sn-tag-mini-logo"></span>
                                 </div>
                             </div>
 
@@ -1003,25 +1001,21 @@ require_once('header.php');
                                     <span>Choose your payment provider:</span>
                                 </div>
                                 <div class="sn-mfs-grid">
-                                    <div class="sn-mfs-option active" id="mfsBkash" onclick="selectMfsProvider('bKash')" data-method="bKash">
+                                    <div class="sn-mfs-option active" id="mfsBkash" onclick="selectMfsProvider('bKash')" data-method="bKash" title="bKash">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
                                         <img src="assets/logos/bkash.png" alt="bKash" class="sn-mfs-brand-logo" onerror="this.onerror=null; this.src='assets/logos/bkash.svg';">
-                                        <span class="sn-mfs-label">bKash</span>
                                     </div>
-                                    <div class="sn-mfs-option" id="mfsNagad" onclick="selectMfsProvider('Nagad')" data-method="Nagad">
+                                    <div class="sn-mfs-option" id="mfsNagad" onclick="selectMfsProvider('Nagad')" data-method="Nagad" title="Nagad">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
                                         <img src="assets/logos/nagad.png" alt="Nagad" class="sn-mfs-brand-logo" onerror="this.onerror=null; this.src='assets/logos/nagad.svg';">
-                                        <span class="sn-mfs-label">Nagad</span>
                                     </div>
-                                    <div class="sn-mfs-option" id="mfsRocket" onclick="selectMfsProvider('Rocket')" data-method="Rocket">
+                                    <div class="sn-mfs-option" id="mfsRocket" onclick="selectMfsProvider('Rocket')" data-method="Rocket" title="Rocket">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
                                         <img src="assets/logos/rocket.png" alt="Rocket" class="sn-mfs-brand-logo">
-                                        <span class="sn-mfs-label">Rocket</span>
                                     </div>
-                                    <div class="sn-mfs-option" id="mfsUpay" onclick="selectMfsProvider('Upay')" data-method="Upay">
+                                    <div class="sn-mfs-option" id="mfsUpay" onclick="selectMfsProvider('Upay')" data-method="Upay" title="Upay">
                                         <div class="sn-mfs-radio"><div class="sn-mfs-radio-dot"></div></div>
                                         <img src="assets/logos/upay.png" alt="Upay" class="sn-mfs-brand-logo">
-                                        <span class="sn-mfs-label">Upay</span>
                                     </div>
                                 </div>
                             </div>
@@ -3298,6 +3292,159 @@ body:has(.sn-checkout-page-wrapper) .sn-footer-wrap {
 @media (max-width: 360px) {
     .sn-mob-badge-safe {
         display: none !important; /* Keep top bar clean on ultra narrow 320px screens */
+    }
+}
+/* ============================================================
+   SWAPNOPAY PURE ICON-ONLY MFS PAYMENT UI (NO TEXT LABELS)
+   ============================================================ */
+.sn-mfs-badges {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+}
+.sn-mfs-tag {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    height: 24px !important;
+    min-width: 32px !important;
+}
+.sn-tag-mini-logo {
+    height: 15px !important;
+    width: auto !important;
+    max-width: 30px !important;
+    object-fit: contain !important;
+    margin: 0 !important;
+    display: block !important;
+}
+.sn-pay-desc,
+.sn-pay-desc-desktop,
+.sn-pay-desc-mobile {
+    display: none !important;
+}
+.sn-mfs-provider-selector {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    margin: 6px 0 12px 0 !important;
+}
+.sn-mfs-selector-label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 8px !important;
+}
+.sn-mfs-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+}
+.sn-mfs-option {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 10px !important;
+    padding: 8px 6px !important;
+    height: 52px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+}
+.sn-mfs-option:hover {
+    border-color: #94A3B8 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.06) !important;
+}
+.sn-mfs-brand-logo {
+    height: 28px !important;
+    width: auto !important;
+    max-width: 58px !important;
+    object-fit: contain !important;
+    display: block !important;
+    transition: transform 0.15s ease !important;
+}
+.sn-mfs-option:hover .sn-mfs-brand-logo {
+    transform: scale(1.05) !important;
+}
+.sn-mfs-radio,
+.sn-mfs-label,
+.sn-mfs-color-bar {
+    display: none !important;
+}
+.sn-mfs-option.active#mfsBkash {
+    border-color: #E2136E !important;
+    background: #FDF2F8 !important;
+    box-shadow: 0 0 0 2px rgba(226, 19, 110, 0.15), 0 2px 8px rgba(226, 19, 110, 0.1) !important;
+}
+.sn-mfs-option.active#mfsNagad {
+    border-color: #F7941D !important;
+    background: #FFF7ED !important;
+    box-shadow: 0 0 0 2px rgba(247, 148, 29, 0.15), 0 2px 8px rgba(247, 148, 29, 0.1) !important;
+}
+.sn-mfs-option.active#mfsRocket {
+    border-color: #8C3494 !important;
+    background: #FAF5FF !important;
+    box-shadow: 0 0 0 2px rgba(140, 52, 148, 0.15), 0 2px 8px rgba(140, 52, 148, 0.1) !important;
+}
+.sn-mfs-option.active#mfsUpay {
+    border-color: #0284C7 !important;
+    background: #F0F9FF !important;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15), 0 2px 8px rgba(2, 132, 199, 0.1) !important;
+}
+.sn-mfs-option.active::after {
+    content: "✓";
+    position: absolute;
+    top: 2px;
+    right: 5px;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+}
+.sn-mfs-option.active#mfsBkash::after { color: #E2136E; }
+.sn-mfs-option.active#mfsNagad::after { color: #F7941D; }
+.sn-mfs-option.active#mfsRocket::after { color: #8C3494; }
+.sn-mfs-option.active#mfsUpay::after { color: #0284C7; }
+
+@media (max-width: 640px) {
+    .sn-mfs-badges {
+        display: flex !important;
+        gap: 4px !important;
+    }
+    .sn-mfs-tag {
+        height: 20px !important;
+        min-width: 26px !important;
+        padding: 2px 4px !important;
+    }
+    .sn-tag-mini-logo {
+        height: 13px !important;
+        max-width: 22px !important;
+    }
+    .sn-mfs-grid {
+        gap: 6px !important;
+    }
+    .sn-mfs-option {
+        height: 44px !important;
+        padding: 6px 3px !important;
+    }
+    .sn-mfs-brand-logo {
+        height: 22px !important;
+        max-width: 44px !important;
     }
 }
 </style>

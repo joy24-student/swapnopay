@@ -373,14 +373,13 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
     align-items: stretch;
 }
 
-.sn-btn-order-buy-again {
-    background: #eff6ff;
-    color: #2563eb;
+.sn-btn-order-action,
+.sn-order-actions-col > button,
+.sn-order-actions-col > a {
     font-size: 12.5px;
-    font-weight: 700;
-    border: 1px solid #bfdbfe;
+    font-weight: 600;
     border-radius: 8px;
-    padding: 9px 14px;
+    padding: 8px 14px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -388,6 +387,14 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
     cursor: pointer;
     text-decoration: none;
     transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.sn-btn-order-buy-again {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    font-weight: 700;
 }
 
 .sn-btn-order-buy-again:hover {
@@ -399,18 +406,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
 .sn-btn-order-track {
     background: #ffffff;
     color: #334155;
-    font-size: 12.5px;
-    font-weight: 600;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.15s ease;
 }
 
 .sn-btn-order-track:hover {
@@ -422,23 +418,32 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
 .sn-btn-order-cancel {
     background: #fef2f2;
     color: #ef4444;
-    font-size: 12.5px;
-    font-weight: 600;
     border: 1px solid #fecaca;
-    border-radius: 8px;
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.15s ease;
 }
 
 .sn-btn-order-cancel:hover {
     background: #ef4444;
     color: #ffffff;
+}
+
+.sn-btn-order-invoice {
+    background: #f0f9ff;
+    color: #0284c7;
+    border: 1px solid #bae6fd;
+}
+
+.sn-btn-order-invoice:hover {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+.sn-order-card-hidden {
+    display: none !important;
+}
+
+.sn-filter-empty-hidden {
+    display: none !important;
 }
 
 /* Modal styling */
@@ -553,6 +558,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
     .sn-status-pill-btn { flex:0 0 auto; white-space:nowrap; font-size:12.5px !important; padding:8px 14px !important; }
 
     .sn-order-card-detailed { display:grid !important; grid-template-columns:64px minmax(0,1fr) !important; gap:12px !important; padding:14px !important; margin-bottom:12px !important; border-radius:16px !important; align-items:start !important; }
+    .sn-order-card-detailed.sn-order-card-hidden { display:none !important; }
     .sn-order-thumb-large { width:64px; height:64px; border-radius:10px; }
     .sn-order-summary-col { min-width:0; gap:3px; }
     .sn-order-id-title { font-size:14px; white-space:normal; word-break:break-all; }
@@ -565,10 +571,67 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
     .sn-track-step-label { font-size:10px; line-height:1.15; }
     .sn-track-step-date { font-size:9.5px; }
     .sn-track-line { margin-bottom:30px; }
-    .sn-order-actions-col { grid-column:1 / -1 !important; flex-direction:row !important; gap:8px !important; }
-    .sn-order-actions-col > button, .sn-order-actions-col > a { flex:1 1 0; min-width:0; padding:11px 8px !important; font-size:12.5px !important; border-radius:999px !important; }
 
-    .sn-empty-state-box { padding:32px 16px !important; }
+    /* Pixel-perfect action buttons row (full width, rounded rectangle, no squished ovals) */
+    .sn-order-actions-col {
+        grid-column: 1 / -1 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: stretch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 8px !important;
+        margin-top: 12px !important;
+        padding-top: 12px !important;
+        border-top: 1px solid #f1f5f9 !important;
+        box-sizing: border-box !important;
+    }
+    .sn-order-actions-col > .sn-btn-order-action,
+    .sn-order-actions-col > button,
+    .sn-order-actions-col > a {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        height: 38px !important;
+        padding: 0 6px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 5px !important;
+        text-decoration: none !important;
+        white-space: nowrap !important;
+        cursor: pointer !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+        transition: all 0.15s ease !important;
+    }
+    .sn-order-actions-col i {
+        font-size: 12px !important;
+        flex-shrink: 0 !important;
+        position: static !important;
+        margin: 0 !important;
+        transform: none !important;
+    }
+    .sn-order-actions-col span {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .sn-empty-state-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 32px 16px !important;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .sn-empty-state-box.sn-filter-empty-hidden {
+        display: none !important;
+    }
 
     /* modal -> bottom sheet */
     .sn-modal-backdrop { align-items:flex-end !important; padding:0 !important; }
@@ -639,7 +702,7 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
                         </a>
                     </div>
                 <?php else: ?>
-                    <div class="sn-empty-state-box" id="snFilterEmpty" style="display:none"><div class="sn-empty-icon-circle"><i class="fa-solid fa-box-open"></i></div><h3>No orders here</h3><p>You have no orders in this status.</p></div>
+                    <div class="sn-empty-state-box sn-filter-empty-hidden" id="snFilterEmpty" style="display:none;"><div class="sn-empty-icon-circle"><i class="fa-solid fa-box-open"></i></div><h3>No orders here</h3><p>You have no orders in this status.</p></div>
                     <div class="sn-orders-list">
                         <?php foreach ($all_orders as $ord): 
                             $first_item = $ord['items'][0] ?? null;
@@ -765,30 +828,30 @@ $filtered_orders = array_filter($all_orders, function($o) use ($filter_status, $
 
                                 <!-- Col 4: Action Buttons -->
                                 <div class="sn-order-actions-col">
-                                    <a href="invoice.php?payment_id=<?= urlencode($ord['payment_id']) ?>" target="_blank" class="sn-btn-order-track" style="color:#0284c7; border-color:#bae6fd; background:#f0f9ff;">
-                                        <i class="fa-solid fa-file-invoice"></i> View Invoice
+                                    <a href="invoice.php?payment_id=<?= urlencode($ord['payment_id']) ?>" target="_blank" class="sn-btn-order-action sn-btn-order-invoice" title="View Invoice">
+                                        <i class="fa-solid fa-file-invoice"></i> <span>Invoice</span>
                                     </a>
                                     <?php if ($cat === 'delivered'): ?>
-                                        <button type="button" class="sn-btn-order-buy-again" onclick="buyAgain('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-solid fa-cart-shopping"></i> Buy Again
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-buy-again" onclick="buyAgain('<?= htmlspecialchars($ord['payment_id']) ?>')" title="Buy Again">
+                                            <i class="fa-solid fa-cart-shopping"></i> <span>Buy Again</span>
                                         </button>
-                                        <button type="button" class="sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-solid fa-location-dot"></i> Track Order
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')" title="Track Order">
+                                            <i class="fa-solid fa-location-dot"></i> <span>Track</span>
                                         </button>
                                     <?php elseif ($cat === 'shipped'): ?>
-                                        <button type="button" class="sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-solid fa-location-dot"></i> Track Order
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')" title="Track Order">
+                                            <i class="fa-solid fa-location-dot"></i> <span>Track</span>
                                         </button>
                                     <?php elseif ($cat === 'processing'): ?>
-                                        <button type="button" class="sn-btn-order-cancel" onclick="cancelOrder('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-solid fa-xmark"></i> Cancel Order
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-cancel" onclick="cancelOrder('<?= htmlspecialchars($ord['payment_id']) ?>')" title="Cancel Order">
+                                            <i class="fa-solid fa-xmark"></i> <span>Cancel</span>
                                         </button>
-                                        <button type="button" class="sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-solid fa-location-dot"></i> Track Order
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')" title="Track Order">
+                                            <i class="fa-solid fa-location-dot"></i> <span>Track</span>
                                         </button>
                                     <?php else: ?>
-                                        <button type="button" class="sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')">
-                                            <i class="fa-regular fa-file-lines"></i> View Details
+                                        <button type="button" class="sn-btn-order-action sn-btn-order-track" onclick="openOrderModal('<?= htmlspecialchars($ord['payment_id']) ?>')" title="View Details">
+                                            <i class="fa-regular fa-file-lines"></i> <span>Details</span>
                                         </button>
                                     <?php endif; ?>
                                 </div>
@@ -943,24 +1006,44 @@ function cancelOrder(paymentId) {
     var pills = document.querySelectorAll('.sn-status-pill-btn[data-filter]');
     var cards = document.querySelectorAll('.sn-order-card-detailed[data-status]');
     var empty = document.getElementById('snFilterEmpty');
+
     function apply(f) {
         var shown = 0;
         cards.forEach(function (c) {
             var ok = (f === 'all' || c.dataset.status === f);
-            c.style.display = ok ? '' : 'none';
-            if (ok) shown++;
+            c.classList.toggle('sn-order-card-hidden', !ok);
+            if (ok) {
+                c.style.display = '';
+                shown++;
+            } else {
+                c.style.display = 'none';
+            }
         });
-        pills.forEach(function (p) { p.classList.toggle('active', p.dataset.filter === f); });
-        if (empty) empty.style.display = shown ? 'none' : '';
+        pills.forEach(function (p) {
+            p.classList.toggle('active', p.dataset.filter === f);
+        });
+        if (empty) {
+            if (shown === 0) {
+                empty.classList.remove('sn-filter-empty-hidden');
+                empty.style.display = 'block';
+            } else {
+                empty.classList.add('sn-filter-empty-hidden');
+                empty.style.display = 'none';
+            }
+        }
     }
+
     pills.forEach(function (p) {
         p.addEventListener('click', function (e) {
             e.preventDefault();
             var f = p.dataset.filter;
             apply(f);
-            try { history.replaceState(null, '', f === 'all' ? 'customer-order.php' : 'customer-order.php?status=' + f); } catch (x) {}
+            try {
+                history.replaceState(null, '', f === 'all' ? 'customer-order.php' : 'customer-order.php?status=' + f);
+            } catch (x) {}
         });
     });
+
     var init = new URLSearchParams(location.search).get('status') || 'all';
     apply(init.toLowerCase());
 })();
