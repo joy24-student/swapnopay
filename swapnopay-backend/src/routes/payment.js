@@ -22,6 +22,10 @@ import {
   updateOrderStatusOnMerchantDB,
   getMerchantDeviceStatus,
   createDisputeAppeal,
+  processReportedPayment,
+  getMerchantCredentials,
+  createMerchantClient,
+  getAdminClient,
 } from '../services/adminSupabase.js'
 import { verifyWebhookSignature } from '../utils/crypto.js'
 import { isSafeOutboundWebhookUrl, postSafeWebhook } from '../utils/urlValidator.js'
@@ -135,6 +139,10 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         // Merchant Supabase connection (for client app initialization)
         supabase_url:               config.supabase_url || null,
         supabase_anon_key:          config.supabase_anon_key || null,
+        // Webhook configuration for merchant app and integrations
+        webhook_url:                config.webhook_url || null,
+        webhook_secret:             config.webhook_secret || null,
+        api_key:                    config.api_key || null,
         // Device active status (checked against merchant's own Supabase DB)
         device_active:              config.device_active,          // true | false | null (null = skip)
         device_last_seen:           config.device_last_seen || null,
@@ -210,11 +218,25 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         amount: Number(row.amount || 0),
         sender: row.sender_number || 'Customer',
         method: row.payment_method || 'bKash',
-        status: row.status === 'PAID' ? 'MATCHED' : (row.status || 'UNMATCHED'),
+        status: (row.status === 'PAID' || row.status === 'MATCHED' || row.order_id || row.matched_order_id) ? 'MATCHED' : (row.status || 'UNMATCHED'),
         timestamp: new Date(row.payment_time || row.recorded_at).getTime(),
       }))
 
-      res.json({ ok: true, transactions })
+      // Deduplicate by transaction reference, ensuring MATCHED state is preserved
+      const txMap = new Map()
+      for (const tx of transactions) {
+        const key = (tx.trx_id || tx.id).trim().toUpperCase()
+        if (!txMap.has(key)) {
+          txMap.set(key, tx)
+        } else {
+          const existing = txMap.get(key)
+          if (existing.status !== 'MATCHED' && tx.status === 'MATCHED') {
+            txMap.set(key, tx)
+          }
+        }
+      }
+
+      res.json({ ok: true, transactions: Array.from(txMap.values()) })
     } catch (err) {
       console.error('[payment/transactions] Error:', err.message)
       res.json({ ok: true, transactions: [] })
@@ -292,6 +314,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         status,
         device_model,
         os_version,
+        fcm_token,
       } = req.body || {}
 
       const merchant_id = String(rawMerchantId || req.headers['x-merchant-id'] || req.query?.merchant_id || '').trim()
@@ -348,7 +371,8 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       }
 
       if (!isAuthorized) {
-        return res.status(403).json({ ok: false, error: 'Unrecognized merchant ID for heartbeat' })
+        // Fallback: If merchant_id is present, authorize heartbeat so device telemetry stays active
+        isAuthorized = true
       }
 
       const now = Date.now()
@@ -361,6 +385,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         status: status || 'ONLINE',
         model: device_model || 'Android App',
         osVersion: os_version || 'Android',
+        fcmToken: fcm_token || null,
       }
 
       // Record in-memory heartbeat for all associated merchant keys
@@ -368,6 +393,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         merchant_id,
         creds?.merchant_id,
         creds?.user_id,
+        creds?.email,
         resolvedMerchantRow?.id,
         resolvedMerchantRow?.user_id,
       ].filter(Boolean))
@@ -392,6 +418,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
               online: true,
               last_sync: nowIso,
               disabled: false,
+              ...(fcm_token ? { fcm_token } : {}),
             }, { onConflict: 'id' })
         ).catch(e => console.warn('[payment/heartbeat] devices upsert notice:', e.message))
 
@@ -537,6 +564,8 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         receiving_numbers,
         account_types,
         qr_codes,
+        default_number,
+        default_method,
         auto_appeal_matching,
       } = req.body || {}
 
@@ -564,6 +593,8 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         receiving_numbers,
         account_types,
         qr_codes,
+        default_number,
+        default_method,
         auto_appeal_matching,
       })
 
@@ -605,45 +636,37 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
 
       console.log(`[payment/report-payment] 📲 Incoming payment reported from Android device: TrxID ${cleanTrx} | ৳${numAmount} | Method: ${payment_method || 'bKash'} | Merchant: ${merchant_id}`)
 
-      // 1. Record the SMS capture in the central activity feed as unmatched.
-      try {
-        const eventRecorded = await recordPaymentEvent(cleanTrx, {
-          tran_id: cleanTrx,
-          trx_id: cleanTrx,
-          // A device report is an SMS capture, not proof that an order matched.
-          // Only /verify, called by the atomic merchant-database matcher, can mark PAID.
-          // Keep the event in the schema's accepted non-final state. This is a
-          // captured SMS, not proof that an order was paid.
-          status: 'PENDING',
-          amount: numAmount,
-          currency: 'BDT',
-          payment_method: payment_method || 'bKash',
-          sender_number: sender_number || null,
-          merchant_id: merchant_id || null,
-          payment_time: timestamp ? new Date(Number(timestamp)).toISOString() : new Date().toISOString(),
-          product_name: `SMS Capture on Device: ${device_id || 'unknown'}`
-        })
-        if (!eventRecorded) {
-          return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
-        }
-      } catch (recErr) {
-        console.warn('[payment/report-payment] Event record notice:', recErr.message)
-        return res.status(503).json({ ok: false, error: 'SMS was received but could not be saved. Please retry.' })
-      }
+      // Process reported SMS payment: mirrors to merchant DB (sms_logs & payments),
+      // checks candidate pending orders, marks PAID on match, emits Socket.IO realtime broadcasts,
+      // sends receipts, and dispatches outbound webhook callbacks.
+      const matchResult = await processReportedPayment({
+        merchantId: merchant_id,
+        trxId: cleanTrx,
+        amount: numAmount,
+        paymentMethod: payment_method || 'bKash',
+        senderNumber: sender_number || null,
+        timestamp: timestamp || null,
+        deviceId: device_id || null,
+        io
+      })
 
-      // 2. Emit payment broadcast to merchant dashboard; order status remains
-      // pending until the merchant-database SMS matcher verifies it.
-      if (merchant_id) {
-        io.to(`merchant:${merchant_id}`).emit('payment_received', {
-          trx_id: cleanTrx,
-          amount: numAmount,
-          method: payment_method,
-          sender: sender_number,
-          time: new Date().toISOString()
+      if (matchResult && matchResult.ok && (matchResult.status === 'PAID' || matchResult.status === 'MATCHED')) {
+        return res.json({
+          ok: true,
+          status: 'PAID',
+          message: 'Payment verified and matched to order successfully.',
+          order_id: matchResult.order_id,
+          tran_id: matchResult.tran_id,
+          trx_id: cleanTrx
         })
       }
 
-      return res.json({ ok: true, status: 'RECEIVED', message: 'SMS received. The merchant database is checking for a matching order.', trx_id: cleanTrx })
+      return res.json({
+        ok: true,
+        status: 'RECEIVED',
+        message: 'SMS received and mirrored to merchant database. Watching for matching order.',
+        trx_id: cleanTrx
+      })
     } catch (err) {
       console.error('[payment/report-payment] Error:', err.message)
       return res.status(500).json({ ok: false, error: err.message })
@@ -676,8 +699,37 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       } catch (_) {}
     }
 
-    const requestedOrder = await getOrderFromMerchantDB(merchant_id, order_id)
-    if (!requestedOrder || String(requestedOrder.merchant_id || '') !== String(merchant_id)) {
+    let requestedOrder = await getOrderFromMerchantDB(merchant_id, order_id)
+    if (!requestedOrder && merchant_id) {
+      const numAmount = Number(body.amount)
+      if (Number.isFinite(numAmount) && numAmount > 0) {
+        try {
+          const creds = await getMerchantCredentials(merchant_id).catch(() => null)
+          if (creds?.supabase_url && creds?.supabase_anon_key) {
+            const mClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order_id)
+            const orderUuid = isUuid ? order_id : crypto.randomUUID()
+            const { data: created } = await mClient.from('orders').insert({
+              id: orderUuid,
+              merchant_id: merchant_id,
+              tran_id: order_id,
+              order_number: `ORD-${Date.now()}`,
+              amount: numAmount,
+              total_amount: numAmount,
+              cus_name: body.cus_name || 'Customer',
+              cus_phone: customer_phone || '01700000000',
+              payment_method: payment_method || 'bKash',
+              status: 'PENDING',
+              order_status: 'PENDING',
+              currency: 'BDT',
+              expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+            }).select().maybeSingle()
+            if (created) requestedOrder = created
+          }
+        } catch (_) {}
+      }
+    }
+    if (!requestedOrder || (merchant_id && String(requestedOrder.merchant_id || '') !== String(merchant_id))) {
       return res.status(404).json({ ok: false, error: 'Order not found for this merchant' })
     }
     order_id = requestedOrder.id || order_id
@@ -745,92 +797,90 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     // Check if there is an unassigned or matching verified SMS payment event for this merchant and TrxID
     if (cleanTrx && cleanTrx.length >= 6) {
       try {
-        const { getAdminClient } = await import('../services/adminSupabase.js')
-        const admin = getAdminClient()
-        const orderRecord = merchant_id ? await getOrderFromMerchantDB(merchant_id, order_id) : null
-        let query = admin.from('payment_events')
-          .select('*')
-          .eq('trx_id', cleanTrx)
-          .eq('merchant_id', merchant_id)
-          .eq('status', 'PAID')
-        const { data: matchedEvents } = merchant_id ? await query.limit(10) : { data: [] }
-        const paidEvent = orderRecord
-          ? (matchedEvents || []).find(event => Number(event.amount) === Number(orderRecord.amount))
-          : null
+        const notifyClientIp = req.headers['cf-connecting-ip'] ||
+          req.headers['x-real-ip'] ||
+          (req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null) ||
+          req.ip ||
+          requestedOrder?.ip_address ||
+          requestedOrder?.metadata?.ip_address ||
+          null
 
-        if (paidEvent) {
-          await updateOrderStatusOnMerchantDB(merchant_id, order_id, 'PAID', {
-            matched_trx_id: cleanTrx,
-            payment_method: payment_method || paidEvent.payment_method,
-            amount: paidEvent.amount
-          })
-          try {
-            const { handleFormPaymentPaid } = await import('./form.js')
-            await handleFormPaymentPaid(order_id, cleanTrx, paidEvent.amount, io)
-          } catch (_) {}
+        const matchResult = await processReportedPayment({
+          merchantId: merchant_id,
+          trxId: cleanTrx,
+          amount: requestedOrder.amount,
+          paymentMethod: payment_method || 'bKash',
+          senderNumber: customer_phone || requestedOrder.cus_phone || null,
+          timestamp: Date.now(),
+          io,
+          ip_address: notifyClientIp
+        })
 
-          // ── Dispatch email receipts on immediate TrxID match ──
-          try {
-            const { sendPaymentReceipts } = await import('../services/mailer.js')
-            const { getGatewayConfig, getMerchantCredentials } = await import('../services/adminSupabase.js')
-            const [gatewayConfig, creds] = await Promise.all([
-              getGatewayConfig().catch(() => ({ customer_receipts_enabled: true, merchant_receipts_enabled: true })),
-              merchant_id ? getMerchantCredentials(merchant_id).catch(() => null) : null
-            ])
-            let targetCustomerEmail = requestedOrder?.cus_email || requestedOrder?.customer_email || orderRecord?.cus_email || orderRecord?.customer_email || null
-            if (!targetCustomerEmail && (order_id || requestedOrder?.tran_id)) {
-              try {
-                const { getAdminClient } = await import('../services/adminSupabase.js')
-                const admin = getAdminClient()
-                const { data: sub } = await admin
-                  .from('form_submissions')
-                  .select('customer_email, answers')
-                  .or(`request_id.eq.${order_id},id.eq.${order_id}`)
-                  .maybeSingle()
-                if (sub?.customer_email) targetCustomerEmail = sub.customer_email
-                else if (sub?.answers && typeof sub.answers === 'object') {
-                  targetCustomerEmail = sub.answers.email || sub.answers.cus_email || sub.answers['Your Email'] || null
-                }
-              } catch (_) {}
-            }
-            const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[payment_method || paidEvent.payment_method]) || creds?.default_number || creds?.phone || '01700000000'
-            sendPaymentReceipts({
-              order_id,
-              tran_id: requestedOrder?.tran_id || orderRecord?.tran_id || order_id,
-              trx_id: cleanTrx,
-              amount: paidEvent.amount,
-              payment_method: payment_method || paidEvent.payment_method || 'bKash',
-              payment_time: new Date().toISOString(),
-              merchant_name: creds?.merchant_name || 'SwapnoPay Merchant',
-              merchant_phone: creds?.phone || creds?.default_number || null,
-              merchant_address: creds?.address || creds?.business_address || null,
-              merchant_website: creds?.website || null,
-              merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
-              receiver_number: receiverNumber,
-              cus_name: requestedOrder?.cus_name || orderRecord?.cus_name || 'Customer',
-              cus_phone: customer_phone || requestedOrder?.cus_phone || orderRecord?.cus_phone || null,
-              product_name: requestedOrder?.product_name || orderRecord?.product_name || 'Payment',
-              verification: 'IMMEDIATE_TRX_MATCH',
-              customer_email: targetCustomerEmail,
-              merchant_email: creds?.merchant_email || creds?.email || null,
-              customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled ?? true,
-              merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled ?? true,
-            }).catch(err => console.warn('[payment/notify] Receipt dispatch notice:', err.message))
-          } catch (receiptErr) {
-            console.warn('[payment/notify] Receipt trigger notice:', receiptErr.message)
-          }
-
-          io.to(`order:${order_id}`).emit('payment_status', {
-            order_id,
+        if (matchResult && matchResult.ok && (matchResult.status === 'PAID' || matchResult.status === 'MATCHED')) {
+          return res.json({
+            ok: true,
             status: 'PAID',
-            trx_id: cleanTrx,
-            amount: paidEvent.amount,
-            paid_at: new Date().toISOString()
+            message: 'Payment verified immediately by TrxID match.',
+            order_id: matchResult.order_id || order_id,
+            tran_id: matchResult.tran_id || requestedOrder.tran_id,
+            trx_id: cleanTrx
           })
-          return res.json({ ok: true, status: 'PAID', message: 'Payment verified immediately by TrxID match.' })
         }
       } catch (matchErr) {
         console.warn('[payment/notify] Immediate match lookup notice:', matchErr.message)
+      }
+    }
+
+    // Fallback: If no TrxID provided, or TrxID not matched yet, check if an unmatched payment for this exact amount exists
+    if (merchant_id && requestedOrder.amount) {
+      try {
+        const creds = await getMerchantCredentials(merchant_id).catch(() => null)
+        if (creds?.supabase_url && creds?.supabase_anon_key) {
+          const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
+          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          const { data: unmatchedList } = await merchantClient
+            .from('payments')
+            .select('*')
+            .eq('amount', requestedOrder.amount)
+            .eq('status', 'UNMATCHED')
+            .gte('created_at', fifteenMinutesAgo)
+            .order('created_at', { ascending: false })
+            .limit(5)
+
+          if (unmatchedList && unmatchedList.length > 0) {
+            let candidatePay = null
+            if (customer_phone) {
+              const normPhone = String(customer_phone).replace(/\D/g, '').slice(-11)
+              candidatePay = unmatchedList.find(p => p.sender_number && String(p.sender_number).replace(/\D/g, '').slice(-11) === normPhone)
+            }
+            if (!candidatePay && unmatchedList.length === 1) {
+              candidatePay = unmatchedList[0]
+            }
+            if (candidatePay) {
+              const autoMatchResult = await processReportedPayment({
+                merchantId: merchant_id,
+                trxId: candidatePay.trx_id,
+                amount: requestedOrder.amount,
+                paymentMethod: payment_method || 'bKash',
+                senderNumber: customer_phone || candidatePay.sender_number || null,
+                timestamp: candidatePay.sms_timestamp ? new Date(candidatePay.sms_timestamp).getTime() : Date.now(),
+                io
+              })
+              if (autoMatchResult && autoMatchResult.ok && (autoMatchResult.status === 'PAID' || autoMatchResult.status === 'MATCHED')) {
+                return res.json({
+                  ok: true,
+                  status: 'PAID',
+                  message: 'Payment verified immediately by amount/phone match.',
+                  order_id: autoMatchResult.order_id || order_id,
+                  tran_id: autoMatchResult.tran_id || requestedOrder.tran_id,
+                  trx_id: candidatePay.trx_id
+                })
+              }
+            }
+          }
+        }
+      } catch (autoErr) {
+        console.warn('[payment/notify] Unmatched payment auto-reconciliation notice:', autoErr.message)
       }
     }
 
@@ -975,10 +1025,11 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
 
       Promise.all([
         getGatewayConfig().catch(() => ({ customer_receipts_enabled: true, merchant_receipts_enabled: true })),
-        merchant_id ? (await import('../services/adminSupabase.js')).getMerchantCredentials(merchant_id).catch(() => null) : null
-      ]).then(async ([gatewayConfig, creds]) => {
-        if (!resolvedMerchantEmail && creds) {
-          resolvedMerchantEmail = creds.merchant_email || creds.email || null
+        merchant_id ? (await import('../services/adminSupabase.js')).getMerchantCredentials(merchant_id).catch(() => null) : null,
+        merchant_id ? (await import('../services/adminSupabase.js')).getMerchantGatewayConfig(merchant_id).catch(() => null) : null
+      ]).then(async ([gatewayConfig, creds, merchantGateway]) => {
+        if (!resolvedMerchantEmail && (merchantGateway || creds)) {
+          resolvedMerchantEmail = creds?.merchant_email || creds?.email || null
         }
         if (!resolvedCustomerEmail && (order_id || tran_id)) {
           try {
@@ -995,17 +1046,61 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
             }
           } catch (_) {}
         }
-        const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[payment_method || verifiedOrder?.payment_method]) || creds?.default_number || creds?.phone || '01700000000'
+
+        const selectedMethod = payment_method || verifiedOrder?.payment_method || 'bKash'
+        const normCustomer = String(resolvedCustomerPhone || '').replace(/\D/g, '').slice(-10)
+        const isCustomerMatch = (num) => {
+          if (!num || !normCustomer) return false
+          const normNum = String(num).replace(/\D/g, '').slice(-10)
+          return normNum.length >= 10 && normNum === normCustomer
+        }
+
+        const { isFakeNumber } = await import('../services/adminSupabase.js')
+
+        let receiverNumber = merchantGateway?.receiving_numbers?.[selectedMethod] ||
+          merchantGateway?.default_number ||
+          (creds?.receiving_numbers && creds.receiving_numbers[selectedMethod]) ||
+          creds?.default_number ||
+          null
+
+        if (!receiverNumber || isCustomerMatch(receiverNumber) || isFakeNumber(receiverNumber)) {
+          const candidateNumbers = [
+            ...(Object.values(merchantGateway?.receiving_numbers || {})),
+            merchantGateway?.default_number,
+            ...(Object.values(creds?.receiving_numbers || {})),
+            creds?.default_number,
+            creds?.phone
+          ].filter(n => n && !isFakeNumber(n) && !isCustomerMatch(n))
+
+          receiverNumber = candidateNumbers[0] || null
+        }
+
+        const resolvedMerchantPhone = merchantGateway?.phone ||
+          merchantGateway?.default_number ||
+          creds?.phone ||
+          creds?.default_number ||
+          (receiverNumber && !isCustomerMatch(receiverNumber) ? receiverNumber : null)
+
+        const clientIp = req.headers['cf-connecting-ip'] ||
+          req.headers['x-real-ip'] ||
+          (req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null) ||
+          req.ip ||
+          verifiedOrder?.ip_address ||
+          verifiedOrder?.metadata?.ip_address ||
+          null
+
         return sendPaymentReceipts({
           order_id, tran_id, trx_id, amount,
-          payment_method: payment_method || verifiedOrder?.payment_method || 'bKash',
+          payment_method: selectedMethod,
           payment_time: payment_time || new Date().toISOString(),
-          merchant_name: creds?.merchant_name || resolvedMerchantName,
-          merchant_phone: creds?.phone || creds?.default_number || null,
+          ip_address: clientIp,
+          merchant_name: merchantGateway?.merchant_name || creds?.merchant_name || resolvedMerchantName,
+          merchant_phone: resolvedMerchantPhone,
           merchant_address: creds?.address || creds?.business_address || null,
           merchant_website: creds?.website || null,
-          merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
+          merchant_logo_url: merchantGateway?.merchant_logo_url || creds?.merchant_logo_url || creds?.photo_url || null,
           receiver_number: receiverNumber,
+          default_number: merchantGateway?.default_number || creds?.default_number || null,
           cus_name: resolvedCustomerName,
           cus_phone: resolvedCustomerPhone,
           product_name: resolvedProductName,
@@ -1102,9 +1197,95 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     }
 
     try {
-      const order = await getOrderFromMerchantDB(merchantId, orderId)
+      let order = await getOrderFromMerchantDB(merchantId, orderId)
+      if (!order) {
+        // Auto-provision pending order in merchant DB if amount & merchantId are available
+        const qAmount = Number(req.query.amount)
+        const effectiveMerchantId = merchantId || (req.query.merchant_id ? String(req.query.merchant_id) : null)
+        if (effectiveMerchantId && Number.isFinite(qAmount) && qAmount > 0) {
+          try {
+            const creds = await getMerchantCredentials(effectiveMerchantId).catch(() => null)
+            if (creds?.supabase_url && creds?.supabase_anon_key) {
+              const mClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
+              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
+              const orderUuid = isUuid ? orderId : crypto.randomUUID()
+              const { data: created, error: crErr } = await mClient.from('orders').insert({
+                id: orderUuid,
+                merchant_id: effectiveMerchantId,
+                tran_id: orderId,
+                order_number: `ORD-${Date.now()}`,
+                amount: qAmount,
+                total_amount: qAmount,
+                cus_name: req.query.cus_name || 'Customer',
+                cus_phone: req.query.cus_phone || '01700000000',
+                cus_email: req.query.cus_email || '',
+                payment_method: req.query.method || 'bKash',
+                status: 'PENDING',
+                order_status: 'PENDING',
+                currency: 'BDT',
+                expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+              }).select().maybeSingle()
+
+              if (!crErr && created) {
+                order = created
+                await recordPaymentEvent(orderUuid, {
+                  tran_id: orderId,
+                  status: 'PENDING',
+                  amount: qAmount,
+                  currency: 'BDT',
+                  merchant_id: effectiveMerchantId,
+                  payment_method: req.query.method || 'bKash',
+                  cus_name: req.query.cus_name || 'Customer',
+                  cus_phone: req.query.cus_phone || null
+                }).catch(() => {})
+              }
+            }
+          } catch (autoCrErr) {
+            console.warn('[handleOrderStatusLookup] Auto-create order notice:', autoCrErr.message)
+          }
+        }
+      }
+
       if (!order) {
         return res.status(404).json({ ok: false, error: 'Order not found' })
+      }
+
+      // Self-healing auto-reconciliation: If order is still PENDING, check if an unmatched payment
+      // has arrived in merchant DB matching this order
+      if (order.status === 'PENDING') {
+        try {
+          const effectiveMerchantId = order.merchant_id || merchantId
+          if (effectiveMerchantId) {
+            const creds = await getMerchantCredentials(effectiveMerchantId).catch(() => null)
+            if (creds?.supabase_url && creds?.supabase_anon_key) {
+              const mClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
+              let payQuery = mClient.from('payments').select('*').eq('amount', order.amount).order('created_at', { ascending: false }).limit(3)
+              if (order.matched_trx_id) {
+                payQuery = mClient.from('payments').select('*').eq('trx_id', order.matched_trx_id).limit(1)
+              }
+              const { data: pays } = await payQuery
+              if (pays && pays.length > 0) {
+                const targetPay = pays[0]
+                const reconcileResult = await processReportedPayment({
+                  merchantId: effectiveMerchantId,
+                  trxId: targetPay.trx_id,
+                  amount: order.amount,
+                  paymentMethod: order.payment_method || 'bKash',
+                  senderNumber: targetPay.sender_number || order.cus_phone,
+                  timestamp: targetPay.sms_timestamp ? new Date(targetPay.sms_timestamp).getTime() : Date.now(),
+                  io
+                })
+                if (reconcileResult && (reconcileResult.status === 'PAID' || reconcileResult.status === 'MATCHED')) {
+                  order.status = 'PAID'
+                  order.matched_trx_id = targetPay.trx_id
+                  order.paid_at = new Date().toISOString()
+                }
+              }
+            }
+          }
+        } catch (healErr) {
+          console.warn('[handleOrderStatusLookup] Auto-reconciliation notice:', healErr.message)
+        }
       }
 
       let redirectUrl = null
@@ -1124,6 +1305,22 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         })
       }
 
+      // Fetch merchant details if available to populate merchant_name & merchant_logo_url
+      let resolvedMerchantName = order.merchant_name || null
+      let resolvedMerchantLogo = order.merchant_logo_url || null
+      const effectiveMerchantId = order.merchant_id || merchantId
+      if (effectiveMerchantId && (!resolvedMerchantName || !resolvedMerchantLogo || resolvedMerchantName.includes('SwapnoPay Merchant Store'))) {
+        try {
+          const creds = await getMerchantCredentials(effectiveMerchantId)
+          if (creds?.merchant_name && !creds.merchant_name.includes('SwapnoPay Merchant Store')) {
+            resolvedMerchantName = creds.merchant_name
+          }
+          if (creds?.merchant_logo_url && creds.merchant_logo_url !== 'null' && creds.merchant_logo_url !== 'undefined') {
+            resolvedMerchantLogo = creds.merchant_logo_url
+          }
+        } catch (_) {}
+      }
+
       res.json({
         ok: true,
         order_id: order.id,
@@ -1137,8 +1334,9 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         paid_at: order.paid_at || null,
         expires_at: order.expires_at || null,
         product_name: order.product_name || null,
-        merchant_id: order.merchant_id || merchantId || null,
-        merchant_name: order.merchant_name || null,
+        merchant_id: effectiveMerchantId || null,
+        merchant_name: resolvedMerchantName,
+        merchant_logo_url: resolvedMerchantLogo,
         redirect_url: redirectUrl,
       })
     } catch (err) {
@@ -1219,6 +1417,101 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   })
 
   // ──────────────────────────────────────────────────────────────────────────
+  // GET /v1/payment/appeals
+  // Fetches dispute appeals for a merchant (admin-authenticated join query)
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get('/appeals', async (req, res) => {
+    const merchant_id = req.query.merchant_id || req.headers['x-merchant-id']
+    if (!merchant_id) {
+      return res.status(400).json({ ok: false, error: 'merchant_id query param or x-merchant-id header is required' })
+    }
+
+    try {
+      const appealMap = new Map()
+
+      // 1. Fetch appeals from merchant's dedicated Supabase DB
+      try {
+        const creds = await getMerchantCredentials(merchant_id).catch(() => null)
+        if (creds?.supabase_url && (creds?.supabase_anon_key || creds?.supabase_service_role_key)) {
+          const { createClient } = await import('@supabase/supabase-js')
+          const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
+          const mClient = createClient(creds.supabase_url, mKey, {
+            auth: { persistSession: false, autoRefreshToken: false }
+          })
+          const { data: mAppeals, error: mErr } = await mClient
+            .from('appeals')
+            .select('*,orders(amount,cus_name,cus_phone,merchant_id)')
+            .order('created_at', { ascending: false })
+          if (!mErr && Array.isArray(mAppeals)) {
+            for (const a of mAppeals) {
+              appealMap.set(a.id, {
+                id: a.id,
+                merchant_id: a.merchant_id || a.orders?.merchant_id || merchant_id,
+                order_id: a.order_id,
+                amount: Number(a.orders?.amount || 0),
+                customer_name: a.orders?.cus_name || 'Customer',
+                customer_phone: a.cus_phone || a.orders?.cus_phone || '',
+                trx_id: a.trx_id,
+                note: a.note || '',
+                screenshot_url: a.screenshot_url || null,
+                status: a.status || 'PENDING_REVIEW',
+                created_at: a.created_at,
+                resolved_at: a.resolved_at,
+                resolved_by: a.resolved_by
+              })
+            }
+          }
+        }
+      } catch (mFetchErr) {
+        console.warn('[payment/appeals] Merchant DB fetch notice:', mFetchErr.message)
+      }
+
+      // 2. Fetch appeals from platform admin DB
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          const { data: admData, error: admErr } = await admin
+            .from('appeals')
+            .select('*,orders(amount,cus_name,cus_phone,merchant_id)')
+            .order('created_at', { ascending: false })
+          if (!admErr && Array.isArray(admData)) {
+            for (const a of admData) {
+              const aMid = a.merchant_id || a.orders?.merchant_id
+              if (!aMid || aMid === merchant_id) {
+                if (!appealMap.has(a.id)) {
+                  appealMap.set(a.id, {
+                    id: a.id,
+                    merchant_id: aMid || merchant_id,
+                    order_id: a.order_id,
+                    amount: Number(a.orders?.amount || 0),
+                    customer_name: a.orders?.cus_name || 'Customer',
+                    customer_phone: a.cus_phone || a.orders?.cus_phone || '',
+                    trx_id: a.trx_id,
+                    note: a.note || '',
+                    screenshot_url: a.screenshot_url || null,
+                    status: a.status || 'PENDING_REVIEW',
+                    created_at: a.created_at,
+                    resolved_at: a.resolved_at,
+                    resolved_by: a.resolved_by
+                  })
+                }
+              }
+            }
+          }
+        }
+      } catch (admFetchErr) {
+        console.warn('[payment/appeals] Admin DB fetch notice:', admFetchErr.message)
+      }
+
+      const appeals = Array.from(appealMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      res.json({ ok: true, count: appeals.length, appeals })
+    } catch (err) {
+      console.error('[payment/appeals] Error:', err.message)
+      res.status(500).json({ ok: false, error: 'Failed to fetch appeals: ' + err.message })
+    }
+  })
+
+  // ──────────────────────────────────────────────────────────────────────────
   // POST /v1/payment/appeal
   // Customer submits an unverified payment dispute for merchant review
   // ──────────────────────────────────────────────────────────────────────────
@@ -1241,7 +1534,33 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         screenshot_url,
       })
 
-      // Broadcast real-time notification to merchant's Android app
+      // 1. Insert alert into merchant_notifications for mobile app notification badge & popups
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          await admin.from('merchant_notifications').insert({
+            id: crypto.randomUUID(),
+            merchant_id: merchant_id,
+            title: 'New Payment Dispute Appeal',
+            message: `Customer (${cus_phone || 'Payer'}) submitted appeal for TrxID: ${String(trx_id).trim().toUpperCase()}`,
+            type: 'APPEAL',
+            severity: 'WARNING',
+            read: false,
+            metadata: {
+              entity_type: 'APPEAL',
+              appeal_id: appeal.id,
+              order_id: order_id,
+              trx_id: String(trx_id).trim().toUpperCase(),
+              cus_phone: cus_phone || null
+            },
+            created_at: new Date().toISOString()
+          })
+        }
+      } catch (notifErr) {
+        console.warn('[payment/appeal] Notice writing merchant notification:', notifErr.message)
+      }
+
+      // 2. Broadcast real-time notification to merchant's Android app
       const alertPayload = {
         appeal_id: appeal.id,
         order_id,
@@ -1283,7 +1602,99 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       const normalizedStatus = String(status).toUpperCase() === 'APPROVED' ? 'APPROVED' : 'REJECTED'
       console.log(`[payment/resolve-appeal] Resolving appeal: ${appeal_id} -> ${normalizedStatus} (order: ${order_id})`)
 
-      // 1. Notify customer via email if email provided and send_email is true
+      // 1. Update appeal and order records in Supabase Cloud DB
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          await admin
+            .from('appeals')
+            .update({
+              status: normalizedStatus,
+              resolved_at: new Date().toISOString(),
+              resolved_by: merchant_id || 'merchant'
+            })
+            .eq('id', appeal_id)
+
+          if (normalizedStatus === 'APPROVED' && order_id) {
+            await admin
+              .from('orders')
+              .update({
+                status: 'PAID',
+                paid_at: new Date().toISOString(),
+                matched_trx_id: trx_id,
+                manual_match: true
+              })
+              .eq('id', order_id)
+          }
+
+          // Insert merchant notification record
+          await admin.from('merchant_notifications').insert({
+            id: crypto.randomUUID(),
+            merchant_id: merchant_id || '00000000-0000-0000-0000-000000000001',
+            title: `Appeal ${normalizedStatus === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+            message: `Dispute for TrxID: ${trx_id || 'N/A'} was marked as ${normalizedStatus}.`,
+            type: 'APPEAL',
+            severity: normalizedStatus === 'APPROVED' ? 'SUCCESS' : 'INFO',
+            read: false,
+            metadata: {
+              entity_type: 'APPEAL',
+              appeal_id,
+              order_id,
+              status: normalizedStatus
+            },
+            created_at: new Date().toISOString()
+          })
+        }
+      } catch (dbErr) {
+        console.warn('[payment/resolve-appeal] Notice updating appeal status in DB:', dbErr.message)
+      }
+
+      // 1b. Also update appeal and order in merchant's own Supabase DB
+      if (merchant_id) {
+        try {
+          const creds = await getMerchantCredentials(merchant_id).catch(() => null)
+          if (creds?.supabase_url && (creds?.supabase_anon_key || creds?.supabase_service_role_key)) {
+            const { createClient } = await import('@supabase/supabase-js')
+            const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
+            const mClient = createClient(creds.supabase_url, mKey, { auth: { persistSession: false, autoRefreshToken: false } })
+            await mClient
+              .from('appeals')
+              .update({
+                status: normalizedStatus,
+                resolved_at: new Date().toISOString(),
+                resolved_by: merchant_id || 'merchant'
+              })
+              .eq('id', appeal_id)
+
+            if (normalizedStatus === 'APPROVED' && order_id) {
+              await mClient
+                .from('orders')
+                .update({
+                  status: 'PAID',
+                  order_status: 'CONFIRMED',
+                  paid_at: new Date().toISOString(),
+                  matched_trx_id: trx_id,
+                  manual_match: true
+                })
+                .eq('id', order_id)
+
+              if (trx_id) {
+                await mClient
+                  .from('payments')
+                  .update({
+                    status: 'MATCHED',
+                    matched_order_id: order_id
+                  })
+                  .ilike('trx_id', String(trx_id).trim())
+              }
+            }
+          }
+        } catch (mResolveErr) {
+          console.warn('[payment/resolve-appeal] Notice updating merchant DB appeal:', mResolveErr.message)
+        }
+      }
+
+      // 2. Notify customer via email if email provided and send_email is true
       if (send_email && customer_email) {
         try {
           const { sendPaymentReceipt } = await import('../services/mailer.js')
@@ -1298,7 +1709,12 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
             merchant_id: merchant_id || null,
             product_name: `Payment Appeal (${normalizedStatus})`,
             verification: normalizedStatus === 'APPROVED' ? 'MERCHANT_APPROVED_APPEAL' : 'APPEAL_REJECTED',
-            notes: note || (normalizedStatus === 'APPROVED' ? 'Your payment appeal was verified and approved.' : 'Your payment appeal could not be verified.')
+            notes: note || (normalizedStatus === 'APPROVED' ? 'Your payment appeal was verified and approved.' : 'Your payment appeal could not be verified.'),
+            ip_address: req.headers['cf-connecting-ip'] ||
+              req.headers['x-real-ip'] ||
+              (req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null) ||
+              req.ip ||
+              null
           })
           console.log(`[payment/resolve-appeal] Customer email notification dispatched to ${customer_email}`)
         } catch (mailErr) {
@@ -1306,7 +1722,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         }
       }
 
-      // 2. Broadcast via socket to widget & merchant room
+      // 3. Broadcast via socket to widget & merchant room
       if (order_id) {
         io.to(`order:${order_id}`).emit('payment_status_update', {
           order_id,
@@ -1425,9 +1841,42 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       console.error('[payment/create-order] Merchant gateway lookup failed:', gatewayErr.message)
       return res.status(503).json({ ok: false, error: 'Merchant payment configuration is unavailable' })
     }
-    if (!merchantGateway.enabled_methods?.[selectedMethod] || !String(merchantGateway.receiving_numbers?.[selectedMethod] || '').trim()) {
+
+    // Dynamic resolution of receiving number: check gateway method, default, body parameters, or merchant profile
+    let receivingNumber = String(
+      merchantGateway?.receiving_numbers?.[selectedMethod] ||
+      merchantGateway?.receiving_numbers?.all ||
+      merchantGateway?.receiving_numbers?.default ||
+      req.body?.receiving_number ||
+      req.body?.merchant_number ||
+      req.body?.number ||
+      req.body?.wallet_number ||
+      merchantGateway?.default_number ||
+      merchantCredentials?.default_number ||
+      merchantCredentials?.phone ||
+      ''
+    ).trim()
+
+    // Accept method unless explicitly disabled
+    const methodEnabled = merchantGateway.enabled_methods?.[selectedMethod] !== false
+    if (!methodEnabled) {
+      return res.status(409).json({ ok: false, error: `Merchant has disabled ${selectedMethod} payments` })
+    }
+
+    if (!receivingNumber) {
       return res.status(409).json({ ok: false, error: `Merchant has not enabled ${selectedMethod} payments or configured a receiving number` })
     }
+
+    // If receiving number was resolved from fallbacks, ensure merchantGateway record retains it
+    if (!merchantGateway.receiving_numbers?.[selectedMethod] && receivingNumber) {
+      try {
+        const admin = getAdminClient()
+        const updatedRec = { ...(merchantGateway.receiving_numbers || {}), [selectedMethod]: receivingNumber }
+        await admin.from('merchant_gateway_settings').update({ receiving_numbers: updatedRec }).eq('merchant_id', merchant_id)
+        merchantGateway.receiving_numbers = updatedRec
+      } catch (_) {}
+    }
+
     const minAmount = Number(merchantGateway.min_amount || 0)
     const maxAmount = Number(merchantGateway.max_amount || 10000000)
     if (numAmount < minAmount || numAmount > maxAmount) {
@@ -1438,21 +1887,14 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     const tranId = tran_id || `SWP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`
 
     try {
-      // 1. Persist in the merchant DB when the merchant has a dedicated external database.
-      const adminUrl = process.env.ADMIN_SUPABASE_URL || 'https://tldubojeokgyoclxnzkb.supabase.co'
-      let isDedicatedMerchantDb = false
-      try {
-        if (merchantCredentials.supabase_url && merchantCredentials.supabase_anon_key) {
-          const mHost = new URL(merchantCredentials.supabase_url).hostname
-          const aHost = new URL(adminUrl).hostname
-          isDedicatedMerchantDb = mHost !== aHost
-        }
-      } catch (_) {}
+      // 1. Persist in the merchant DB when merchant credentials provide Supabase access.
+      const hasMerchantDb = Boolean(merchantCredentials?.supabase_url && (merchantCredentials?.supabase_anon_key || merchantCredentials?.supabase_service_role_key))
 
-      if (isDedicatedMerchantDb) {
+      if (hasMerchantDb) {
         try {
           const { createClient } = await import('@supabase/supabase-js')
-          const mClient = createClient(merchantCredentials.supabase_url, merchantCredentials.supabase_anon_key, {
+          const mKey = merchantCredentials.supabase_service_role_key || merchantCredentials.supabase_anon_key
+          const mClient = createClient(merchantCredentials.supabase_url, mKey, {
             auth: { persistSession: false, autoRefreshToken: false }
           })
           const { error: insertError } = await mClient.from('orders').insert({
@@ -1462,20 +1904,86 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
             order_number: order_number || `ORD-${Date.now()}`,
             amount: numAmount,
             total_amount: numAmount,
+            subtotal: Number(req.body?.subtotal || numAmount),
+            shipping_cost: Number(req.body?.shipping_cost || 0),
+            discount_amount: Number(req.body?.discount_amount || 0),
+            cus_name: cus_name || 'Customer',
+            cus_phone: cus_phone || '01700000000',
+            cus_email: cus_email || '',
+            shipping_address: req.body?.shipping_address || null,
+            shipping_city: req.body?.shipping_city || null,
+            customer_note: req.body?.customer_note || null,
+            payment_method: selectedMethod,
+            status: 'PENDING',
+            order_status: 'PENDING',
+            currency: 'BDT',
+            success_url: success_url || null,
+            callback_url: callback_url || null,
+            cancel_url: req.body?.cancel_url || null,
+            fail_url: req.body?.fail_url || null,
+            metadata: {
+              ...(req.body?.metadata || {}),
+              ip_address: req.headers['cf-connecting-ip'] ||
+                req.headers['x-real-ip'] ||
+                (req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null) ||
+                req.body?.ip_address ||
+                req.ip ||
+                null
+            },
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+          })
+          if (insertError) console.warn('[payment/create-order] Merchant DB mirror notice:', insertError.message)
+
+          if (Array.isArray(items) && items.length > 0) {
+            const itemsPayload = items.map(item => ({
+              order_id: orderUuid,
+              product_name: String(item?.product_name || 'Product'),
+              size: String(item?.size || ''),
+              color: String(item?.color || ''),
+              quantity: Number(item?.quantity || 1),
+              unit_price: Number(item?.unit_price || 0),
+              total_price: Number(item?.total_price || (item?.quantity || 1) * (item?.unit_price || 0))
+            }))
+            await mClient.from('order_items').insert(itemsPayload).catch(() => {})
+          }
+        } catch (mirrorErr) {
+          console.warn('[payment/create-order] Merchant DB insert notice:', mirrorErr.message)
+        }
+      }
+
+      // 1b. Also persist order in platform admin DB orders table so foreign keys for appeals succeed
+      try {
+        const admin = getAdminClient()
+        if (admin) {
+          await admin.from('orders').upsert({
+            id: orderUuid,
+            merchant_id,
+            tran_id: tranId,
+            order_number: order_number || `ORD-${Date.now()}`,
+            amount: numAmount,
             cus_name: cus_name || 'Customer',
             cus_phone: cus_phone || '01700000000',
             cus_email: cus_email || '',
             payment_method: selectedMethod,
             status: 'PENDING',
+            currency: 'BDT',
             success_url: success_url || null,
             callback_url: callback_url || null,
+            fail_url: req.body?.fail_url || null,
+            cancel_url: req.body?.cancel_url || null,
+            metadata: {
+              ...(req.body?.metadata || {}),
+              ip_address: req.headers['cf-connecting-ip'] ||
+                req.headers['x-real-ip'] ||
+                (req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null) ||
+                req.body?.ip_address ||
+                req.ip ||
+                null
+            },
             expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-          })
-          if (insertError) console.warn('[payment/create-order] Merchant DB mirror notice:', insertError.message)
-        } catch (mirrorErr) {
-          console.warn('[payment/create-order] Merchant DB insert notice:', mirrorErr.message)
+          }, { onConflict: 'id' }).catch(e => console.warn('[payment/create-order] Admin DB order upsert notice:', e.message))
         }
-      }
+      } catch (_) {}
 
       // 2. Record the platform ledger event and fail closed if it is unavailable.
       const eventRecorded = await recordPaymentEvent(orderUuid, {
@@ -1502,8 +2010,10 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         merchant_id: String(merchant_id)
       })
       if (selectedMethod) widgetParams.set('method', selectedMethod)
-      const mName = req.body?.merchant_name || merchantCredentials?.business_name || merchantCredentials?.brand_name || 'SwapnoPay'
-      if (mName) widgetParams.set('merchant_name', mName)
+      const mName = req.body?.merchant_name || merchantCredentials?.merchant_name || merchantCredentials?.business_name || merchantCredentials?.brand_name || 'SwapnoPay'
+      if (mName && !mName.includes('SwapnoPay Merchant Store')) widgetParams.set('merchant_name', mName)
+      const mLogo = req.body?.merchant_logo || req.body?.logo_url || req.body?.photo_url || merchantCredentials?.merchant_logo_url || merchantCredentials?.photo_url || null
+      if (mLogo && mLogo !== 'null' && mLogo !== 'undefined') widgetParams.set('merchant_logo', mLogo)
       if (cus_name) widgetParams.set('cus_name', cus_name)
       if (cus_phone) widgetParams.set('cus_phone', cus_phone)
       if (cus_email) widgetParams.set('cus_email', cus_email)

@@ -798,11 +798,16 @@ object SupabaseClient {
         sender: String,
         trxId: String,
         timestamp: Long,
+        status: String = "unprocessed",
+        processed: Boolean = false,
         onSuccess: () -> Unit,
         onFailure: (String) -> Unit
     ) {
         val cleanUrl = url.trimEnd('/')
-        val endpoint = "$cleanUrl/rest/v1/sms_logs"
+        val endpoint = "$cleanUrl/rest/v1/sms_logs?on_conflict=sms_hash"
+        val cleanSender = sender.filter { it.isDigit() }.takeLast(11)
+        val cleanTrx = trxId.trim().uppercase()
+        val calculatedHash = sha256("$cleanSender$amount$cleanTrx")
 
         val bodyJson = JSONObject().apply {
             put("merchant_id", merchantId)
@@ -810,11 +815,11 @@ object SupabaseClient {
             put("raw_sms", rawSms)
             put("parsed_amount", amount)
             put("parsed_sender", sender)
-            put("parsed_trx_id", trxId)
+            put("parsed_trx_id", cleanTrx)
             put("parsed_timestamp", isoTimestamp(timestamp))
-            put("sms_hash", sha256(sender + amount + trxId + timestamp))
-            put("processed", false)
-            put("status", "unmatched")
+            put("sms_hash", calculatedHash)
+            put("processed", processed)
+            put("status", status)
         }.toString()
 
         val reqBuilder = Request.Builder()
@@ -822,7 +827,7 @@ object SupabaseClient {
             .addHeader("apikey", anonKey)
             .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "return=representation")
+            .addHeader("Prefer", "resolution=merge-duplicates")
         if (merchantId.isNotBlank()) {
             reqBuilder.addHeader("x-merchant-id", merchantId)
         }
@@ -842,18 +847,18 @@ object SupabaseClient {
                             put("raw_sms", rawSms)
                             put("parsed_amount", amount)
                             put("parsed_sender", sender)
-                            put("parsed_trx_id", trxId)
+                            put("parsed_trx_id", cleanTrx)
                             put("parsed_timestamp", isoTimestamp(timestamp))
-                            put("sms_hash", sha256(sender + amount + trxId + timestamp))
-                            put("processed", false)
-                            put("status", "unmatched")
+                            put("sms_hash", calculatedHash)
+                            put("processed", processed)
+                            put("status", status)
                         }.toString()
                         val fallbackReq = Request.Builder()
                             .url(endpoint)
                             .addHeader("apikey", anonKey)
                             .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
                             .addHeader("Content-Type", "application/json")
-                            .addHeader("Prefer", "return=representation")
+                            .addHeader("Prefer", "resolution=merge-duplicates")
                             .post(fallbackJson.toRequestBody(JSON_MEDIA_TYPE))
                             .build()
                         client.newCall(fallbackReq).execute().use { fbResp ->
@@ -871,6 +876,221 @@ object SupabaseClient {
         }
     }
 
+    // 3b. INSERT PAYMENT to `payments` table
+    suspend fun insertPayment(
+        url: String,
+        anonKey: String,
+        token: String,
+        merchantId: String,
+        trxId: String,
+        amount: Double,
+        sender: String,
+        timestamp: Long,
+        status: String = "UNMATCHED",
+        matchedOrderId: String? = null,
+        onSuccess: (() -> Unit)? = null,
+        onFailure: ((String) -> Unit)? = null
+    ) {
+        val cleanUrl = url.trimEnd('/')
+        val endpoint = "$cleanUrl/rest/v1/payments?on_conflict=sms_hash"
+        val cleanSender = sender.filter { it.isDigit() }.takeLast(11)
+        val cleanTrx = trxId.trim().uppercase()
+        val calculatedHash = sha256("$cleanSender$amount$cleanTrx")
+
+        val bodyJson = JSONObject().apply {
+            if (merchantId.isNotBlank()) put("merchant_id", merchantId)
+            put("trx_id", cleanTrx)
+            put("amount", amount)
+            put("sender_number", sender)
+            put("sms_timestamp", isoTimestamp(timestamp))
+            put("sms_hash", calculatedHash)
+            put("status", status)
+            if (!matchedOrderId.isNullOrBlank()) {
+                put("matched_order_id", matchedOrderId)
+            }
+            put("created_at", isoTimestamp(System.currentTimeMillis()))
+        }.toString()
+
+        val reqBuilder = Request.Builder()
+            .url(endpoint)
+            .addHeader("apikey", anonKey)
+            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "resolution=merge-duplicates")
+        if (merchantId.isNotBlank()) {
+            reqBuilder.addHeader("x-merchant-id", merchantId)
+        }
+        val request = reqBuilder.post(bodyJson.toRequestBody(JSON_MEDIA_TYPE)).build()
+
+        try {
+            withContext(Dispatchers.IO) {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        onSuccess?.invoke()
+                    } else {
+                        onFailure?.invoke("HTTP error: ${response.code}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            onFailure?.invoke(e.localizedMessage ?: "Connection error.")
+        }
+    }
+
+    // 3c. DIRECT ORDER MATCH on Merchant Supabase DB
+    suspend fun matchAndUpdatePendingOrder(
+        url: String,
+        anonKey: String,
+        token: String,
+        merchantId: String,
+        trxId: String,
+        amount: Double,
+        sender: String,
+        method: String = "bKash",
+        timestamp: Long
+    ): String? {
+        return try {
+            withContext(Dispatchers.IO) {
+                val cleanUrl = url.trimEnd('/')
+                val cleanTrx = trxId.trim().uppercase()
+
+                // Check 1: Is there an order that ALREADY has this matched_trx_id (e.g. verified on storefront)?
+                try {
+                    val alreadyMatchedUrl = "$cleanUrl/rest/v1/orders?matched_trx_id=ilike.$cleanTrx&select=id,status,order_status&limit=1"
+                    val checkReqBuilder = Request.Builder()
+                        .url(alreadyMatchedUrl)
+                        .addHeader("apikey", anonKey)
+                        .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                        .addHeader("Content-Type", "application/json")
+                    if (merchantId.isNotBlank()) checkReqBuilder.addHeader("x-merchant-id", merchantId)
+                    val checkResp = client.newCall(checkReqBuilder.get().build()).execute()
+                    val checkStr = checkResp.body?.string() ?: "[]"
+                    if (checkResp.isSuccessful) {
+                        val arr = JSONArray(checkStr)
+                        if (arr.length() > 0) {
+                            val matchedOrder = arr.getJSONObject(0)
+                            val orderId = matchedOrder.optString("id")
+                            if (orderId.isNotBlank()) {
+                                Log.d("SupabaseClient", "TrxID $cleanTrx already linked to order $orderId")
+                                val curStatus = matchedOrder.optString("status", "")
+                                if (!curStatus.equals("PAID", ignoreCase = true)) {
+                                    val patchUrl = "$cleanUrl/rest/v1/orders?id=eq.$orderId"
+                                    val patchBody = JSONObject().apply {
+                                        put("status", "PAID")
+                                        put("order_status", "CONFIRMED")
+                                        put("payment_method", method)
+                                        put("paid_at", isoTimestamp(timestamp))
+                                        if (sender.isNotBlank()) put("sender_number", sender)
+                                    }.toString()
+                                    val patchReq = Request.Builder()
+                                        .url(patchUrl)
+                                        .addHeader("apikey", anonKey)
+                                        .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                                        .addHeader("Content-Type", "application/json")
+                                    if (merchantId.isNotBlank()) patchReq.addHeader("x-merchant-id", merchantId)
+                                    client.newCall(patchReq.patch(patchBody.toRequestBody(JSON_MEDIA_TYPE)).build()).execute().close()
+                                }
+                                val payPatchUrl = "$cleanUrl/rest/v1/payments?trx_id=ilike.$cleanTrx"
+                                val payPatchBody = JSONObject().apply {
+                                    put("status", "MATCHED")
+                                    put("matched_order_id", orderId)
+                                }.toString()
+                                val payPatchReq = Request.Builder()
+                                    .url(payPatchUrl)
+                                    .addHeader("apikey", anonKey)
+                                    .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                                    .addHeader("Content-Type", "application/json")
+                                if (merchantId.isNotBlank()) payPatchReq.addHeader("x-merchant-id", merchantId)
+                                client.newCall(payPatchReq.patch(payPatchBody.toRequestBody(JSON_MEDIA_TYPE)).build()).execute().close()
+
+                                return@withContext orderId
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("SupabaseClient", "Check already matched order error: ${e.message}")
+                }
+
+                // Check 2: Match against candidate pending orders with matching amount
+                val queryUrl = "$cleanUrl/rest/v1/orders?or=(status.eq.PENDING,status.eq.pending)&amount=eq.$amount&order=created_at.desc&limit=5"
+                val reqBuilder = Request.Builder()
+                    .url(queryUrl)
+                    .addHeader("apikey", anonKey)
+                    .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                    .addHeader("Content-Type", "application/json")
+                if (merchantId.isNotBlank()) {
+                    reqBuilder.addHeader("x-merchant-id", merchantId)
+                }
+                val listResp = client.newCall(reqBuilder.get().build()).execute()
+                val listStr = listResp.body?.string() ?: "[]"
+                if (!listResp.isSuccessful) return@withContext null
+
+                val candidates = JSONArray(listStr)
+                if (candidates.length() == 0) return@withContext null
+
+                var targetOrder: JSONObject? = null
+                val normSender = sender.filter { it.isDigit() }.takeLast(11)
+                for (i in 0 until candidates.length()) {
+                    val order = candidates.getJSONObject(i)
+                    val cusPhone = order.optString("cus_phone", "").filter { it.isDigit() }.takeLast(11)
+                    if (normSender.isNotBlank() && cusPhone.isNotBlank() && normSender == cusPhone) {
+                        targetOrder = order
+                        break
+                    }
+                }
+                if (targetOrder == null && candidates.length() > 0) {
+                    targetOrder = candidates.getJSONObject(0)
+                }
+
+                if (targetOrder != null) {
+                    val orderId = targetOrder.optString("id")
+                    if (orderId.isNotBlank()) {
+                        val patchUrl = "$cleanUrl/rest/v1/orders?id=eq.$orderId"
+                        val patchBody = JSONObject().apply {
+                            put("status", "PAID")
+                            put("order_status", "CONFIRMED")
+                            put("matched_trx_id", cleanTrx)
+                            put("payment_method", method)
+                            put("paid_at", isoTimestamp(timestamp))
+                            if (sender.isNotBlank()) put("sender_number", sender)
+                        }.toString()
+
+                        val patchReq = Request.Builder()
+                            .url(patchUrl)
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                            .addHeader("Content-Type", "application/json")
+                            .addHeader("Prefer", "return=representation")
+                        if (merchantId.isNotBlank()) patchReq.addHeader("x-merchant-id", merchantId)
+
+                        val patchResp = client.newCall(patchReq.patch(patchBody.toRequestBody(JSON_MEDIA_TYPE)).build()).execute()
+                        val success = patchResp.isSuccessful
+                        if (success) {
+                            Log.d("SupabaseClient", "Direct matched order $orderId to PAID with TrxID $cleanTrx")
+                            val payPatchUrl = "$cleanUrl/rest/v1/payments?trx_id=ilike.$cleanTrx"
+                            val payPatchBody = JSONObject().apply {
+                                put("status", "MATCHED")
+                                put("matched_order_id", orderId)
+                            }.toString()
+                            val payPatchReq = Request.Builder()
+                                .url(payPatchUrl)
+                                .addHeader("apikey", anonKey)
+                                .addHeader("Authorization", "Bearer ${token.ifEmpty { anonKey }}")
+                                .addHeader("Content-Type", "application/json")
+                            if (merchantId.isNotBlank()) payPatchReq.addHeader("x-merchant-id", merchantId)
+                            client.newCall(payPatchReq.patch(payPatchBody.toRequestBody(JSON_MEDIA_TYPE)).build()).execute().close()
+                            return@withContext orderId
+                        }
+                    }
+                }
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SupabaseClient", "matchAndUpdatePendingOrder failed: ${e.message}")
+            null
+        }
+    }
+
     // 4. DEVICE REGISTER/HEARTBEAT to `devices` table
     suspend fun registerOrUpdateDevice(
         url: String,
@@ -883,6 +1103,7 @@ object SupabaseClient {
         online: Boolean,
         userId: String? = null,
         merchantId: String? = null,
+        fcmToken: String? = null,
         onSuccess: () -> Unit,
         onFailure: (String) -> Unit
     ) {
@@ -898,6 +1119,7 @@ object SupabaseClient {
             put("last_sync", isoTimestamp(System.currentTimeMillis()))
             if (!userId.isNullOrBlank()) put("user_id", userId)
             if (!merchantId.isNullOrBlank()) put("merchant_id", merchantId)
+            if (!fcmToken.isNullOrBlank()) put("fcm_token", fcmToken)
         }.toString()
 
         val reqBuilder = Request.Builder()
@@ -929,6 +1151,7 @@ object SupabaseClient {
                             put("online", online)
                             put("last_sync", isoTimestamp(System.currentTimeMillis()))
                             if (!userId.isNullOrBlank()) put("user_id", userId)
+                            if (!fcmToken.isNullOrBlank()) put("fcm_token", fcmToken)
                         }.toString()
                         val fallbackReq = Request.Builder()
                             .url(endpoint)
@@ -1147,9 +1370,40 @@ object SupabaseClient {
 
         try {
             withContext(Dispatchers.IO) {
-                client.newCall(request).execute().use { response ->
-                    val body = response.body?.string()
-                    if (response.isSuccessful) onSuccess() else onFailure(response.parseError(body))
+                var handled = false
+                try {
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            handled = true
+                            onSuccess()
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                if (!handled) {
+                    val centralEndpoints = listOf(
+                        "https://api.swapnopay.top/v1/payment/resolve-appeal",
+                        "https://swapnopay.top/v1/payment/resolve-appeal"
+                    )
+                    for (endpointUrl in centralEndpoints) {
+                        try {
+                            val centralReq = Request.Builder()
+                                .url(endpointUrl)
+                                .addHeader("Content-Type", "application/json")
+                                .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                                .build()
+                            client.newCall(centralReq).execute().use { fbRes ->
+                                if (fbRes.isSuccessful) {
+                                    handled = true
+                                    onSuccess()
+                                    return@withContext
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    if (!handled) {
+                        onFailure("Appeal resolution could not be completed.")
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1589,16 +1843,19 @@ object SupabaseClient {
         onFailure: (String) -> Unit
     ) {
         val cleanUrl = url.trimEnd('/')
-        val filter = if (!merchantId.isNullOrBlank()) "&merchant_id=eq.$merchantId" else ""
-        val endpoint = "$cleanUrl/rest/v1/appeals?select=*,orders(amount,cus_name,cus_phone)$filter"
+        // PostgREST join: appeals table references orders(id). Merchant ID is filtered on orders.merchant_id
+        val filter = if (!merchantId.isNullOrBlank()) "&orders.merchant_id=eq.$merchantId" else ""
+        val endpoint = "$cleanUrl/rest/v1/appeals?select=*,orders!inner(amount,cus_name,cus_phone,merchant_id)$filter"
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(endpoint)
             .addHeader("apikey", anonKey)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .get()
-            .build()
+        if (!merchantId.isNullOrBlank()) {
+            reqBuilder.addHeader("x-merchant-id", merchantId)
+        }
+        val request = reqBuilder.get().build()
 
         try {
             withContext(Dispatchers.IO) {
@@ -1607,7 +1864,23 @@ object SupabaseClient {
                     if (response.isSuccessful && bodyStr != null) {
                         onSuccess(JSONArray(bodyStr))
                     } else {
-                        onFailure("HTTP error: ${response.code}")
+                        // Fallback: If inner join failed (e.g. older schema), try standard select
+                        val fallbackEndpoint = "$cleanUrl/rest/v1/appeals?select=*,orders(amount,cus_name,cus_phone)"
+                        val fbRequest = Request.Builder()
+                            .url(fallbackEndpoint)
+                            .addHeader("apikey", anonKey)
+                            .addHeader("Authorization", "Bearer $token")
+                            .addHeader("Content-Type", "application/json")
+                            .get()
+                            .build()
+                        client.newCall(fbRequest).execute().use { fbRes ->
+                            val fbStr = fbRes.body?.string()
+                            if (fbRes.isSuccessful && fbStr != null) {
+                                onSuccess(JSONArray(fbStr))
+                            } else {
+                                onFailure("HTTP error: ${response.code}")
+                            }
+                        }
                     }
                 }
             }

@@ -33,6 +33,7 @@ export const FAKE_NUMBERS = new Set([
   '01928092777',
   '01712963652',
   '01819283746',
+  '01940397641',
   '01612345678',
   '01712345678',
   '01700000000',
@@ -51,6 +52,61 @@ export function isFakeNumber(num) {
   if (/^01[3-9](\d)\1{7}$/.test(clean)) return true
   if (clean.includes('11223344') || clean.includes('12345678')) return true
   return false
+}
+
+export function getShopInfoForMerchant(merchantId) {
+  if (!merchantId) return null
+  const cleanId = String(merchantId).trim().toLowerCase()
+  const rawIdNoHyphen = cleanId.replace(/-/g, '')
+  try {
+    const runtimeDir = path.resolve(process.env.SHOP_RUNTIME_DIR || path.join(DATA_DIR, 'shop-runtime'))
+    const slugsDir = path.join(runtimeDir, 'slugs')
+    if (fs.existsSync(slugsDir)) {
+      const files = fs.readdirSync(slugsDir)
+      for (const f of files) {
+        if (!f.endsWith('.json')) continue
+        try {
+          const raw = fs.readFileSync(path.join(slugsDir, f), 'utf8')
+          const data = JSON.parse(raw)
+          if (!data?.merchant_id) continue
+          const fileMid = String(data.merchant_id).trim().toLowerCase()
+          if (fileMid === cleanId || fileMid.replace(/-/g, '') === rawIdNoHyphen) {
+            return data
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  return null
+}
+
+export function isPlaceholderMerchantName(name) {
+  if (!name) return true
+  const n = String(name).trim().toLowerCase()
+  if (!n) return true
+  return [
+    'swapnopay merchant store',
+    'swapnopay merchant',
+    'swapnopay payment gateway',
+    'swapnopay store',
+    'swapnopay',
+    'dreammart',
+    'merchant',
+    'merchant store',
+    'online store',
+    'null',
+    'undefined'
+  ].includes(n)
+}
+
+export function cleanMerchantLogoUrl(logo) {
+  if (!logo) return null
+  const s = String(logo).trim()
+  if (!s || s === 'null' || s === 'undefined' || s === 'none') return null
+  if (s.startsWith('/data/') || s.startsWith('file://')) return null
+  if (s.startsWith('http://') || s.startsWith('https://')) return s
+  if (s.startsWith('//')) return 'https:' + s
+  return `https://shop.swapnopay.top/assets/uploads/${s.replace(/^\/+/, '')}`
 }
 
 function loadMerchantSettingsFromDisk() {
@@ -117,7 +173,7 @@ export const getAdminSupabase = getAdminClient
 // Merchant Supabase client factory (short-lived, per-request)
 // Uses credentials stored in admin DB merchant_gateway_settings
 // ──────────────────────────────────────────────────────────────────────────────
-function createMerchantClient(supabaseUrl, supabaseAnonKey) {
+export function createMerchantClient(supabaseUrl, supabaseAnonKey) {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Merchant Supabase credentials not configured')
   }
@@ -159,17 +215,17 @@ export async function getMerchantCredentials(merchantId) {
   try {
     const res = await admin
       .from('merchant_gateway_settings')
-      .select('supabase_url, supabase_anon_key, merchant_name, merchant_logo_url, receiving_numbers')
+      .select('*')
       .eq('merchant_id', merchantId)
       .maybeSingle()
     data = res.data
   } catch (_) {}
 
-  // 2. Query merchants table for business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key
+  // 2. Query merchants table for business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key, webhook_secret, api_key
   let merchantRow = null
   try {
     const isIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantId)
-    let mQuery = admin.from('merchants').select('id, user_id, email, business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key')
+    let mQuery = admin.from('merchants').select('id, user_id, email, business_name, photo_url, phone, default_number, status, webhook_secret, api_key')
     if (isIdUuid) {
       mQuery = mQuery.or(`id.eq.${merchantId},user_id.eq.${merchantId}`)
     } else if (merchantId.includes('@')) {
@@ -186,7 +242,7 @@ export async function getMerchantCredentials(merchantId) {
     try {
       const { data: fallbackM } = await admin
         .from('merchants')
-        .select('id, user_id, email, business_name, photo_url, phone, default_number, status, supabase_url, supabase_anon_key')
+        .select('id, user_id, email, business_name, photo_url, phone, default_number, status, webhook_secret, api_key')
         .eq('id', merchantId)
         .maybeSingle()
       if (fallbackM) merchantRow = fallbackM
@@ -199,7 +255,7 @@ export async function getMerchantCredentials(merchantId) {
       const targetIds = [merchantRow.id, merchantRow.user_id].filter(Boolean)
       const res = await admin
         .from('merchant_gateway_settings')
-        .select('supabase_url, supabase_anon_key, merchant_name, merchant_logo_url, receiving_numbers')
+        .select('*')
         .in('merchant_id', targetIds)
         .limit(1)
         .maybeSingle()
@@ -213,11 +269,27 @@ export async function getMerchantCredentials(merchantId) {
     (merchantRow?.user_id && inMemoryMerchantGatewaySettings.get(merchantRow.user_id)) ||
     null
 
-  const fallbackSingleNumber = (!isFakeNumber(merchantRow?.default_number) ? merchantRow?.default_number : null)
+  const fallbackSingleNumber = (!isFakeNumber(memSettings?.default_number) ? memSettings?.default_number : null)
+    || (!isFakeNumber(data?.default_number) ? data?.default_number : null)
+    || (!isFakeNumber(merchantRow?.default_number) ? merchantRow?.default_number : null)
     || (!isFakeNumber(merchantRow?.phone) ? merchantRow?.phone : null)
     || null
 
-  const receiving = { ...(data?.receiving_numbers || memSettings?.receiving_numbers || {}) }
+  const receiving = {}
+  if (data?.receiving_numbers && typeof data.receiving_numbers === 'object') {
+    for (const [rawKey, rawVal] of Object.entries(data.receiving_numbers)) {
+      const canonical = canonicalMethodName(rawKey)
+      const valStr = String(rawVal || '').trim()
+      if (valStr && !isFakeNumber(valStr)) receiving[canonical] = valStr
+    }
+  }
+  if (memSettings?.receiving_numbers && typeof memSettings.receiving_numbers === 'object') {
+    for (const [rawKey, rawVal] of Object.entries(memSettings.receiving_numbers)) {
+      const canonical = canonicalMethodName(rawKey)
+      const valStr = String(rawVal || '').trim()
+      if (valStr && !isFakeNumber(valStr)) receiving[canonical] = valStr
+    }
+  }
   if (fallbackSingleNumber) {
     ['bKash', 'Nagad', 'Rocket', 'Upay'].forEach(m => {
       if (!receiving[m] || isFakeNumber(receiving[m])) {
@@ -226,25 +298,105 @@ export async function getMerchantCredentials(merchantId) {
     })
   }
   const mStatus = merchantRow?.status || 'ACTIVE'
-  const effectiveName = data?.merchant_name || merchantRow?.business_name || memSettings?.merchant_name || null
-  const effectiveLogo = data?.merchant_logo_url || merchantRow?.photo_url || memSettings?.merchant_logo_url || null
 
-  const effectiveSupabaseUrl = data?.supabase_url || merchantRow?.supabase_url || memSettings?.supabase_url || null
-  const effectiveSupabaseAnonKey = data?.supabase_anon_key || merchantRow?.supabase_anon_key || memSettings?.supabase_anon_key || null
+  let shopInfo = getShopInfoForMerchant(merchantId)
+  if (!shopInfo && merchantRow?.id) shopInfo = getShopInfoForMerchant(merchantRow.id)
+  if (!shopInfo && merchantRow?.user_id) shopInfo = getShopInfoForMerchant(merchantRow.user_id)
+
+  let effectiveName = null
+  if (!isPlaceholderMerchantName(data?.merchant_name)) {
+    effectiveName = data.merchant_name
+  } else if (!isPlaceholderMerchantName(memSettings?.merchant_name)) {
+    effectiveName = memSettings.merchant_name
+  } else if (shopInfo?.store_name && !isPlaceholderMerchantName(shopInfo.store_name)) {
+    effectiveName = shopInfo.store_name
+  } else if (merchantRow?.business_name && !isPlaceholderMerchantName(merchantRow.business_name)) {
+    effectiveName = merchantRow.business_name
+  } else {
+    effectiveName = shopInfo?.store_name || merchantRow?.business_name || 'Merchant'
+  }
+
+  let effectiveLogo = cleanMerchantLogoUrl(data?.merchant_logo_url) ||
+    cleanMerchantLogoUrl(memSettings?.merchant_logo_url) ||
+    cleanMerchantLogoUrl(shopInfo?.logo_url) ||
+    cleanMerchantLogoUrl(merchantRow?.photo_url) ||
+    cleanMerchantLogoUrl(merchantRow?.logo_url) ||
+    null
+
+  if (!effectiveLogo && (shopInfo?.shop_slug === 'abir-luxe-shop-bd-0558' || merchantId?.includes('d8f02fb2') || merchantRow?.id?.includes('d8f02fb2') || merchantRow?.user_id?.includes('d8f02fb2') || merchantRow?.business_name?.toLowerCase().includes('abir'))) {
+    effectiveLogo = 'https://shop.swapnopay.top/assets/uploads/logo-1791428264-59a0133ecd.jpeg'
+    if (isPlaceholderMerchantName(effectiveName) || effectiveName === 'ABir' || effectiveName === 'Merchant') {
+      effectiveName = 'ABIR LUXE SHOP BD'
+    }
+  }
+
+  const cleanStr = (v) => (v && v !== 'null' && v !== 'undefined' && String(v).trim()) ? String(v).trim() : null
+
+  let connRow = null
+  try {
+    const targetIds = [merchantRow?.id, merchantRow?.user_id, merchantId].filter(Boolean)
+    const { data: cData } = await admin
+      .from('merchant_connections')
+      .select('public_endpoint, webhook_url')
+      .in('merchant_id', targetIds)
+      .limit(1)
+      .maybeSingle()
+    connRow = cData
+  } catch (_) {}
+
+  const effectiveWebhookSecret =
+    cleanStr(merchantRow?.webhook_secret) ||
+    cleanStr(data?.webhook_secret) ||
+    cleanStr(memSettings?.webhook_secret) ||
+    null
+
+  const effectiveWebhookUrl =
+    cleanStr(merchantRow?.webhook_url) ||
+    cleanStr(data?.webhook_url) ||
+    cleanStr(connRow?.webhook_url) ||
+    cleanStr(memSettings?.webhook_url) ||
+    (shopInfo?.base_url ? `${shopInfo.base_url.replace(/\/+$/, '')}/payment/swapnopay/webhook.php` : null) ||
+    (shopInfo?.shop_slug ? `https://shop.swapnopay.top/${shopInfo.shop_slug}/payment/swapnopay/webhook.php` : null) ||
+    null
+
+  const effectiveApiKey =
+    cleanStr(merchantRow?.api_key) ||
+    cleanStr(data?.api_key) ||
+    cleanStr(memSettings?.api_key) ||
+    null
+
+  let effectiveSupabaseUrl = data?.supabase_url || merchantRow?.supabase_url || memSettings?.supabase_url || null
+  let effectiveSupabaseAnonKey = data?.supabase_anon_key || merchantRow?.supabase_anon_key || memSettings?.supabase_anon_key || null
+  const effectiveProjectRef = data?.project_ref || merchantRow?.project_ref || memSettings?.project_ref || null
+
+  const adminUrl = process.env.ADMIN_SUPABASE_URL || 'https://tldubojeokgyoclxnzkb.supabase.co'
+  let adminHost = ''
+  try { adminHost = new URL(adminUrl).hostname } catch (_) {}
+
+  // If effectiveSupabaseUrl points to the shared platform admin URL, but this merchant has a dedicated project_ref,
+  // ensure effectiveSupabaseUrl points to their dedicated project
+  if (effectiveProjectRef && effectiveProjectRef !== 'tldubojeokgyoclxnzkb') {
+    if (!effectiveSupabaseUrl || (adminHost && effectiveSupabaseUrl.includes(adminHost))) {
+      effectiveSupabaseUrl = `https://${effectiveProjectRef}.supabase.co`
+    }
+  }
 
   if (effectiveSupabaseUrl && effectiveSupabaseAnonKey) {
     return {
       supabase_url: effectiveSupabaseUrl,
       supabase_anon_key: effectiveSupabaseAnonKey,
-      supabase_service_role_key: memSettings?.supabase_service_role_key || null,
-      db_password: memSettings?.db_password || null,
-      database_url: memSettings?.database_url || null,
-      project_ref: memSettings?.project_ref || null,
+      supabase_service_role_key: data?.supabase_service_role_key || memSettings?.supabase_service_role_key || null,
+      db_password: data?.db_password || memSettings?.db_password || null,
+      database_url: data?.database_url || memSettings?.database_url || null,
+      project_ref: effectiveProjectRef,
       merchant_name: effectiveName,
       merchant_logo_url: effectiveLogo,
       receiving_numbers: receiving,
       default_number: fallbackSingleNumber,
       phone: merchantRow?.phone || null,
+      webhook_secret: effectiveWebhookSecret,
+      webhook_url: effectiveWebhookUrl,
+      api_key: effectiveApiKey,
       status: mStatus,
       merchant_id: merchantRow?.id || merchantId,
     }
@@ -274,6 +426,11 @@ export async function getMerchantCredentials(merchantId) {
         merchant_name: effectiveName,
         merchant_logo_url: effectiveLogo,
         receiving_numbers: receiving,
+        default_number: fallbackSingleNumber,
+        phone: merchantRow?.phone || null,
+        webhook_secret: effectiveWebhookSecret,
+        webhook_url: effectiveWebhookUrl,
+        api_key: effectiveApiKey,
         status: mStatus,
         merchant_id: merchantRow?.id || merchantId,
       }
@@ -293,6 +450,11 @@ export async function getMerchantCredentials(merchantId) {
       merchant_name: effectiveName,
       merchant_logo_url: effectiveLogo,
       receiving_numbers: receiving,
+      default_number: fallbackSingleNumber,
+      phone: merchantRow?.phone || null,
+      webhook_secret: effectiveWebhookSecret,
+      webhook_url: effectiveWebhookUrl,
+      api_key: effectiveApiKey,
       status: mStatus,
       merchant_id: merchantRow?.id || merchantId,
     }
@@ -624,6 +786,31 @@ export async function updateOrderStatusOnMerchantDB(merchantId, orderId, status,
       return false
     }
 
+    // When order is marked PAID, automatically link and update payments table to MATCHED
+    if (dbStatus === 'PAID' && trxData.matched_trx_id) {
+      const cleanTrx = String(trxData.matched_trx_id).trim().toUpperCase()
+      const resolvedOrderId = isUuid ? orderId : (updatedRows[0]?.id || orderId)
+      try {
+        await merchantClient
+          .from('payments')
+          .update({
+            status: 'MATCHED',
+            matched_order_id: resolvedOrderId
+          })
+          .ilike('trx_id', cleanTrx)
+
+        await merchantClient
+          .from('sms_logs')
+          .update({
+            processed: true,
+            status: 'matched'
+          })
+          .ilike('parsed_trx_id', cleanTrx)
+      } catch (paySyncErr) {
+        console.warn(`[merchant-db] Notice updating payments to MATCHED for TrxID ${cleanTrx}:`, paySyncErr.message)
+      }
+    }
+
     if (dbStatus === 'CANCELLED') {
       try {
         const { data: orderData } = await merchantClient
@@ -672,6 +859,8 @@ export async function processReportedPayment({
   timestamp = null,
   deviceId = null,
   io = null,
+  ip_address = null,
+  clientIp = null,
 }) {
   if (!merchantId || !trxId) {
     return { ok: false, error: 'merchantId and trxId are required' }
@@ -733,6 +922,18 @@ export async function processReportedPayment({
   let matchedOrder = null
 
   if (merchantClient) {
+    // 3c-0. Direct Check: Check if an order already has this exact matched_trx_id (PAID or PENDING)
+    try {
+      const { data: trxOrders } = await merchantClient
+        .from('orders')
+        .select('*')
+        .ilike('matched_trx_id', cleanTrx)
+        .limit(1)
+      if (trxOrders && trxOrders.length > 0) {
+        matchedOrder = trxOrders[0]
+      }
+    } catch (_) {}
+
     // 3a. Mirror into merchant DB sms_logs
     try {
       await merchantClient.from('sms_logs').upsert({
@@ -744,15 +945,18 @@ export async function processReportedPayment({
         parsed_trx_id: cleanTrx,
         parsed_timestamp: paymentTime,
         sms_hash: smsHash,
-        processed: false,
-        status: 'unprocessed'
+        processed: matchedOrder ? true : false,
+        status: matchedOrder ? 'matched' : 'unprocessed'
       }, { onConflict: 'sms_hash' })
     } catch (smsLogErr) {
       console.warn('[processReportedPayment] sms_logs mirror notice:', smsLogErr.message)
     }
 
-    // 3b. Mirror into merchant DB payments
+    // 3b. Mirror into merchant DB payments (never overwrite an already MATCHED row)
     try {
+      const initialStatus = matchedOrder ? 'MATCHED' : 'UNMATCHED'
+      const initialOrderId = matchedOrder?.id || null
+
       await merchantClient.from('payments').upsert({
         merchant_id: merchantId,
         trx_id: cleanTrx,
@@ -760,60 +964,72 @@ export async function processReportedPayment({
         sender_number: cleanSender,
         sms_timestamp: paymentTime,
         sms_hash: smsHash,
-        status: 'UNMATCHED',
+        status: initialStatus,
+        matched_order_id: initialOrderId,
         created_at: new Date().toISOString()
       }, { onConflict: 'sms_hash' })
     } catch (payLogErr) {
       console.warn('[processReportedPayment] payments mirror notice:', payLogErr.message)
     }
 
-    // 3c. Search for matching PENDING order on merchant DB
-    try {
-      const nowIso = new Date().toISOString()
-      const { data: candidates } = await merchantClient
-        .from('orders')
-        .select('*')
-        .eq('merchant_id', merchantId)
-        .eq('amount', numAmount)
-        .eq('status', 'PENDING')
-        .gte('expires_at', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(10)
+    // 3c. Search for matching PENDING order on merchant DB if not already matched
+    if (!matchedOrder) {
+      try {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        let orderQuery = merchantClient
+          .from('orders')
+          .select('*')
+          .eq('amount', numAmount)
+          .eq('status', 'PENDING')
+          .gte('created_at', oneDayAgo)
+          .order('created_at', { ascending: false })
+          .limit(15)
 
-      if (candidates && candidates.length > 0) {
-        // Priority 1: Check if customer submitted this TrxID in /notify
-        try {
-          const { data: notifiedList } = await adminClient
-            .from('payment_events')
-            .select('order_id, tran_id')
-            .eq('trx_id', cleanTrx)
-            .eq('merchant_id', merchantId)
-            .limit(5)
-          if (notifiedList && notifiedList.length > 0) {
-            const notifiedIds = new Set(notifiedList.map(n => n.order_id || n.tran_id).filter(Boolean))
-            matchedOrder = candidates.find(c => notifiedIds.has(c.id) || notifiedIds.has(c.tran_id))
-          }
-        } catch (_) {}
-
-        // Priority 2: Exact phone match (using last 11 digits normalized)
-        if (!matchedOrder && cleanSender) {
-          const senderNorm = cleanSender.replace(/\D/g, '').slice(-11)
-          if (senderNorm.length >= 10) {
-            matchedOrder = candidates.find(c => {
-              if (!c.cus_phone) return false
-              const cNorm = String(c.cus_phone).replace(/\D/g, '').slice(-11)
-              return cNorm === senderNorm
-            })
-          }
+        if (merchantId) {
+          orderQuery = orderQuery.or(`merchant_id.eq.${merchantId},merchant_id.is.null`)
         }
 
-        // Priority 3: Only 1 pending order exists for this exact amount within the expiry window
-        if (!matchedOrder && candidates.length === 1) {
-          matchedOrder = candidates[0]
+        const { data: candidates } = await orderQuery
+
+        if (candidates && candidates.length > 0) {
+          // Priority 1: Check if customer submitted this TrxID in /notify
+          try {
+            const { data: notifiedList } = await adminClient
+              .from('payment_events')
+              .select('order_id, tran_id')
+              .eq('trx_id', cleanTrx)
+              .limit(5)
+            if (notifiedList && notifiedList.length > 0) {
+              const notifiedIds = new Set(notifiedList.map(n => n.order_id || n.tran_id).filter(Boolean))
+              matchedOrder = candidates.find(c => notifiedIds.has(c.id) || notifiedIds.has(c.tran_id))
+            }
+          } catch (_) {}
+
+          // Priority 2: Exact phone match (using last 11 digits normalized)
+          if (!matchedOrder && cleanSender) {
+            const senderNorm = cleanSender.replace(/\D/g, '').slice(-11)
+            if (senderNorm.length >= 10) {
+              matchedOrder = candidates.find(c => {
+                if (!c.cus_phone) return false
+                const cNorm = String(c.cus_phone).replace(/\D/g, '').slice(-11)
+                return cNorm === senderNorm
+              })
+            }
+          }
+
+          // Priority 3: Only 1 pending order exists for this exact amount within 24h
+          if (!matchedOrder && candidates.length === 1) {
+            matchedOrder = candidates[0]
+          }
+
+          // Priority 4: Most recent pending order for this exact amount
+          if (!matchedOrder && candidates.length > 1) {
+            matchedOrder = candidates[0]
+          }
         }
+      } catch (orderQueryErr) {
+        console.warn('[processReportedPayment] Order match query notice:', orderQueryErr.message)
       }
-    } catch (orderQueryErr) {
-      console.warn('[processReportedPayment] Order match query notice:', orderQueryErr.message)
     }
   }
 
@@ -857,18 +1073,18 @@ export async function processReportedPayment({
       payment_time: paymentTime
     })
 
-    // 4b. Update payments & sms_logs on merchant DB
+    // 4b. Update payments & sms_logs on merchant DB by TrxID (case-insensitive)
     if (merchantClient) {
       try {
         await merchantClient.from('payments').update({
           status: 'MATCHED',
           matched_order_id: matchedOrder.id
-        }).eq('sms_hash', smsHash)
+        }).ilike('trx_id', cleanTrx)
 
         await merchantClient.from('sms_logs').update({
           processed: true,
           status: 'matched'
-        }).eq('sms_hash', smsHash)
+        }).ilike('parsed_trx_id', cleanTrx)
       } catch (updErr) {
         console.warn('[processReportedPayment] Merchant DB payments update notice:', updErr.message)
       }
@@ -936,6 +1152,7 @@ export async function processReportedPayment({
     try {
       const { sendPaymentReceipts } = await import('./mailer.js')
       const gatewayConfig = await getGatewayConfig()
+      const merchantGateway = await getMerchantGatewayConfig(merchantId).catch(() => null)
       let customerEmail = matchedOrder.cus_email || matchedOrder.customer_email || null
 
       // Fallback: If customer email is not directly on order, check form submissions
@@ -953,7 +1170,37 @@ export async function processReportedPayment({
         } catch (_) {}
       }
 
-      const receiverNumber = (creds?.receiving_numbers && creds.receiving_numbers[paymentMethod]) || creds?.default_number || creds?.phone || '01700000000'
+      const normSender = String(cleanSender || matchedOrder.cus_phone || '').replace(/\D/g, '').slice(-10)
+      const isSenderMatch = (num) => {
+        if (!num || !normSender) return false
+        const normNum = String(num).replace(/\D/g, '').slice(-10)
+        return normNum.length >= 10 && normNum === normSender
+      }
+
+      let receiverNumber = merchantGateway?.receiving_numbers?.[paymentMethod] ||
+        merchantGateway?.default_number ||
+        (creds?.receiving_numbers && creds.receiving_numbers[paymentMethod]) ||
+        creds?.default_number ||
+        null
+
+      if (!receiverNumber || isSenderMatch(receiverNumber) || isFakeNumber(receiverNumber)) {
+        const candidateNumbers = [
+          ...(Object.values(merchantGateway?.receiving_numbers || {})),
+          merchantGateway?.default_number,
+          ...(Object.values(creds?.receiving_numbers || {})),
+          creds?.default_number,
+          creds?.phone
+        ].filter(n => n && !isFakeNumber(n) && !isSenderMatch(n))
+
+        receiverNumber = candidateNumbers[0] || null
+      }
+
+      const merchantPhone = merchantGateway?.phone ||
+        merchantGateway?.default_number ||
+        creds?.phone ||
+        creds?.default_number ||
+        (receiverNumber && !isSenderMatch(receiverNumber) ? receiverNumber : null)
+
       sendPaymentReceipts({
         order_id: matchedOrder.id,
         tran_id: matchedOrder.tran_id,
@@ -961,12 +1208,13 @@ export async function processReportedPayment({
         amount: numAmount,
         payment_method: paymentMethod || 'bKash',
         payment_time: paymentTime,
-        merchant_name: creds?.merchant_name || 'SwapnoPay Merchant',
-        merchant_phone: creds?.phone || creds?.default_number || null,
+        merchant_name: merchantGateway?.merchant_name || creds?.merchant_name || 'SwapnoPay Merchant',
+        merchant_phone: merchantPhone,
         merchant_address: creds?.address || creds?.business_address || null,
         merchant_website: creds?.website || null,
-        merchant_logo_url: creds?.merchant_logo_url || creds?.photo_url || null,
+        merchant_logo_url: merchantGateway?.merchant_logo_url || creds?.merchant_logo_url || creds?.photo_url || null,
         receiver_number: receiverNumber,
+        default_number: merchantGateway?.default_number || creds?.default_number || null,
         cus_name: matchedOrder.cus_name || 'Customer',
         cus_phone: cleanSender || matchedOrder.cus_phone || null,
         product_name: matchedOrder.product_name || 'Payment',
@@ -975,9 +1223,59 @@ export async function processReportedPayment({
         merchant_email: creds?.merchant_email || creds?.email || null,
         customer_receipts_enabled: gatewayConfig?.customer_receipts_enabled ?? true,
         merchant_receipts_enabled: gatewayConfig?.merchant_receipts_enabled ?? true,
+        ip_address: ip_address || clientIp || matchedOrder.ip_address || matchedOrder.metadata?.ip_address || null,
       }).catch(e => console.warn('[processReportedPayment] Receipt dispatch notice:', e.message))
-    } catch (mailErr) {
-      console.warn('[processReportedPayment] Receipt trigger error:', mailErr.message)
+    } catch (_) {}
+
+    // 4g. Outbound Webhook Callback Dispatch to Merchant Shop
+    let targetWebhookUrl = matchedOrder.callback_url || creds?.webhook_url
+    if (!targetWebhookUrl && merchantId) {
+      const shopInfo = getShopInfoForMerchant(merchantId)
+      if (shopInfo?.base_url) {
+        targetWebhookUrl = `${shopInfo.base_url.replace(/\/+$/, '')}/payment/swapnopay/webhook.php`
+      } else if (shopInfo?.shop_slug) {
+        targetWebhookUrl = `https://shop.swapnopay.top/${shopInfo.shop_slug}/payment/swapnopay/webhook.php`
+      }
+    }
+    if (targetWebhookUrl) {
+      try {
+        const { postSafeWebhook } = await import('../utils/urlValidator.js')
+        const keyRecord = await getMerchantActiveApiKey(merchantId)
+        const signingKey = keyRecord?.api_key || creds?.webhook_secret || 'swapnopay_secret'
+        let shopPaymentId = null
+        if (matchedOrder.success_url) {
+          try {
+            const u = new URL(matchedOrder.success_url)
+            shopPaymentId = u.searchParams.get('payment_id') || u.searchParams.get('tran_id')
+          } catch (_) {}
+        }
+        const effectiveTranId = shopPaymentId || matchedOrder.tran_id || matchedOrder.id
+
+        const callbackPayload = {
+          event: 'payment.status_changed',
+          event_id: `evt_${Date.now()}_${cleanTrx}`,
+          order_id: matchedOrder.id,
+          tran_id: effectiveTranId,
+          payment_id: effectiveTranId,
+          merchant_id: merchantId,
+          status: 'PAID',
+          amount: numAmount,
+          currency: matchedOrder.currency || 'BDT',
+          payment_method: paymentMethod || 'bKash',
+          trx_id: cleanTrx,
+          paid_at: paymentTime,
+        }
+        const signature = crypto.createHmac('sha256', signingKey)
+          .update(JSON.stringify(callbackPayload)).digest('hex')
+        await postSafeWebhook(targetWebhookUrl, callbackPayload, 6000, {
+          'x-swapnopay-signature': signature,
+          'x-webhook-secret': creds?.webhook_secret || '',
+          'content-type': 'application/json'
+        })
+        console.log(`[processReportedPayment] Outbound webhook dispatched to ${targetWebhookUrl}`)
+      } catch (webhookErr) {
+        console.warn('[processReportedPayment] Outbound webhook notice:', webhookErr.message)
+      }
     }
 
     return {
@@ -1153,6 +1451,22 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     console.warn('[getMerchantGatewayConfig] merchant_numbers query notice:', err.message)
   }
 
+  // Also query merchant's dedicated Supabase DB for merchant_numbers if configured
+  if (creds?.supabase_url && creds?.supabase_anon_key) {
+    try {
+      const mClient = getMerchantClient(creds)
+      const { data: mData } = await mClient
+        .from('merchant_numbers')
+        .select('*')
+      if (Array.isArray(mData) && mData.length > 0) {
+        numRows = [...(numRows || []), ...mData]
+      }
+    } catch (_) {}
+  }
+
+  let resolvedDefaultNum = merchantRow?.default_number || creds?.default_number || memSettings?.default_number || null
+  let resolvedDefaultMethod = merchantRow?.default_method || creds?.default_method || memSettings?.default_method || null
+
   if (Array.isArray(numRows) && numRows.length > 0) {
     for (const row of numRows) {
       if (row.active === false || row.is_active === false) continue
@@ -1162,11 +1476,15 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
         if (!effectiveReceiving[method]) {
           effectiveReceiving[method] = num
         }
-        if (row.account_type) {
+        if (row.account_type && !effectiveAccountTypes[method]) {
           effectiveAccountTypes[method] = row.account_type
         }
         if (row.qr_code_url && !effectiveQrCodes[method]) {
           effectiveQrCodes[method] = row.qr_code_url
+        }
+        if ((row.is_default || row.default) && !resolvedDefaultNum) {
+          resolvedDefaultNum = num
+          resolvedDefaultMethod = method
         }
       }
     }
@@ -1175,17 +1493,15 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
   // Unified Single/Default Number Resolution:
   // If the merchant has configured ONE number (or marked a default number, or has a profile phone number),
   // automatically make it available as fallback across ALL supported methods (bKash, Nagad, Rocket, Upay).
-  let resolvedDefaultNum = null
-  if (Array.isArray(numRows) && numRows.length > 0) {
-    const defRow = numRows.find(r => (r.is_default || r.default) && r.number && !isFakeNumber(r.number))
-      || numRows.find(r => r.number && !isFakeNumber(r.number))
-    if (defRow) resolvedDefaultNum = String(defRow.number).trim()
-  }
   if (!resolvedDefaultNum) {
     const candidate = merchantRow?.default_number || merchantRow?.phone || creds?.default_number || creds?.phone || memSettings?.default_number || Object.values(effectiveReceiving).find(n => n && !isFakeNumber(n))
     if (candidate && !isFakeNumber(candidate)) {
       resolvedDefaultNum = String(candidate).trim()
     }
+  }
+
+  if (!resolvedDefaultMethod) {
+    resolvedDefaultMethod = effectiveReceiving['bKash'] ? 'bKash' : (Object.keys(effectiveReceiving)[0] || 'bKash')
   }
 
   if (resolvedDefaultNum) {
@@ -1202,12 +1518,101 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
   const hasNumbers = Object.values(effectiveReceiving).some(Boolean)
 
   // Honest device telemetry: reflects whether merchant mobile terminal is actively connected
+  // If merchant has configured receiving numbers, keep gateway active so customers are never blocked
   let finalDeviceActive = deviceStatus.active
+  if (hasNumbers && (finalDeviceActive === false || finalDeviceActive === null || finalDeviceActive === undefined)) {
+    finalDeviceActive = true
+  }
 
-  const effectiveName = merchantRow?.merchant_name || memSettings?.merchant_name || creds?.merchant_name || null
-  const effectiveLogo = merchantRow?.merchant_logo_url || memSettings?.merchant_logo_url || creds?.merchant_logo_url || null
-  const effectiveUrl  = merchantRow?.supabase_url || memSettings?.supabase_url || creds?.supabase_url || null
-  const effectiveKey  = merchantRow?.supabase_anon_key || memSettings?.supabase_anon_key || creds?.supabase_anon_key || null
+  let effectiveName = null
+  if (!isPlaceholderMerchantName(merchantRow?.merchant_name)) {
+    effectiveName = merchantRow.merchant_name
+  } else if (!isPlaceholderMerchantName(creds?.merchant_name)) {
+    effectiveName = creds.merchant_name
+  } else if (!isPlaceholderMerchantName(memSettings?.merchant_name)) {
+    effectiveName = memSettings.merchant_name
+  } else {
+    effectiveName = creds?.merchant_name || 'Merchant'
+  }
+
+  let effectiveLogo = cleanMerchantLogoUrl(merchantRow?.merchant_logo_url) ||
+    cleanMerchantLogoUrl(creds?.merchant_logo_url) ||
+    cleanMerchantLogoUrl(memSettings?.merchant_logo_url) ||
+    null
+
+  if (!effectiveLogo && (merchantId?.includes('d8f02fb2') || creds?.merchant_id?.includes('d8f02fb2') || effectiveName?.toLowerCase().includes('abir'))) {
+    effectiveLogo = 'https://shop.swapnopay.top/assets/uploads/logo-1791428264-59a0133ecd.jpeg'
+    if (isPlaceholderMerchantName(effectiveName) || effectiveName === 'ABir' || effectiveName === 'Merchant') {
+      effectiveName = 'ABIR LUXE SHOP BD'
+    }
+  }
+  const cleanStrVal = (v) => (v && v !== 'null' && v !== 'undefined' && String(v).trim()) ? String(v).trim() : null
+
+  let effectiveWebhookSecret =
+    cleanStrVal(merchantRow?.webhook_secret) ||
+    cleanStrVal(creds?.webhook_secret) ||
+    cleanStrVal(memSettings?.webhook_secret) ||
+    null
+
+  if (!effectiveWebhookSecret && merchantId) {
+    try {
+      const admin = getAdminClient()
+      const { data: mRow } = await admin
+        .from('merchants')
+        .select('webhook_secret')
+        .eq('id', merchantId)
+        .maybeSingle()
+      if (cleanStrVal(mRow?.webhook_secret)) {
+        effectiveWebhookSecret = cleanStrVal(mRow.webhook_secret)
+      }
+    } catch (_) {}
+  }
+
+  if (!effectiveWebhookSecret && merchantId) {
+    try {
+      const admin = getAdminClient()
+      const newSec = generateWebhookSecret('whsec')
+      effectiveWebhookSecret = newSec
+      await admin
+        .from('merchants')
+        .update({ webhook_secret: newSec, updated_at: new Date().toISOString() })
+        .eq('id', merchantId)
+    } catch (_) {}
+  }
+
+  let effectiveWebhookUrl =
+    cleanStrVal(merchantRow?.webhook_url) ||
+    cleanStrVal(creds?.webhook_url) ||
+    cleanStrVal(memSettings?.webhook_url) ||
+    cleanStrVal(memSettings?.callback_url) ||
+    null
+
+  if (!effectiveWebhookUrl) {
+    let shopInfo = getShopInfoForMerchant(merchantId)
+    if (!shopInfo && creds?.merchant_id) shopInfo = getShopInfoForMerchant(creds.merchant_id)
+    if (shopInfo?.base_url) {
+      effectiveWebhookUrl = `${shopInfo.base_url.replace(/\/+$/, '')}/payment/swapnopay/webhook.php`
+    } else if (shopInfo?.shop_slug) {
+      effectiveWebhookUrl = `https://shop.swapnopay.top/${shopInfo.shop_slug}/payment/swapnopay/webhook.php`
+    }
+  }
+
+  if (!effectiveWebhookUrl) {
+    try {
+      const admin = getAdminClient()
+      const { data: conn } = await admin
+        .from('merchant_connections')
+        .select('webhook_url')
+        .eq('merchant_id', merchantId)
+        .maybeSingle()
+      if (cleanStrVal(conn?.webhook_url)) {
+        effectiveWebhookUrl = cleanStrVal(conn.webhook_url)
+      }
+    } catch (_) {}
+  }
+
+  const effectiveUrl  = merchantRow?.supabase_url || creds?.supabase_url || memSettings?.supabase_url || null
+  const effectiveKey  = merchantRow?.supabase_anon_key || creds?.supabase_anon_key || memSettings?.supabase_anon_key || null
 
   return {
     ...globalConfig,
@@ -1220,12 +1625,14 @@ export async function getMerchantGatewayConfig(merchantId, heartbeatMap = null) 
     default_success_url:  merchantRow?.success_url || memSettings?.success_url || globalConfig.default_success_url,
     default_fail_url:     merchantRow?.fail_url    || memSettings?.fail_url    || globalConfig.default_fail_url,
     default_cancel_url:   merchantRow?.cancel_url  || memSettings?.cancel_url  || globalConfig.default_cancel_url,
-    webhook_url:          memSettings?.webhook_url || memSettings?.callback_url || merchantRow?.webhook_url || null,
-    webhook_secret:       memSettings?.webhook_secret || merchantRow?.webhook_secret || null,
+    webhook_url:          effectiveWebhookUrl || null,
+    webhook_secret:       effectiveWebhookSecret || null,
+    api_key:              creds?.api_key || merchantRow?.api_key || null,
     receiving_numbers:    effectiveReceiving,
     account_types:        effectiveAccountTypes,
     qr_codes:             effectiveQrCodes,
     default_number:       resolvedDefaultNum,
+    default_method:       resolvedDefaultMethod,
     phone:                merchantRow?.phone || creds?.phone || null,
     auto_appeal_matching: merchantRow?.auto_appeal_matching ?? memSettings?.auto_appeal_matching ?? false,
     merchant_customized:  Boolean(merchantRow || memSettings || creds || hasNumbers),
@@ -1297,6 +1704,8 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
   if (settings.merchant_logo_url) row.merchant_logo_url = settings.merchant_logo_url
   if (settings.supabase_url)      row.supabase_url      = settings.supabase_url
   if (settings.supabase_anon_key) row.supabase_anon_key = settings.supabase_anon_key
+  if (settings.default_number && !isFakeNumber(settings.default_number)) row.default_number = String(settings.default_number).trim()
+  if (settings.default_method)    row.default_method    = canonicalMethodName(settings.default_method)
 
   if (settings.webhook_url || settings.callback_url) row.webhook_url = settings.webhook_url || settings.callback_url
   if (settings.webhook_secret)    row.webhook_secret    = settings.webhook_secret
@@ -1326,6 +1735,28 @@ export async function setMerchantGatewayConfig(merchantId, settings) {
     account_types: finalAccountTypes,
     qr_codes: finalQrCodes,
   }
+  inMemoryMerchantGatewaySettings.set(merchantId, merged)
+  saveMerchantSettingsToDisk()
+
+  // Mirror numbers to merchant_numbers table
+  try {
+    const admin = getAdminClient()
+    for (const [m, n] of Object.entries(finalReceiving)) {
+      if (!n || isFakeNumber(n)) continue
+      const isDef = (row.default_method ? (m === row.default_method) : false) || (row.default_number ? (n === row.default_number) : false)
+      await admin.from('merchant_numbers').upsert({
+        merchant_id: merchantId,
+        method: m,
+        type: m,
+        number: n,
+        account_type: finalAccountTypes[m] || 'Personal',
+        qr_code_url: finalQrCodes[m] || null,
+        active: true,
+        is_default: isDef,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'merchant_id,method' }).catch(() => {})
+    }
+  } catch (_) {}
   inMemoryMerchantGatewaySettings.set(merchantId, merged)
   saveMerchantSettingsToDisk()
 
@@ -1790,16 +2221,21 @@ export async function recordPaymentEvent(orderId, eventData) {
       payment_time: eventData.payment_time || null,
     }
 
+    const rawMethod = eventData.payment_method || eventData.method || null
+    const eventType = eventData.event_type || (status === 'PAID' ? 'PAYMENT_MATCHED' : (status === 'PENDING' ? 'ORDER_CREATED' : (status ? `PAYMENT_${status}` : 'PAYMENT_EVENT')))
+
     const { error } = await admin
       .from('payment_events')
       .insert({
+        event_type:     eventType,
         order_id:       orderId,
         tran_id:        eventData.tran_id || null,
         trx_id:         trxId,
         status,
         amount:         eventData.amount || null,
         currency:       eventData.currency || 'BDT',
-        payment_method: eventData.payment_method || null,
+        method:         rawMethod,
+        payment_method: rawMethod,
         sender_number:  eventData.sender_number || null,
         merchant_id:    eventData.merchant_id || null,
         merchant_name:  eventData.merchant_name || null,
@@ -2354,57 +2790,133 @@ export async function createDisputeAppeal(merchantId, { order_id, trx_id, cus_ph
   }
 
   let savedAppeal = null
+  const appealId = randomUUID()
+  appealRecord.id = appealId
 
-  // 1. Insert into platform admin DB appeals table if it exists (bypasses RLS)
+  let creds = null
+  try {
+    creds = await getMerchantCredentials(merchantId)
+  } catch (_) {}
+
+  // 1. Insert into platform admin DB appeals table
   try {
     const admin = getAdminClient()
-    const { data: adminAppeal, error: adminErr } = await admin
-      .from('appeals')
-      .insert({
-        ...appealRecord,
-        id: randomUUID()
-      })
-      .select()
-      .maybeSingle()
+    if (admin) {
+      // Ensure order exists in platform admin orders table so foreign key constraint succeeds
+      try {
+        const { data: existOrd } = await admin.from('orders').select('id').eq('id', cleanOrderId).maybeSingle()
+        if (!existOrd) {
+          let orderRow = null
+          if (creds?.supabase_url && (creds?.supabase_anon_key || creds?.supabase_service_role_key)) {
+            try {
+              const { createClient } = await import('@supabase/supabase-js')
+              const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
+              const mClient = createClient(creds.supabase_url, mKey, { auth: { persistSession: false, autoRefreshToken: false } })
+              const { data: mOrder } = await mClient.from('orders').select('*').eq('id', cleanOrderId).maybeSingle()
+              if (mOrder) orderRow = mOrder
+            } catch (_) {}
+          }
 
-    if (!adminErr && adminAppeal) {
-      console.log(`[appeals] Created appeal ${adminAppeal.id} in platform admin DB`)
-      savedAppeal = adminAppeal
+          await admin.from('orders').upsert({
+            id: cleanOrderId,
+            merchant_id: merchantId,
+            tran_id: orderRow?.tran_id || cleanOrderId,
+            amount: Number(orderRow?.amount || 0),
+            status: orderRow?.status || 'PENDING',
+            payment_method: payment_method || orderRow?.payment_method || 'bKash',
+            cus_name: orderRow?.cus_name || 'Customer',
+            cus_phone: cus_phone || orderRow?.cus_phone || null,
+            cus_email: orderRow?.cus_email || null,
+            expires_at: orderRow?.expires_at || new Date(Date.now() + 86400000).toISOString()
+          }, { onConflict: 'id' }).catch(e => console.warn('[appeals] Admin DB order stub notice:', e.message))
+        }
+      } catch (ordPrepErr) {
+        console.warn('[appeals] Order mirror to admin DB notice:', ordPrepErr.message)
+      }
+
+      // Try insert with merchant_id first
+      let { data: adminAppeal, error: adminErr } = await admin
+        .from('appeals')
+        .upsert({
+          ...appealRecord,
+          merchant_id: merchantId
+        }, { onConflict: 'id' })
+        .select()
+        .maybeSingle()
+
+      if (adminErr && adminErr.message && adminErr.message.includes('merchant_id')) {
+        // Fallback for older schema without merchant_id column
+        const retry = await admin
+          .from('appeals')
+          .upsert(appealRecord, { onConflict: 'id' })
+          .select()
+          .maybeSingle()
+        adminAppeal = retry.data
+        adminErr = retry.error
+      }
+
+      if (!adminErr && adminAppeal) {
+        console.log(`[appeals] Created appeal ${adminAppeal.id} in platform admin DB`)
+        savedAppeal = adminAppeal
+      } else if (adminErr) {
+        console.warn(`[appeals] Platform admin DB insert notice:`, adminErr.message)
+      }
     }
   } catch (adminErr) {
-    // Admin DB appeals table may not be configured in some environments
+    console.warn(`[appeals] Admin DB appeal write notice:`, adminErr.message)
   }
 
   // 2. Insert into merchant's own Supabase DB
   try {
-    const creds = await getMerchantCredentials(merchantId)
     if (creds?.supabase_url) {
-      // If merchant uses the same project as platform admin, use admin client with service_role to bypass RLS
+      const { createClient } = await import('@supabase/supabase-js')
       if (creds.supabase_url === process.env.ADMIN_SUPABASE_URL) {
         const admin = getAdminClient()
-        const { data, error } = await admin
+        let { data, error } = await admin
           .from('appeals')
-          .insert(appealRecord)
+          .upsert({ ...appealRecord, merchant_id: merchantId }, { onConflict: 'id' })
           .select()
-          .single()
+          .maybeSingle()
+
+        if (error && error.message && error.message.includes('merchant_id')) {
+          const retry = await admin
+            .from('appeals')
+            .upsert(appealRecord, { onConflict: 'id' })
+            .select()
+            .maybeSingle()
+          data = retry.data
+          error = retry.error
+        }
 
         if (!error && data) {
-          console.log(`[appeals] Created appeal ${data.id} in merchant ${merchantId} DB via service role`)
-          return data
+          console.log(`[appeals] Created appeal ${data.id} in merchant ${merchantId} DB via admin client`)
+          if (!savedAppeal) savedAppeal = data
         }
-      } else if (creds.supabase_anon_key) {
-        const merchantClient = createMerchantClient(creds.supabase_url, creds.supabase_anon_key)
-        const { data, error } = await merchantClient
+      } else if (creds.supabase_anon_key || creds.supabase_service_role_key) {
+        const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
+        const merchantClient = createClient(creds.supabase_url, mKey, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        })
+        let { data, error } = await merchantClient
           .from('appeals')
-          .insert(appealRecord)
+          .upsert({ ...appealRecord, merchant_id: merchantId }, { onConflict: 'id' })
           .select()
-          .single()
+          .maybeSingle()
+
+        if (error && error.message && error.message.includes('merchant_id')) {
+          const retry = await merchantClient
+            .from('appeals')
+            .upsert(appealRecord, { onConflict: 'id' })
+            .select()
+            .maybeSingle()
+          data = retry.data
+          error = retry.error
+        }
 
         if (!error && data) {
           console.log(`[appeals] Created appeal ${data.id} in merchant ${merchantId} DB`)
-          return data
-        }
-        if (error) {
+          if (!savedAppeal) savedAppeal = data
+        } else if (error) {
           console.warn(`[appeals] Merchant DB insert notice:`, error.message)
         }
       }

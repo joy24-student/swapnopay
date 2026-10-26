@@ -175,6 +175,28 @@ $$;
 DO $$ BEGIN GRANT EXECUTE ON FUNCTION public.fn_normalize_merchant_id() TO postgres, authenticated, service_role, anon;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
+-- 3b. Ensure appeals table has merchant_id column and permissive RLS policies for customer appeals
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'appeals') THEN
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS merchant_id UUID REFERENCES public.merchants(id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_merchant_id ON public.appeals(merchant_id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_order_id ON public.appeals(order_id)';
+    EXECUTE 'ALTER TABLE public.appeals ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS "appeals_anon_insert" ON public.appeals';
+    EXECUTE 'CREATE POLICY "appeals_anon_insert" ON public.appeals FOR INSERT WITH CHECK (true)';
+    EXECUTE 'DROP POLICY IF EXISTS "appeals_anon_select" ON public.appeals';
+    EXECUTE 'CREATE POLICY "appeals_anon_select" ON public.appeals FOR SELECT USING (true)';
+    EXECUTE 'DROP POLICY IF EXISTS "appeals_anon_update" ON public.appeals';
+    EXECUTE 'CREATE POLICY "appeals_anon_update" ON public.appeals FOR UPDATE USING (true)';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'orders') THEN
+    EXECUTE 'ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_order_status_check';
+    EXECUTE 'ALTER TABLE public.orders ADD CONSTRAINT orders_order_status_check CHECK (order_status IS NULL OR UPPER(order_status) IN (''PENDING'', ''CONFIRMED'', ''PROCESSING'', ''SHIPPED'', ''DELIVERED'', ''CANCELLED'', ''PAID'', ''COMPLETED''))';
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 -- 4. (Re)attach the self-provisioning trigger to every business table
 DO $$
 DECLARE
@@ -185,6 +207,7 @@ DECLARE
     'loans', 'dps_accounts', 'finance_installments', 'business_analytics',
     'payment_forms', 'form_submissions', 'categories', 'store_settings',
     'employees', 'devices', 'sms_logs', 'merchant_numbers', 'orders', 'payments',
+    'appeals', 'merchant_notifications',
     'merchant_subscriptions', 'showcase_config', 'product_photos',
     'product_reviews', 'shipping_methods', 'order_items', 'customer_carts'
   ];
@@ -219,6 +242,7 @@ DECLARE
     'loans', 'dps_accounts', 'finance_installments', 'business_analytics',
     'payment_forms', 'form_submissions', 'categories', 'store_settings',
     'employees', 'devices', 'sms_logs', 'merchant_numbers', 'orders', 'payments',
+    'appeals', 'merchant_notifications',
     'merchant_subscriptions', 'showcase_config', 'product_photos',
     'product_reviews', 'shipping_methods', 'order_items', 'customer_carts'
   ];
@@ -255,7 +279,7 @@ DO $$
 DECLARE
   t TEXT;
   rt_tables TEXT[] := ARRAY['merchants', 'employees', 'products', 'customers', 'suppliers',
-                            'ledger_transactions', 'pos_sales', 'orders', 'payments'];
+                            'ledger_transactions', 'pos_sales', 'orders', 'payments', 'appeals', 'merchant_notifications'];
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     FOREACH t IN ARRAY rt_tables LOOP
