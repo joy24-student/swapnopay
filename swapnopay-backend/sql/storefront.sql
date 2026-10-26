@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS "tbl_coin_transactions" (
 
 CREATE TABLE IF NOT EXISTS "tbl_color" (
   "color_id" SERIAL PRIMARY KEY,
-  "color_name" VARCHAR(255) NOT NULL
+  "color_name" VARCHAR(255) NOT NULL,
+  "color_code" VARCHAR(100) DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_country" (
@@ -433,7 +434,8 @@ CREATE TABLE IF NOT EXISTS "tbl_order" (
   "unit_price" NUMERIC(12,2) NOT NULL DEFAULT 0,
   "payment_id" VARCHAR(255) NOT NULL DEFAULT '',
   "coupon_code" VARCHAR(100) DEFAULT NULL,
-  "coupon_discount" NUMERIC(10, 2) DEFAULT NULL
+  "coupon_discount" NUMERIC(10, 2) DEFAULT NULL,
+  "order_no" VARCHAR(100) DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_page" (
@@ -518,7 +520,11 @@ CREATE TABLE IF NOT EXISTS "tbl_payment" (
   "card_holder_name" VARCHAR(255) DEFAULT NULL,
   "card_security_code" VARCHAR(255) DEFAULT NULL,
   "card_expiry_month" VARCHAR(255) DEFAULT NULL,
-  "card_expiry_year" VARCHAR(255) DEFAULT NULL
+  "card_expiry_year" VARCHAR(255) DEFAULT NULL,
+  "shipping_partner" VARCHAR(100) DEFAULT NULL,
+  "tracking_number" VARCHAR(100) DEFAULT NULL,
+  "courier_consignment_id" VARCHAR(100) DEFAULT NULL,
+  "estimated_delivery" VARCHAR(100) DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_photo" (
@@ -568,7 +574,11 @@ CREATE TABLE IF NOT EXISTS "tbl_product" (
   "vendor_id" INTEGER DEFAULT 0,
   "allow_coin_payment" SMALLINT DEFAULT 0,
   "is_coin_buyable" SMALLINT DEFAULT 0,
-  "coin_price" INTEGER DEFAULT 0
+  "coin_price" INTEGER DEFAULT 0,
+  "coupon_code" VARCHAR(255) DEFAULT NULL,
+  "slug" VARCHAR(255) DEFAULT NULL,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS "tbl_product_color" (
@@ -592,9 +602,9 @@ CREATE TABLE IF NOT EXISTS "tbl_product_size" (
 CREATE TABLE IF NOT EXISTS "tbl_product_variants" (
   "variant_id" SERIAL PRIMARY KEY,
   "p_id" INTEGER NOT NULL,
-  "size_id" INTEGER NOT NULL,
-  "color_id" INTEGER NOT NULL,
-  "variant_price" NUMERIC(10, 2) NOT NULL,
+  "size_id" INTEGER NOT NULL DEFAULT 0,
+  "color_id" INTEGER NOT NULL DEFAULT 0,
+  "variant_price" NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   "variant_qty" INTEGER DEFAULT 0
 );
 
@@ -1903,66 +1913,38 @@ VALUES (1, 'XS'),
 (47, '24 Plus')
 ON CONFLICT ("size_id") DO NOTHING;
 SELECT setval(pg_get_serial_sequence('tbl_size','size_id'),(SELECT max(size_id) FROM tbl_size));
-INSERT INTO "tbl_color" ("color_id", "color_name")
-VALUES (1, 'Red'),
-(2, 'Black'),
-(3, 'Blue'),
-(4, 'Yellow'),
-(5, 'Green'),
-(6, 'White'),
-(7, 'Orange'),
-(8, 'Brown'),
-(9, 'Tan'),
-(10, 'Pink'),
-(11, 'Mixed'),
-(12, 'Lightblue'),
-(13, 'Violet'),
-(14, 'Light Purple'),
-(15, 'Salmon'),
-(16, 'Gold'),
-(17, 'Gray'),
-(18, 'Ash'),
-(19, 'Maroon'),
-(20, 'Silver'),
-(21, 'Dark Clay'),
-(22, 'Cognac'),
-(23, 'Coffee'),
-(24, 'Charcoal'),
-(25, 'Navy'),
-(26, 'Fuchsia'),
-(27, 'Olive'),
-(28, 'Burgundy'),
-(29, 'Midnight Blue'),
-(1, 'Red'),
-(2, 'Black'),
-(3, 'Blue'),
-(4, 'Yellow'),
-(5, 'Green'),
-(6, 'White'),
-(7, 'Orange'),
-(8, 'Brown'),
-(9, 'Tan'),
-(10, 'Pink'),
-(11, 'Mixed'),
-(12, 'Lightblue'),
-(13, 'Violet'),
-(14, 'Light Purple'),
-(15, 'Salmon'),
-(16, 'Gold'),
-(17, 'Gray'),
-(18, 'Ash'),
-(19, 'Maroon'),
-(20, 'Silver'),
-(21, 'Dark Clay'),
-(22, 'Cognac'),
-(23, 'Coffee'),
-(24, 'Charcoal'),
-(25, 'Navy'),
-(26, 'Fuchsia'),
-(27, 'Olive'),
-(28, 'Burgundy'),
-(29, 'Midnight Blue')
-ON CONFLICT ("color_id") DO NOTHING;
+INSERT INTO "tbl_color" ("color_id", "color_name", "color_code")
+VALUES 
+(1, 'Red', '#ef4444'),
+(2, 'Black', '#0f172a'),
+(3, 'Blue', '#3b82f6'),
+(4, 'Yellow', '#eab308'),
+(5, 'Green', '#22c55e'),
+(6, 'White', '#ffffff'),
+(7, 'Orange', '#f97316'),
+(8, 'Brown', '#78350f'),
+(9, 'Tan', '#d2b48c'),
+(10, 'Pink', '#ec4899'),
+(11, 'Mixed', 'linear-gradient(135deg, #6366f1, #ec4899, #f59e0b)'),
+(12, 'Lightblue', '#38bdf8'),
+(13, 'Violet', '#8b5cf6'),
+(14, 'Light Purple', '#c084fc'),
+(15, 'Salmon', '#fa8072'),
+(16, 'Gold', '#eab308'),
+(17, 'Gray', '#6b7280'),
+(18, 'Ash', '#9ca3af'),
+(19, 'Maroon', '#800000'),
+(20, 'Silver', '#cbd5e1'),
+(21, 'Dark Clay', '#5c4033'),
+(22, 'Cognac', '#9e472a'),
+(23, 'Coffee', '#6f4e37'),
+(24, 'Charcoal', '#374151'),
+(25, 'Navy', '#1e3a8a'),
+(26, 'Fuchsia', '#d946ef'),
+(27, 'Olive', '#84cc16'),
+(28, 'Burgundy', '#881337'),
+(29, 'Midnight Blue', '#1e1b4b')
+ON CONFLICT ("color_id") DO UPDATE SET "color_code" = EXCLUDED."color_code";
 SELECT setval(pg_get_serial_sequence('tbl_color','color_id'),(SELECT max(color_id) FROM tbl_color));
 
 CREATE OR REPLACE FUNCTION rand() RETURNS double precision LANGUAGE sql AS 'SELECT random()';
@@ -1972,37 +1954,37 @@ ALTER TABLE tbl_product ADD CONSTRAINT product_stock_nonnegative CHECK (p_qty >=
 ALTER TABLE tbl_product ADD CONSTRAINT product_price_nonnegative CHECK (p_current_price >= 0);
 ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS theme_color varchar(7) NOT NULL DEFAULT '#4F46E5';
 ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS currency_code varchar(3) NOT NULL DEFAULT 'BDT';
-ALTER TABLE tbl_settings ADD COLUMN popup_on_off smallint NOT NULL DEFAULT 0;
-ALTER TABLE tbl_settings ADD COLUMN popup_text text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN popup_link text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN popup_photo text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN sms_api_key text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN sms_sender_id text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN sms_feature_on_off smallint NOT NULL DEFAULT 0;
-ALTER TABLE tbl_settings ADD COLUMN facebook_url text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN instagram_url text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN linkedin_url text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN twitter_url text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN youtube_url text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN copyright_text text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN footer_about_us text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN payment_verified_image text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_about text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_contact text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_customer_panel text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_faq text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_payment text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_photo_gallery text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_privacy text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_return_policy text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_shipping text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_team text NOT NULL DEFAULT '';
-ALTER TABLE tbl_settings ADD COLUMN banner_terms text NOT NULL DEFAULT '';
-ALTER TABLE tbl_product ADD COLUMN slug text UNIQUE;
-ALTER TABLE tbl_top_category ADD COLUMN slug text UNIQUE;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_on_off smallint NOT NULL DEFAULT 0;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_text text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_link text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS popup_photo text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_api_key text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_sender_id text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS sms_feature_on_off smallint NOT NULL DEFAULT 0;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS facebook_url text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS instagram_url text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS linkedin_url text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS twitter_url text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS youtube_url text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS copyright_text text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS footer_about_us text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS payment_verified_image text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_about text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_contact text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_customer_panel text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_faq text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_payment text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_photo_gallery text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_privacy text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_return_policy text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_shipping text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_team text NOT NULL DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS banner_terms text NOT NULL DEFAULT '';
+ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS slug text;
+ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS slug text;
 ALTER TABLE tbl_top_category ADD COLUMN IF NOT EXISTS banner text DEFAULT '';
-ALTER TABLE tbl_mid_category ADD COLUMN slug text UNIQUE;
-ALTER TABLE tbl_end_category ADD COLUMN slug text UNIQUE;
+ALTER TABLE tbl_mid_category ADD COLUMN IF NOT EXISTS slug text;
+ALTER TABLE tbl_end_category ADD COLUMN IF NOT EXISTS slug text;
 ALTER TABLE tbl_product_size ADD CONSTRAINT product_size_unique UNIQUE(p_id,size_id);
 ALTER TABLE tbl_product_color ADD CONSTRAINT product_color_unique UNIQUE(p_id,color_id);
 ALTER TABLE tbl_product_size ADD CONSTRAINT product_size_product_fk FOREIGN KEY(p_id) REFERENCES tbl_product(p_id) ON DELETE CASCADE;
@@ -2013,14 +1995,14 @@ ALTER TABLE tbl_product_photo ADD CONSTRAINT product_photo_product_fk FOREIGN KE
 ALTER TABLE tbl_mid_category ADD CONSTRAINT mid_category_parent_fk FOREIGN KEY(tcat_id) REFERENCES tbl_top_category(tcat_id) ON DELETE RESTRICT;
 ALTER TABLE tbl_end_category ADD CONSTRAINT end_category_parent_fk FOREIGN KEY(mcat_id) REFERENCES tbl_mid_category(mcat_id) ON DELETE RESTRICT;
 ALTER TABLE tbl_product ADD CONSTRAINT product_category_fk FOREIGN KEY(ecat_id) REFERENCES tbl_end_category(ecat_id) ON DELETE RESTRICT;
-CREATE UNIQUE INDEX storefront_payment_reference ON tbl_payment(payment_id);
-CREATE INDEX storefront_order_payment ON tbl_order(payment_id);
-CREATE INDEX storefront_active_products ON tbl_product(p_is_active,p_id);
-CREATE UNIQUE INDEX storefront_admin_email ON tbl_user(lower(email));
-CREATE UNIQUE INDEX storefront_customer_email ON tbl_customer(lower(cust_email));
-CREATE UNIQUE INDEX storefront_customer_review ON tbl_review(cust_id,product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS storefront_payment_reference ON tbl_payment(payment_id);
+CREATE INDEX IF NOT EXISTS storefront_order_payment ON tbl_order(payment_id);
+CREATE INDEX IF NOT EXISTS storefront_active_products ON tbl_product(p_is_active,p_id);
+CREATE UNIQUE INDEX IF NOT EXISTS storefront_admin_email ON tbl_user(lower(email));
+CREATE UNIQUE INDEX IF NOT EXISTS storefront_customer_email ON tbl_customer(lower(cust_email)) WHERE cust_email IS NOT NULL AND cust_email != '' AND cust_email NOT LIKE '%@storefront.local';
+CREATE UNIQUE INDEX IF NOT EXISTS storefront_customer_review ON tbl_review(cust_id,product_id);
 ALTER TABLE tbl_review ADD CONSTRAINT storefront_review_rating CHECK (rating BETWEEN 1 AND 5);
-CREATE TABLE shop_login_attempts (attempt_key text PRIMARY KEY, failures integer NOT NULL DEFAULT 0, last_attempt timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS shop_login_attempts (attempt_key text PRIMARY KEY, failures integer NOT NULL DEFAULT 0, last_attempt timestamptz NOT NULL DEFAULT now());
 INSERT INTO tbl_settings(id,logo,favicon,meta_title_home,footer_copyright,featured_product_title,latest_product_title,popular_product_title,
  home_featured_product_on_off,home_latest_product_on_off,total_featured_product_home,total_latest_product_home,total_popular_product_home,
  home_map_on_off,home_newsletter_on_off,home_brand_on_off,home_slider_on_off,home_features_on_off,home_category_on_off,
@@ -2057,3 +2039,80 @@ INSERT INTO tbl_social(social_name,social_url) VALUES('Quora','');
 INSERT INTO tbl_social(social_name,social_url) VALUES('StumbleUpon','');
 INSERT INTO tbl_social(social_name,social_url) VALUES('Delicious','');
 INSERT INTO tbl_social(social_name,social_url) VALUES('Digg','');
+
+-- Idempotent column migrations for existing storefront tables
+ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(255) DEFAULT NULL;
+ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS slug VARCHAR(255) DEFAULT NULL;
+ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS order_no VARCHAR(100) DEFAULT NULL;
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS cust_id INTEGER DEFAULT NULL;
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS callback_url TEXT DEFAULT NULL;
+ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS external_reference VARCHAR(255) DEFAULT NULL;
+
+ALTER TABLE tbl_payment ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE tbl_payment ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_password VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_phone VARCHAR(50) NOT NULL DEFAULT '';
+
+ALTER TABLE tbl_color ADD COLUMN IF NOT EXISTS color_code VARCHAR(100) DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS "tbl_product_variants" (
+  "variant_id" SERIAL PRIMARY KEY,
+  "p_id" INTEGER NOT NULL,
+  "size_id" INTEGER NOT NULL DEFAULT 0,
+  "color_id" INTEGER NOT NULL DEFAULT 0,
+  "variant_price" NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+  "variant_qty" INTEGER DEFAULT 0
+);
+ALTER TABLE tbl_product_variants ADD COLUMN IF NOT EXISTS variant_qty INTEGER DEFAULT 0;
+ALTER TABLE tbl_product_variants ALTER COLUMN size_id SET DEFAULT 0;
+ALTER TABLE tbl_product_variants ALTER COLUMN color_id SET DEFAULT 0;
+ALTER TABLE tbl_product_variants ALTER COLUMN variant_price SET DEFAULT 0.00;
+CREATE INDEX IF NOT EXISTS "idx_prod_variants_pid" ON tbl_product_variants(p_id);
+CREATE INDEX IF NOT EXISTS "idx_prod_variants_combo" ON tbl_product_variants(p_id, size_id, color_id);
+
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_merchant_id VARCHAR(255) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_bkash_number VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_nagad_number VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_rocket_number VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_upay_number VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_default_number VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS store_name VARCHAR(255) DEFAULT '';
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS delivery_charge_inside_dhaka NUMERIC(10,2) DEFAULT 60.00;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS delivery_charge_outside_dhaka NUMERIC(10,2) DEFAULT 120.00;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_google_login SMALLINT DEFAULT 1;
+ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS show_facebook_login SMALLINT DEFAULT 1;
+
+DROP INDEX IF EXISTS storefront_customer_email;
+CREATE UNIQUE INDEX IF NOT EXISTS storefront_customer_email ON tbl_customer(lower(cust_email)) 
+  WHERE cust_email IS NOT NULL AND cust_email != '' AND cust_email NOT LIKE '%@storefront.local';
+
+-- Storefront customer payment dispute appeals table
+CREATE TABLE IF NOT EXISTS "tbl_appeals" (
+  "id" SERIAL PRIMARY KEY,
+  "appeal_id" VARCHAR(255) DEFAULT NULL,
+  "order_no" VARCHAR(100) DEFAULT NULL,
+  "payment_id" VARCHAR(255) DEFAULT NULL,
+  "txnid" VARCHAR(255) NOT NULL DEFAULT '',
+  "customer_phone" VARCHAR(50) DEFAULT NULL,
+  "customer_name" VARCHAR(255) DEFAULT NULL,
+  "amount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+  "payment_method" VARCHAR(50) NOT NULL DEFAULT 'bKash',
+  "note" TEXT,
+  "screenshot_url" TEXT,
+  "status" VARCHAR(50) NOT NULL DEFAULT 'PENDING_REVIEW',
+  "resolved_by" VARCHAR(255) DEFAULT NULL,
+  "resolved_at" TIMESTAMPTZ DEFAULT NULL,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS "storefront_appeals_txnid" ON "tbl_appeals"("txnid");
+CREATE INDEX IF NOT EXISTS "storefront_appeals_payment_id" ON "tbl_appeals"("payment_id");
+CREATE INDEX IF NOT EXISTS "storefront_appeals_status" ON "tbl_appeals"("status");

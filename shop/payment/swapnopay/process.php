@@ -6,7 +6,7 @@ require_once("../../admin/inc/functions.php");
 
 // Validate customer session and cart
 if (!isset($_SESSION['customer']) || !isset($_SESSION['cart_p_id']) || empty($_SESSION['cart_p_id'])) {
-    header('location: ../../cart.php');
+    header('Location: ' . (defined('BASE_URL') ? BASE_URL . 'cart.php' : '../../cart.php'));
     exit;
 }
 
@@ -34,6 +34,10 @@ $supabase_url = defined('SUPABASE_URL') ? SUPABASE_URL : getenv('SUPABASE_URL');
 $supabase_service_key = defined('SUPABASE_SERVICE_KEY') && !empty(SUPABASE_SERVICE_KEY) 
     ? SUPABASE_SERVICE_KEY 
     : getenv('SUPABASE_SERVICE_KEY');
+$supabase_anon_key = defined('SUPABASE_ANON_KEY') && !empty(SUPABASE_ANON_KEY)
+    ? SUPABASE_ANON_KEY
+    : (getenv('SUPABASE_ANON_KEY') ?: '');
+$supabase_key = !empty($supabase_service_key) ? $supabase_service_key : $supabase_anon_key;
 
 $supabase_order_id = null;
 $gateway_order_id = null;
@@ -44,7 +48,13 @@ $gateway_api_key = trim((string)($runtime['gateway_api_key'] ?? (defined('SWAPNO
 $api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
 
 try {
-    $stmt_sett = $pdo->query("SELECT swapnopay_merchant_id, swapnopay_api_key, swapnopay_api_url FROM tbl_settings WHERE id=1");
+    $stmt_sett = $pdo->query("SELECT swapnopay_merchant_id, swapnopay_api_key, swapnopay_api_url,
+        swapnopay_bkash_number, swapnopay_bkash_account_type,
+        swapnopay_nagad_number, swapnopay_nagad_account_type,
+        swapnopay_rocket_number, swapnopay_rocket_account_type,
+        swapnopay_upay_number, swapnopay_upay_account_type,
+        swapnopay_default_number, contact_phone, logo, favicon, meta_title_home
+        FROM tbl_settings WHERE id=1");
     if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
         if (empty($merchant_id) && !empty($sett_row['swapnopay_merchant_id'])) {
             $merchant_id = trim($sett_row['swapnopay_merchant_id']);
@@ -58,6 +68,63 @@ try {
     }
 } catch (Throwable $e) {}
 
+$store_logo_url = '';
+if (!empty($sett_row['logo'])) {
+    $store_logo_url = 'https://shop.swapnopay.top/assets/uploads/' . trim($sett_row['logo']);
+} elseif (!empty($runtime['logo_url'])) {
+    $store_logo_url = trim($runtime['logo_url']);
+}
+
+$method_key = strtolower($selected_method);
+$method_receiver_num = '';
+$method_receiver_type = 'Personal';
+
+if ($method_key === 'bkash') {
+    $method_receiver_num = trim($sett_row['swapnopay_bkash_number'] ?? '');
+    $method_receiver_type = trim($sett_row['swapnopay_bkash_account_type'] ?? 'Personal');
+} elseif ($method_key === 'nagad') {
+    $method_receiver_num = trim($sett_row['swapnopay_nagad_number'] ?? '');
+    $method_receiver_type = trim($sett_row['swapnopay_nagad_account_type'] ?? 'Personal');
+} elseif ($method_key === 'rocket') {
+    $method_receiver_num = trim($sett_row['swapnopay_rocket_number'] ?? '');
+    $method_receiver_type = trim($sett_row['swapnopay_rocket_account_type'] ?? 'Personal');
+} elseif ($method_key === 'upay') {
+    $method_receiver_num = trim($sett_row['swapnopay_upay_number'] ?? '');
+    $method_receiver_type = trim($sett_row['swapnopay_upay_account_type'] ?? 'Personal');
+}
+
+if (empty($method_receiver_num)) {
+    $method_receiver_num = trim($sett_row['swapnopay_default_number'] ?? ($sett_row['contact_phone'] ?? ''));
+}
+
+if (empty($method_receiver_num) && !empty($merchant_id)) {
+    try {
+        $cfg_url = rtrim($api_url, '/') . '/v1/payment/config?merchant_id=' . urlencode($merchant_id);
+        $ch_cfg = curl_init($cfg_url);
+        curl_setopt($ch_cfg, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch_cfg, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch_cfg, CURLOPT_TIMEOUT, 6);
+        $cfg_res = curl_exec($ch_cfg);
+        curl_close($ch_cfg);
+        if ($cfg_res) {
+            $cfg_data = json_decode($cfg_res, true);
+            $rec = $cfg_data['receiving_numbers'] ?? [];
+            if (!empty($rec[$selected_method])) {
+                $method_receiver_num = trim($rec[$selected_method]);
+            } elseif (!empty($cfg_data['default_number'])) {
+                $method_receiver_num = trim($cfg_data['default_number']);
+            }
+            if (!empty($cfg_data['account_types'][$selected_method])) {
+                $method_receiver_type = trim($cfg_data['account_types'][$selected_method]);
+            }
+        }
+    } catch (Throwable $_) {}
+}
+
+if (empty($method_receiver_type)) {
+    $method_receiver_type = 'Personal';
+}
+
 if (!$merchant_id) {
     try {
         $stmt_any = $pdo->query("SELECT swapnopay_merchant_id FROM tbl_settings WHERE swapnopay_merchant_id IS NOT NULL AND swapnopay_merchant_id != '' LIMIT 1");
@@ -65,15 +132,23 @@ if (!$merchant_id) {
             $merchant_id = trim($any_row['swapnopay_merchant_id']);
         }
     } catch (Throwable $e) {}
-    if (empty($merchant_id)) {
-        $merchant_id = 'd4f197d0-4cef-4468-adf6-4fa7c4e5de77';
-    }
 }
 
-// If dedicated Supabase and service key are available, attempt direct insert
-if (!empty($supabase_url) && !empty($supabase_service_key)) {
+// If dedicated Supabase and key are available, attempt direct insert
+if (!empty($supabase_url) && !empty($supabase_key)) {
     try {
         $clean_supabase_url = rtrim($supabase_url, '/');
+        $webhook_url = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/payment/swapnopay/webhook.php' : '';
+        $success_url_gateway = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id) : '';
+        $cancel_url_gateway = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/checkout.php' : '';
+        $fail_url_gateway = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/checkout.php?error=payment_failed' : '';
+
+        $client_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] 
+            ?? (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : null)
+            ?? $_SERVER['HTTP_X_REAL_IP'] 
+            ?? $_SERVER['REMOTE_ADDR'] 
+            ?? '';
+
         $order_payload = json_encode([
             'merchant_id' => $merchant_id,
             'tran_id' => $tran_id,
@@ -90,7 +165,16 @@ if (!empty($supabase_url) && !empty($supabase_service_key)) {
             'shipping_city' => (string)($shipping_details['city'] ?? ''),
             'payment_method' => $selected_method,
             'status' => 'PENDING',
+            'order_status' => 'PENDING',
+            'currency' => 'BDT',
             'customer_note' => $customer_note,
+            'metadata' => [
+                'ip_address' => $client_ip
+            ],
+            'callback_url' => $webhook_url,
+            'success_url' => $success_url_gateway,
+            'cancel_url' => $cancel_url_gateway,
+            'fail_url' => $fail_url_gateway,
             'expires_at' => date('c', strtotime('+15 minutes')) // 15-minute verification window
         ]);
 
@@ -101,8 +185,8 @@ if (!empty($supabase_url) && !empty($supabase_service_key)) {
         curl_setopt($ch_order, CURLOPT_POST, true);
         curl_setopt($ch_order, CURLOPT_POSTFIELDS, $order_payload);
         curl_setopt($ch_order, CURLOPT_HTTPHEADER, [
-            "apikey: {$supabase_service_key}",
-            "Authorization: Bearer {$supabase_service_key}",
+            "apikey: {$supabase_key}",
+            "Authorization: Bearer {$supabase_key}",
             "Content-Type: application/json",
             "Prefer: return=representation"
         ]);
@@ -135,8 +219,8 @@ if (!empty($supabase_url) && !empty($supabase_service_key)) {
             curl_setopt($ch_items, CURLOPT_POST, true);
             curl_setopt($ch_items, CURLOPT_POSTFIELDS, json_encode($items_payload));
             curl_setopt($ch_items, CURLOPT_HTTPHEADER, [
-                "apikey: {$supabase_service_key}",
-                "Authorization: Bearer {$supabase_service_key}",
+                "apikey: {$supabase_key}",
+                "Authorization: Bearer {$supabase_key}",
                 "Content-Type: application/json"
             ]);
             curl_exec($ch_items);
@@ -172,19 +256,33 @@ if (!$supabase_order_id) {
             $success_url_gateway = rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id);
             $cancel_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php';
             $fail_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php?error=payment_failed';
-            $store_name = defined('STORE_NAME') && !empty(STORE_NAME) ? STORE_NAME : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'Online Store');
+            $store_name = defined('STORE_NAME') && !empty(STORE_NAME) 
+                ? STORE_NAME 
+                : (!empty($sett_row['meta_title_home']) ? trim($sett_row['meta_title_home']) : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'ABIR LUXE SHOP BD'));
 
             $api_payload = json_encode([
                 'merchant_id' => $merchant_id,
                 'merchant_name' => $store_name,
+                'merchant_logo' => $store_logo_url,
+                'logo_url' => $store_logo_url,
                 'tran_id' => $tran_id,
                 'order_number' => $order_number,
                 'amount' => $total_amount,
+                'subtotal' => (float)($payment_data['paid_amount'] ?? $total_amount),
+                'shipping_cost' => (float)($payment_data['shipping_cost'] ?? 0),
+                'discount_amount' => (float)($payment_data['coupon_discount'] ?? 0),
                 'cus_phone' => (string)($shipping_details['phone'] ?? ($billing_details['phone'] ?? '01700000000')),
                 'cus_name' => (string)($payment_data['customer_name'] ?? ($billing_details['name'] ?? 'Customer')),
                 'cus_email' => (string)($payment_data['customer_email'] ?? ($billing_details['email'] ?? '')),
+                'shipping_address' => (string)($shipping_details['address'] ?? ''),
+                'shipping_city' => (string)($shipping_details['city'] ?? ''),
+                'customer_note' => $customer_note,
                 'payment_method' => $selected_method,
+                'merchant_number' => $method_receiver_num,
+                'receiving_number' => $method_receiver_num,
+                'account_type' => $method_receiver_type,
                 'items' => $items_payload,
+                'ip_address' => $client_ip,
                 'callback_url' => $webhook_url,
                 'success_url' => $success_url_gateway,
                 'cancel_url' => $cancel_url_gateway,
@@ -338,24 +436,31 @@ if (defined('SWAPNOPAY_GATEWAY_URL') && !empty(SWAPNOPAY_GATEWAY_URL)) {
 
 $store_name = defined('STORE_NAME') && !empty(STORE_NAME) 
     ? STORE_NAME 
-    : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'SwapnoPay Merchant');
+    : (!empty($sett_row['meta_title_home']) ? trim($sett_row['meta_title_home']) : (defined('SHOP_NAME') && !empty(SHOP_NAME) ? SHOP_NAME : 'ABIR LUXE SHOP BD'));
 
 $success_url_gateway = rtrim(BASE_URL, '/') . '/payment_success.php?method=swapnopay&payment_id=' . urlencode($tran_id);
 $cancel_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php';
 $fail_url_gateway = rtrim(BASE_URL, '/') . '/checkout.php?error=payment_failed';
 
 $widget_params = [
-    'order_id'      => $gateway_order_id ?: $tran_id,
-    'amount'        => number_format($total_amount, 2, '.', ''),
-    'merchant_id'   => $merchant_id,
-    'merchant_name' => $store_name,
-    'method'        => $selected_method,
-    'cus_name'      => (string)($payment_data['customer_name'] ?? ($billing_details['name'] ?? 'Customer')),
-    'cus_phone'     => (string)($shipping_details['phone'] ?? ($billing_details['phone'] ?? '')),
-    'cus_email'     => (string)($payment_data['customer_email'] ?? ($billing_details['email'] ?? '')),
-    'success_url'   => $success_url_gateway,
-    'cancel_url'    => $cancel_url_gateway,
-    'fail_url'      => $fail_url_gateway
+    'order_id'         => $gateway_order_id ?: $tran_id,
+    'amount'           => number_format($total_amount, 2, '.', ''),
+    'merchant_id'      => $merchant_id,
+    'merchant_name'    => $store_name,
+    'merchant_logo'    => $store_logo_url,
+    'logo_url'         => $store_logo_url,
+    'method'           => $selected_method,
+    'merchant_number'  => $method_receiver_num,
+    'receiving_number' => $method_receiver_num,
+    'number'           => $method_receiver_num,
+    'phone'            => $method_receiver_num,
+    'account_type'     => $method_receiver_type,
+    'cus_name'         => (string)($payment_data['customer_name'] ?? ($billing_details['name'] ?? 'Customer')),
+    'cus_phone'        => (string)($shipping_details['phone'] ?? ($billing_details['phone'] ?? '')),
+    'cus_email'        => (string)($payment_data['customer_email'] ?? ($billing_details['email'] ?? '')),
+    'success_url'      => $success_url_gateway,
+    'cancel_url'       => $cancel_url_gateway,
+    'fail_url'         => $fail_url_gateway
 ];
 
 if (!empty($supabase_url) && !empty($supabase_anon_key)) {

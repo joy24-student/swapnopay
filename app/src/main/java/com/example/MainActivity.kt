@@ -21,6 +21,9 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.ui.AppNavigation
 import com.example.ui.AppViewModel
 import com.example.ui.theme.MyApplicationTheme
@@ -81,6 +84,12 @@ class MainActivity : FragmentActivity() {
         }
         enableEdgeToEdge()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { splashScreenView ->
+                splashScreenView.remove()
+            }
+        }
+
         // Initialize channels early so status bar notifications appear reliably
         NotificationHelper.initNotificationChannels(this)
         checkNotificationPermission()
@@ -106,10 +115,41 @@ class MainActivity : FragmentActivity() {
             val isDarkMode by viewModel.isDarkMode.collectAsState()
             val language by viewModel.language.collectAsState()
             val isBangla = language == "Bangla"
+            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
 
             MyApplicationTheme(darkTheme = isDarkMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppNavigation(viewModel = viewModel)
+
+                    if (isLoggingOut) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = {},
+                            title = {
+                                androidx.compose.material3.Text(
+                                    if (isBangla) "লগআউট হচ্ছে..." else "Logging Out...",
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                )
+                            },
+                            text = {
+                                Row(
+                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                ) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(32.dp),
+                                        color = androidx.compose.ui.graphics.Color(0xFFD97706)
+                                    )
+                                    androidx.compose.material3.Text(
+                                        if (isBangla) "ক্লাউডে ডেটা সিঙ্ক করা হচ্ছে এবং লোকাল মেমোরি পরিষ্কার করা হচ্ছে..."
+                                        else "Syncing all business data to Supabase and clearing local storage...",
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            },
+                            confirmButton = {}
+                        )
+                    }
 
                     // Render Prominent Disclosure Consent Dialog before requesting permissions
                     if (showPermissionConsent) {

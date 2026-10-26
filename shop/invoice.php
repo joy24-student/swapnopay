@@ -125,6 +125,11 @@ $isPrint = isset($_GET['print']) && $_GET['print'] == '1';
             color: #0f172a;
         }
 
+        @page {
+            size: landscape;
+            margin: 6mm 8mm;
+        }
+
         @media print {
             body {
                 background: #ffffff !important;

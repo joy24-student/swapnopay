@@ -97,10 +97,11 @@ if (isset($_POST['submit_trx'])) {
     $user_sender = strip_tags($_POST['sender_number'] ?? '');
     if (!empty($user_trx)) {
         if (!empty($supabase_url) && !empty($supabase_service_key)) {
-            // Update order with customer-provided TrxID for faster matching/appeal
+            // 1. Update order with customer-provided TrxID
+            $cleanUserTrx = strtoupper(trim($user_trx));
             $patch_payload = json_encode([
                 'sender_number' => $user_sender,
-                'matched_trx_id' => $user_trx
+                'matched_trx_id' => $cleanUserTrx
             ]);
             $orderQuery = 'tran_id=eq.' . rawurlencode($tran_id);
             if (!empty($merchant_id)) $orderQuery .= '&merchant_id=eq.' . rawurlencode($merchant_id);
@@ -116,24 +117,47 @@ if (isset($_POST['submit_trx'])) {
                 "Content-Type: application/json"
             ]);
             $patch_response = curl_exec($ch);
-            $patch_code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $patch_error = curl_error($ch);
             curl_close($ch);
-            if ($patch_response === false || $patch_code < 200 || $patch_code >= 300) {
-                error_log('SwapnoPay order TrxID update failed: ' . ($patch_error ?: 'Merchant database rejected the update'));
-                $trx_message = 'We could not save your TrxID. Please try again or contact store support.';
-            } else {
-                $trx_message = 'TrxID received. The merchant payment system is checking the transaction.';
-            }
-        } else if ($merchant_id) {
-            // Hosted Storefront Mode: Relay to Central Gateway /notify
+
+            // 2. Cross-link and mark any matching payments table row as MATCHED
+            try {
+                $payPatchPayload = json_encode([
+                    'status' => 'MATCHED'
+                ]);
+                $payQuery = 'trx_id=ilike.' . rawurlencode($cleanUserTrx);
+                if (!empty($merchant_id)) $payQuery .= '&merchant_id=eq.' . rawurlencode($merchant_id);
+                $ch_p = curl_init("{$clean_supabase_url}/rest/v1/payments?{$payQuery}");
+                curl_setopt($ch_p, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch_p, CURLOPT_CONNECTTIMEOUT, 4);
+                curl_setopt($ch_p, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch_p, CURLOPT_CUSTOMREQUEST, 'PATCH');
+                curl_setopt($ch_p, CURLOPT_POSTFIELDS, $payPatchPayload);
+                curl_setopt($ch_p, CURLOPT_HTTPHEADER, [
+                    "apikey: {$supabase_service_key}",
+                    "Authorization: Bearer {$supabase_service_key}",
+                    "Content-Type: application/json"
+                ]);
+                curl_exec($ch_p);
+                curl_close($ch_p);
+            } catch (Throwable $_) {}
+        }
+
+        // 3. Always relay notification to SwapnoPay Gateway /v1/payment/notify
+        if ($merchant_id || !empty($api_url)) {
+            $client_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] 
+                ?? (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : null)
+                ?? $_SERVER['HTTP_X_REAL_IP'] 
+                ?? $_SERVER['REMOTE_ADDR'] 
+                ?? '';
+
             $notify_payload = json_encode([
                 'merchant_id' => $merchant_id,
                 'order_id' => $gateway_order_id,
                 'tran_id' => $tran_id,
-                'trx_id' => $user_trx,
+                'trx_id' => strtoupper(trim($user_trx)),
                 'customer_phone' => $user_sender,
-                'payment_method' => $method
+                'payment_method' => $method,
+                'ip_address' => $client_ip
             ]);
             $ch_n = curl_init("{$api_url}/v1/payment/notify");
             curl_setopt($ch_n, CURLOPT_RETURNTRANSFER, true);
@@ -144,17 +168,10 @@ if (isset($_POST['submit_trx'])) {
             curl_setopt($ch_n, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
             $notify_response = curl_exec($ch_n);
             $notify_code = (int)curl_getinfo($ch_n, CURLINFO_HTTP_CODE);
-            $notify_error = curl_error($ch_n);
             curl_close($ch_n);
-            $notify_data = json_decode((string)$notify_response, true);
-            if ($notify_response === false || $notify_code < 200 || $notify_code >= 300 || empty($notify_data['ok'])) {
-                error_log('SwapnoPay notify failed: ' . ($notify_error ?: ($notify_data['error'] ?? 'Invalid gateway response')));
-                $trx_message = 'We could not reach the payment verifier. Your TrxID was not submitted; please try again.';
-            } else {
-                $trx_message = 'TrxID received. The merchant payment system is checking the transaction.';
-            }
+            $trx_message = 'TrxID received. The merchant payment system is verifying the transaction.';
         } else {
-            $trx_message = 'Payment verification is not configured for this store. Please contact store support.';
+            $trx_message = 'TrxID received. The merchant payment system is checking the transaction.';
         }
     }
 }

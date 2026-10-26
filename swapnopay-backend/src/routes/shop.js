@@ -59,11 +59,13 @@ export function createShopRouter({ service = getShopService, authenticate = requ
   router.use(authenticate)
   const id = req => req.shopMerchantId
   const existing = async req => {
-    const row = await service().row(id(req))
+    const slug = req.query.slug || req.query.shop_slug || req.body?.shop_slug || null
+    const row = await service().row(id(req), slug)
     if (!row) throw new ShopError(409, 'STORE_NOT_READY', 'Launch your storefront first.')
     return row
   }
-  router.get('/status', wrap(async (req,res) => res.json(await service().status(id(req)))))
+  router.get('/status', wrap(async (req,res) => res.json(await service().status(id(req), req.query.slug || req.query.shop_slug || null))))
+  router.get('/stores', wrap(async (req,res) => res.json({ ok: true, stores: await service().listStores(id(req)) })))
   // Link the merchant's own Supabase project to its gateway before a site is launched.
   router.post('/connect-database', wrap(async (req,res) => {
     if (!req.isAdmin && !['api_key', 'supabase', 'merchant_supabase'].includes(req.authMethod)) {
@@ -124,7 +126,7 @@ export function createShopRouter({ service = getShopService, authenticate = requ
     res.status(result.deployed ? 200 : 202).json(result)
   }))
   const updateDomainHandler = wrap(async (req,res) => {
-    await existing(req);
+    const row = await existing(req);
     let domainVal = req.body.custom_domain
     if (typeof domainVal === 'string') {
       domainVal = domainVal.trim()
@@ -132,7 +134,7 @@ export function createShopRouter({ service = getShopService, authenticate = requ
         domainVal = null
       }
     }
-    res.status(202).json(await service().enqueue({merchant_id:id(req),custom_domain:domainVal || null}))
+    res.status(202).json(await service().enqueue({merchant_id:id(req),shop_slug:row.shop_slug,custom_domain:domainVal || null}))
   })
   router.post('/domain', updateDomainHandler)
   router.patch('/domain', updateDomainHandler)
@@ -141,15 +143,15 @@ export function createShopRouter({ service = getShopService, authenticate = requ
     res.json({ok:true,settings:{store_name:row.store_name,shop_slug:row.shop_slug,custom_domain:row.custom_domain,theme_color:row.theme_color,currency_code:row.currency,admin_email:row.admin_email}})
   }))
   router.post('/settings', wrap(async (req,res) => {
-    await existing(req)
-    res.status(202).json(await service().enqueue({merchant_id:id(req),store_name:req.body.store_name || req.body.site_title,theme_color:req.body.theme_color,primary_currency:req.body.currency_code || req.body.currency || req.body.primary_currency}))
+    const row = await existing(req)
+    res.status(202).json(await service().enqueue({merchant_id:id(req),shop_slug:row.shop_slug,store_name:req.body.store_name || req.body.site_title,theme_color:req.body.theme_color,primary_currency:req.body.currency_code || req.body.currency || req.body.primary_currency}))
   }))
   router.post('/admin/credentials', wrap(async (req,res) => {
-    await existing(req)
+    const row = await existing(req)
     const adminPassword = req.body.admin_password || req.body.password
     const adminEmail = req.body.admin_email || req.body.email
     if (!adminPassword) throw new ShopError(400,'PASSWORD_REQUIRED','Enter a new password of at least 12 characters.')
-    res.status(202).json(await service().enqueue({merchant_id:id(req),admin_email:adminEmail,admin_password:adminPassword}))
+    res.status(202).json(await service().enqueue({merchant_id:id(req),shop_slug:row.shop_slug,admin_email:adminEmail,admin_password:adminPassword}))
   }))
   router.post('/sync-inventory', wrap(async(req,res) => res.json(await service().sync(id(req),req.body.items))))
   router.post('/images',rateLimit({windowMs:60000,limit:60,standardHeaders:'draft-8',legacyHeaders:false}),wrap(async(req,res)=>res.status(201).json(await service().uploadImage(id(req),req.body))))

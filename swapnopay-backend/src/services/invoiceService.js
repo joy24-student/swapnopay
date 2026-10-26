@@ -16,6 +16,77 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const webDir = path.resolve(__dirname, '../../web')
 
+const FAKE_NUMBERS = new Set([
+  '01711223344', '01811223344', '019112233441', '01928092777', '01712963652',
+  '01819283746', '01940397641', '01612345678', '01712345678', '01700000000',
+  '01700000001', '01800000000', '01900000000', '01600000000', '01500000000'
+])
+export function isFakeNumber(num) {
+  if (!num) return true
+  const clean = String(num).replace(/[^0-9]/g, '')
+  if (!clean || clean.length < 10) return true
+  if (FAKE_NUMBERS.has(clean)) return true
+  if (/^01[3-9](\d)\1{7}$/.test(clean)) return true
+  if (clean.includes('11223344') || clean.includes('12345678')) return true
+  return false
+}
+
+/**
+ * Normalizes and validates an IP address string.
+ * Strips IPv4-mapped IPv6 prefix (::ffff:), splits comma-separated proxy chains,
+ * and strips ports if attached.
+ */
+export function resolveClientIp(ipInput) {
+  if (!ipInput) return null
+  let ip = String(ipInput).trim()
+  if (!ip) return null
+
+  // If comma-separated list (e.g. from X-Forwarded-For: client, proxy1, proxy2)
+  if (ip.includes(',')) {
+    ip = ip.split(',')[0].trim()
+  }
+
+  // Strip IPv4-mapped IPv6 prefix (::ffff:192.168.1.1 -> 192.168.1.1)
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.slice(7).trim()
+  }
+
+  // Standardize IPv6 loopback
+  if (ip === '::1') {
+    ip = '127.0.0.1'
+  }
+
+  // Remove port if present (e.g. 192.168.1.1:54321)
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/.test(ip)) {
+    ip = ip.split(':')[0]
+  }
+
+  return ip || null
+}
+
+let _cachedServerIp = null
+export function getServerPublicIp() {
+  if (_cachedServerIp) return _cachedServerIp
+  if (process.env.PUBLIC_IP) {
+    _cachedServerIp = resolveClientIp(process.env.PUBLIC_IP)
+    if (_cachedServerIp) return _cachedServerIp
+  }
+  if (process.env.SHOP_SERVER_IPS) {
+    const ips = process.env.SHOP_SERVER_IPS.split(',').map(s => resolveClientIp(s)).filter(Boolean)
+    const publicCandidate = ips.find(ip => ip !== '127.0.0.1' && !ip.startsWith('10.') && !ip.startsWith('192.168.'))
+    if (publicCandidate) {
+      _cachedServerIp = publicCandidate
+      return _cachedServerIp
+    }
+    if (ips[0]) {
+      _cachedServerIp = ips[0]
+      return _cachedServerIp
+    }
+  }
+  return '127.0.0.1'
+}
+
+
 /**
  * Resolve local payment method logo paths with fallbacks
  */
@@ -100,16 +171,59 @@ export async function generateInvoicePdf(d) {
       const trxId = d.trx_id || 'N/A'
       const method = (d.payment_method || 'bKash').trim()
       const merchantName = d.merchant_name || 'SwapnoPay Merchant'
-      const merchantPhone = d.merchant_phone || d.phone || '01700000000'
       const merchantEmail = d.merchant_email || d.email || 'support@swapnopay.top'
       const merchantWebsite = d.merchant_website || d.website || ''
       const merchantAddress = d.merchant_address || d.business_address || d.address || ''
-      const receiverNumber = d.receiver_number || d.receiving_number || d.merchant_number || d.receiver || 'N/A'
 
       const cusName = d.cus_name || 'Customer'
       const cusPhone = d.cus_phone || 'N/A'
       const cusEmail = d.customer_email || d.cus_email || 'N/A'
       const productName = d.product_name || 'Payment Services'
+
+      // Resolve dynamic IP Address (from request, order record, or dynamic server fallback)
+      const rawIp = d.ip_address ||
+        d.client_ip ||
+        d.customer_ip ||
+        d.ip ||
+        d.customer_ip_address ||
+        (d.req ? (d.req.headers?.['cf-connecting-ip'] || d.req.headers?.['x-real-ip'] || (d.req.headers?.['x-forwarded-for'] ? String(d.req.headers['x-forwarded-for']).split(',')[0].trim() : null) || d.req.ip) : null)
+
+      let ipAddress = resolveClientIp(rawIp)
+      if (!ipAddress) {
+        ipAddress = getServerPublicIp()
+      }
+
+      const normCus = String(cusPhone || '').replace(/\D/g, '').slice(-10)
+      const isCusMatch = (num) => {
+        if (!num || !normCus) return false
+        const n = String(num).replace(/\D/g, '').slice(-10)
+        return n.length >= 10 && n === normCus
+      }
+
+      let receiverNumber = d.receiver_number || d.receiving_number || null
+      if (receiverNumber && (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber))) {
+        receiverNumber = null
+      }
+      if (!receiverNumber) {
+        receiverNumber = d.merchant_number || d.default_number || d.merchant_phone || null
+        if (receiverNumber && (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber))) {
+          receiverNumber = null
+        }
+      }
+      if (!receiverNumber) {
+        receiverNumber = d.receiver || 'N/A'
+        if (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber)) {
+          receiverNumber = 'N/A'
+        }
+      }
+
+      let merchantPhone = d.merchant_phone || d.phone || d.default_number || null
+      if (merchantPhone && (isFakeNumber(merchantPhone) || merchantPhone === '01700000000')) {
+        merchantPhone = null
+      }
+      if (!merchantPhone && receiverNumber && receiverNumber !== 'N/A' && !isCusMatch(receiverNumber) && !isFakeNumber(receiverNumber)) {
+        merchantPhone = receiverNumber
+      }
 
       const dateStr = d.payment_time
         ? new Date(d.payment_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) + ' ' + new Date(d.payment_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' (GMT+6 Time)'
@@ -151,8 +265,10 @@ export async function generateInvoicePdf(d) {
         doc.text(merchantAddress, margin + boxPadding, boxContentY, { width: 280 })
         boxContentY += 18
       }
-      doc.text(`Phone: ${merchantPhone}`, margin + boxPadding, boxContentY)
-      boxContentY += 12
+      if (merchantPhone) {
+        doc.text(`Phone: ${merchantPhone}`, margin + boxPadding, boxContentY)
+        boxContentY += 12
+      }
       doc.text(`Email: ${merchantEmail}`, margin + boxPadding, boxContentY)
       boxContentY += 12
       doc.text(`Date: ${dateStr}`, margin + boxPadding, boxContentY)
@@ -275,7 +391,7 @@ export async function generateInvoicePdf(d) {
       const remainingFields = [
         ['Customer Sender', cusPhone.length > 5 ? cusPhone.slice(0, 3) + '****' + cusPhone.slice(-4) : cusPhone],
         ['Transaction Type', 'Purchase'],
-        ['IP Address', '103.109.59.237'],
+        ['IP Address', ipAddress],
         ['Statement Show', merchantName.toUpperCase().replace(/\s+/g, '_')],
         ['Gateway Currency', 'BDT'],
         ['Transaction Amount', `BDT ${amountFormatted}`],
@@ -336,8 +452,11 @@ export async function generateInvoicePdf(d) {
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0F172A')
         .text(`For refund policy related information please check the merchant store (${merchantWebsite || merchantEmail})`, margin + boxPadding, boxContentY, { width: contentWidth - boxPadding * 2 })
       boxContentY += 14
+      const supportContact = merchantPhone
+        ? `Questions? Email: ${merchantEmail} or Call: ${merchantPhone}`
+        : `Questions? Email: ${merchantEmail}`
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0F172A')
-        .text(`Questions? Email: ${merchantEmail} or Call: ${merchantPhone}`, margin + boxPadding, boxContentY, { width: contentWidth - boxPadding * 2 })
+        .text(supportContact, margin + boxPadding, boxContentY, { width: contentWidth - boxPadding * 2 })
       boxContentY += 24
 
       // ── Footer Channel Logos Strip ──
@@ -412,16 +531,59 @@ export function buildInvoiceHtml(d, role = 'customer', hasMerchantLogo = false) 
   const trxId = d.trx_id || 'N/A'
   const method = (d.payment_method || 'bKash').trim()
   const merchantName = d.merchant_name || 'SwapnoPay Merchant'
-  const merchantPhone = d.merchant_phone || d.phone || '01700000000'
   const merchantEmail = d.merchant_email || d.email || 'support@swapnopay.top'
   const merchantWebsite = d.merchant_website || d.website || ''
   const merchantAddress = d.merchant_address || d.business_address || d.address || ''
-  const receiverNumber = d.receiver_number || d.receiving_number || d.merchant_number || d.receiver || 'N/A'
 
   const cusName = d.cus_name || 'Customer'
   const cusPhone = d.cus_phone || 'N/A'
   const cusEmail = d.customer_email || d.cus_email || 'N/A'
   const productName = d.product_name || 'Payment Services'
+
+  // Resolve dynamic IP Address (from request, order record, or dynamic server fallback)
+  const rawIp = d.ip_address ||
+    d.client_ip ||
+    d.customer_ip ||
+    d.ip ||
+    d.customer_ip_address ||
+    (d.req ? (d.req.headers?.['cf-connecting-ip'] || d.req.headers?.['x-real-ip'] || (d.req.headers?.['x-forwarded-for'] ? String(d.req.headers['x-forwarded-for']).split(',')[0].trim() : null) || d.req.ip) : null)
+
+  let ipAddress = resolveClientIp(rawIp)
+  if (!ipAddress) {
+    ipAddress = getServerPublicIp()
+  }
+
+  const normCus = String(cusPhone || '').replace(/\D/g, '').slice(-10)
+  const isCusMatch = (num) => {
+    if (!num || !normCus) return false
+    const n = String(num).replace(/\D/g, '').slice(-10)
+    return n.length >= 10 && n === normCus
+  }
+
+  let receiverNumber = d.receiver_number || d.receiving_number || null
+  if (receiverNumber && (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber))) {
+    receiverNumber = null
+  }
+  if (!receiverNumber) {
+    receiverNumber = d.merchant_number || d.default_number || d.merchant_phone || null
+    if (receiverNumber && (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber))) {
+      receiverNumber = null
+    }
+  }
+  if (!receiverNumber) {
+    receiverNumber = d.receiver || 'N/A'
+    if (isCusMatch(receiverNumber) || isFakeNumber(receiverNumber)) {
+      receiverNumber = 'N/A'
+    }
+  }
+
+  let merchantPhone = d.merchant_phone || d.phone || d.default_number || null
+  if (merchantPhone && (isFakeNumber(merchantPhone) || merchantPhone === '01700000000')) {
+    merchantPhone = null
+  }
+  if (!merchantPhone && receiverNumber && receiverNumber !== 'N/A' && !isCusMatch(receiverNumber) && !isFakeNumber(receiverNumber)) {
+    merchantPhone = receiverNumber
+  }
 
   const dateStr = d.payment_time
     ? new Date(d.payment_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) + ' ' + new Date(d.payment_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' (GMT+6 Time)'
@@ -474,7 +636,7 @@ export function buildInvoiceHtml(d, role = 'customer', hasMerchantLogo = false) 
             <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">${esc(merchantName)}</div>
             <div style="font-size: 11.5px; line-height: 1.5; color: #334155;">
               ${merchantAddress ? `${esc(merchantAddress)}<br />` : ''}
-              Phone: ${esc(merchantPhone)}<br />
+              ${merchantPhone ? `Phone: ${esc(merchantPhone)}<br />` : ''}
               Email: ${esc(merchantEmail)}<br />
               Date: ${esc(dateStr)}<br />
               ${merchantWebsite ? `<a href="${esc(merchantWebsite)}" style="color: #2563eb; text-decoration: none;">${esc(merchantWebsite)}</a>` : '<span style="color: #64748b;">Verified Merchant</span>'}
@@ -572,7 +734,7 @@ export function buildInvoiceHtml(d, role = 'customer', hasMerchantLogo = false) 
 
               <div>Customer Sender : <strong>${esc(maskedPhone)}</strong></div>
               <div>Transaction Type : Purchase</div>
-              <div>IP Address : 103.109.59.237</div>
+              <div>IP Address : ${esc(ipAddress)}</div>
               <div>Statement Show : ${esc(merchantName.toUpperCase().replace(/\s+/g, '_'))}</div>
               <div>Gateway Currency : BDT</div>
               <div>Transaction Amount : BDT ${esc(amountFormatted)}</div>
@@ -627,7 +789,7 @@ export function buildInvoiceHtml(d, role = 'customer', hasMerchantLogo = false) 
         For refund policy related information please check the merchant store (${merchantWebsite ? `<a href="${esc(merchantWebsite)}" style="color: #2563eb; text-decoration: none;">${esc(merchantWebsite)}</a>` : esc(merchantEmail)})
       </div>
       <div style="font-size: 11px; font-weight: 700; color: #0f172a; margin-top: 6px; line-height: 1.5;">
-        Questions? Email: <a href="mailto:${esc(merchantEmail)}" style="color: #2563eb; text-decoration: none;">${esc(merchantEmail)}</a> or Call: ${esc(merchantPhone)}
+        Questions? Email: <a href="mailto:${esc(merchantEmail)}" style="color: #2563eb; text-decoration: none;">${esc(merchantEmail)}</a>${merchantPhone ? ` or Call: ${esc(merchantPhone)}` : ''}
       </div>
 
       <!-- Bottom Channel Logos Strip -->

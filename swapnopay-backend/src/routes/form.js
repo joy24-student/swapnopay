@@ -1664,6 +1664,7 @@ export function formRouter(io = null) {
           cus_email: clientEmail,
           product_name: productName,
           payment_method: payment_method || 'bKash',
+          callback_url: theme?.payment_callback_url || null,
           created_at: new Date().toISOString()
         }
 
@@ -2214,6 +2215,26 @@ export async function handleFormPaymentPaid(orderId, trxId, amount, io = null) {
         console.warn('[form-router] Realtime emit notice:', ioErr.message)
       }
     }
+
+    // 4. Dispatch webhook to custom form callback if configured
+    try {
+      const formMeta = formsMemory.get(form_id) || formsMemory.get(form_slug)
+      const targetCbUrl = formMeta?.theme?.payment_callback_url || formMeta?.payment_callback_url
+      if (targetCbUrl) {
+        const { postSafeWebhook } = await import('../utils/urlValidator.js')
+        postSafeWebhook(targetCbUrl, {
+          event: 'form_payment_success',
+          form_id,
+          form_slug,
+          submission_id,
+          order_id: cleanId,
+          status: 'PAID',
+          trx_id: trxId,
+          amount: Number(amount || 0),
+          timestamp: new Date().toISOString()
+        }).catch(err => console.warn('[form-router] Form payment webhook dispatch notice:', err.message))
+      }
+    } catch (_) {}
   }
 
   return updatedRecord

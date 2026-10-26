@@ -1,6 +1,6 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/config.php';
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/CSRF_Protect.php';
 $csrf=new CSRF_Protect();
@@ -84,7 +84,8 @@ if($method==='POST') {
             exit('Upload an image up to 16 MB.');
         }
         $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
-        if ($adminPage === 'broadcast-notification.php' && $ext === 'json') {
+        $currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        if (($currentScript === 'broadcast-notification.php' || ($adminPage ?? '') === 'broadcast-notification.php') && $ext === 'json') {
             $jsonContent = @file_get_contents($file['tmp_name']);
             if ($jsonContent !== false && json_decode($jsonContent, true) !== null) {
                 return;

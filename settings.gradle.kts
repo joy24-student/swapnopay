@@ -33,3 +33,4 @@ rootProject.name = "SwapnoPay"
 
 include(":app")
 include(":abir_luxe_app")
+include(":abir_luxe_admin")

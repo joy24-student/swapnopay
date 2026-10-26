@@ -509,6 +509,7 @@
     // ------------------------------------------------------------
     function syncPageStylesheets(newDoc, newContainer) {
         try {
+            // 1. Sync external stylesheets (<link rel="stylesheet">)
             const existingLinks = new Set(
                 Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(l => cleanUrl(l.href))
             );
@@ -524,6 +525,26 @@
                     newLink.href = link.href;
                     document.head.appendChild(newLink);
                     existingLinks.add(cleanHref);
+                }
+            });
+
+            // 2. Sync internal style blocks (<style>)
+            const incomingStyles = [
+                ...Array.from(newDoc.querySelectorAll('head style')),
+                ...(newContainer ? Array.from(newContainer.querySelectorAll('style')) : [])
+            ];
+            const existingStyleTexts = new Set(
+                Array.from(document.querySelectorAll('head style')).map(s => s.textContent.trim())
+            );
+            incomingStyles.forEach(styleEl => {
+                const text = styleEl.textContent.trim();
+                if (text && !existingStyleTexts.has(text)) {
+                    const newStyle = document.createElement('style');
+                    if (styleEl.id) newStyle.id = styleEl.id;
+                    newStyle.setAttribute('data-spa-injected', 'true');
+                    newStyle.textContent = text;
+                    document.head.appendChild(newStyle);
+                    existingStyleTexts.add(text);
                 }
             });
         } catch (e) {

@@ -953,7 +953,8 @@ body.shopnext-theme {
     margin-bottom: 48px;
 }
 
-.sn-promo-card {
+.sn-promo-grid .sn-promo-card,
+.sn-promo-banner-card {
     border-radius: var(--sn-radius-xl);
     padding: 36px 40px;
     display: flex;
@@ -965,7 +966,8 @@ body.shopnext-theme {
     transition: transform 0.25s ease;
 }
 
-.sn-promo-card:hover {
+.sn-promo-grid .sn-promo-card:hover,
+.sn-promo-banner-card:hover {
     transform: translateY(-3px);
 }
 

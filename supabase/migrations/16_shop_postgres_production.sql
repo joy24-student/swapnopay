@@ -1012,7 +1012,11 @@ CREATE TABLE IF NOT EXISTS "tbl_product" (
   "vendor_id" INTEGER DEFAULT 0,
   "allow_coin_payment" SMALLINT DEFAULT 0,
   "is_coin_buyable" SMALLINT DEFAULT 0,
-  "coin_price" INTEGER DEFAULT 0
+  "coin_price" INTEGER DEFAULT 0,
+  "coupon_code" VARCHAR(255) DEFAULT NULL,
+  "slug" VARCHAR(255) DEFAULT NULL,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS "idx_tbl_product_merchant" ON "tbl_product"(merchant_id);

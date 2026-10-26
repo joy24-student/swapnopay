@@ -1981,7 +1981,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
                 null
             },
             expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-          }, { onConflict: 'id' }).catch(e => console.warn('[payment/create-order] Admin DB order upsert notice:', e.message))
+          }, { onConflict: 'id' })
         }
       } catch (_) {}
 

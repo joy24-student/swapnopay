@@ -18,51 +18,81 @@ if (!$payload) {
 $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? ($_SERVER['HTTP_X_SWAPNOPAY_SIGNATURE'] ?? '');
 $header_secret = $_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? '';
 $configured_secret = getenv('SWAPNOPAY_WEBHOOK_SECRET') ?: (defined('SWAPNOPAY_WEBHOOK_SECRET') ? SWAPNOPAY_WEBHOOK_SECRET : ($runtime['webhook_secret'] ?? ''));
+$configured_api_key = getenv('SWAPNOPAY_API_KEY') ?: (defined('SWAPNOPAY_API_KEY') ? SWAPNOPAY_API_KEY : ($runtime['gateway_api_key'] ?? ''));
 
-if (empty($configured_secret)) {
-    try {
-        $stmt_sett = $pdo->query("SELECT swapnopay_webhook_secret FROM tbl_settings WHERE id=1");
-        if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
-            if (!empty($sett_row['swapnopay_webhook_secret'])) {
-                $configured_secret = trim($sett_row['swapnopay_webhook_secret']);
-            }
+try {
+    $stmt_sett = $pdo->query("SELECT swapnopay_webhook_secret, swapnopay_api_key FROM tbl_settings WHERE id=1");
+    if ($stmt_sett && $sett_row = $stmt_sett->fetch(PDO::FETCH_ASSOC)) {
+        if (!empty($sett_row['swapnopay_webhook_secret'])) {
+            $configured_secret = trim($sett_row['swapnopay_webhook_secret']);
         }
-    } catch (Throwable $e) {}
-}
+        if (!empty($sett_row['swapnopay_api_key'])) {
+            $configured_api_key = trim($sett_row['swapnopay_api_key']);
+        }
+    }
+} catch (Throwable $e) {}
 
-// Webhook secret MUST be configured and request MUST provide valid authentication
-if (empty($configured_secret)) {
-    error_log("[swapnopay-webhook] Rejecting webhook: SWAPNOPAY_WEBHOOK_SECRET is not configured.");
+// Webhook secret or API key MUST be configured and request MUST provide valid authentication
+if (empty($configured_secret) && empty($configured_api_key)) {
+    error_log("[swapnopay-webhook] Rejecting webhook: Neither SWAPNOPAY_WEBHOOK_SECRET nor SWAPNOPAY_API_KEY is configured.");
     http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Unauthorized: Webhook secret not configured on server']);
+    echo json_encode(['ok' => false, 'error' => 'Unauthorized: Webhook credentials not configured on server']);
     exit;
 }
 
-$hmac_valid = !empty($signature) && hash_equals(hash_hmac('sha256', $raw_input, $configured_secret), $signature);
-$secret_valid = !empty($header_secret) && hash_equals($configured_secret, $header_secret);
+$hmac_valid = false;
+if (!empty($signature)) {
+    if (!empty($configured_secret) && hash_equals(hash_hmac('sha256', $raw_input, $configured_secret), $signature)) {
+        $hmac_valid = true;
+    } elseif (!empty($configured_api_key) && hash_equals(hash_hmac('sha256', $raw_input, $configured_api_key), $signature)) {
+        $hmac_valid = true;
+    }
+}
+
+$secret_valid = false;
+if (!empty($header_secret)) {
+    if (!empty($configured_secret) && hash_equals($configured_secret, $header_secret)) {
+        $secret_valid = true;
+    } elseif (!empty($configured_api_key) && hash_equals($configured_api_key, $header_secret)) {
+        $secret_valid = true;
+    }
+}
+
 if (!$hmac_valid && !$secret_valid) {
+    error_log("[swapnopay-webhook] Signature verification failed. Headers: " . json_encode(getallheaders()));
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => 'Unauthorized: Invalid or missing webhook signature']);
     exit;
 }
 
-$tran_id = strip_tags($payload['tran_id'] ?? ($payload['order_id'] ?? ''));
+$tran_id = strip_tags($payload['tran_id'] ?? ($payload['payment_id'] ?? ($payload['order_id'] ?? '')));
+$order_id = strip_tags($payload['order_id'] ?? '');
 $status = strtoupper(strip_tags($payload['status'] ?? ''));
 $trx_id = strip_tags($payload['trx_id'] ?? '');
 $payment_method = strip_tags($payload['payment_method'] ?? 'SwapnoPay');
 $amount = (float)($payload['amount'] ?? 0);
 
-if (empty($tran_id)) {
+if (empty($tran_id) && empty($order_id)) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Missing tran_id']);
+    echo json_encode(['ok' => false, 'error' => 'Missing tran_id or order_id']);
     exit;
 }
 
 // 2. Fetch payment record
 try {
-    $stmt = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_id = ? OR txnid = ? LIMIT 1");
-    $stmt->execute([$tran_id, $tran_id]);
+    $stmt = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_id = ? OR payment_id = ? OR txnid = ? LIMIT 1");
+    $stmt->execute([$tran_id, $order_id, $tran_id]);
     $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Resilient fallback: If not found by tran_id/order_id, match latest Pending payment with this exact amount
+    if (!$payment && $amount > 0) {
+        $stmt_fallback = $pdo->prepare("SELECT * FROM tbl_payment WHERE paid_amount = ? AND payment_status = 'Pending' ORDER BY id DESC LIMIT 1");
+        $stmt_fallback->execute([$amount]);
+        $payment = $stmt_fallback->fetch(PDO::FETCH_ASSOC);
+        if ($payment) {
+            $tran_id = $payment['payment_id'];
+        }
+    }
 
     if (!$payment) {
         http_response_code(404);

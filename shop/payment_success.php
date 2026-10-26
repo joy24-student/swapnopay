@@ -113,6 +113,7 @@ function clearCartSessions() {
                                         </a>
                                     </div>
                                 </div>
+                                <?php require(__DIR__ . '/inc/guest_password_card.php'); ?>
                                 <?php require(__DIR__ . '/inc/order_receipt_view.php'); ?>
                             </div>
                         </div>
@@ -137,6 +138,14 @@ function clearCartSessions() {
                         $gateway_order_id = !empty($payment['txnid']) ? $payment['txnid'] : $tran_id;
                         $api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
                         $merchant_id = defined('MERCHANT_ID') && !empty(MERCHANT_ID) ? MERCHANT_ID : ($runtime['merchant_id'] ?? '');
+                        if (empty($merchant_id)) {
+                            try {
+                                $stmt_m = $pdo->query("SELECT swapnopay_merchant_id FROM tbl_settings WHERE id=1");
+                                if ($stmt_m && $row_m = $stmt_m->fetch(PDO::FETCH_ASSOC)) {
+                                    $merchant_id = trim($row_m['swapnopay_merchant_id'] ?? '');
+                                }
+                            } catch (Throwable $_) {}
+                        }
 
                         $is_paid = false;
                         $matched_trx = $ret_trx_id;
@@ -302,6 +311,7 @@ function clearCartSessions() {
                             </div>
                         </div>
 
+                        <?php require(__DIR__ . '/inc/guest_password_card.php'); ?>
                         <?php require(__DIR__ . '/inc/order_receipt_view.php'); ?>
                     </div>
                 </div>

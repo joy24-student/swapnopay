@@ -954,6 +954,8 @@ private fun EmployeeCheckoutDialog(
     var customerName by remember { mutableStateOf("Walk-in Customer") }
     var customerPhone by remember { mutableStateOf("") }
     var discountInput by remember { mutableStateOf("0") }
+    var isPercentDiscount by remember { mutableStateOf(false) }
+    var customerGivenInput by remember { mutableStateOf("") }
 
     // Payment method: "Cash", "bKash", "Nagad", "Rocket", "Upay"
     var paymentMethod by remember { mutableStateOf("Cash") }
@@ -964,8 +966,19 @@ private fun EmployeeCheckoutDialog(
     val subtotal = remember(cartItems) {
         cartItems.values.sumOf { it.first.salePrice * it.second }
     }
-    val discount = discountInput.toDoubleOrNull() ?: 0.0
+    val discountVal = discountInput.toDoubleOrNull() ?: 0.0
+    val discount = if (isPercentDiscount) {
+        ((subtotal * discountVal) / 100.0).coerceAtMost(subtotal)
+    } else {
+        discountVal.coerceAtMost(subtotal)
+    }
     val netTotal = (subtotal - discount).coerceAtLeast(0.0)
+
+    val customerGiven = customerGivenInput.toDoubleOrNull()
+    val hasGiven = customerGiven != null && customerGiven > 0.0
+    val effectiveGiven = customerGiven ?: 0.0
+    val changeReturn = if (hasGiven && effectiveGiven > netTotal) effectiveGiven - netTotal else 0.0
+    val dueAmount = if (hasGiven && effectiveGiven < netTotal) netTotal - effectiveGiven else 0.0
 
     val cardBg = if (isDark) Color(0xFF1E293B) else Color.White
     val cardBorder = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
@@ -1095,7 +1108,7 @@ private fun EmployeeCheckoutDialog(
                                 shape = RoundedCornerShape(12.dp),
                                 border = BorderStroke(1.dp, brandBlue.copy(alpha = 0.3f))
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -1103,29 +1116,86 @@ private fun EmployeeCheckoutDialog(
                                         Text("সাবটোটাল:", color = textSecondary, fontSize = 13.sp)
                                         Text("৳$subtotal", fontWeight = FontWeight.SemiBold, color = textPrimary)
                                     }
-                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Discount Mode & Presets
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("ডিসকাউন্ট (৳):", color = textSecondary, fontSize = 13.sp)
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(if (isPercentDiscount) "ডিসকাউন্ট (%):" else "ডিসকাউন্ট (৳):", color = textSecondary, fontSize = 13.sp)
+                                            // Toggle chip
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = brandBlue.copy(alpha = 0.15f),
+                                                border = BorderStroke(1.dp, brandBlue.copy(alpha = 0.4f)),
+                                                modifier = Modifier.clickable {
+                                                    isPercentDiscount = !isPercentDiscount
+                                                    if (discountInput == "0") discountInput = ""
+                                                }
+                                            ) {
+                                                Text(
+                                                    if (isPercentDiscount) "মোড: % (টাকা ৳)" else "মোড: ৳ (শতাংশ %)",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = brandBlue,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+
                                         OutlinedTextField(
                                             value = discountInput,
-                                            onValueChange = { discountInput = it },
+                                            onValueChange = { discountInput = it.filter { c -> c.isDigit() || c == '.' } },
                                             modifier = Modifier.width(100.dp),
                                             singleLine = true,
                                             shape = RoundedCornerShape(8.dp),
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                         )
                                     }
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = cardBorder)
+
+                                    // Quick percent chips (5%, 7%, 10%, 15%, 20%)
+                                    if (isPercentDiscount) {
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            items(listOf(5, 7, 10, 15, 20)) { pct ->
+                                                val isSelected = discountInput == pct.toString()
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isSelected) brandBlue else cardBg,
+                                                    border = BorderStroke(1.dp, if (isSelected) brandBlue else cardBorder),
+                                                    modifier = Modifier.clickable { discountInput = pct.toString() }
+                                                ) {
+                                                    Text(
+                                                        "$pct%",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isSelected) Color.White else textPrimary,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (discount > 0.0) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(if (isPercentDiscount) "প্রযোজ্য ছাড় (${discountInput}%):" else "প্রযোজ্য ছাড়:", color = Color(0xFFEF4444), fontSize = 12.sp)
+                                            Text("-৳${String.format("%.2f", discount)}", fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                        }
+                                    }
+
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = cardBorder)
+
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text("পরিশোধযোগ্য মোট:", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textPrimary)
-                                        Text("৳$netTotal", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = brandBlue)
+                                        Text("৳${String.format("%.2f", netTotal)}", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = brandBlue)
                                     }
                                 }
                             }
@@ -1174,32 +1244,133 @@ private fun EmployeeCheckoutDialog(
                         // Specific Details for Selected Method
                         item {
                             if (paymentMethod == "Cash") {
-                                // Cash Mechanism Notice
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF59E0B).copy(alpha = 0.12f)),
-                                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f)),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.Top
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    // Cash Given & Return Calculation Card
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = cardBg),
+                                        border = BorderStroke(1.dp, cardBorder),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                text = "ক্যাশ পেমেন্ট মেকানিজম",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = Color(0xFFF59E0B)
+                                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text("গ্রাহকের দেওয়া নগদ টাকা (Given Amount):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+
+                                            // Quick presets
+                                            val exactCeil = Math.ceil(netTotal).toInt()
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                item {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = if (customerGivenInput == exactCeil.toString()) brandBlue else cardBg,
+                                                        border = BorderStroke(1.dp, cardBorder),
+                                                        modifier = Modifier.clickable { customerGivenInput = exactCeil.toString() }
+                                                    ) {
+                                                        Text("Exact (৳$exactCeil)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (customerGivenInput == exactCeil.toString()) Color.White else textPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                                    }
+                                                }
+                                                items(listOf(500, 1000, 2000)) { p ->
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = if (customerGivenInput == p.toString()) brandBlue else cardBg,
+                                                        border = BorderStroke(1.dp, cardBorder),
+                                                        modifier = Modifier.clickable { customerGivenInput = p.toString() }
+                                                    ) {
+                                                        Text("৳$p", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (customerGivenInput == p.toString()) Color.White else textPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                                    }
+                                                }
+                                                item {
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        listOf(50, 100).forEach { plus ->
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = cardBg,
+                                                                border = BorderStroke(1.dp, brandBlue.copy(alpha = 0.5f)),
+                                                                modifier = Modifier.clickable {
+                                                                    val cur = customerGivenInput.toDoubleOrNull() ?: 0.0
+                                                                    customerGivenInput = (cur + plus).toInt().toString()
+                                                                }
+                                                            ) {
+                                                                Text("+৳$plus", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandBlue, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            OutlinedTextField(
+                                                value = customerGivenInput,
+                                                onValueChange = { customerGivenInput = it.filter { c -> c.isDigit() || c == '.' } },
+                                                placeholder = { Text("নগদ প্রাপ্ত টাকা (যেমন: ১০০০)", fontSize = 12.sp) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp),
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                             )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = "ক্যাশ সেল তৈরি করলে মার্চেন্ট অ্যাপের 'লাইভ স্টাফ মনিটর'-এ 'PENDING_CASH_CONFIRMATION' হিসেবে দৃশ্যমান হবে। মার্চেন্ট ক্যাশ টাকা বুঝে পাওয়ার পর ১-ট্যাপে বিক্রয় অনুমোদন করবেন।",
-                                                fontSize = 12.sp,
-                                                color = textPrimary,
-                                                lineHeight = 16.sp
-                                            )
+
+                                            if (hasGiven) {
+                                                if (changeReturn > 0.0) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(10.dp),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text("গ্রাহককে ফেরত দিন (Return):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                                            Text("৳${String.format("%.2f", changeReturn)}", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF10B981))
+                                                        }
+                                                    }
+                                                } else if (dueAmount > 0.0) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(10.dp),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text("বাকি থাকবে (Shortage/Due):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                                            Text("৳${String.format("%.2f", dueAmount)}", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Cash Mechanism Notice
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF59E0B).copy(alpha = 0.12f)),
+                                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "ক্যাশ পেমেন্ট মেকানিজম",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFFF59E0B)
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "ক্যাশ সেল তৈরি করলে মার্চেন্ট অ্যাপের 'লাইভ স্টাফ মনিটর'-এ 'PENDING_CASH_CONFIRMATION' হিসেবে দৃশ্যমান হবে। মার্চেন্ট ক্যাশ টাকা বুঝে পাওয়ার পর ১-ট্যাপে বিক্রয় অনুমোদন করবেন।",
+                                                    fontSize = 12.sp,
+                                                    color = textPrimary,
+                                                    lineHeight = 16.sp
+                                                )
+                                            }
                                         }
                                     }
                                 }

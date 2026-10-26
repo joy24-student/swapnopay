@@ -60,6 +60,7 @@ foreach ($result as $row) {
 	$p_video_link = $row['p_video_link'] ?? '';
 	$p_is_featured = $row['p_is_featured'];
 	$p_is_active = $row['p_is_active'];
+	$coupon_code = $row['coupon_code'] ?? '';
 	$ecat_id = $row['ecat_id'];
 }
 
@@ -276,34 +277,138 @@ foreach ($result as $row) {
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Other Photos</label>
-							<div class="col-sm-4" style="padding-top:4px;">
-								<table id="ProductTable" style="width:100%;">
+							<label for="" class="col-sm-3 control-label">Existing Other Photos</label>
+							<div class="col-sm-8" style="padding-top:4px;">
+								<table style="width:100%; max-width: 450px;">
 			                        <tbody>
 			                        	<?php
 			                        	$statement = $pdo->prepare("SELECT * FROM tbl_product_photo WHERE p_id=?");
 			                        	$statement->execute(array($_REQUEST['id']));
 			                        	$result = $statement->fetchAll(PDO::FETCH_ASSOC);
-			                        	foreach ($result as $row) {
-			                        		?>
-											<tr>
-				                                <td>
-				                                    <img src="../assets/uploads/product_photos/<?php echo $row['photo']; ?>" alt="" style="width:150px;margin-bottom:5px;">
-				                                </td>
-				                                <td style="width:28px;">
-				                                	<a onclick="return confirmDelete();" href="product-other-photo-delete.php?id=<?php echo $row['pp_id']; ?>&id1=<?php echo $_REQUEST['id']; ?>" class="btn btn-danger btn-xs">X</a>
-				                                </td>
-				                            </tr>
-			                        		<?php
+			                        	if (empty($result)) {
+			                        		echo '<tr><td colspan="2" style="color:#777; font-size:13px;">No other photos added yet.</td></tr>';
+			                        	} else {
+				                        	foreach ($result as $row) {
+				                        		?>
+												<tr style="border-bottom: 1px solid #f1f5f9;">
+					                                <td style="padding: 6px 0;">
+					                                    <img src="../assets/uploads/<?php echo $row['photo']; ?>" alt="" style="width:100px; height:70px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0;">
+					                                </td>
+					                                <td style="width:40px; text-align:right;">
+					                                	<a onclick="return confirm('Are you sure you want to delete this photo?');" href="product-other-photo-delete.php?id=<?php echo $row['pp_id']; ?>&id1=<?php echo $_REQUEST['id']; ?>" class="btn btn-danger btn-xs"><i class="fa fa-trash"></i></a>
+					                                </td>
+					                            </tr>
+				                        		<?php
+				                        	}
 			                        	}
 			                        	?>
 			                        </tbody>
 			                    </table>
 							</div>
-							<div class="col-sm-2">
-			                    <input type="button" id="btnAddNew" value="Add Item" style="margin-top: 5px;margin-bottom:10px;border:0;color: #fff;font-size: 14px;border-radius:3px;" class="btn btn-warning btn-xs">
-			                </div>
 						</div>
+						<div class="form-group">
+							<label for="" class="col-sm-3 control-label">Upload More Photos</label>
+							<div class="col-sm-8">
+								<input type="file" name="photo[]" id="galleryPhotosInput" multiple accept="image/*" style="display:none;">
+								<div class="sn-multi-upload-box" id="galleryDropzone" onclick="document.getElementById('galleryPhotosInput').click();">
+									<i class="fa fa-cloud-upload" style="font-size: 28px; color: #3b82f6; margin-bottom: 6px;"></i>
+									<div style="font-weight: 600; font-size: 14px; color: #1e293b;">Click or Drag &amp; Drop Multiple Photos Here</div>
+									<div style="font-size: 12px; color: #64748b; margin-top: 2px;">Select multiple images at once (PNG, JPG, WebP). Max 30 photos.</div>
+									<button type="button" class="btn btn-primary btn-sm" style="margin-top: 10px; border-radius: 6px; pointer-events: none;">
+										<i class="fa fa-plus"></i> Select Multiple Photos
+									</button>
+								</div>
+								<div id="galleryPreviewContainer" class="sn-gallery-preview-grid" style="display: none;"></div>
+								<div id="galleryCountNotice" style="display: none; font-size: 12px; color: #16a34a; font-weight: 600; margin-top: 8px;"></div>
+							</div>
+						</div>
+						<script>
+						(function() {
+							var fileInput = document.getElementById('galleryPhotosInput');
+							var dropzone = document.getElementById('galleryDropzone');
+							var previewContainer = document.getElementById('galleryPreviewContainer');
+							var countNotice = document.getElementById('galleryCountNotice');
+							if (!fileInput || !dropzone) return;
+
+							var dt = new DataTransfer();
+
+							function updatePreviews() {
+								previewContainer.innerHTML = '';
+								if (dt.files.length === 0) {
+									previewContainer.style.display = 'none';
+									countNotice.style.display = 'none';
+									fileInput.files = dt.files;
+									return;
+								}
+
+								previewContainer.style.display = 'flex';
+								countNotice.style.display = 'block';
+								countNotice.textContent = dt.files.length + ' new photo(s) selected for upload.';
+
+								Array.from(dt.files).forEach(function(file, index) {
+									var item = document.createElement('div');
+									item.className = 'sn-gallery-preview-item';
+
+									var img = document.createElement('img');
+									img.src = URL.createObjectURL(file);
+									item.appendChild(img);
+
+									var removeBtn = document.createElement('span');
+									removeBtn.className = 'sn-preview-remove';
+									removeBtn.innerHTML = '&times;';
+									removeBtn.title = 'Remove photo';
+									removeBtn.onclick = function(e) {
+										e.stopPropagation();
+										var newDt = new DataTransfer();
+										Array.from(dt.files).forEach(function(f, i) {
+											if (i !== index) newDt.items.add(f);
+										});
+										dt = newDt;
+										fileInput.files = dt.files;
+										updatePreviews();
+									};
+									item.appendChild(removeBtn);
+									previewContainer.appendChild(item);
+								});
+
+								fileInput.files = dt.files;
+							}
+
+							fileInput.addEventListener('change', function() {
+								Array.from(fileInput.files).forEach(function(f) {
+									dt.items.add(f);
+								});
+								updatePreviews();
+							});
+
+							['dragenter', 'dragover'].forEach(function(ev) {
+								dropzone.addEventListener(ev, function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									dropzone.classList.add('dragover');
+								});
+							});
+
+							['dragleave', 'drop'].forEach(function(ev) {
+								dropzone.addEventListener(ev, function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									dropzone.classList.remove('dragover');
+								});
+							});
+
+							dropzone.addEventListener('drop', function(e) {
+								if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+									Array.from(e.dataTransfer.files).forEach(function(f) {
+										if (f.type.startsWith('image/')) {
+											dt.items.add(f);
+										}
+									});
+									updatePreviews();
+								}
+							});
+						})();
+						</script>
 						<div class="form-group">
 							<label for="" class="col-sm-3 control-label">
 								Description
@@ -377,6 +482,27 @@ foreach ($result as $row) {
 							<div class="col-sm-8">
 								<input type="text" name="p_video_link" class="form-control" value="<?php echo htmlspecialchars($p_video_link ?? ''); ?>" placeholder="https://www.youtube.com/watch?v=... or https://...r2.dev/video.mp4">
 								<small class="text-muted">Supports YouTube video links or Cloudflare R2 / direct MP4 object storage URLs (comma or newline separated for multiple videos).</small>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="" class="col-sm-3 control-label">Coupon Code / Promotion</label>
+							<div class="col-sm-4">
+								<select name="coupon_code" class="form-control select2" style="width:100%;">
+									<option value="">-- No Special Coupon --</option>
+									<?php
+									try {
+										$cpStmt = $pdo->prepare("SELECT coupon_code, discount_type, discount_value, status FROM tbl_coupon WHERE status = 'active' ORDER BY coupon_id DESC");
+										$cpStmt->execute();
+										$couponList = $cpStmt->fetchAll(PDO::FETCH_ASSOC);
+										foreach ($couponList as $cp) {
+											$discLabel = ($cp['discount_type'] === 'percentage') ? $cp['discount_value'] . '%' : '$' . $cp['discount_value'];
+											$sel = (isset($coupon_code) && $coupon_code === $cp['coupon_code']) ? 'selected' : '';
+											echo '<option value="' . htmlspecialchars($cp['coupon_code']) . '" ' . $sel . '>' . htmlspecialchars($cp['coupon_code']) . ' (' . $discLabel . ' off)</option>';
+										}
+									} catch (Throwable $_) {}
+									?>
+								</select>
+								<small class="text-muted">Link this product with an active discount coupon. Coupons can be managed in <a href="coupons.php" target="_blank">Coupons</a>.</small>
 							</div>
 						</div>
 						<div class="form-group">

@@ -382,6 +382,7 @@ CREATE TABLE IF NOT EXISTS public.devices (
 -- 7. Appeals Table
 CREATE TABLE IF NOT EXISTS public.appeals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID REFERENCES public.merchants(id),
   trx_id TEXT NOT NULL,
   cus_phone TEXT,
   order_id UUID REFERENCES public.orders,
@@ -392,6 +393,13 @@ CREATE TABLE IF NOT EXISTS public.appeals (
   resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Ensure merchant_id column and performance indices exist if table already created
+ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS merchant_id UUID REFERENCES public.merchants(id);
+CREATE INDEX IF NOT EXISTS idx_appeals_merchant_id ON public.appeals(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_order_id ON public.appeals(order_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_trx_id ON public.appeals(trx_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_status ON public.appeals(status);
 
 -- 8. Notifications Table
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -1253,7 +1261,17 @@ DROP POLICY IF EXISTS "prod_devices_own" ON public.devices;
 CREATE POLICY "Devices policy" ON public.devices FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Appeals policy" ON public.appeals;
-CREATE POLICY "Appeals policy" ON public.appeals FOR ALL TO authenticated, anon USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = appeals.order_id AND o.merchant_id = public.current_merchant_id()));
+CREATE POLICY "Appeals policy" ON public.appeals FOR ALL TO authenticated, anon 
+  USING (
+    merchant_id = public.current_merchant_id() 
+    OR EXISTS (SELECT 1 FROM public.orders o WHERE o.id = appeals.order_id AND o.merchant_id = public.current_merchant_id())
+    OR auth.uid() IS NULL
+  )
+  WITH CHECK (
+    merchant_id = public.current_merchant_id() 
+    OR EXISTS (SELECT 1 FROM public.orders o WHERE o.id = appeals.order_id AND o.merchant_id = public.current_merchant_id())
+    OR auth.uid() IS NULL
+  );
 
 DROP POLICY IF EXISTS "Notifications policy" ON public.notifications;
 CREATE POLICY "Notifications policy" ON public.notifications FOR ALL TO authenticated, anon USING (user_id = auth.uid() OR auth.uid() IS NULL) WITH CHECK (user_id = auth.uid() OR auth.uid() IS NULL);

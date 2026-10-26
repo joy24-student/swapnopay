@@ -36,7 +36,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FormSubmissionCacheEntity::class,
         OutboxSmsEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -188,6 +188,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `merchant_numbers_v17` (`number` TEXT NOT NULL, `merchantId` TEXT NOT NULL, `method` TEXT NOT NULL, `accountType` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `isDefault` INTEGER NOT NULL, `qrCodeUrl` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`merchantId`, `number`, `method`))")
+                db.execSQL("INSERT OR REPLACE INTO `merchant_numbers_v17` (`number`,`merchantId`,`method`,`accountType`,`isActive`,`isDefault`,`qrCodeUrl`,`updatedAt`) SELECT `number`,`merchantId`,`method`,`accountType`,`isActive`,`isDefault`,`qrCodeUrl`,`updatedAt` FROM `merchant_numbers`")
+                db.execSQL("DROP TABLE IF EXISTS `merchant_numbers`")
+                db.execSQL("ALTER TABLE `merchant_numbers_v17` RENAME TO `merchant_numbers`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_merchant_numbers_merchantId` ON `merchant_numbers` (`merchantId`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -195,7 +205,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "swapnopay_database"
                 )
-                .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
                 .fallbackToDestructiveMigration()
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()

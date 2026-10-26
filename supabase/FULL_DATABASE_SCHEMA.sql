@@ -136,6 +136,7 @@ create table if not exists devices (
 -- 7. Appeals Table
 create table if not exists appeals (
   id uuid primary key default gen_random_uuid(),
+  merchant_id uuid references merchants(id) on delete cascade,
   trx_id text not null,
   cus_phone text,
   order_id uuid references orders,
@@ -146,6 +147,11 @@ create table if not exists appeals (
   resolved_at timestamptz,
   created_at timestamptz default now()
 );
+
+create index if not exists idx_appeals_merchant_id on appeals(merchant_id);
+create index if not exists idx_appeals_order_id on appeals(order_id);
+create index if not exists idx_appeals_trx_id on appeals(trx_id);
+create index if not exists idx_appeals_status on appeals(status);
 
 -- 8. Notifications Table
 create table if not exists notifications (

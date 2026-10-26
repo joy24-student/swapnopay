@@ -160,7 +160,7 @@
 	}
 	</style>
 
-	<script src="js/jquery-2.2.4.min.js"></script>
+	<script>if (typeof window.jQuery === 'undefined') { document.write('<script src="js/jquery-2.2.4.min.js"><\/script>'); }</script>
 	<script src="js/bootstrap.min.js"></script>
 	<script src="js/jquery.dataTables.min.js"></script>
 	<script src="js/dataTables.bootstrap.min.js"></script>
@@ -218,9 +218,11 @@
 					cache: false,
 					success: function(html) {
 						$(".mid-cat").html(html);
-						$(".mid-cat").select2('destroy').select2();
+						try { $(".mid-cat").select2('destroy'); } catch(e) {}
+						$(".mid-cat").select2({ width: '100%' });
 						$(".end-cat").html('<option value="">Select End Level Category</option>');
-						$(".end-cat").select2('destroy').select2();
+						try { $(".end-cat").select2('destroy'); } catch(e) {}
+						$(".end-cat").select2({ width: '100%' });
 					}
 				});
 			}
@@ -235,7 +237,8 @@
 					cache: false,
 					success: function(html) {
 						$(".end-cat").html(html);
-						$(".end-cat").select2('destroy').select2();
+						try { $(".end-cat").select2('destroy'); } catch(e) {}
+						$(".end-cat").select2({ width: '100%' });
 					}
 				});
 			}
@@ -246,7 +249,7 @@
 	  $(function () {
 
 	    //Initialize Select2 Elements
-	    $(".select2").select2();
+	    $(".select2").select2({ width: '100%' });
 
 	    //Datemask dd/mm/yyyy
 	    $("#datemask").inputmask("dd-mm-yyyy", {"placeholder": "dd-mm-yyyy"});

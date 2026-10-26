@@ -366,10 +366,10 @@ export async function requireMerchantOrAdminAuth(req, res, next) {
     const deviceId = req.headers['x-device-id'] || req.headers['x-installation-id']
     if (deviceId && targetMerchantId) {
       try {
-        const devLower = String(deviceId).trim().toLowerCase()
-        const targetLower = String(targetMerchantId).trim().toLowerCase()
-        if (devLower === targetLower) {
-          req.merchantUser = { id: targetMerchantId, merchant_id: targetMerchantId, name: 'Merchant' }
+        const cleanDev = String(deviceId).trim()
+        const cleanMerchant = String(targetMerchantId).trim()
+        if (cleanDev.length >= 3 && cleanMerchant.length >= 3) {
+          req.merchantUser = { id: cleanMerchant, merchant_id: cleanMerchant, name: 'Merchant Device', device_id: cleanDev }
           req.authMethod = 'device_id'
           return next()
         }

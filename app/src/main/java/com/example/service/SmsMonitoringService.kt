@@ -94,17 +94,22 @@ class SmsMonitoringService : Service() {
         smsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-                    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
+                    if (messages.isEmpty()) return
+                    
+                    // Group multipart SMS pieces by sender address and concatenate their text
+                    val fullBodyMap = LinkedHashMap<String, StringBuilder>()
                     for (msg in messages) {
                         val sender = msg.originatingAddress ?: continue
-                        val body = msg.messageBody ?: continue
-                        
-                        // Transaction messages contain financial and personal data;
-                        // never include their sender or body in application logs.
-                        Log.d("SmsMonitoringService", "Incoming SMS queued for local validation.")
-                        
+                        val body = msg.messageBody ?: ""
+                        fullBodyMap.getOrPut(sender) { StringBuilder() }.append(body)
+                    }
+
+                    Log.d("SmsMonitoringService", "Incoming SMS queued for local validation.")
+                    for ((sender, bodyBuilder) in fullBodyMap) {
+                        val fullBody = bodyBuilder.toString()
                         scope.launch {
-                            repository.processIncomingSms(sender, body)
+                            repository.processIncomingSms(sender, fullBody)
                         }
                     }
                 }

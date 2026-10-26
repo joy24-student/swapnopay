@@ -17,10 +17,23 @@ class SwapnoPayApp : Application() {
         }
 
         try {
-            // 2. Enable FCM auto-init for push notifications
-            FirebaseMessaging.getInstance().isAutoInitEnabled = true
+            // 2. Enable FCM auto-init and subscribe to admin broadcast topics
+            val fcm = FirebaseMessaging.getInstance()
+            fcm.isAutoInitEnabled = true
+            fcm.subscribeToTopic("all_merchants")
+            fcm.subscribeToTopic("announcements")
+            fcm.token.addOnCompleteListener { task ->
+                if (task.isSuccessful && !task.result.isNullOrBlank()) {
+                    val token = task.result
+                    getSharedPreferences("swapnopay_fcm_prefs", android.content.Context.MODE_PRIVATE)
+                        .edit()
+                        .putString("latest_fcm_token", token)
+                        .apply()
+                    android.util.Log.d("SwapnoPayApp", "FCM token initialized: $token")
+                }
+            }
         } catch (e: Exception) {
-            Log.w("SwapnoPayApp", "FCM auto-init not available: ${e.message}")
+            Log.w("SwapnoPayApp", "FCM setup note: ${e.message}")
         }
     }
 }

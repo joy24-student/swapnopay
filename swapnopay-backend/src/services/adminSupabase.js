@@ -2828,7 +2828,7 @@ export async function createDisputeAppeal(merchantId, { order_id, trx_id, cus_ph
             cus_phone: cus_phone || orderRow?.cus_phone || null,
             cus_email: orderRow?.cus_email || null,
             expires_at: orderRow?.expires_at || new Date(Date.now() + 86400000).toISOString()
-          }, { onConflict: 'id' }).catch(e => console.warn('[appeals] Admin DB order stub notice:', e.message))
+          }, { onConflict: 'id' })
         }
       } catch (ordPrepErr) {
         console.warn('[appeals] Order mirror to admin DB notice:', ordPrepErr.message)

@@ -159,25 +159,108 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="" class="col-sm-3 control-label">Other Photos</label>
-							<div class="col-sm-4" style="padding-top:4px;">
-								<table id="ProductTable" style="width:100%;">
-			                        <tbody>
-			                            <tr>
-			                                <td>
-			                                    <div class="upload-btn">
-			                                        <input type="file" name="photo[]" style="margin-bottom:5px;">
-			                                    </div>
-			                                </td>
-			                                <td style="width:28px;"><a href="javascript:void()" class="Delete btn btn-danger btn-xs">X</a></td>
-			                            </tr>
-			                        </tbody>
-			                    </table>
+							<label for="" class="col-sm-3 control-label">Other Photos (Gallery)</label>
+							<div class="col-sm-8">
+								<input type="file" name="photo[]" id="galleryPhotosInput" multiple accept="image/*" style="display:none;">
+								<div class="sn-multi-upload-box" id="galleryDropzone" onclick="document.getElementById('galleryPhotosInput').click();">
+									<i class="fa fa-cloud-upload" style="font-size: 28px; color: #3b82f6; margin-bottom: 6px;"></i>
+									<div style="font-weight: 600; font-size: 14px; color: #1e293b;">Click or Drag &amp; Drop Multiple Photos Here</div>
+									<div style="font-size: 12px; color: #64748b; margin-top: 2px;">Select multiple images at once (PNG, JPG, WebP). Max 30 photos.</div>
+									<button type="button" class="btn btn-primary btn-sm" style="margin-top: 10px; border-radius: 6px; pointer-events: none;">
+										<i class="fa fa-plus"></i> Select Multiple Photos
+									</button>
+								</div>
+								<div id="galleryPreviewContainer" class="sn-gallery-preview-grid" style="display: none;"></div>
+								<div id="galleryCountNotice" style="display: none; font-size: 12px; color: #16a34a; font-weight: 600; margin-top: 8px;"></div>
 							</div>
-							<div class="col-sm-2">
-			                    <input type="button" id="btnAddNew" value="Add Item" style="margin-top: 5px;margin-bottom:10px;border:0;color: #fff;font-size: 14px;border-radius:3px;" class="btn btn-warning btn-xs">
-			                </div>
 						</div>
+						<script>
+						(function() {
+							var fileInput = document.getElementById('galleryPhotosInput');
+							var dropzone = document.getElementById('galleryDropzone');
+							var previewContainer = document.getElementById('galleryPreviewContainer');
+							var countNotice = document.getElementById('galleryCountNotice');
+							if (!fileInput || !dropzone) return;
+
+							var dt = new DataTransfer();
+
+							function updatePreviews() {
+								previewContainer.innerHTML = '';
+								if (dt.files.length === 0) {
+									previewContainer.style.display = 'none';
+									countNotice.style.display = 'none';
+									fileInput.files = dt.files;
+									return;
+								}
+
+								previewContainer.style.display = 'flex';
+								countNotice.style.display = 'block';
+								countNotice.textContent = dt.files.length + ' photo(s) selected for upload.';
+
+								Array.from(dt.files).forEach(function(file, index) {
+									var item = document.createElement('div');
+									item.className = 'sn-gallery-preview-item';
+
+									var img = document.createElement('img');
+									img.src = URL.createObjectURL(file);
+									item.appendChild(img);
+
+									var removeBtn = document.createElement('span');
+									removeBtn.className = 'sn-preview-remove';
+									removeBtn.innerHTML = '&times;';
+									removeBtn.title = 'Remove photo';
+									removeBtn.onclick = function(e) {
+										e.stopPropagation();
+										var newDt = new DataTransfer();
+										Array.from(dt.files).forEach(function(f, i) {
+											if (i !== index) newDt.items.add(f);
+										});
+										dt = newDt;
+										fileInput.files = dt.files;
+										updatePreviews();
+									};
+									item.appendChild(removeBtn);
+									previewContainer.appendChild(item);
+								});
+
+								fileInput.files = dt.files;
+							}
+
+							fileInput.addEventListener('change', function() {
+								Array.from(fileInput.files).forEach(function(f) {
+									dt.items.add(f);
+								});
+								updatePreviews();
+							});
+
+							['dragenter', 'dragover'].forEach(function(ev) {
+								dropzone.addEventListener(ev, function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									dropzone.classList.add('dragover');
+								});
+							});
+
+							['dragleave', 'drop'].forEach(function(ev) {
+								dropzone.addEventListener(ev, function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									dropzone.classList.remove('dragover');
+								});
+							});
+
+							dropzone.addEventListener('drop', function(e) {
+								if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+									Array.from(e.dataTransfer.files).forEach(function(f) {
+										if (f.type.startsWith('image/')) {
+											dt.items.add(f);
+										}
+									});
+									updatePreviews();
+								}
+							});
+						})();
+						</script>
 						<div class="form-group">
 							<label for="" class="col-sm-3 control-label">
 								Description
@@ -264,6 +347,27 @@ if(isset($_GET['saved'])) $success_message='Product saved successfully.';
 						
 						
 						
+						<div class="form-group">
+							<label for="" class="col-sm-3 control-label">Coupon Code / Promotion</label>
+							<div class="col-sm-4">
+								<select name="coupon_code" class="form-control select2" style="width:100%;">
+									<option value="">-- No Special Coupon --</option>
+									<?php
+									try {
+										$cpStmt = $pdo->prepare("SELECT coupon_code, discount_type, discount_value, status FROM tbl_coupon WHERE status = 'active' ORDER BY coupon_id DESC");
+										$cpStmt->execute();
+										$couponList = $cpStmt->fetchAll(PDO::FETCH_ASSOC);
+										foreach ($couponList as $cp) {
+											$discLabel = ($cp['discount_type'] === 'percentage') ? $cp['discount_value'] . '%' : '$' . $cp['discount_value'];
+											$sel = (isset($coupon_code) && $coupon_code === $cp['coupon_code']) ? 'selected' : '';
+											echo '<option value="' . htmlspecialchars($cp['coupon_code']) . '" ' . $sel . '>' . htmlspecialchars($cp['coupon_code']) . ' (' . $discLabel . ' off)</option>';
+										}
+									} catch (Throwable $_) {}
+									?>
+								</select>
+								<small class="text-muted">Link this product with an active discount coupon. Coupons can be managed in <a href="coupons.php" target="_blank">Coupons</a>.</small>
+							</div>
+						</div>
 						<div class="form-group">
 							<label for="" class="col-sm-3 control-label">Is Featured?</label>
 							<div class="col-sm-8">

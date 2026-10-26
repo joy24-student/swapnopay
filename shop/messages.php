@@ -703,8 +703,11 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
         const messageText = `Hi! I'm inquiring about this product:\n"${currentProductInfo.name}"\nPrice: ৳ ${currentProductInfo.price}\nProduct Link: ${currentProductInfo.url}`;
 
+        const fwdClientId = 'cmsg_fwd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
         // Render user message bubble with product card
         appendMessageBubble({
+            client_msg_id: fwdClientId,
             sender_type: 'customer',
             message: messageText,
             product_data: currentProductInfo,
@@ -758,7 +761,11 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 const res = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: fd });
                 const d = await res.json();
                 if (d.message) {
-                    lastMessageId = d.message.id;
+                    lastMessageId = Math.max(lastMessageId, parseInt(d.message.id, 10) || 0);
+                    const optBubble = document.querySelector(`[data-client-id="${fwdClientId}"]`);
+                    if (optBubble) {
+                        optBubble.setAttribute('data-msg-id', d.message.id);
+                    }
                 }
             } catch (err) {
                 console.error('Error forwarding product in live chat:', err);
@@ -828,8 +835,11 @@ if (!empty($_SESSION['cart_p_qty'])) {
 
         input.value = '';
 
+        const clientId = 'cmsg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
         // Render user message bubble immediately
         appendMessageBubble({
+            client_msg_id: clientId,
             sender_type: 'customer',
             message: messageText,
             created_at: new Date().toISOString()
@@ -884,7 +894,11 @@ if (!empty($_SESSION['cart_p_qty'])) {
                 const res = await fetch('live_chat_api.php?action=send_message', { method: 'POST', body: fd });
                 const d = await res.json();
                 if (d.message) {
-                    lastMessageId = d.message.id;
+                    lastMessageId = Math.max(lastMessageId, parseInt(d.message.id, 10) || 0);
+                    const optBubble = document.querySelector(`[data-client-id="${clientId}"]`);
+                    if (optBubble) {
+                        optBubble.setAttribute('data-msg-id', d.message.id);
+                    }
                 }
             } catch (err) {
                 console.error('Error sending message:', err);
@@ -930,20 +944,44 @@ if (!empty($_SESSION['cart_p_qty'])) {
         const container = document.getElementById('chatMessages');
         if (!container) return;
 
-        // Deduplication 1: If message with this ID already rendered, skip
+        const isUser = msg.sender_type === 'customer';
+        const isSystem = msg.sender_type === 'system';
+
+        // Deduplication 1: If message with this database ID already rendered, skip
         if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) {
             lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
             return;
         }
 
-        // Deduplication 2: If message with this attachment URL already rendered, skip
+        // Deduplication 2: If message matches client_msg_id, stamp real ID and skip duplicate
+        if (msg.client_msg_id && container.querySelector(`[data-client-id="${msg.client_msg_id}"]`)) {
+            const existingOpt = container.querySelector(`[data-client-id="${msg.client_msg_id}"]`);
+            if (msg.id) {
+                existingOpt.setAttribute('data-msg-id', msg.id);
+                lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
+            }
+            return;
+        }
+
+        // Deduplication 3: If polled customer message matches a pending optimistic bubble without an ID yet
+        if (isUser && msg.id) {
+            const pendingCustomerBubbles = container.querySelectorAll('.customer-chat-bubble:not([data-msg-id])');
+            for (let i = 0; i < pendingCustomerBubbles.length; i++) {
+                const pendingEl = pendingCustomerBubbles[i];
+                const pendingText = decodeURIComponent(pendingEl.getAttribute('data-msg-text') || '');
+                if (pendingText === (msg.message || '')) {
+                    pendingEl.setAttribute('data-msg-id', msg.id);
+                    lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
+                    return;
+                }
+            }
+        }
+
+        // Deduplication 4: If message with this attachment URL already rendered, skip
         if (msg.attachment_url && container.querySelector(`[data-attachment-url="${encodeURIComponent(msg.attachment_url)}"]`)) {
             if (msg.id) lastMessageId = Math.max(lastMessageId, parseInt(msg.id, 10) || 0);
             return;
         }
-
-        const isUser = msg.sender_type === 'customer';
-        const isSystem = msg.sender_type === 'system';
 
         if (isSystem) {
             appendSystemNotice(msg.message);
@@ -951,9 +989,15 @@ if (!empty($_SESSION['cart_p_qty'])) {
         }
 
         const wrap = document.createElement('div');
-        wrap.className = `flex items-start gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`;
+        wrap.className = `flex items-start gap-2.5 ${isUser ? 'justify-end customer-chat-bubble' : 'justify-start'}`;
         if (msg.id) {
             wrap.setAttribute('data-msg-id', msg.id);
+        }
+        if (msg.client_msg_id) {
+            wrap.setAttribute('data-client-id', msg.client_msg_id);
+        }
+        if (isUser) {
+            wrap.setAttribute('data-msg-text', encodeURIComponent(msg.message || ''));
         }
         if (msg.attachment_url) {
             wrap.setAttribute('data-attachment-url', encodeURIComponent(msg.attachment_url));

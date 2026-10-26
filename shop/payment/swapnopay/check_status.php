@@ -16,8 +16,15 @@ $supabase_key = defined('SUPABASE_ANON_KEY') && !empty(SUPABASE_ANON_KEY)
     ? SUPABASE_ANON_KEY 
     : (getenv('SUPABASE_ANON_KEY') ?: (defined('SUPABASE_SERVICE_KEY') ? SUPABASE_SERVICE_KEY : getenv('SUPABASE_SERVICE_KEY')));
 
-$api_url = defined('SWAPNOPAY_API_URL') && !empty(SWAPNOPAY_API_URL) ? SWAPNOPAY_API_URL : 'https://api.swapnopay.top';
 $merchant_id = defined('MERCHANT_ID') && !empty(MERCHANT_ID) ? MERCHANT_ID : ($runtime['merchant_id'] ?? '');
+if (empty($merchant_id)) {
+    try {
+        $stmt_m = $pdo->query("SELECT swapnopay_merchant_id FROM tbl_settings WHERE id=1");
+        if ($stmt_m && $row_m = $stmt_m->fetch(PDO::FETCH_ASSOC)) {
+            $merchant_id = trim($row_m['swapnopay_merchant_id'] ?? '');
+        }
+    } catch (Throwable $_) {}
+}
 $gateway_order_id = (!empty($_SESSION['pending_tran_id']) && hash_equals((string)$_SESSION['pending_tran_id'], $tran_id))
     ? (string)($_SESSION['pending_gateway_order_id'] ?? $tran_id)
     : $tran_id;
@@ -121,6 +128,28 @@ if ($status === 'PAID') {
             $pdo->rollBack();
         }
         error_log("Local payment completion sync error: " . $e->getMessage());
+    }
+
+    if (!empty($trx_id) && !empty($supabase_url) && !empty($supabase_key)) {
+        try {
+            $clean_supabase_url = rtrim($supabase_url, '/');
+            $payPatchPayload = json_encode(['status' => 'MATCHED']);
+            $payQuery = 'trx_id=ilike.' . rawurlencode(trim($trx_id));
+            if (!empty($merchant_id)) $payQuery .= '&merchant_id=eq.' . rawurlencode($merchant_id);
+            $ch_m = curl_init("{$clean_supabase_url}/rest/v1/payments?{$payQuery}");
+            curl_setopt($ch_m, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch_m, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch_m, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch_m, CURLOPT_CUSTOMREQUEST, 'PATCH');
+            curl_setopt($ch_m, CURLOPT_POSTFIELDS, $payPatchPayload);
+            curl_setopt($ch_m, CURLOPT_HTTPHEADER, [
+                "apikey: {$supabase_key}",
+                "Authorization: Bearer {$supabase_key}",
+                "Content-Type: application/json"
+            ]);
+            curl_exec($ch_m);
+            curl_close($ch_m);
+        } catch (Throwable $_) {}
     }
 
     echo json_encode([

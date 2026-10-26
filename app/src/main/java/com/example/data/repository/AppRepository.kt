@@ -332,7 +332,13 @@ class AppRepository(private val context: Context) {
                     method = obj.optString("payment_method", "bKash"),
                     createdAt = parseIsoDateToMillis(obj.optString("created_at")),
                     expiresAt = parseIsoDateToMillis(obj.optString("expires_at")),
-                    notes = obj.optJSONObject("metadata")?.optString("notes", "").orEmpty()
+                    notes = run {
+                        val matchedTrx = obj.optString("matched_trx_id", "").trim()
+                        val rawNotes = obj.optJSONObject("metadata")?.optString("notes", "").orEmpty()
+                        if (matchedTrx.isNotBlank()) {
+                            if (rawNotes.isNotBlank()) "$rawNotes | TrxID: $matchedTrx" else "TrxID: $matchedTrx"
+                        } else rawNotes
+                    }
                 )
                 dao.insertOrder(order)
             }
@@ -367,15 +373,27 @@ class AppRepository(private val context: Context) {
             if (resultData != null) {
                 for (i in 0 until resultData!!.length()) {
                     val obj = resultData!!.getJSONObject(i)
+                    val rawStatus = obj.optString("status", "UNMATCHED")
+                    val matchedOrderId = if (obj.isNull("matched_order_id")) null else obj.getString("matched_order_id")
+                    val normalizedStatus = if (!matchedOrderId.isNullOrBlank() || 
+                        rawStatus.equals("PAID", ignoreCase = true) || 
+                        rawStatus.equals("MATCHED", ignoreCase = true) || 
+                        rawStatus.equals("SUCCESS", ignoreCase = true) || 
+                        rawStatus.equals("COMPLETED", ignoreCase = true)) {
+                        "MATCHED"
+                    } else {
+                        rawStatus
+                    }
+
                     val payment = CachedPaymentEntity(
                         id = obj.optString("trx_id", obj.getString("id")),
                         merchantId = effectiveMid,
                         amount = obj.getDouble("amount"),
                         sender = obj.optString("sender_number", "Unknown"),
                         timestamp = parseIsoDateToMillis(obj.optString("sms_timestamp", obj.optString("created_at"))),
-                        status = obj.getString("status"),
+                        status = normalizedStatus,
                         method = obj.optString("method", "bKash"),
-                        orderId = if (obj.isNull("matched_order_id")) null else obj.getString("matched_order_id")
+                        orderId = matchedOrderId
                     )
                     dao.insertPayment(payment)
                     if (System.currentTimeMillis() - payment.timestamp < 10 * 60 * 1000L &&
@@ -416,15 +434,27 @@ class AppRepository(private val context: Context) {
                             val obj = list.getJSONObject(i)
                             val trxId = obj.optString("trx_id").ifBlank { obj.optString("id") }
                             if (trxId.isNotBlank()) {
+                                val rawStatus = obj.optString("status", "SUCCESS")
+                                val orderIdVal = if (obj.isNull("order_id")) null else obj.optString("order_id")
+                                val normalizedStatus = if (!orderIdVal.isNullOrBlank() || 
+                                    rawStatus.equals("PAID", ignoreCase = true) || 
+                                    rawStatus.equals("MATCHED", ignoreCase = true) || 
+                                    rawStatus.equals("SUCCESS", ignoreCase = true) || 
+                                    rawStatus.equals("COMPLETED", ignoreCase = true)) {
+                                    "MATCHED"
+                                } else {
+                                    rawStatus
+                                }
+
                                 val payment = CachedPaymentEntity(
                                     id = trxId,
                                     merchantId = targetMerchantId,
                                     amount = obj.optDouble("amount", 0.0),
                                     sender = obj.optString("sender_number", obj.optString("sender", "Unknown")),
                                     timestamp = obj.optLong("timestamp", parseIsoDateToMillis(obj.optString("created_at"))),
-                                    status = obj.optString("status", "SUCCESS"),
+                                    status = normalizedStatus,
                                     method = obj.optString("payment_method", obj.optString("method", "bKash")),
-                                    orderId = if (obj.isNull("order_id")) null else obj.optString("order_id")
+                                    orderId = orderIdVal
                                 )
                                 dao.insertPayment(payment)
                                 if (System.currentTimeMillis() - payment.timestamp < 10 * 60 * 1000L &&
@@ -451,47 +481,100 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun syncAppealsFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         val effectiveMid = targetMerchantId.ifBlank { activeProfileId }
+        var didSyncAny = false
 
-        var resultData: org.json.JSONArray? = null
-        try {
-            com.example.data.remote.SupabaseClient.fetchAppeals(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
-                merchantId = effectiveMid,
-                onSuccess = { jsonArray -> resultData = jsonArray },
-                onFailure = { err ->
-                    android.util.Log.e("AppRepository", "Failed to fetch appeals: $err")
-                }
+        // 1. Central Backend REST API Sync: /v1/payment/appeals?merchant_id=...
+        if (effectiveMid.isNotBlank() && effectiveMid != "00000000-0000-0000-0000-000000000001") {
+            val backendEndpoints = listOf(
+                "https://api.swapnopay.top/v1/payment/appeals?merchant_id=${java.net.URLEncoder.encode(effectiveMid, "UTF-8")}",
+                "https://swapnopay.top/v1/payment/appeals?merchant_id=${java.net.URLEncoder.encode(effectiveMid, "UTF-8")}"
             )
-        } catch (e: Exception) {
-            android.util.Log.e("AppRepository", "Exception fetching appeals", e)
+            for (endpoint in backendEndpoints) {
+                try {
+                    val url = java.net.URL(endpoint)
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+                    val activeProfile = getAuthenticatedSupabaseProfile()
+                    activeProfile?.authSessionToken?.takeIf { it.isNotBlank() }?.let {
+                        conn.setRequestProperty("Authorization", "Bearer $it")
+                    }
+                    if (conn.responseCode in 200..299) {
+                        val respStr = conn.inputStream.bufferedReader().use { it.readText() }
+                        val json = org.json.JSONObject(respStr)
+                        val list = json.optJSONArray("appeals")
+                        if (list != null) {
+                            for (i in 0 until list.length()) {
+                                val obj = list.getJSONObject(i)
+                                val order = obj.optJSONObject("orders")
+                                val appeal = AppealEntity(
+                                    id = obj.getString("id"),
+                                    merchantId = effectiveMid,
+                                    orderId = obj.optString("order_id", ""),
+                                    amount = obj.optDouble("amount", order?.optDouble("amount", 0.0) ?: 0.0),
+                                    customerName = obj.optString("customer_name").ifBlank { order?.optString("cus_name", "Customer") ?: "Customer" },
+                                    customerPhone = obj.optString("customer_phone").ifBlank { obj.optString("cus_phone").ifBlank { order?.optString("cus_phone").orEmpty() } },
+                                    trxId = obj.getString("trx_id"),
+                                    timestamp = parseIsoDateToMillis(obj.optString("created_at")),
+                                    status = obj.optString("status", "PENDING_REVIEW")
+                                )
+                                dao.insertAppeal(appeal)
+                            }
+                            didSyncAny = true
+                            conn.disconnect()
+                            break
+                        }
+                    }
+                    conn.disconnect()
+                } catch (e: Exception) {
+                    android.util.Log.w("AppRepository", "Backend appeal fetch error ($endpoint): ${e.message}")
+                }
+            }
         }
 
-        if (resultData != null) {
-            for (i in 0 until resultData!!.length()) {
-                val obj = resultData!!.getJSONObject(i)
-                val order = obj.optJSONObject("orders")
-                val appeal = AppealEntity(
-                    id = obj.getString("id"),
+        // 2. Direct Supabase Query (PostgREST inner join)
+        val active = getAuthenticatedSupabaseProfile()
+        if (active != null && active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
+            var resultData: org.json.JSONArray? = null
+            try {
+                com.example.data.remote.SupabaseClient.fetchAppeals(
+                    url = active.supabaseUrl,
+                    anonKey = active.anonKey,
+                    token = active.authSessionToken.ifBlank { active.anonKey },
                     merchantId = effectiveMid,
-                    orderId = obj.optString("order_id", ""),
-                    amount = order?.optDouble("amount", 0.0) ?: 0.0,
-                    customerName = order?.optString("cus_name", "Payer") ?: "Payer",
-                    customerPhone = obj.optString("cus_phone").ifBlank { order?.optString("cus_phone").orEmpty() },
-                    trxId = obj.getString("trx_id"),
-                    timestamp = parseIsoDateToMillis(obj.optString("created_at")),
-                    status = obj.getString("status")
+                    onSuccess = { jsonArray -> resultData = jsonArray },
+                    onFailure = { err ->
+                        android.util.Log.e("AppRepository", "Failed to fetch appeals from Supabase: $err")
+                    }
                 )
-                dao.insertAppeal(appeal)
+            } catch (e: Exception) {
+                android.util.Log.e("AppRepository", "Exception fetching appeals from Supabase", e)
             }
-            true
-        } else {
-            false
+
+            if (resultData != null) {
+                for (i in 0 until resultData!!.length()) {
+                    val obj = resultData!!.getJSONObject(i)
+                    val order = obj.optJSONObject("orders")
+                    val appeal = AppealEntity(
+                        id = obj.getString("id"),
+                        merchantId = effectiveMid,
+                        orderId = obj.optString("order_id", ""),
+                        amount = order?.optDouble("amount", 0.0) ?: obj.optDouble("amount", 0.0),
+                        customerName = order?.optString("cus_name", "Customer") ?: obj.optString("customer_name", "Customer"),
+                        customerPhone = obj.optString("cus_phone").ifBlank { order?.optString("cus_phone").orEmpty() },
+                        trxId = obj.getString("trx_id"),
+                        timestamp = parseIsoDateToMillis(obj.optString("created_at")),
+                        status = obj.optString("status", "PENDING_REVIEW")
+                    )
+                    dao.insertAppeal(appeal)
+                }
+                didSyncAny = true
+            }
         }
+
+        didSyncAny
     }
 
     suspend fun syncDevicesFromSupabase(targetMerchantId: String = activeProfileId): Boolean = withContext(Dispatchers.IO) {
@@ -547,6 +630,7 @@ class AppRepository(private val context: Context) {
         val model = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
         val osVer = "Android ${android.os.Build.VERSION.RELEASE}"
 
+        val fcmToken = com.example.service.AppFirebaseMessagingService.getSavedToken(context).orEmpty()
         var success = false
 
         // 1. Always ping SwapnoPay backend heartbeat so gateway immediately marks merchant active
@@ -556,24 +640,36 @@ class AppRepository(private val context: Context) {
                 put("device_id", deviceId)
                 put("battery_level", batteryLevel)
                 put("status", "ONLINE")
-            }
-            val conn = (java.net.URL("https://api.swapnopay.top/v1/payment/heartbeat").openConnection() as java.net.HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("Content-Type", "application/json")
-                active.authSessionToken.takeIf { it.isNotBlank() }?.let {
-                    setRequestProperty("Authorization", "Bearer $it")
+                put("device_model", model)
+                put("os_version", osVer)
+                if (fcmToken.isNotBlank()) {
+                    put("fcm_token", fcmToken)
                 }
-                doOutput = true
-                connectTimeout = 4000
-                readTimeout = 4000
             }
-            conn.outputStream.use { os ->
-                os.write(backendPayload.toString().toByteArray(Charsets.UTF_8))
+            val endpoints = listOf("https://api.swapnopay.top/v1/payment/heartbeat", "https://swapnopay.top/v1/payment/heartbeat")
+            for (endpoint in endpoints) {
+                try {
+                    val conn = (java.net.URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        setRequestProperty("Content-Type", "application/json")
+                        active.authSessionToken.takeIf { it.isNotBlank() }?.let {
+                            setRequestProperty("Authorization", "Bearer $it")
+                        }
+                        doOutput = true
+                        connectTimeout = 4000
+                        readTimeout = 4000
+                    }
+                    conn.outputStream.use { os ->
+                        os.write(backendPayload.toString().toByteArray(Charsets.UTF_8))
+                    }
+                    if (conn.responseCode in 200..299) {
+                        success = true
+                        conn.disconnect()
+                        break
+                    }
+                    conn.disconnect()
+                } catch (_: Exception) {}
             }
-            if (conn.responseCode in 200..299) {
-                success = true
-            }
-            conn.disconnect()
         } catch (_: Exception) {}
 
         // 2. Also register/update device on merchant Supabase if credentials present
@@ -590,8 +686,43 @@ class AppRepository(private val context: Context) {
                     batteryLevel = batteryLevel,
                     online = true,
                     merchantId = active.id,
+                    fcmToken = fcmToken.ifBlank { null },
                     onSuccess = { success = true },
                     onFailure = { /* non-fatal if backend heartbeat succeeded */ }
+                )
+            } catch (_: Exception) {}
+        }
+
+        // 3. Persist current device status as ONLINE in local Room database
+        try {
+            dao.insertDevices(listOf(
+                com.example.data.local.DeviceInfoEntity(
+                    id = deviceId,
+                    merchantId = active.id,
+                    deviceName = model,
+                    status = "ONLINE",
+                    batteryLevel = batteryLevel,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+            ))
+        } catch (_: Exception) {}
+
+        // 3. Guarantee registration on Platform Admin Supabase so Admin Dashboard always sees the device
+        if (!active.supabaseUrl.contains("tldubojeokgyoclxnzkb")) {
+            try {
+                com.example.data.remote.SupabaseClient.registerOrUpdateDevice(
+                    url = "https://tldubojeokgyoclxnzkb.supabase.co",
+                    anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0",
+                    token = active.authSessionToken.ifBlank { "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHVib2plb2tneW9jbHhuemtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwODMsImV4cCI6MjEwMzM0MzA4M30.vlgmNEJ0_DpdbsZEQMA2Z82vwY4hwTxpgS4o9p5oEb0" },
+                    deviceId = deviceId,
+                    model = model,
+                    osVersion = osVer,
+                    batteryLevel = batteryLevel,
+                    online = true,
+                    merchantId = active.id,
+                    fcmToken = fcmToken.ifBlank { null },
+                    onSuccess = {},
+                    onFailure = {}
                 )
             } catch (_: Exception) {}
         }
@@ -675,7 +806,7 @@ class AppRepository(private val context: Context) {
     // SMS Parsing & Automation Engine
     suspend fun processIncomingSms(sender: String, body: String): Boolean {
         // 1. Sender Identification filter
-        if (!isAllowedSender(sender)) {
+        if (!isAllowedSender(sender, body)) {
             android.util.Log.d("AppRepository", "SMS rejected: sender '$sender' is not in allowed list.")
             return false
         }
@@ -782,6 +913,18 @@ class AppRepository(private val context: Context) {
                 conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
                 if (code in 200..299) {
+                    try {
+                        val respStr = conn.inputStream.bufferedReader().use { it.readText() }
+                        val respJson = org.json.JSONObject(respStr)
+                        val respStatus = respJson.optString("status")
+                        val matchedOrderId = if (respJson.isNull("order_id")) null else respJson.optString("order_id")
+                        if (respStatus.equals("PAID", true) || respStatus.equals("MATCHED", true) || !matchedOrderId.isNullOrBlank()) {
+                            dao.updatePaymentStatus(payment.id, "MATCHED", matchedOrderId)
+                            android.util.Log.d("AppRepository", "Reported payment ${payment.id} matched order $matchedOrderId")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.d("AppRepository", "Failed to parse report-payment response: ${e.message}")
+                    }
                     android.util.Log.d("AppRepository", "Reported payment ${payment.id} to SwapnoPay backend ($urlStr)")
                     return@withContext true
                 }
@@ -793,30 +936,36 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun uploadSmsToSupabase(sms: SmsQueueEntity): Boolean = withContext(Dispatchers.IO) {
-        // First try central backend
-        val backendReported = reportPaymentToBackend(
-            CachedPaymentEntity(
-                id = sms.trxId,
-                merchantId = sms.merchantId,
-                amount = sms.amount,
-                sender = sms.sender,
-                timestamp = sms.timestamp,
-                status = "UNMATCHED",
-                method = "bKash",
-                orderId = null
-            )
-        )
-        if (backendReported) return@withContext true
-
         val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
         if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
         
         var success = false
+        val token = active.authSessionToken.ifBlank { active.anonKey }
         try {
+            // 1. Direct match or check existing order match on merchant DB FIRST
+            val matchedOrderId = com.example.data.remote.SupabaseClient.matchAndUpdatePendingOrder(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = token,
+                merchantId = sms.merchantId,
+                trxId = sms.trxId,
+                amount = sms.amount,
+                sender = sms.sender,
+                method = "bKash",
+                timestamp = sms.timestamp
+            )
+            val isOrderMatched = !matchedOrderId.isNullOrBlank()
+            if (isOrderMatched) {
+                success = true
+                dao.updatePaymentStatus(sms.trxId, "MATCHED", matchedOrderId)
+                android.util.Log.d("AppRepository", "Direct order match on merchant Supabase succeeded for TrxID ${sms.trxId}, order $matchedOrderId")
+            }
+
+            // 2. Insert into merchant DB sms_logs
             com.example.data.remote.SupabaseClient.insertSmsLog(
                 url = active.supabaseUrl,
                 anonKey = active.anonKey,
-                token = active.authSessionToken.ifBlank { active.anonKey },
+                token = token,
                 merchantId = sms.merchantId,
                 deviceId = installationId,
                 rawSms = sms.rawBody,
@@ -824,13 +973,30 @@ class AppRepository(private val context: Context) {
                 sender = sms.sender,
                 trxId = sms.trxId,
                 timestamp = sms.timestamp,
+                status = if (isOrderMatched) "matched" else "unprocessed",
+                processed = isOrderMatched,
                 onSuccess = { success = true },
                 onFailure = { err ->
                     android.util.Log.e("AppRepository", "Failed to upload SMS log: $err")
-                    success = false
                 }
             )
+
+            // 3. Insert into merchant DB payments table
+            com.example.data.remote.SupabaseClient.insertPayment(
+                url = active.supabaseUrl,
+                anonKey = active.anonKey,
+                token = token,
+                merchantId = sms.merchantId,
+                trxId = sms.trxId,
+                amount = sms.amount,
+                sender = sms.sender,
+                timestamp = sms.timestamp,
+                status = if (isOrderMatched) "MATCHED" else "UNMATCHED",
+                matchedOrderId = matchedOrderId,
+                onSuccess = { success = true }
+            )
         } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "uploadSmsToSupabase exception: ${e.message}")
             success = false
         }
         success
@@ -913,19 +1079,30 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    fun isAllowedSender(address: String?): Boolean {
-        val s = address?.lowercase()?.trim() ?: return false
+    fun isAllowedSender(address: String?, body: String? = null): Boolean {
+        val s = address?.lowercase()?.trim() ?: ""
         val clean = s.filter { it.isLetterOrDigit() }
-        return s == "bkash" || s == "nagad" || s == "upay" || s == "rocket" || s == "16216" ||
-               s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("rocket") || s.endsWith("16216") ||
-               clean.contains("bkash") ||
-               clean.contains("nagad") ||
-               clean.contains("upay") ||
-               clean.contains("rocket") ||
-               clean == "16247" || clean.endsWith("16247") ||
-               clean == "16167" || clean.endsWith("16167") ||
-               clean == "16216" || clean.endsWith("16216") ||
-               clean == "16268" || clean.endsWith("16268")
+        if (s == "bkash" || s == "nagad" || s == "upay" || s == "rocket" || s == "16216" ||
+            s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("rocket") || s.endsWith("16216") ||
+            clean.contains("bkash") ||
+            clean.contains("nagad") ||
+            clean.contains("upay") ||
+            clean.contains("rocket") ||
+            clean == "16247" || clean.endsWith("16247") ||
+            clean == "16167" || clean.endsWith("16167") ||
+            clean == "16216" || clean.endsWith("16216") ||
+            clean == "16268" || clean.endsWith("16268")) {
+            return true
+        }
+        if (!body.isNullOrBlank()) {
+            val bodyLower = body.lowercase()
+            val hasMfs = bodyLower.contains("bkash") || bodyLower.contains("nagad") || bodyLower.contains("upay") || bodyLower.contains("rocket")
+            val hasTrx = bodyLower.contains("trxid") || bodyLower.contains("txnid") || bodyLower.contains("transaction id") || bodyLower.contains("trans id")
+            if (hasMfs && hasTrx) {
+                return true
+            }
+        }
+        return false
     }
 
     fun isIncomingMoneyAlert(sender: String, body: String): Boolean {
@@ -1747,11 +1924,24 @@ class AppRepository(private val context: Context) {
         dao.observeMerchantNumbers(merchantId)
     suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity> = dao.getMerchantNumbers(merchantId)
     suspend fun upsertMerchantNumber(number: MerchantNumberEntity) = dao.upsertMerchantNumber(number)
+    suspend fun upsertMerchantNumbers(numbers: List<MerchantNumberEntity>) = dao.upsertMerchantNumbers(numbers)
     suspend fun setDefaultMerchantNumber(merchantId: String, number: MerchantNumberEntity) {
         dao.setDefaultMerchantNumber(merchantId, number)
     }
-    suspend fun deleteMerchantNumber(merchantId: String, number: String) =
-        dao.deleteMerchantNumber(merchantId, number)
+    suspend fun deleteMerchantNumber(merchantId: String, number: String, method: String? = null) {
+        if (!method.isNullOrBlank()) {
+            dao.deleteMerchantNumberByMethod(merchantId, number, method)
+        } else {
+            dao.deleteMerchantNumber(merchantId, number)
+        }
+    }
+    suspend fun clearAllPayments(merchantId: String? = null) {
+        if (merchantId.isNullOrBlank()) {
+            dao.deleteAllCachedPayments()
+        } else {
+            dao.clearPaymentsForMerchant(merchantId)
+        }
+    }
 
     fun observePaymentFormCache(merchantId: String): Flow<List<PaymentFormCacheEntity>> =
         dao.observePaymentFormCache(merchantId)
@@ -1776,4 +1966,13 @@ class AppRepository(private val context: Context) {
         dao.updateOutboxSmsStatus(id, status, sentAt, errorMessage)
     suspend fun deleteOutboxSms(id: String): Int = dao.deleteOutboxSms(id)
     suspend fun clearOutboxSms(merchantId: String): Int = dao.clearOutboxSms(merchantId)
+
+    /**
+     * Purges all tenant business records from the local Room SQLite database on logout.
+     * Prevents data leakage between merchant accounts and ensures fresh sync upon next login.
+     */
+    suspend fun purgeAllTenantBusinessData() = withContext(Dispatchers.IO) {
+        dao.purgeAllTenantBusinessData()
+        activeProfileId = "merchant_default"
+    }
 }

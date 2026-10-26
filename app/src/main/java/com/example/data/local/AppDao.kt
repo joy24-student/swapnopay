@@ -88,6 +88,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPayment(payment: CachedPaymentEntity)
 
+    @Query("UPDATE cached_payments SET status = :status, orderId = :orderId WHERE id = :trxId")
+    suspend fun updatePaymentStatus(trxId: String, status: String, orderId: String? = null)
+
     // Appeals
     @Query("SELECT * FROM appeals WHERE merchantId = :merchantId ORDER BY timestamp DESC")
     fun observeAppeals(merchantId: String): Flow<List<AppealEntity>>
@@ -741,10 +744,10 @@ interface AppDao {
     suspend fun deleteEmployee(id: String)
 
     // Merchant payment numbers
-    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default') AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' OR merchantId NOT IN (SELECT id FROM merchant_profile WHERE id != :merchantId AND id NOT IN ('merchant_default', '00000000-0000-0000-0000-000000000001', ''))) AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     fun observeMerchantNumbers(merchantId: String): Flow<List<MerchantNumberEntity>>
 
-    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default') AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
+    @Query("SELECT * FROM merchant_numbers WHERE (merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' OR merchantId NOT IN (SELECT id FROM merchant_profile WHERE id != :merchantId AND id NOT IN ('merchant_default', '00000000-0000-0000-0000-000000000001', ''))) AND number NOT IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') AND number NOT LIKE '%XXXX%' AND number NOT LIKE '%11223344%' AND number NOT LIKE '%0000000%' ORDER BY (CASE WHEN merchantId = :merchantId THEN 0 ELSE 1 END), isDefault DESC, method ASC")
     suspend fun getMerchantNumbers(merchantId: String): List<MerchantNumberEntity>
 
     @Query("DELETE FROM merchant_numbers WHERE number IN ('01711223344', '01811223344', '019112233441', '01928092777', '01712963652', '01819283746', '01612345678', '01712345678', '01700000000', '01700000001', '01800000000', '01900000000', '01600000000', '01500000000') OR number LIKE '%XXXX%' OR number LIKE '%11223344%' OR number LIKE '%0000000%'")
@@ -752,6 +755,9 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMerchantNumber(number: MerchantNumberEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMerchantNumbers(numbers: List<MerchantNumberEntity>)
 
     @Query("UPDATE merchant_numbers SET isDefault = 0 WHERE merchantId = :merchantId")
     suspend fun clearDefaultMerchantNumber(merchantId: String)
@@ -764,6 +770,9 @@ interface AppDao {
 
     @Query("DELETE FROM merchant_numbers WHERE merchantId = :merchantId AND number = :number")
     suspend fun deleteMerchantNumber(merchantId: String, number: String)
+
+    @Query("DELETE FROM merchant_numbers WHERE merchantId = :merchantId AND number = :number AND method = :method")
+    suspend fun deleteMerchantNumberByMethod(merchantId: String, number: String, method: String)
 
     // Offline form and response mirrors
     @Query("SELECT * FROM payment_form_cache WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' ORDER BY updatedAt DESC")
@@ -823,4 +832,106 @@ interface AppDao {
 
     @Query("SELECT * FROM customers WHERE merchantId = :merchantId ORDER BY name ASC")
     suspend fun getAllCustomersList(merchantId: String): List<CustomerEntity>
+
+    // Complete Tenant Business Data Purge on Logout
+    @Query("DELETE FROM products")
+    suspend fun deleteAllProducts()
+
+    @Query("DELETE FROM product_variants")
+    suspend fun deleteAllProductVariants()
+
+    @Query("DELETE FROM stock_transactions")
+    suspend fun deleteAllStockTransactions()
+
+    @Query("DELETE FROM customers")
+    suspend fun deleteAllCustomers()
+
+    @Query("DELETE FROM suppliers")
+    suspend fun deleteAllSuppliers()
+
+    @Query("DELETE FROM ledger_transactions")
+    suspend fun deleteAllLedgerTransactions()
+
+    @Query("DELETE FROM pos_sales")
+    suspend fun deleteAllPosSales()
+
+    @Query("DELETE FROM expenses")
+    suspend fun deleteAllExpenses()
+
+    @Query("DELETE FROM loans")
+    suspend fun deleteAllLoans()
+
+    @Query("DELETE FROM dps_accounts")
+    suspend fun deleteAllDpsAccounts()
+
+    @Query("DELETE FROM finance_installments")
+    suspend fun deleteAllFinanceInstallments()
+
+    @Query("DELETE FROM merchant_notifications")
+    suspend fun deleteAllMerchantNotifications()
+
+    @Query("DELETE FROM business_analytics")
+    suspend fun deleteAllBusinessAnalytics()
+
+    @Query("DELETE FROM employees")
+    suspend fun deleteAllEmployees()
+
+    @Query("DELETE FROM merchant_numbers")
+    suspend fun deleteAllMerchantNumbers()
+
+    @Query("DELETE FROM payment_form_cache")
+    suspend fun deleteAllPaymentFormCache()
+
+    @Query("DELETE FROM form_submission_cache")
+    suspend fun deleteAllFormSubmissionCache()
+
+    @Query("DELETE FROM cached_orders")
+    suspend fun deleteAllCachedOrders()
+
+    @Query("DELETE FROM cached_payments")
+    suspend fun deleteAllCachedPayments()
+
+    @Query("DELETE FROM cached_payments WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = ''")
+    suspend fun clearPaymentsForMerchant(merchantId: String)
+
+    @Query("DELETE FROM appeals")
+    suspend fun deleteAllAppeals()
+
+    @Query("DELETE FROM outbox_sms")
+    suspend fun deleteAllOutboxSms()
+
+    @Query("DELETE FROM merchant_profile")
+    suspend fun deleteAllMerchantProfiles()
+
+    @Query("DELETE FROM supabase_profiles WHERE id != '00000000-0000-0000-0000-000000000001'")
+    suspend fun deleteAllCustomSupabaseProfiles()
+
+    @Transaction
+    suspend fun purgeAllTenantBusinessData() {
+        deleteAllProducts()
+        deleteAllProductVariants()
+        deleteAllStockTransactions()
+        deleteAllCustomers()
+        deleteAllSuppliers()
+        deleteAllLedgerTransactions()
+        deleteAllPosSales()
+        deleteAllExpenses()
+        deleteAllLoans()
+        deleteAllDpsAccounts()
+        deleteAllFinanceInstallments()
+        deleteAllMerchantNotifications()
+        deleteAllBusinessAnalytics()
+        deleteAllEmployees()
+        deleteAllMerchantNumbers()
+        deleteAllPaymentFormCache()
+        deleteAllFormSubmissionCache()
+        deleteAllCachedOrders()
+        deleteAllCachedPayments()
+        deleteAllAppeals()
+        clearSmsQueue()
+        deleteAllOutboxSms()
+        clearDevices()
+        deleteAllMerchantProfiles()
+        deleteAllCustomSupabaseProfiles()
+    }
 }

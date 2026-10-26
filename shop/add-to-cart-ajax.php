@@ -46,6 +46,51 @@ $size_name = trim($_POST['size_name'] ?? '');
 $color_id = (int)($_POST['color_id'] ?? 0);
 $color_name = trim($_POST['color_name'] ?? '');
 
+// Check for dynamic variant price & variant stock
+$final_price = (float)$product['p_current_price'];
+$final_qty = (int)$product['p_qty'];
+
+if ($size_id > 0 || $color_id > 0) {
+    try {
+        $vStmt = $pdo->prepare("
+            SELECT variant_price, variant_qty 
+            FROM tbl_product_variants 
+            WHERE p_id = ? 
+              AND (
+                (size_id = ? AND color_id = ?)
+                OR (size_id = ? AND color_id = 0)
+                OR (size_id = 0 AND color_id = ?)
+              )
+            ORDER BY 
+              (size_id = ? AND color_id = ?) DESC,
+              (size_id = ?) DESC,
+              (color_id = ?) DESC
+            LIMIT 1
+        ");
+        $vStmt->execute([
+            $p_id,
+            $size_id, $color_id,
+            $size_id,
+            $color_id,
+            $size_id, $color_id,
+            $size_id,
+            $color_id
+        ]);
+        $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
+        if ($variant && (float)$variant['variant_price'] > 0) {
+            $final_price = (float)$variant['variant_price'];
+            if ($variant['variant_qty'] !== null && $variant['variant_qty'] !== '') {
+                $final_qty = (int)$variant['variant_qty'];
+            }
+        }
+    } catch (Throwable $_) {}
+}
+
+if ($final_qty < $p_qty_added && $final_qty > 0) {
+    echo json_encode(['success' => false, 'message' => 'Selected option is out of stock.']);
+    exit;
+}
+
 // Server-side duplicate rapid click protection (debounce within 450ms)
 $nowMicro = microtime(true);
 $reqSig = md5($p_id . '_' . $size_id . '_' . $color_id . '_' . $p_qty_added);
@@ -62,7 +107,7 @@ if (isset($_SESSION['sn_last_cart_add_time']) && isset($_SESSION['sn_last_cart_a
             'message' => htmlspecialchars($product['p_name']) . ' added to cart!',
             'cart_count' => $total_cart_count,
             'product_name' => $product['p_name'],
-            'product_price' => $product['p_current_price']
+            'product_price' => $final_price
         ]);
         exit;
     }
@@ -83,6 +128,7 @@ foreach ($_SESSION['cart_p_id'] as $k => $id) {
 
 if ($item_found) {
     $_SESSION['cart_p_qty'][$found_index] += $p_qty_added;
+    $_SESSION['cart_p_current_price'][$found_index] = $final_price;
     if (isset($_SESSION['customer']['cust_id'])) {
         updateCartItemQuantity($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id, $color_id, $_SESSION['cart_p_qty'][$found_index]);
     }
@@ -94,12 +140,12 @@ if ($item_found) {
     $_SESSION['cart_color_id'][$next_index] = $color_id;
     $_SESSION['cart_color_name'][$next_index] = $color_name;
     $_SESSION['cart_p_qty'][$next_index] = $p_qty_added;
-    $_SESSION['cart_p_current_price'][$next_index] = $product['p_current_price'];
+    $_SESSION['cart_p_current_price'][$next_index] = $final_price;
     $_SESSION['cart_p_name'][$next_index] = $product['p_name'];
     $_SESSION['cart_p_featured_photo'][$next_index] = $product['p_featured_photo'];
 
     if (isset($_SESSION['customer']['cust_id'])) {
-        addOrUpdateCartItem($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id, $size_name, $color_id, $color_name, $p_qty_added, $product['p_current_price'], $product['p_name'], $product['p_featured_photo']);
+        addOrUpdateCartItem($pdo, $_SESSION['customer']['cust_id'], $p_id, $size_id, $size_name, $color_id, $color_name, $p_qty_added, $final_price, $product['p_name'], $product['p_featured_photo']);
     }
 }
 
@@ -113,6 +159,6 @@ echo json_encode([
     'message' => htmlspecialchars($product['p_name']) . ' added to cart!',
     'cart_count' => $total_cart_count,
     'product_name' => $product['p_name'],
-    'product_price' => $product['p_current_price']
+    'product_price' => $final_price
 ]);
 

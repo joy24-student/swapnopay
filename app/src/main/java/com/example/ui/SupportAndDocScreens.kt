@@ -69,13 +69,6 @@ fun SupportScreen(viewModel: AppViewModel) {
     // Chat Message State
     var chatInput by remember { mutableStateOf("") }
 
-    // Ticket Submission State
-    var ticketTab by remember { mutableStateOf("NEW") }
-    var ticketCategory by remember { mutableStateOf("Payment Matching") }
-    var ticketSubject by remember { mutableStateOf("") }
-    var ticketDesc by remember { mutableStateOf("") }
-    var ticketSubmitted by remember { mutableStateOf(false) }
-    var lastSubmittedTicketId by remember { mutableStateOf("") }
 
     // Dynamic Articles synced from Firebase Admin CMS
     val articles = systemConfig.articles.mapIndexed { index, art ->
@@ -544,6 +537,33 @@ fun SupportScreen(viewModel: AppViewModel) {
 
         // 3. CATEGORIES DIALOG
         activeCategoryDialog?.let { dialogType ->
+            SupportCategoryModal(
+                dialogType = dialogType,
+                onDismiss = { activeCategoryDialog = null },
+                viewModel = viewModel
+            )
+        }
+    }
+    }
+
+@Composable
+private fun SupportCategoryModal(
+    dialogType: String,
+    onDismiss: () -> Unit,
+    viewModel: AppViewModel
+) {
+    val activeProfile by viewModel.activeProfile.collectAsState()
+    val systemConfig by viewModel.systemRemoteConfig.collectAsState()
+    val myTickets by viewModel.mySupportTicketsList.collectAsState()
+
+    // Ticket Submission State
+    var ticketTab by remember { mutableStateOf("NEW") }
+    var ticketCategory by remember { mutableStateOf("Payment Matching") }
+    var ticketSubject by remember { mutableStateOf("") }
+    var ticketDesc by remember { mutableStateOf("") }
+    var ticketSubmitted by remember { mutableStateOf(false) }
+    var lastSubmittedTicketId by remember { mutableStateOf("") }
+
             val modalTitle = when (dialogType) {
                 "FAQs" -> "Frequently Asked Questions"
                 "Guides" -> "User Guides & Onboarding"
@@ -553,7 +573,7 @@ fun SupportScreen(viewModel: AppViewModel) {
                 else -> "System Operations Status"
             }
             EnterpriseGestureModal(
-                onDismissRequest = { activeCategoryDialog = null },
+                onDismissRequest = { onDismiss() },
                 title = modalTitle,
                 subtitle = "Swipe down or drag handle to dismiss",
                 icon = when (dialogType) {
@@ -920,7 +940,7 @@ fun SupportScreen(viewModel: AppViewModel) {
 
                                     Button(
                                         onClick = {
-                                            activeCategoryDialog = null
+                                            onDismiss()
                                             viewModel.navigateTo("SupportChat")
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
@@ -1217,8 +1237,7 @@ fun SupportScreen(viewModel: AppViewModel) {
                     }
                 }
             }
-        }
-    }
+
 
 @Composable
 fun QuickHelpCard(

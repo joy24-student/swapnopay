@@ -54,8 +54,14 @@ object SmsGatewayEngine {
             }
 
             val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                ?: (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) SubscriptionManager.from(context) else null)
             if (subManager != null) {
-                val activeSubs: List<SubscriptionInfo>? = subManager.activeSubscriptionInfoList
+                var activeSubs: List<SubscriptionInfo>? = null
+                try {
+                    activeSubs = subManager.activeSubscriptionInfoList
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "SecurityException querying activeSubscriptionInfoList: ${e.message}")
+                }
                 if (!activeSubs.isNullOrEmpty()) {
                     for (info in activeSubs) {
                         val carrier = info.carrierName?.toString()?.ifBlank { null }
@@ -90,13 +96,24 @@ object SmsGatewayEngine {
     private fun getSmsManagerForSlot(context: Context, simSlot: Int): SmsManager {
         val simCards = getAvailableSimCards(context)
         val selectedSim = simCards.find { it.slotIndex == simSlot } ?: simCards.firstOrNull()
+        Log.d(TAG, "Resolving SmsManager for requested simSlot: $simSlot -> matched: ${selectedSim?.displayName} (subId: ${selectedSim?.subscriptionId})")
 
         return if (selectedSim != null && selectedSim.subscriptionId != -1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                context.getSystemService(SmsManager::class.java).createForSubscriptionId(selectedSim.subscriptionId)
-            } else {
-                @Suppress("DEPRECATION")
-                SmsManager.getSmsManagerForSubscriptionId(selectedSim.subscriptionId)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.getSystemService(SmsManager::class.java).createForSubscriptionId(selectedSim.subscriptionId)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getSmsManagerForSubscriptionId(selectedSim.subscriptionId)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed creating subscription SmsManager for ${selectedSim.subscriptionId}: ${e.message}")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    context.getSystemService(SmsManager::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
+                }
             }
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -321,12 +338,22 @@ object SmsGatewayEngine {
                             val dao = AppDatabase.getDatabase(context).appDao()
                             val entities = mutableListOf<OutboxSmsEntity>()
 
+                            val prefs = context.getSharedPreferences("sms_gateway_prefs", Context.MODE_PRIVATE)
+                            val defaultSimSlot = prefs.getInt("selected_sim_slot", 0)
+
                             for (i in 0 until jobsArray.length()) {
                                 val jobObj = jobsArray.getJSONObject(i)
                                 val jobId = jobObj.optString("job_id")
                                 val phone = jobObj.optString("phone")
                                 val msg = jobObj.optString("message")
                                 val type = jobObj.optString("type", "GATEWAY_CUSTOM")
+
+                                val targetSlot = if (jobObj.has("sim_slot") && !jobObj.isNull("sim_slot")) {
+                                    val raw = jobObj.optInt("sim_slot", defaultSimSlot)
+                                    if (raw in 1..2) raw - 1 else raw
+                                } else {
+                                    defaultSimSlot
+                                }
 
                                 if (phone.isNotBlank() && msg.isNotBlank()) {
                                     entities.add(
@@ -336,7 +363,7 @@ object SmsGatewayEngine {
                                             recipientPhone = phone,
                                             messageText = msg,
                                             smsType = type,
-                                            simSlot = 0,
+                                            simSlot = targetSlot,
                                             status = "QUEUED",
                                             externalJobId = jobId,
                                             partsCount = (msg.length / 160) + 1,

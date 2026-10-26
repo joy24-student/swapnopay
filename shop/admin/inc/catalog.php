@@ -1,5 +1,15 @@
 <?php
 function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int {
+    static $productSchemaMigrated = false;
+    if (!$productSchemaMigrated) {
+        $productSchemaMigrated = true;
+        try {
+            $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(255) DEFAULT NULL");
+            $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS slug VARCHAR(255) DEFAULT NULL");
+            $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
+            $pdo->exec("ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()");
+        } catch (Throwable $_) {}
+    }
     $name=trim(strip_tags((string)($data['p_name'] ?? '')));
     $price=filter_var($data['p_current_price'] ?? '',FILTER_VALIDATE_FLOAT);
     $old=filter_var(($data['p_old_price'] ?? '')==='' ? 0 : $data['p_old_price'],FILTER_VALIDATE_FLOAT);
@@ -47,14 +57,15 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
         $existing=null;
         if($id) {$stmt=$pdo->prepare('SELECT * FROM tbl_product WHERE p_id=? FOR UPDATE');$stmt->execute([$id]);$existing=$stmt->fetch();if(!$existing) throw new RuntimeException('Product not found.');}
         $photo=$saveImage($files['p_featured_photo'] ?? []) ?? ($existing['p_featured_photo'] ?? 'placeholder.svg');
+        $couponCode = !empty($data['coupon_code']) ? trim(strip_tags((string)$data['coupon_code'])) : null;
         $values=[$name,round($old,2),round($price,2),$stock,$photo];
         foreach(['p_description','p_short_description','p_feature','p_condition','p_return_policy','p_video_link'] as $field) $values[]=substr((string)($data[$field] ?? ''),0,40000);
-        $values[]=(int)(($data['p_is_featured'] ?? 0)==1);$values[]=(int)(($data['p_is_active'] ?? 1)==1);$values[]=$category;
+        $values[]=(int)(($data['p_is_featured'] ?? 0)==1);$values[]=(int)(($data['p_is_active'] ?? 1)==1);$values[]=$category;$values[]=$couponCode;
         if($id) {
             $values[]=$id;
-            $pdo->prepare('UPDATE tbl_product SET p_name=?,p_old_price=?,p_current_price=?,p_qty=?,p_featured_photo=?,p_description=?,p_short_description=?,p_feature=?,p_condition=?,p_return_policy=?,p_video_link=?,p_is_featured=?,p_is_active=?,ecat_id=? WHERE p_id=?')->execute($values);
+            $pdo->prepare('UPDATE tbl_product SET p_name=?,p_old_price=?,p_current_price=?,p_qty=?,p_featured_photo=?,p_description=?,p_short_description=?,p_feature=?,p_condition=?,p_return_policy=?,p_video_link=?,p_is_featured=?,p_is_active=?,ecat_id=?,coupon_code=? WHERE p_id=?')->execute($values);
         } else {
-            $sql='INSERT INTO tbl_product(p_name,p_old_price,p_current_price,p_qty,p_featured_photo,p_description,p_short_description,p_feature,p_condition,p_return_policy,p_video_link,p_is_featured,p_is_active,ecat_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+            $sql='INSERT INTO tbl_product(p_name,p_old_price,p_current_price,p_qty,p_featured_photo,p_description,p_short_description,p_feature,p_condition,p_return_policy,p_video_link,p_is_featured,p_is_active,ecat_id,coupon_code) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
             $stmt=$pdo->prepare($sql . (DB_DRIVER_NAME==='pgsql' ? ' RETURNING p_id' : ''));$stmt->execute($values);
             $id=(int)(DB_DRIVER_NAME==='pgsql' ? $stmt->fetchColumn() : $pdo->lastInsertId());
         }
@@ -68,10 +79,18 @@ function saveStoreProduct(PDO $pdo,array $data,array $files,?int $id=null): int 
             }
         }
         $photos=$files['photo'] ?? [];
-        if(count((array)($photos['tmp_name'] ?? []))>10) throw new RuntimeException('Upload up to 10 additional images at a time.');
-        foreach((array)($photos['tmp_name'] ?? []) as $key=>$tmp) {
+        $tmpList = (array)($photos['tmp_name'] ?? []);
+        if(count($tmpList)>30) throw new RuntimeException('Upload up to 30 additional images at a time.');
+        $upDir = dirname(__DIR__, 2) . '/assets/uploads/';
+        foreach($tmpList as $key=>$tmp) {
+            if(empty($tmp)) continue;
             $saved=$saveImage(['tmp_name'=>$tmp,'error'=>$photos['error'][$key],'size'=>$photos['size'][$key]],'product_photos/');
-            if($saved) $pdo->prepare('INSERT INTO tbl_product_photo(photo,p_id) VALUES(?,?)')->execute([$saved,$id]);
+            if($saved) {
+                if (file_exists($upDir . 'product_photos/' . $saved) && !file_exists($upDir . $saved)) {
+                    @copy($upDir . 'product_photos/' . $saved, $upDir . $saved);
+                }
+                $pdo->prepare('INSERT INTO tbl_product_photo(photo,p_id) VALUES(?,?)')->execute([$saved,$id]);
+            }
         }
         $pdo->commit();
         if (function_exists('clearShopCache')) {

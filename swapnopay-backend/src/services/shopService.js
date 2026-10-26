@@ -296,6 +296,19 @@ export class ShopService {
       dbUrl = `postgresql://${poolerUser}:${encodeURIComponent(dbPass)}@${poolerHost}:${poolerPort}/${poolerName}`
     }
 
+    let diskShopInfo = null
+    if (!dbUrl) {
+      try {
+        const { getShopInfoForMerchant } = await import('./adminSupabase.js')
+        diskShopInfo = getShopInfoForMerchant(id)
+        if (diskShopInfo?.db?.host && diskShopInfo?.db?.password) {
+          const db = diskShopInfo.db
+          const isSsl = db.sslmode === 'require' || db.host.includes('supabase') || db.host.includes('pooler')
+          dbUrl = `postgresql://${encodeURIComponent(db.user)}:${encodeURIComponent(db.password)}@${db.host}:${db.port || 5432}/${encodeURIComponent(db.database || 'postgres')}${isSsl ? '?sslmode=require' : '?sslmode=disable'}`
+        }
+      } catch (_) {}
+    }
+
     if (dbUrl) {
       try {
         const parsed = new URL(dbUrl)
@@ -304,11 +317,14 @@ export class ShopService {
         const database = decodeURIComponent(parsed.pathname.slice(1)) || 'postgres'
         const user = decodeURIComponent(parsed.username || '')
         const password = decodeURIComponent(parsed.password || '')
+        const effectiveSchema = explicitSchema || diskShopInfo?.db?.schema || schema
         return {
           connectionString: parsed.href,
           host, port, database, user, password,
-          schema, sslmode: 'require',
-          supabaseUrl, supabaseAnonKey,
+          schema: effectiveSchema,
+          sslmode: parsed.searchParams.get('sslmode') || (host.includes('supabase') || host.includes('pooler') ? 'require' : 'disable'),
+          supabaseUrl: supabaseUrl || diskShopInfo?.supabase_url || '',
+          supabaseAnonKey: supabaseAnonKey || diskShopInfo?.supabase_anon_key || '',
         }
       } catch (_) {}
     }
@@ -382,6 +398,29 @@ export class ShopService {
     const url = customUrl || platformUrl
     const effectiveAdminUrl = customUrl ? `${customUrl}/admin` : `${platformUrl}/admin`
     const effectiveLoginUrl = customUrl ? `${customUrl}/admin/login.php` : `${platformUrl}/admin/login.php`
+
+    let plainAdminPassword = null
+    if (row.secret_config && this.config.key) {
+      try {
+        const decrypted = decryptConfig(row.secret_config, this.config.key)
+        if (decrypted?.adminPassword) {
+          plainAdminPassword = String(decrypted.adminPassword).trim()
+        }
+      } catch (_) {}
+    }
+
+    const adminCreds = {
+      email: row.admin_email,
+      login_url: effectiveLoginUrl,
+      role: 'Top Admin',
+      has_custom_password: true
+    }
+    if (plainAdminPassword) {
+      adminCreds.default_password = plainAdminPassword
+      adminCreds.initial_password = plainAdminPassword
+      adminCreds.admin_password = plainAdminPassword
+    }
+
     return {
       ok: true, merchant_id: row.merchant_id, deployed: row.status === 'LIVE', status: row.status,
       job_id: row.job_id, message: row.message,
@@ -389,7 +428,10 @@ export class ShopService {
       platform_url: platformUrl,
       shop_slug: row.shop_slug,
       admin_url: effectiveAdminUrl, admin_login_url: effectiveLoginUrl,
-      admin_credentials: { email: row.admin_email, login_url: effectiveLoginUrl, role: 'Top Admin', has_custom_password: true },
+      admin_credentials: adminCreds,
+      admin_password: plainAdminPassword || undefined,
+      default_password: plainAdminPassword || undefined,
+      initial_password: plainAdminPassword || undefined,
       store_name: row.store_name, custom_domain: row.custom_domain || null, currency: row.currency, theme_color: row.theme_color,
       base_domain: this.config.baseDomain, ssl_active: row.status === 'LIVE',
       vps_status: row.status === 'LIVE' ? 'VERIFIED' : 'UNVERIFIED', gateway_connected: false,
@@ -401,9 +443,20 @@ export class ShopService {
       last_updated: row.updated_at, products_count: 0, orders_count: 0, total_revenue: 0, ...counts,
     }
   }
-  async status(id) {
+  async listStores(id) {
+    if (!this.pool) return []
+    try {
+      await this.initialize()
+      const mId = merchantId(id)
+      const { rows } = await this.pool.query('SELECT * FROM shop_control.launches WHERE merchant_id=$1 ORDER BY updated_at DESC', [mId])
+      return rows.map(r => this.publicStatus(r))
+    } catch (_) {
+      return []
+    }
+  }
+  async status(id, slug = null) {
     if (!this.pool) return this.publicStatus(null)
-    const row = await this.row(id)
+    const row = await this.row(id, slug)
     if (row && ['LIVE','DEGRADED'].includes(row.status) && Date.now()-new Date(row.updated_at).getTime()>60000) {
       const host = row.custom_domain || this.config.baseDomain
       const checkPath = row.custom_domain ? '/health.php' : `/${row.shop_slug}/health.php`
@@ -411,10 +464,14 @@ export class ShopService {
       row.status=ready ? 'LIVE' : 'DEGRADED'
       row.message=ready ? 'Your storefront and admin login are ready over HTTPS.' : 'The storefront could not be reached over HTTPS. Check your domain and hosting, then refresh.'
       const saved=await this.pool.query("UPDATE shop_control.launches SET status=$2,message=$3,updated_at=now() WHERE shop_slug=$1 AND job_id=$4 AND status IN ('LIVE','DEGRADED') RETURNING updated_at",[row.shop_slug,row.status,row.message,row.job_id])
-      if(!saved.rowCount) return this.status(id)
+      if(!saved.rowCount) return this.status(id, slug)
       row.updated_at=saved.rows[0].updated_at
     }
-    if (!row?.schema_ready) return this.publicStatus(row)
+    if (!row?.schema_ready) {
+      const baseStatus = this.publicStatus(row)
+      baseStatus.stores = await this.listStores(id)
+      return baseStatus
+    }
     const s = identifier(row.schema_name || schemaName(id, row.shop_slug))
     const tenantPool = await this.getTenantPool(id)
     const { rows } = await tenantPool.query(`SELECT
@@ -431,11 +488,13 @@ export class ShopService {
     } catch (error) {
       console.warn('[shop/status] Gateway configuration check failed:', error.message)
     }
-    return {
+    const finalStatus = {
       ...this.publicStatus(row, rows[0]),
       gateway_connected: gatewayConnected,
       gateway_status: gatewayConnected ? 'CONNECTED' : 'CONFIGURATION_REQUIRED',
     }
+    finalStatus.stores = await this.listStores(id)
+    return finalStatus
   }
   async enqueue(body) {
     if (!this.pool) {
@@ -491,9 +550,28 @@ export class ShopService {
       configuration.resetAdminPassword=Boolean(input.password || !existing)
       if (input.password || !existing) {
         initialPassword = input.password || generatedPassword()
+        configuration.adminPassword = initialPassword
         configuration.adminHash = await bcrypt.hash(initialPassword, 12)
+      } else if (!configuration.adminPassword && existing?.secret_config) {
+        try {
+          const prev = decryptConfig(existing.secret_config, this.config.key)
+          if (prev?.adminPassword) configuration.adminPassword = prev.adminPassword
+        } catch (_) {}
       }
-      if (sameSettings && !input.password && existing.status === 'LIVE') { await client.query('COMMIT'); return this.publicStatus(existing) }
+      if (sameSettings && !input.password && existing.status === 'LIVE') {
+        await client.query('COMMIT')
+        const st = this.publicStatus(existing)
+        const eff = configuration.adminPassword
+        if (eff) {
+          st.admin_credentials.initial_password = eff
+          st.admin_credentials.default_password = eff
+          st.admin_credentials.admin_password = eff
+          st.admin_password = eff
+          st.default_password = eff
+          st.initial_password = eff
+        }
+        return st
+      }
 
       const targetSchema = existing?.schema_name || schemaName(id, input.shop_slug)
       const jobId = crypto.randomUUID()
@@ -529,7 +607,15 @@ export class ShopService {
       }
       await client.query('COMMIT')
       const status = this.publicStatus(result.rows[0])
-      if (initialPassword && !input.password) status.admin_credentials.initial_password = initialPassword
+      const effPass = initialPassword || configuration.adminPassword
+      if (effPass) {
+        status.admin_credentials.initial_password = effPass
+        status.admin_credentials.default_password = effPass
+        status.admin_credentials.admin_password = effPass
+        status.admin_password = effPass
+        status.default_password = effPass
+        status.initial_password = effPass
+      }
       return status
     } catch (error) {
       await client.query('ROLLBACK')
@@ -734,9 +820,78 @@ export class ShopService {
         : `https://${this.config.baseDomain}/${row.shop_slug}/`
       await dbClient.query(`UPDATE tbl_settings SET meta_title_home=$1,meta_description_home=$2,contact_email=$3,receive_email=$3,"BASE_URL"=$4,theme_color=$5,currency_code=$6 WHERE id=1`,
         [row.store_name,`Shop online with ${row.store_name}.`,row.admin_email,storeBaseUrl,row.theme_color,row.currency])
+      const phpAdminHash = (secrets.adminHash || '').replace(/^\$2b\$/, '$2y$')
       if (!row.schema_ready || secrets.resetAdminPassword) await dbClient.query(`INSERT INTO tbl_user(id,full_name,email,phone,password,role,status) VALUES(1,$1,$2,'',$3,'Top Admin','Active')
-        ON CONFLICT(id) DO UPDATE SET full_name=$1,email=$2,password=$3,role='Top Admin',status='Active'`,[`${row.store_name} Administrator`,row.admin_email,secrets.adminHash])
+        ON CONFLICT(id) DO UPDATE SET full_name=$1,email=$2,password=$3,role='Top Admin',status='Active'`,[`${row.store_name} Administrator`,row.admin_email,phpAdminHash])
       else await dbClient.query('UPDATE tbl_user SET email=$1 WHERE id=1',[row.admin_email])
+
+      // Ensure essential schema columns and tables exist on storefront
+      try {
+        await dbClient.query(`
+          ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(255) DEFAULT NULL;
+          ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS slug VARCHAR(255) DEFAULT NULL;
+          ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+          ALTER TABLE tbl_product ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS order_no VARCHAR(100) DEFAULT NULL;
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS cust_id INTEGER DEFAULT NULL;
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS callback_url TEXT DEFAULT NULL;
+          ALTER TABLE tbl_order ADD COLUMN IF NOT EXISTS external_reference VARCHAR(255) DEFAULT NULL;
+
+          ALTER TABLE tbl_payment ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+          ALTER TABLE tbl_payment ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+          ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_password VARCHAR(255) NOT NULL DEFAULT '';
+          ALTER TABLE tbl_customer ADD COLUMN IF NOT EXISTS cust_phone VARCHAR(50) NOT NULL DEFAULT '';
+
+          ALTER TABLE tbl_color ADD COLUMN IF NOT EXISTS color_code VARCHAR(100) DEFAULT NULL;
+
+          CREATE TABLE IF NOT EXISTS tbl_product_variants (
+            variant_id SERIAL PRIMARY KEY,
+            p_id INTEGER NOT NULL,
+            size_id INTEGER NOT NULL DEFAULT 0,
+            color_id INTEGER NOT NULL DEFAULT 0,
+            variant_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+            variant_qty INTEGER DEFAULT 0
+          );
+          ALTER TABLE tbl_product_variants ADD COLUMN IF NOT EXISTS variant_qty INTEGER DEFAULT 0;
+          ALTER TABLE tbl_product_variants ALTER COLUMN size_id SET DEFAULT 0;
+          ALTER TABLE tbl_product_variants ALTER COLUMN color_id SET DEFAULT 0;
+          ALTER TABLE tbl_product_variants ALTER COLUMN variant_price SET DEFAULT 0.00;
+
+          CREATE INDEX IF NOT EXISTS idx_prod_variants_pid ON tbl_product_variants(p_id);
+          CREATE INDEX IF NOT EXISTS idx_prod_variants_combo ON tbl_product_variants(p_id, size_id, color_id);
+
+          CREATE TABLE IF NOT EXISTS shop_login_attempts (
+            attempt_key text PRIMARY KEY,
+            failures integer NOT NULL DEFAULT 0,
+            last_attempt timestamptz NOT NULL DEFAULT now()
+          );
+
+          DROP INDEX IF EXISTS storefront_customer_email;
+          CREATE UNIQUE INDEX IF NOT EXISTS storefront_customer_email ON tbl_customer(lower(cust_email)) 
+            WHERE cust_email IS NOT NULL AND cust_email != '' AND cust_email NOT LIKE '%@storefront.local';
+        `)
+
+        const colorHexMap = {
+          'Red': '#ef4444', 'Black': '#0f172a', 'Blue': '#3b82f6', 'Yellow': '#eab308',
+          'Green': '#22c55e', 'White': '#ffffff', 'Orange': '#f97316', 'Brown': '#78350f',
+          'Tan': '#d2b48c', 'Pink': '#ec4899', 'Mixed': 'linear-gradient(135deg, #6366f1, #ec4899, #f59e0b)',
+          'Lightblue': '#38bdf8', 'Violet': '#8b5cf6', 'Light Purple': '#c084fc', 'Salmon': '#fa8072',
+          'Gold': '#eab308', 'Gray': '#6b7280', 'Ash': '#9ca3af', 'Maroon': '#800000',
+          'Silver': '#cbd5e1', 'Dark Clay': '#5c4033', 'Cognac': '#9e472a', 'Coffee': '#6f4e37',
+          'Charcoal': '#374151', 'Navy': '#1e3a8a', 'Fuchsia': '#d946ef', 'Olive': '#84cc16',
+          'Burgundy': '#881337', 'Midnight Blue': '#1e1b4b', 'Lavender': '#a78bfa'
+        }
+        for (const [cName, cHex] of Object.entries(colorHexMap)) {
+          await dbClient.query("UPDATE tbl_color SET color_code=$1 WHERE lower(color_name)=lower($2) AND (color_code IS NULL OR color_code='')", [cHex, cName])
+        }
+      } catch (colErr) {
+        console.warn('[shop/provision] schema migration notice:', colErr.message)
+      }
+
       if (!useSeparateTenantDb) {
         await client.query(`UPDATE shop_control.launches SET schema_ready=true, schema_name=$2 WHERE shop_slug=$1`, [row.shop_slug, schema])
       }

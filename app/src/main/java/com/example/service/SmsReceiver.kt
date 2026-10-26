@@ -27,12 +27,18 @@ class SmsReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Group multipart SMS segments by sender address and concatenate their text
+                val fullBodyMap = LinkedHashMap<String, StringBuilder>()
                 for (msg in messages) {
                     val sender = msg.originatingAddress ?: continue
-                    val body = msg.messageBody ?: continue
+                    val body = msg.messageBody ?: ""
+                    fullBodyMap.getOrPut(sender) { StringBuilder() }.append(body)
+                }
 
-                    Log.d("SmsReceiver", "Static receiver intercepted SMS from: $sender")
-                    repository.processIncomingSms(sender, body)
+                for ((sender, bodyBuilder) in fullBodyMap) {
+                    val fullBody = bodyBuilder.toString()
+                    Log.d("SmsReceiver", "Static receiver intercepted full SMS from: $sender (length: ${fullBody.length})")
+                    repository.processIncomingSms(sender, fullBody)
                 }
             } catch (e: Exception) {
                 Log.e("SmsReceiver", "Error processing incoming SMS via static receiver", e)

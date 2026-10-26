@@ -146,7 +146,7 @@ export default function SystemHealth() {
           service: 'Gateway Receipt Service',
           status: receiptStatus,
           latencyMs: latencyAdmin,
-          details: `Service health: ${data.gateway_service}`,
+          details: data.gateway_service === 'ok' ? 'Email & Invoice Receipt Engine Active' : `Service health: ${data.gateway_service}`,
         });
       } else {
         updated.push({

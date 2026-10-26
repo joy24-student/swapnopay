@@ -360,7 +360,7 @@ data class EmployeeEntity(
 /** Mobile-wallet numbers configured by a merchant. */
 @Entity(
     tableName = "merchant_numbers",
-    primaryKeys = ["merchantId", "number"],
+    primaryKeys = ["merchantId", "number", "method"],
     indices = [Index("merchantId")]
 )
 data class MerchantNumberEntity(

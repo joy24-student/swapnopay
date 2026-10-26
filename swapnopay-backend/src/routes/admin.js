@@ -153,9 +153,9 @@ router.get('/health', async (_req, res) => {
     status.admin_supabase = 'error'
   }
 
-  // Check gateway-service (email receipt service)
+  // Check gateway receipt service (external microservice OR built-in mailer)
   const receiptUrl = process.env.RECEIPT_SERVICE_URL
-  if (receiptUrl) {
+  if (receiptUrl && receiptUrl !== 'internal' && receiptUrl !== 'self') {
     try {
       const r = await fetch(`${receiptUrl}/healthz`, { signal: AbortSignal.timeout(3000) })
       status.gateway_service = r.ok ? 'ok' : `http_${r.status}`
@@ -163,7 +163,12 @@ router.get('/health', async (_req, res) => {
       status.gateway_service = 'unreachable'
     }
   } else {
-    status.gateway_service = 'not_configured'
+    try {
+      const { isMailerReady } = await import('../services/mailer.js')
+      status.gateway_service = isMailerReady() ? 'ok' : 'not_configured'
+    } catch {
+      status.gateway_service = 'not_configured'
+    }
   }
 
   const allOk = status.admin_supabase === 'ok'
@@ -198,7 +203,8 @@ router.post('/test-email', async (req, res) => {
       cus_phone: req.body?.cus_phone || '01735342839',
       customer_email: targetEmail,
       product_name: req.body?.product_name || 'E-commerce Purchase',
-      verification: 'ADMIN_DIAGNOSTIC_TEST'
+      verification: 'ADMIN_DIAGNOSTIC_TEST',
+      ip_address: req.body?.ip_address || req.headers['x-real-ip'] || req.ip || null
     })
     res.json({ ok: true, message: `Test receipt sent successfully to ${targetEmail}`, messageId })
   } catch (err) {

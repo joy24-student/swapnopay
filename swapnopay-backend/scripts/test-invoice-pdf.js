@@ -174,7 +174,7 @@ export async function generateInvoicePdf(d) {
         ['Merchant Bank ID', trxId],
         ['Approved Code', trxId],
         ['Transaction Type', 'Purchase'],
-        ['IP Address', '103.109.59.237'],
+        ['IP Address', d.ip_address || d.ip || '127.0.0.1'],
         ['Statement Show', merchantName.toUpperCase().replace(/\s+/g, '_')],
         ['Gateway Currency', 'BDT'],
         ['Transaction Amount', `BDT ${amountFormatted}`],

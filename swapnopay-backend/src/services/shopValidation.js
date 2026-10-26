@@ -79,7 +79,16 @@ export function launchInput(body, existing = null) {
   }
   return { merchant_id: id, store_name: name, shop_slug: slug, currency, theme_color: color, admin_email: email, custom_domain: customDomain, password }
 }
-export const schemaName = id => `store_${merchantId(id).replaceAll('-', '')}`
+export const schemaName = (id, slug = '') => {
+  const cleanId = merchantId(id).replaceAll('-', '')
+  if (slug) {
+    const cleanSlug = String(slug).toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20).replace(/^_+|_+$/g, '')
+    if (cleanSlug) {
+      return `store_${cleanId.slice(0, 16)}_${cleanSlug}`
+    }
+  }
+  return `store_${cleanId}`
+}
 export const identifier = value => {
   if (!/^[a-z_][a-z0-9_]{0,62}$/.test(value)) throw new Error('Invalid database identifier')
   return `"${value}"`

@@ -28,11 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.local.ProductItemEntity
+import com.example.data.local.ProductVariantEntity
 
 // INVENTORY & QR BINDING SCREEN — Pixel-Perfect Redesign & Barcode Binding
 @Composable
 fun InventoryScreen(viewModel: AppViewModel) {
     val products by viewModel.products.collectAsState()
+    val productVariants by viewModel.productVariants.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     SideEffect { isDarkModeGlobal = isDarkMode }
 
@@ -41,6 +43,10 @@ fun InventoryScreen(viewModel: AppViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingProduct by remember { mutableStateOf<ProductItemEntity?>(null) }
     var productToDelete by remember { mutableStateOf<ProductItemEntity?>(null) }
+    var bindingQrProduct by remember { mutableStateOf<ProductItemEntity?>(null) }
+    var managingVariantsProduct by remember { mutableStateOf<ProductItemEntity?>(null) }
+    var showBarcodeScannerForAdd by remember { mutableStateOf(false) }
+    var showBarcodeScannerForEdit by remember { mutableStateOf(false) }
 
     // State for Add Product Modal
     var newProdName by remember { mutableStateOf("") }
@@ -498,9 +504,72 @@ fun InventoryScreen(viewModel: AppViewModel) {
                                                 color = yellowText
                                             )
                                         }
+
+                                        Spacer(modifier = Modifier.height(5.dp))
+                                        val itemVariants = productVariants.filter { it.productId == prod.id }
+                                        val hasQr = !prod.qrCode.isNullOrBlank() || !prod.code.isNullOrBlank()
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            // QR Code Badge
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (hasQr) (if (isDarkMode) Color(0xFF1E1A11) else Color(0xFFFFFBEB)) else (if (isDarkMode) Color(0xFF16120B) else Color(0xFFF1F5F9)),
+                                                border = BorderStroke(0.8.dp, if (hasQr) yellowBadgeBorder else cardBorder),
+                                                modifier = Modifier.clickable { bindingQrProduct = prod }
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Icon(
+                                                        if (hasQr) Icons.Default.QrCode else Icons.Default.QrCodeScanner,
+                                                        contentDescription = null,
+                                                        tint = if (hasQr) yellowText else secondaryText,
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Text(
+                                                        if (hasQr) (prod.qrCode ?: prod.code ?: "QR Attached") else "+ Bind QR",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (hasQr) yellowText else secondaryText,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+
+                                            // Variants Badge
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (itemVariants.isNotEmpty()) (if (isDarkMode) Color(0xFF1A182E) else Color(0xFFEEF2FF)) else (if (isDarkMode) Color(0xFF121212) else Color(0xFFF8FAFC)),
+                                                border = BorderStroke(0.8.dp, if (itemVariants.isNotEmpty()) Color(0xFF6366F1).copy(alpha = 0.5f) else cardBorder),
+                                                modifier = Modifier.clickable { managingVariantsProduct = prod }
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Layers,
+                                                        contentDescription = null,
+                                                        tint = if (itemVariants.isNotEmpty()) Color(0xFF818CF8) else secondaryText,
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Text(
+                                                        if (itemVariants.isNotEmpty()) "${itemVariants.size} Variants" else "+ Variants",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (itemVariants.isNotEmpty()) Color(0xFF818CF8) else secondaryText
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
 
-                                    // 3-DOT OVERFLOW MENU (Edit, Delete, Scan QR)
+                                    // 3-DOT OVERFLOW MENU (Edit, Delete, Scan QR, Variants)
                                     Box {
                                         IconButton(onClick = { showMenu = true }) {
                                             Icon(
@@ -543,7 +612,23 @@ fun InventoryScreen(viewModel: AppViewModel) {
                                                 },
                                                 onClick = {
                                                     showMenu = false
-                                                    viewModel.navigateTo("QrScanner")
+                                                    bindingQrProduct = prod
+                                                }
+                                            )
+
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Layers, contentDescription = null, tint = Color(0xFF818CF8), modifier = Modifier.size(16.dp))
+                                                        Text("Manage Variants & Serials", color = primaryText, fontSize = 13.sp)
+                                                    }
+                                                },
+                                                onClick = {
+                                                    showMenu = false
+                                                    managingVariantsProduct = prod
                                                 }
                                             )
 
@@ -892,17 +977,33 @@ fun InventoryScreen(viewModel: AppViewModel) {
                     )
 
                     Button(
-                        onClick = {
-                            showAddDialog = false
-                            viewModel.navigateTo("QrScanner")
-                        },
+                        onClick = { showBarcodeScannerForAdd = !showBarcodeScannerForAdd },
                         modifier = Modifier.height(54.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (showBarcodeScannerForAdd) Color(0xFFEF4444) else yellowPrimary)
                     ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Icon(if (showBarcodeScannerForAdd) Icons.Default.Close else Icons.Default.QrCodeScanner, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Scan", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                        Text(if (showBarcodeScannerForAdd) "Close" else "Scan", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                    }
+                }
+
+                if (showBarcodeScannerForAdd) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, yellowPrimary, RoundedCornerShape(12.dp))
+                    ) {
+                        RealQrCameraScanner(
+                            onQrScanned = { scanned ->
+                                newProdCode = scanned.trim()
+                                showBarcodeScannerForAdd = false
+                                Toast.makeText(context, "Barcode scanned: $scanned", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
 
@@ -1224,17 +1325,33 @@ fun InventoryScreen(viewModel: AppViewModel) {
                     )
 
                     Button(
-                        onClick = {
-                            editingProduct = null
-                            viewModel.navigateTo("QrScanner")
-                        },
+                        onClick = { showBarcodeScannerForEdit = !showBarcodeScannerForEdit },
                         modifier = Modifier.height(54.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (showBarcodeScannerForEdit) Color(0xFFEF4444) else yellowPrimary)
                     ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Icon(if (showBarcodeScannerForEdit) Icons.Default.Close else Icons.Default.QrCodeScanner, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Scan", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                        Text(if (showBarcodeScannerForEdit) "Close" else "Scan", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                    }
+                }
+
+                if (showBarcodeScannerForEdit) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, yellowPrimary, RoundedCornerShape(12.dp))
+                    ) {
+                        RealQrCameraScanner(
+                            onQrScanned = { scanned ->
+                                editCode = scanned.trim()
+                                showBarcodeScannerForEdit = false
+                                Toast.makeText(context, "Barcode scanned: $scanned", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
 
@@ -1400,6 +1517,738 @@ fun InventoryScreen(viewModel: AppViewModel) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Delete Product (পণ্য মুছে ফেলুন)", fontWeight = FontWeight.Bold, color = Color(0xFFEF4444), fontSize = 14.sp)
+                }
+            }
+        }
+    }
+
+    // ── BIND QR CODE MODAL ──────────────────────────────────────────
+    if (bindingQrProduct != null) {
+        BindProductQrModal(
+            product = bindingQrProduct!!,
+            viewModel = viewModel,
+            isDarkMode = isDarkMode,
+            onDismiss = { bindingQrProduct = null }
+        )
+    }
+
+    // ── MANAGE VARIANTS & SERIALS MODAL ────────────────────────────
+    if (managingVariantsProduct != null) {
+        val targetProd = managingVariantsProduct!!
+        val variants = productVariants.filter { it.productId == targetProd.id }
+        ManageProductVariantsModal(
+            product = targetProd,
+            variants = variants,
+            viewModel = viewModel,
+            isDarkMode = isDarkMode,
+            onDismiss = { managingVariantsProduct = null }
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BIND PRODUCT QR CODE MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun BindProductQrModal(
+    product: ProductItemEntity,
+    viewModel: AppViewModel,
+    isDarkMode: Boolean,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var qrInput by remember(product) { mutableStateOf(product.qrCode ?: product.code ?: "") }
+    var isCameraActive by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    val yellowPrimary = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFFFC800)
+    val cardBorder = if (isDarkMode) Color(0xFF382A0B) else Color(0xFFE2E8F0)
+    val primaryText = if (isDarkMode) Color(0xFFF3F4F6) else Color(0xFF0F172A)
+    val secondaryText = if (isDarkMode) Color(0xFF9CA3AF) else Color(0xFF64748B)
+
+    EnterpriseGestureModal(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = "কিউআর কোড যুক্ত করুন (Bind QR Code)",
+        subtitle = "পণ্য: ${product.name} (SKU: ${product.code ?: "None"})",
+        icon = Icons.Default.QrCode
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Product info badge
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF14120D) else Color(0xFFF8FAFC)),
+                border = BorderStroke(1.dp, cardBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isDarkMode) Color(0xFF261D07) else Color(0xFFFFFBEB)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = yellowPrimary, modifier = Modifier.size(20.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(product.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = primaryText)
+                        Text(
+                            text = if (!product.qrCode.isNullOrBlank()) "বর্তমান QR: ${product.qrCode}" else "বর্তমানে কোনো QR কোড যুক্ত নেই",
+                            fontSize = 11.5.sp,
+                            color = if (!product.qrCode.isNullOrBlank()) Color(0xFF10B981) else secondaryText
+                        )
+                    }
+                }
+            }
+
+            // QR Input field
+            OutlinedTextField(
+                value = qrInput,
+                onValueChange = { qrInput = it },
+                label = { Text("কিউআর / বারকোড কোড (QR or Barcode)") },
+                placeholder = { Text("e.g. 89411002341 or SP-PRD-01") },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.QrCode, null, tint = yellowPrimary) },
+                trailingIcon = {
+                    if (qrInput.isNotEmpty()) {
+                        IconButton(onClick = { qrInput = "" }) {
+                            Icon(Icons.Default.Close, null, tint = secondaryText)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = yellowPrimary,
+                    unfocusedBorderColor = cardBorder,
+                    focusedTextColor = primaryText,
+                    unfocusedTextColor = primaryText
+                )
+            )
+
+            // Action Buttons: Camera Scan & Auto-Generate
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { isCameraActive = !isCameraActive },
+                    modifier = Modifier.weight(1f).height(46.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isCameraActive) Color(0xFFEF4444) else primaryText),
+                    border = BorderStroke(1.dp, if (isCameraActive) Color(0xFFEF4444) else cardBorder)
+                ) {
+                    Icon(
+                        imageVector = if (isCameraActive) Icons.Default.Close else Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isCameraActive) "ক্যামেরা বন্ধ" else "ক্যামেরা স্ক্যান", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val genCode = "SP-${product.name.take(3).uppercase().filter { it.isLetterOrDigit() }.ifEmpty { "PRD" }}-${java.util.UUID.randomUUID().toString().take(6).uppercase()}"
+                        qrInput = genCode
+                        Toast.makeText(context, "কোড তৈরি হয়েছে: $genCode", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f).height(46.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryText),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = yellowPrimary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("অটো-কোড তৈরি", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            // Real Camera Scanner Container
+            if (isCameraActive) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(230.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.5.dp, yellowPrimary, RoundedCornerShape(14.dp))
+                ) {
+                    RealQrCameraScanner(
+                        onQrScanned = { code ->
+                            val trimmed = code.trim()
+                            if (trimmed.isNotEmpty()) {
+                                qrInput = trimmed
+                                isCameraActive = false
+                                Toast.makeText(context, "স্ক্যান সফল: $trimmed", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Save / Bind Button
+            Button(
+                onClick = {
+                    val code = qrInput.trim()
+                    if (code.isBlank()) {
+                        Toast.makeText(context, "দয়া করে একটি কিউআর বা বারকোড দিন", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    isSubmitting = true
+                    viewModel.bindProductQrCode(product.id, code) { success, message ->
+                        isSubmitting = false
+                        Toast.makeText(context, message, if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG).show()
+                        if (success) onDismiss()
+                    }
+                },
+                enabled = !isSubmitting,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary, contentColor = Color.Black)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("কিউআর কোড যুক্ত ও সংরক্ষণ করুন", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MANAGE PRODUCT VARIANTS & SERIALS MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun ManageProductVariantsModal(
+    product: ProductItemEntity,
+    variants: List<ProductVariantEntity>,
+    viewModel: AppViewModel,
+    isDarkMode: Boolean,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var selectedTab by remember { mutableIntStateOf(if (variants.isEmpty()) 1 else 0) }
+
+    val yellowPrimary = if (isDarkMode) Color(0xFFF5C518) else Color(0xFFFFC800)
+    val cardBorder = if (isDarkMode) Color(0xFF382A0B) else Color(0xFFE2E8F0)
+    val primaryText = if (isDarkMode) Color(0xFFF3F4F6) else Color(0xFF0F172A)
+    val secondaryText = if (isDarkMode) Color(0xFF9CA3AF) else Color(0xFF64748B)
+
+    // Form State for Single Variant
+    var varName by remember { mutableStateOf("") }
+    var varQty by remember { mutableStateOf("1") }
+    var varBuyPrice by remember { mutableStateOf(if (product.purchasePrice > 0.0) product.purchasePrice.toString() else "") }
+    var varAskingPrice by remember { mutableStateOf(if (product.askingPrice > 0.0) product.askingPrice.toString() else "") }
+    var varSellPrice by remember { mutableStateOf(if (product.salePrice > 0.0) product.salePrice.toString() else "") }
+    var varQrCode by remember { mutableStateOf("") }
+    var isScanningSingleQr by remember { mutableStateOf(false) }
+    var isSavingSingle by remember { mutableStateOf(false) }
+
+    // Form State for Each Quantity Unique QR Mode
+    var unitPrefix by remember { mutableStateOf("Piece") }
+    var unitQtyCount by remember { mutableStateOf("3") }
+    var unitBuyPrice by remember { mutableStateOf(if (product.purchasePrice > 0.0) product.purchasePrice.toString() else "") }
+    var unitAskingPrice by remember { mutableStateOf(if (product.askingPrice > 0.0) product.askingPrice.toString() else "") }
+    var unitSellPrice by remember { mutableStateOf(if (product.salePrice > 0.0) product.salePrice.toString() else "") }
+    var generatedQrsList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isScanningUnitQr by remember { mutableStateOf(false) }
+    var isSavingUnits by remember { mutableStateOf(false) }
+
+    EnterpriseGestureModal(
+        onDismissRequest = onDismiss,
+        title = "ভ্যারিয়েন্ট ও সিরিয়াল কিউআর (Variants & Serials)",
+        subtitle = "${product.name} • ${product.category ?: "General"}",
+        icon = Icons.Default.Layers
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Tabs Bar
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = if (isDarkMode) Color(0xFF13100B) else Color(0xFFF1F5F9),
+                contentColor = yellowPrimary,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp))
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("তালিকা (${variants.size})", fontSize = 12.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("+ ভ্যারিয়েন্ট যোগ", fontSize = 12.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("প্রতি পিসের QR", fontSize = 12.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
+                )
+            }
+
+            // ── TAB 0: EXISTING VARIANTS LIST ──────────────────────────
+            if (selectedTab == 0) {
+                if (variants.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF13100B) else Color(0xFFF8FAFC)),
+                        border = BorderStroke(1.dp, cardBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Layers, contentDescription = null, tint = secondaryText, modifier = Modifier.size(36.dp))
+                            Text("এই পণ্যে এখনো কোনো ভ্যারিয়েন্ট নেই", fontWeight = FontWeight.Bold, color = primaryText, fontSize = 14.sp)
+                            Text("সাইজ/রং বা প্রতি পিসের জন্য আলাদা QR কোড তৈরি করতে উপরের ট্যাব নির্বাচন করুন।", fontSize = 11.5.sp, color = secondaryText, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { selectedTab = 1 },
+                                    colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("+ ভ্যারিয়েন্ট যোগ", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { selectedTab = 2 },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Text("প্রতি পিসের QR", fontSize = 12.sp, color = primaryText)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        variants.forEach { v ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF16130E) else Color(0xFFFFFFFF)),
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isDarkMode) Color(0xFF201B2E) else Color(0xFFEEF2FF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.QrCode, contentDescription = null, tint = Color(0xFF818CF8), modifier = Modifier.size(20.dp))
+                                    }
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(v.variantName, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = primaryText)
+                                        Text(
+                                            "বিক্রি: ৳${String.format("%,.0f", v.salePrice)} • স্টক: ${v.stockQuantity.toInt()} টি",
+                                            fontSize = 11.5.sp,
+                                            color = secondaryText
+                                        )
+                                        Text(
+                                            "QR: ${v.qrCode}",
+                                            fontSize = 10.5.sp,
+                                            color = yellowPrimary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.deleteProductVariant(v.id) { success, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── TAB 1: ADD SINGLE VARIANT ──────────────────────────────
+            if (selectedTab == 1) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF14120D) else Color(0xFFF8FAFC)),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("স্ট্যান্ডার্ড ভ্যারিয়েন্ট যোগ করুন (e.g. Size L, Red Color, 500g):", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = primaryText)
+
+                        OutlinedTextField(
+                            value = varName,
+                            onValueChange = { varName = it },
+                            label = { Text("ভ্যারিয়েন্ট নাম (Variant Name)*") },
+                            placeholder = { Text("e.g. Size XL / Red / 1kg") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = varBuyPrice,
+                                onValueChange = { varBuyPrice = it },
+                                label = { Text("ক্রয়মূল্য (Buy ৳)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                            OutlinedTextField(
+                                value = varSellPrice,
+                                onValueChange = { varSellPrice = it },
+                                label = { Text("বিক্রয়মূল্য (Sell ৳)*") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                        }
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = varAskingPrice,
+                                onValueChange = { varAskingPrice = it },
+                                label = { Text("ট্যাগ মূল্য (Asking ৳)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                            OutlinedTextField(
+                                value = varQty,
+                                onValueChange = { varQty = it },
+                                label = { Text("স্টক পরিমাণ (Qty)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = varQrCode,
+                                onValueChange = { varQrCode = it },
+                                label = { Text("ভ্যারিয়েন্ট QR / বারকোড*") },
+                                placeholder = { Text("Unique QR") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+
+                            Button(
+                                onClick = { isScanningSingleQr = !isScanningSingleQr },
+                                modifier = Modifier.height(52.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isScanningSingleQr) Color(0xFFEF4444) else yellowPrimary)
+                            ) {
+                                Icon(if (isScanningSingleQr) Icons.Default.Close else Icons.Default.QrCodeScanner, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isScanningSingleQr) "Stop" else "Scan", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    val gen = "SP-VAR-${java.util.UUID.randomUUID().toString().take(6).uppercase()}"
+                                    varQrCode = gen
+                                    Toast.makeText(context, "কোড: $gen", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.height(52.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFF261D07) else Color(0xFFFEF3C7))
+                            ) {
+                                Text("Auto", color = yellowPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (isScanningSingleQr) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.dp, yellowPrimary, RoundedCornerShape(12.dp))
+                            ) {
+                                RealQrCameraScanner(
+                                    onQrScanned = { code ->
+                                        varQrCode = code.trim()
+                                        isScanningSingleQr = false
+                                        Toast.makeText(context, "Scanned: $code", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                val name = varName.trim()
+                                if (name.isBlank()) {
+                                    Toast.makeText(context, "ভ্যারিয়েন্টের নাম দিন", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val sell = varSellPrice.toDoubleOrNull()
+                                if (sell == null || sell < 0.0) {
+                                    Toast.makeText(context, "সঠিক বিক্রয়মূল্য দিন", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val buy = varBuyPrice.toDoubleOrNull() ?: 0.0
+                                val asking = varAskingPrice.toDoubleOrNull() ?: sell
+                                val qty = varQty.toDoubleOrNull() ?: 1.0
+                                val qr = varQrCode.trim().ifEmpty {
+                                    "SP-VAR-${java.util.UUID.randomUUID().toString().take(6).uppercase()}"
+                                }
+
+                                isSavingSingle = true
+                                viewModel.addProductVariant(
+                                    productId = product.id,
+                                    variantName = name,
+                                    qrCode = qr,
+                                    costPrice = buy,
+                                    askingPrice = asking,
+                                    salePrice = sell,
+                                    quantity = qty
+                                ) { success, msg ->
+                                    isSavingSingle = false
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    if (success) {
+                                        varName = ""
+                                        varQrCode = ""
+                                        selectedTab = 0
+                                    }
+                                }
+                            },
+                            enabled = !isSavingSingle,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary, contentColor = Color.Black)
+                        ) {
+                            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ভ্যারিয়েন্ট সংরক্ষণ করুন", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+
+            // ── TAB 2: EACH QUANTITY UNIQUE QR / SERIAL ────────────────
+            if (selectedTab == 2) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF14120D) else Color(0xFFF8FAFC)),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.AutoFixHigh, null, tint = yellowPrimary, modifier = Modifier.size(16.dp))
+                            Text("প্রতি পিসের আলাদা QR কোড তৈরি (Each Unit QR Tracking):", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = primaryText)
+                        }
+                        Text(
+                            "যেসব পণ্যের প্রতিটি পিস বা ইউনিটে আলাদা স্টিকার বা সিরিয়াল নাম্বার থাকে, তাদের জন্য প্রতিটি পিসের স্টক ১ ধরে আলাদা QR কোড তৈরি হবে।",
+                            fontSize = 11.sp,
+                            color = secondaryText
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = unitPrefix,
+                                onValueChange = { unitPrefix = it },
+                                label = { Text("লেবেল বা প্রিফিক্স") },
+                                placeholder = { Text("Piece / Serial / Unit") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1.2f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                            OutlinedTextField(
+                                value = unitQtyCount,
+                                onValueChange = { unitQtyCount = it },
+                                label = { Text("পিসের সংখ্যা (Qty)") },
+                                placeholder = { Text("e.g. 5") },
+                                singleLine = true,
+                                modifier = Modifier.weight(0.8f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                        }
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = unitBuyPrice,
+                                onValueChange = { unitBuyPrice = it },
+                                label = { Text("প্রতিটির ক্রয়মূল্য (৳)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                            OutlinedTextField(
+                                value = unitSellPrice,
+                                onValueChange = { unitSellPrice = it },
+                                label = { Text("প্রতিটির বিক্রয়মূল্য (৳)*") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = yellowPrimary)
+                            )
+                        }
+
+                        // Generation Buttons
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    val count = unitQtyCount.toIntOrNull() ?: 1
+                                    if (count <= 0 || count > 50) {
+                                        Toast.makeText(context, "পিসের সংখ্যা ১ থেকে ৫০ এর মধ্যে দিন", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
+                                    val pName = product.name.take(3).uppercase().filter { it.isLetterOrDigit() }.ifEmpty { "PRD" }
+                                    val list = (1..count).map {
+                                        "SP-$pName-${java.util.UUID.randomUUID().toString().take(6).uppercase()}"
+                                    }
+                                    generatedQrsList = list
+                                    Toast.makeText(context, "$count টি ইউনিক QR কোড জেনারেট হয়েছে", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFF261D07) else Color(0xFFFEF3C7))
+                            ) {
+                                Icon(Icons.Default.AutoFixHigh, null, tint = yellowPrimary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("অটো QR তৈরি করুন", color = yellowPrimary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { isScanningUnitQr = !isScanningUnitQr },
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isScanningUnitQr) Color(0xFFEF4444) else yellowPrimary)
+                            ) {
+                                Icon(if (isScanningUnitQr) Icons.Default.Close else Icons.Default.QrCodeScanner, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isScanningUnitQr) "স্ক্যান বন্ধ" else "ক্যামেরা দিয়ে স্ক্যান", color = Color.Black, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (isScanningUnitQr) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.dp, yellowPrimary, RoundedCornerShape(12.dp))
+                            ) {
+                                RealQrCameraScanner(
+                                    onQrScanned = { code ->
+                                        val trimmed = code.trim()
+                                        if (trimmed.isNotEmpty() && !generatedQrsList.contains(trimmed)) {
+                                            generatedQrsList = generatedQrsList + trimmed
+                                            Toast.makeText(context, "যুক্ত হয়েছে (${generatedQrsList.size}টি): $trimmed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+
+                        // Generated / Scanned Units Preview
+                        if (generatedQrsList.isNotEmpty()) {
+                            Text("প্রস্তুতকৃত কোড তালিকা (${generatedQrsList.size} টি পিস):", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = primaryText)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 180.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                generatedQrsList.forEachIndexed { idx, qr ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(if (isDarkMode) Color(0xFF1E1A11) else Color(0xFFF1F5F9), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("${unitPrefix.ifEmpty { "Unit" }} #${idx + 1}: $qr", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = primaryText)
+                                        IconButton(
+                                            onClick = { generatedQrsList = generatedQrsList.filterIndexed { i, _ -> i != idx } },
+                                            modifier = Modifier.size(20.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (generatedQrsList.isEmpty()) {
+                                    Toast.makeText(context, "দয়া করে অন্তত একটি QR কোড তৈরি বা স্ক্যান করুন", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val sell = unitSellPrice.toDoubleOrNull()
+                                if (sell == null || sell < 0.0) {
+                                    Toast.makeText(context, "সঠিক বিক্রয়মূল্য দিন", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val buy = unitBuyPrice.toDoubleOrNull() ?: 0.0
+                                val asking = unitAskingPrice.toDoubleOrNull() ?: sell
+
+                                isSavingUnits = true
+                                viewModel.addUnitVariantsForEachQuantity(
+                                    productId = product.id,
+                                    unitPrefix = unitPrefix,
+                                    qrCodes = generatedQrsList,
+                                    costPrice = buy,
+                                    askingPrice = asking,
+                                    salePrice = sell
+                                ) { success, msg ->
+                                    isSavingUnits = false
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    if (success) {
+                                        generatedQrsList = emptyList()
+                                        selectedTab = 0
+                                    }
+                                }
+                            },
+                            enabled = !isSavingUnits && generatedQrsList.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = yellowPrimary, contentColor = Color.Black)
+                        ) {
+                            Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("সকল ${generatedQrsList.size}টি পিসের QR কোড সংরক্ষণ করুন", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
             }
         }

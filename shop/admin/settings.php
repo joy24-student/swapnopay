@@ -179,7 +179,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'check_sms_device_status') {
 }
 
 // Ensure required columns exist across all tenant schemas safely (run once per tenant, never on every page load)
-$tenantMigKey = md5(($runtime['merchant_id'] ?? 'def') . '_' . ($runtime['shop_slug'] ?? 'store') . '_v3');
+$tenantMigKey = md5(($runtime['merchant_id'] ?? 'def') . '_' . ($runtime['shop_slug'] ?? 'store') . '_v4');
 $migFlag1 = sys_get_temp_dir() . '/.mig_' . $tenantMigKey;
 $migFlag2 = __DIR__ . '/inc/.mig_' . $tenantMigKey;
 if (!is_file($migFlag1) && !is_file($migFlag2)) {
@@ -323,6 +323,15 @@ if (!is_file($migFlag1) && !is_file($migFlag2)) {
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_api_url text DEFAULT 'https://api.swapnopay.top'",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_webhook_secret text DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_mode varchar(20) DEFAULT 'live'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_bkash_number varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_bkash_account_type varchar(20) DEFAULT 'Personal'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_nagad_number varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_nagad_account_type varchar(20) DEFAULT 'Personal'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_rocket_number varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_rocket_account_type varchar(20) DEFAULT 'Personal'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_upay_number varchar(50) DEFAULT ''",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_upay_account_type varchar(20) DEFAULT 'Personal'",
+    "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS swapnopay_default_number varchar(50) DEFAULT ''",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS home_marquee_on_off smallint DEFAULT 1",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS marquee_item1_tag varchar(100) DEFAULT 'HOT'",
     "ALTER TABLE tbl_settings ADD COLUMN IF NOT EXISTS marquee_item1_text text DEFAULT 'MEGA SALE IS LIVE • Up to 80% Off Top Brands'",
@@ -503,6 +512,15 @@ $swapnopay_api_key = $settings_data['swapnopay_api_key'] ?? '';
 $swapnopay_api_url = !empty($settings_data['swapnopay_api_url']) ? $settings_data['swapnopay_api_url'] : 'https://api.swapnopay.top';
 $swapnopay_webhook_secret = $settings_data['swapnopay_webhook_secret'] ?? '';
 $swapnopay_mode = $settings_data['swapnopay_mode'] ?? 'live';
+$swapnopay_bkash_number = $settings_data['swapnopay_bkash_number'] ?? '';
+$swapnopay_bkash_account_type = $settings_data['swapnopay_bkash_account_type'] ?? 'Personal';
+$swapnopay_nagad_number = $settings_data['swapnopay_nagad_number'] ?? '';
+$swapnopay_nagad_account_type = $settings_data['swapnopay_nagad_account_type'] ?? 'Personal';
+$swapnopay_rocket_number = $settings_data['swapnopay_rocket_number'] ?? '';
+$swapnopay_rocket_account_type = $settings_data['swapnopay_rocket_account_type'] ?? 'Personal';
+$swapnopay_upay_number = $settings_data['swapnopay_upay_number'] ?? '';
+$swapnopay_upay_account_type = $settings_data['swapnopay_upay_account_type'] ?? 'Personal';
+$swapnopay_default_number = $settings_data['swapnopay_default_number'] ?? '';
 $stripe_public_key = $settings_data['stripe_public_key'] ?? '';
 $stripe_secret_key = $settings_data['stripe_secret_key'] ?? '';
 $paypal_client_id = $settings_data['paypal_client_id'] ?? '';
@@ -1122,9 +1140,26 @@ if(isset($_POST['form_payment_gateways'])) {
 
     $payment_methods_selected = implode(',', array_unique($selected_methods));
 
+    $swapnopay_merchant_id_val = trim($_POST['swapnopay_merchant_id'] ?? '');
+    $swapnopay_api_key_val = trim($_POST['swapnopay_api_key'] ?? '');
     $swapnopay_api_url_val = trim($_POST['swapnopay_api_url'] ?? '');
     if (empty($swapnopay_api_url_val)) {
         $swapnopay_api_url_val = 'https://api.swapnopay.top';
+    }
+    $swapnopay_webhook_secret_val = trim($_POST['swapnopay_webhook_secret'] ?? '');
+    $swapnopay_mode_val = in_array($_POST['swapnopay_mode'] ?? '', ['sandbox', 'test'], true) ? 'sandbox' : 'live';
+
+    $swapnopay_bkash_num = trim($_POST['swapnopay_bkash_number'] ?? '');
+    $swapnopay_bkash_type = in_array($_POST['swapnopay_bkash_account_type'] ?? '', ['Personal', 'Merchant', 'Agent'], true) ? $_POST['swapnopay_bkash_account_type'] : 'Personal';
+    $swapnopay_nagad_num = trim($_POST['swapnopay_nagad_number'] ?? '');
+    $swapnopay_nagad_type = in_array($_POST['swapnopay_nagad_account_type'] ?? '', ['Personal', 'Merchant', 'Agent'], true) ? $_POST['swapnopay_nagad_account_type'] : 'Personal';
+    $swapnopay_rocket_num = trim($_POST['swapnopay_rocket_number'] ?? '');
+    $swapnopay_rocket_type = in_array($_POST['swapnopay_rocket_account_type'] ?? '', ['Personal', 'Merchant', 'Agent'], true) ? $_POST['swapnopay_rocket_account_type'] : 'Personal';
+    $swapnopay_upay_num = trim($_POST['swapnopay_upay_number'] ?? '');
+    $swapnopay_upay_type = in_array($_POST['swapnopay_upay_account_type'] ?? '', ['Personal', 'Merchant', 'Agent'], true) ? $_POST['swapnopay_upay_account_type'] : 'Personal';
+    $swapnopay_default_num = trim($_POST['swapnopay_default_number'] ?? '');
+    if (empty($swapnopay_default_num)) {
+        $swapnopay_default_num = $swapnopay_bkash_num ?: ($swapnopay_nagad_num ?: ($swapnopay_rocket_num ?: ($swapnopay_upay_num ?: '')));
     }
 
     try {
@@ -1134,6 +1169,15 @@ if(isset($_POST['form_payment_gateways'])) {
                                     swapnopay_api_url=?,
                                     swapnopay_webhook_secret=?,
                                     swapnopay_mode=?,
+                                    swapnopay_bkash_number=?,
+                                    swapnopay_bkash_account_type=?,
+                                    swapnopay_nagad_number=?,
+                                    swapnopay_nagad_account_type=?,
+                                    swapnopay_rocket_number=?,
+                                    swapnopay_rocket_account_type=?,
+                                    swapnopay_upay_number=?,
+                                    swapnopay_upay_account_type=?,
+                                    swapnopay_default_number=?,
                                     sslcz_store_id=?,
                                     sslcz_store_pass=?,
                                     sslcz_mode=?,
@@ -1142,11 +1186,20 @@ if(isset($_POST['form_payment_gateways'])) {
                                     bank_detail=?
                                     WHERE id=1");
         $statement->execute(array(
-            trim($_POST['swapnopay_merchant_id'] ?? ''),
-            trim($_POST['swapnopay_api_key'] ?? ''),
+            $swapnopay_merchant_id_val,
+            $swapnopay_api_key_val,
             $swapnopay_api_url_val,
-            trim($_POST['swapnopay_webhook_secret'] ?? ''),
-            in_array($_POST['swapnopay_mode'] ?? '', ['sandbox', 'test'], true) ? 'sandbox' : 'live',
+            $swapnopay_webhook_secret_val,
+            $swapnopay_mode_val,
+            $swapnopay_bkash_num,
+            $swapnopay_bkash_type,
+            $swapnopay_nagad_num,
+            $swapnopay_nagad_type,
+            $swapnopay_rocket_num,
+            $swapnopay_rocket_type,
+            $swapnopay_upay_num,
+            $swapnopay_upay_type,
+            $swapnopay_default_num,
             $_POST['sslcz_store_id'] ?? '',
             $_POST['sslcz_store_pass'] ?? '',
             in_array($_POST['sslcz_mode'] ?? '', ['live','0'], true) ? 'live' : 'sandbox',
@@ -1154,6 +1207,49 @@ if(isset($_POST['form_payment_gateways'])) {
             $payment_methods_selected,
             $_POST['bank_detail'] ?? ''
         ));
+
+        // Synchronize receiving numbers and webhook settings to SwapnoPay Gateway Backend in real-time
+        if (!empty($swapnopay_merchant_id_val)) {
+            $sync_payload = [
+                'merchant_id' => $swapnopay_merchant_id_val,
+                'default_number' => $swapnopay_default_num,
+                'receiving_numbers' => array_filter([
+                    'bKash'  => $swapnopay_bkash_num,
+                    'Nagad'  => $swapnopay_nagad_num,
+                    'Rocket' => $swapnopay_rocket_num,
+                    'Upay'   => $swapnopay_upay_num
+                ]),
+                'account_types' => [
+                    'bKash'  => $swapnopay_bkash_type,
+                    'Nagad'  => $swapnopay_nagad_type,
+                    'Rocket' => $swapnopay_rocket_type,
+                    'Upay'   => $swapnopay_upay_type
+                ]
+            ];
+            if (!empty($swapnopay_webhook_secret_val)) {
+                $sync_payload['webhook_secret'] = $swapnopay_webhook_secret_val;
+            }
+            $store_webhook_url = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/payment/swapnopay/webhook.php' : '';
+            if (!empty($store_webhook_url) && str_starts_with($store_webhook_url, 'http')) {
+                $sync_payload['webhook_url'] = $store_webhook_url;
+            }
+            $clean_api_url = rtrim($swapnopay_api_url_val, '/');
+            $ch_sync = curl_init("{$clean_api_url}/v1/payment/merchant-config");
+            curl_setopt($ch_sync, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch_sync, CURLOPT_CONNECTTIMEOUT, 4);
+            curl_setopt($ch_sync, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch_sync, CURLOPT_POST, true);
+            curl_setopt($ch_sync, CURLOPT_POSTFIELDS, json_encode($sync_payload));
+            $sync_headers = ["Content-Type: application/json", "X-Merchant-ID: {$swapnopay_merchant_id_val}"];
+            if (!empty($swapnopay_api_key_val)) {
+                $sync_headers[] = "X-API-Key: {$swapnopay_api_key_val}";
+                $sync_headers[] = "Authorization: Bearer {$swapnopay_api_key_val}";
+            }
+            curl_setopt($ch_sync, CURLOPT_HTTPHEADER, $sync_headers);
+            @curl_exec($ch_sync);
+            @curl_close($ch_sync);
+        }
+
         clearShopCaches();
         $success_message = 'Payment Gateway Settings are updated successfully.';
     } catch (Throwable $ex) {
@@ -1328,7 +1424,7 @@ if(isset($_POST['form_banner_settings'])) {
                     $updated_val = $cloud_url;
                 } else {
                     $valid = 0;
-                    $error_message = 'Failed to upload ' . $field . ' to Supabase Storage.';
+                    $error_message = 'Failed to process upload for ' . $field . '. Please verify the image file and try again.';
                     break;
                 }
             } else {
@@ -1817,6 +1913,15 @@ $swapnopay_api_key = $settings_data['swapnopay_api_key'] ?? '';
 $swapnopay_api_url = !empty($settings_data['swapnopay_api_url']) ? $settings_data['swapnopay_api_url'] : 'https://api.swapnopay.top';
 $swapnopay_webhook_secret = $settings_data['swapnopay_webhook_secret'] ?? '';
 $swapnopay_mode = $settings_data['swapnopay_mode'] ?? 'live';
+$swapnopay_bkash_number = $settings_data['swapnopay_bkash_number'] ?? '';
+$swapnopay_bkash_account_type = $settings_data['swapnopay_bkash_account_type'] ?? 'Personal';
+$swapnopay_nagad_number = $settings_data['swapnopay_nagad_number'] ?? '';
+$swapnopay_nagad_account_type = $settings_data['swapnopay_nagad_account_type'] ?? 'Personal';
+$swapnopay_rocket_number = $settings_data['swapnopay_rocket_number'] ?? '';
+$swapnopay_rocket_account_type = $settings_data['swapnopay_rocket_account_type'] ?? 'Personal';
+$swapnopay_upay_number = $settings_data['swapnopay_upay_number'] ?? '';
+$swapnopay_upay_account_type = $settings_data['swapnopay_upay_account_type'] ?? 'Personal';
+$swapnopay_default_number = $settings_data['swapnopay_default_number'] ?? '';
 $stripe_public_key = $settings_data['stripe_public_key'] ?? '';
 $stripe_secret_key = $settings_data['stripe_secret_key'] ?? '';
 $paypal_client_id = $settings_data['paypal_client_id'] ?? '';
@@ -3538,6 +3643,91 @@ require_once('header.php');
                                                 <option value="live" <?php if($swapnopay_mode === 'live') {echo 'selected';} ?>>Live</option>
                                                 <option value="sandbox" <?php if($swapnopay_mode === 'sandbox') {echo 'selected';} ?>>Sandbox</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="background:#f8fafc; padding:18px 20px; border-radius:10px; border:1px solid #e2e8f0; margin-left:0; margin-right:0; margin-top:20px; margin-bottom:20px;">
+                                        <div style="margin-bottom:15px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+                                            <h4 style="margin:0 0 6px; font-weight:700; color:#0f172a; font-size:15px;">
+                                                <i class="fa fa-money text-success"></i> Customer Payment Receiving Numbers (MFS Wallets)
+                                            </h4>
+                                            <p style="color:#64748b; font-size:13px; margin:0;">These numbers and account types are displayed to customers on the SwapnoPay checkout screen (bKash, Nagad, Rocket, Upay) and synchronized with the payment gateway.</p>
+                                        </div>
+
+                                        <!-- Default Master Number -->
+                                        <div class="row" style="margin-bottom:14px; align-items:center;">
+                                            <label class="col-sm-3 control-label" style="text-align:left; font-weight:600; color:#334155;">Default Master Number</label>
+                                            <div class="col-sm-6">
+                                                <input type="text" name="swapnopay_default_number" class="form-control" value="<?php echo htmlspecialchars($swapnopay_default_number); ?>" placeholder="e.g. 017XXXXXXXX">
+                                                <p class="help-block" style="margin-bottom:0; font-size:12px;">Fallback wallet number for any payment method where a specific number is left blank.</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- bKash Number & Type -->
+                                        <div class="row" style="margin-bottom:14px; align-items:center;">
+                                            <label class="col-sm-3 control-label" style="text-align:left; font-weight:600; color:#334155;">
+                                                <span class="badge" style="background:#e2136e; font-size:12px; font-weight:700; padding:4px 8px; border-radius:4px;">bKash</span> Receiving Number
+                                            </label>
+                                            <div class="col-sm-5">
+                                                <input type="text" name="swapnopay_bkash_number" class="form-control" value="<?php echo htmlspecialchars($swapnopay_bkash_number); ?>" placeholder="e.g. 017XXXXXXXX">
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <select name="swapnopay_bkash_account_type" class="form-control">
+                                                    <option value="Personal" <?php if(($swapnopay_bkash_account_type ?? 'Personal') === 'Personal') echo 'selected'; ?>>Personal (Send Money)</option>
+                                                    <option value="Merchant" <?php if(($swapnopay_bkash_account_type ?? '') === 'Merchant') echo 'selected'; ?>>Merchant (Make Payment)</option>
+                                                    <option value="Agent" <?php if(($swapnopay_bkash_account_type ?? '') === 'Agent') echo 'selected'; ?>>Agent (Cash In)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Nagad Number & Type -->
+                                        <div class="row" style="margin-bottom:14px; align-items:center;">
+                                            <label class="col-sm-3 control-label" style="text-align:left; font-weight:600; color:#334155;">
+                                                <span class="badge" style="background:#f7941d; font-size:12px; font-weight:700; padding:4px 8px; border-radius:4px;">Nagad</span> Receiving Number
+                                            </label>
+                                            <div class="col-sm-5">
+                                                <input type="text" name="swapnopay_nagad_number" class="form-control" value="<?php echo htmlspecialchars($swapnopay_nagad_number); ?>" placeholder="e.g. 017XXXXXXXX">
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <select name="swapnopay_nagad_account_type" class="form-control">
+                                                    <option value="Personal" <?php if(($swapnopay_nagad_account_type ?? 'Personal') === 'Personal') echo 'selected'; ?>>Personal (Send Money)</option>
+                                                    <option value="Merchant" <?php if(($swapnopay_nagad_account_type ?? '') === 'Merchant') echo 'selected'; ?>>Merchant (Make Payment)</option>
+                                                    <option value="Agent" <?php if(($swapnopay_nagad_account_type ?? '') === 'Agent') echo 'selected'; ?>>Agent (Cash In)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Rocket Number & Type -->
+                                        <div class="row" style="margin-bottom:14px; align-items:center;">
+                                            <label class="col-sm-3 control-label" style="text-align:left; font-weight:600; color:#334155;">
+                                                <span class="badge" style="background:#8c3494; font-size:12px; font-weight:700; padding:4px 8px; border-radius:4px;">Rocket</span> Receiving Number
+                                            </label>
+                                            <div class="col-sm-5">
+                                                <input type="text" name="swapnopay_rocket_number" class="form-control" value="<?php echo htmlspecialchars($swapnopay_rocket_number); ?>" placeholder="e.g. 017XXXXXXXX">
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <select name="swapnopay_rocket_account_type" class="form-control">
+                                                    <option value="Personal" <?php if(($swapnopay_rocket_account_type ?? 'Personal') === 'Personal') echo 'selected'; ?>>Personal (Send Money)</option>
+                                                    <option value="Merchant" <?php if(($swapnopay_rocket_account_type ?? '') === 'Merchant') echo 'selected'; ?>>Merchant (Make Payment)</option>
+                                                    <option value="Agent" <?php if(($swapnopay_rocket_account_type ?? '') === 'Agent') echo 'selected'; ?>>Agent (Cash In)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Upay Number & Type -->
+                                        <div class="row" style="margin-bottom:6px; align-items:center;">
+                                            <label class="col-sm-3 control-label" style="text-align:left; font-weight:600; color:#334155;">
+                                                <span class="badge" style="background:#00a3e0; font-size:12px; font-weight:700; padding:4px 8px; border-radius:4px;">Upay</span> Receiving Number
+                                            </label>
+                                            <div class="col-sm-5">
+                                                <input type="text" name="swapnopay_upay_number" class="form-control" value="<?php echo htmlspecialchars($swapnopay_upay_number); ?>" placeholder="e.g. 017XXXXXXXX">
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <select name="swapnopay_upay_account_type" class="form-control">
+                                                    <option value="Personal" <?php if(($swapnopay_upay_account_type ?? 'Personal') === 'Personal') echo 'selected'; ?>>Personal (Send Money)</option>
+                                                    <option value="Merchant" <?php if(($swapnopay_upay_account_type ?? '') === 'Merchant') echo 'selected'; ?>>Merchant (Make Payment)</option>
+                                                    <option value="Agent" <?php if(($swapnopay_upay_account_type ?? '') === 'Agent') echo 'selected'; ?>>Agent (Cash In)</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="form-group">

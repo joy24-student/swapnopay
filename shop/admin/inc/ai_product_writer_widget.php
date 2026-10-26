@@ -598,7 +598,7 @@
                     <span>Generated Content Ready! <small id="sn_ai_provider_tag" style="color: #047857; font-weight: 500;"></small></span>
                 </div>
                 <div class="sn-ai-results-actions">
-                    <button type="button" id="sn_ai_apply_all_btn" class="sn-ai-btn-apply-all">
+                    <button type="button" id="sn_ai_apply_all_btn" class="sn-ai-btn-apply-all" onclick="if(window.snAiApplyAllToForm) window.snAiApplyAllToForm();">
                         <i class="fa fa-bolt"></i> Apply All to Form Now
                     </button>
                     <button type="button" id="sn_ai_dismiss_preview_btn" class="btn btn-default btn-xs">
@@ -693,18 +693,34 @@
     // Helper: Set content into Summernote or plain textarea
     function setEditorContent(editorId, htmlContent) {
         var $el = $('#' + editorId);
+        if (!$el.length) $el = $('[name="' + editorId + '"]');
         if (!$el.length) return;
 
-        // Try Summernote API
-        if ($el.next('.note-editor').length && typeof $el.summernote === 'function') {
-            $el.summernote('code', htmlContent);
-        } else {
-            $el.val(htmlContent);
+        // 1. Always set underlying textarea value so form submission succeeds
+        $el.val(htmlContent);
+
+        // 2. Set Summernote via its API if available
+        try {
+            if (typeof $el.summernote === 'function') {
+                $el.summernote('code', htmlContent);
+            } else if (window.jQuery && typeof window.jQuery.fn.summernote === 'function') {
+                window.jQuery('#' + editorId).summernote('code', htmlContent);
+            }
+        } catch (e) {
+            console.warn('Summernote API set notice:', e);
         }
+
+        // 3. Directly update the rendered .note-editable DOM container as bulletproof fallback
+        var $editable = $el.closest('.form-group').find('.note-editable');
+        if ($editable.length) {
+            $editable.html(htmlContent);
+        }
+
         $el.trigger('change');
 
         // Flash green animation on editor container
-        var $container = $el.next('.note-editor').length ? $el.next('.note-editor') : $el;
+        var $container = $el.closest('.form-group').find('.note-editor');
+        if (!$container.length) $container = $el;
         $container.removeClass('sn-ai-flash-applied');
         void $container[0].offsetWidth; // trigger reflow
         $container.addClass('sn-ai-flash-applied');
@@ -877,8 +893,8 @@
             });
         });
 
-        // 5. "Apply All to Form" Button
-        $('#sn_ai_apply_all_btn').on('click', function() {
+        // 5. "Apply All to Form" Function & Button
+        window.snAiApplyAllToForm = function() {
             if (!generatedCache) {
                 alert('No generated content found. Please click Generate first.');
                 return;
@@ -926,9 +942,19 @@
             showAiToast('success', '🎉 Applied ' + appliedCount + ' sections to product form successfully!');
 
             // Scroll down to the editors so the user sees the filled content
-            $('html, body').animate({
-                scrollTop: $('#editor1').closest('.form-group').offset().top - 100
-            }, 500);
+            try {
+                var $target = $('#editor1').closest('.form-group');
+                if ($target.length && $target.offset()) {
+                    $('html, body').animate({
+                        scrollTop: $target.offset().top - 100
+                    }, 500);
+                }
+            } catch (e) {}
+        };
+
+        $(document).on('click', '#sn_ai_apply_all_btn', function(e) {
+            e.preventDefault();
+            window.snAiApplyAllToForm();
         });
 
         // 6. Inline Field Buttons Click Handler

@@ -217,6 +217,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     data class NavState(val screen: String, val tab: String)
     private val navigationStack = java.util.ArrayDeque<NavState>()
 
+    fun resolveInitialScreen(): String {
+        val flavorRole = try {
+            com.example.BuildConfig.APP_FLAVOR_ROLE
+        } catch (e: Throwable) {
+            "MERCHANT"
+        }
+        if (flavorRole == "EMPLOYEE") {
+            val savedSession = securityPrefs.getString("employee_session_json", null)
+            return if (!savedSession.isNullOrBlank()) "EmployeePortal" else "EmployeeLogin"
+        }
+        val token = securityPrefs.getString("encrypted_session_token", null)
+        val email = securityPrefs.getString("logged_in_email", null)
+        val createdAt = securityPrefs.getLong("session_created_at", 0L)
+        val thirtyDaysMs = 30L * 24 * 3600 * 1000
+        val isValid = !token.isNullOrBlank() && !email.isNullOrBlank() && createdAt > 0L && (System.currentTimeMillis() - createdAt) < thirtyDaysMs
+
+        if (!isValid) return "Login"
+        if (!securityPrefs.getBoolean("is_onboarded", false)) return "Onboarding"
+        if (securityPrefs.getBoolean("is_biometric_locked", false)) {
+            return "LockScreen"
+        }
+        return "Main"
+    }
+
     private val _currentScreen = MutableStateFlow("Splash")
     val currentScreen: StateFlow<String> = _currentScreen.asStateFlow()
 
@@ -237,6 +261,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         syncAllCachedFormsToVps()
         startObservingPaymentFormsCache()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.prepopulateIfEmpty()
+                listenToFirebaseNotice()
+            } catch (e: Exception) {
+                android.util.Log.e("AppInit", "Env prep error: ${e.message}")
+            }
+            try {
+                localAccountReady.await()
+                val session = verifyEncryptedSessionToken()
+                if (session.isValid && !session.email.isNullOrBlank()) {
+                    fetchSubscriptionStatus()
+                    val account = checkMerchantAccountOnBackend(session.email, session.uid)
+                    if (account != null) {
+                        applyRestoredMerchantSetup(account)
+                        val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
+                        setOnboarded(isEffectivelyOnboarded)
+                        syncPinFromCloud()
+                        fetchMerchantApiKey()
+                        refreshGatewayConfig()
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppInit", "Session restore error: ${e.message}")
+            }
+        }
         viewModelScope.launch {
             repository.observeMerchantProfile().collect { profile ->
                 if (profile != null && profile.businessName.isNotBlank()) {
@@ -499,8 +549,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     dailyLimit = json.optDouble("daily_limit", 500000.0),
                     retryCount = json.optInt("retry_count", 3),
                     autoFailover = json.optBoolean("auto_failover", true),
-                    webhookUrl = json.optString("webhook_url", ""),
-                    webhookSecret = json.optString("webhook_secret", ""),
+                    webhookUrl = json.optString("webhook_url", "").let { if (it == "null") "" else it },
+                    webhookSecret = json.optString("webhook_secret", "").let { if (it == "null") "" else it },
                     successCallbackUrl = json.optString("success_callback_url", ""),
                     failureCallbackUrl = json.optString("failure_callback_url", ""),
                     cancelCallbackUrl = json.optString("cancel_callback_url", ""),
@@ -527,27 +577,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.getOrDefault(GatewayConfig())
     }
 
-    fun saveGatewayConfig(config: GatewayConfig) {
-        val safeConfig = config.copy(provider = "SwapnoPay Verified MFS")
-        val invalidPolicy = safeConfig.minAmount <= 0.0 || safeConfig.maxAmount < safeConfig.minAmount ||
-            safeConfig.dailyLimit < safeConfig.maxAmount || safeConfig.retryCount !in 1..10
-        val invalidEmail = safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess &&
-            !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(safeConfig.notificationEmail.trim())
-        val invalidWebhook = safeConfig.webhookUrl.isNotBlank() && !isSafeGatewayCallbackUrl(safeConfig.webhookUrl)
-        val invalidCallback = listOf(safeConfig.successCallbackUrl, safeConfig.failureCallbackUrl, safeConfig.cancelCallbackUrl)
-            .filter(String::isNotBlank).any { !isSafeGatewayCallbackUrl(it) }
-        if (invalidPolicy || invalidEmail || invalidCallback || invalidWebhook) {
-            _gatewaySettingsStatus.value = when {
-                invalidPolicy -> "Invalid limits: min ≤ max ≤ daily limit; retries 1–10"
-                invalidEmail -> "Enter a valid merchant receipt email"
-                invalidWebhook -> "Webhook must be a valid public URL"
-                else -> "Callbacks must be public HTTPS URLs"
-            }
-            logFirebaseStatus("Gateway settings were not saved because validation failed.")
-            return
-        }
-        _gatewayConfig.value = safeConfig
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    private fun persistGatewayConfigLocally(safeConfig: GatewayConfig) {
+        runCatching {
             val json = org.json.JSONObject().apply {
                 put("provider", safeConfig.provider)
                 put("min_amount", safeConfig.minAmount)
@@ -567,6 +598,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 put("active_methods", org.json.JSONObject(safeConfig.activeMethods))
             }
             securityPrefs.edit().putString("gateway_config_json", json.toString()).apply()
+        }
+    }
+
+    fun saveGatewayConfig(config: GatewayConfig) {
+        val cleanSecret = config.webhookSecret.trim().let { if (it == "null") "" else it }
+        val cleanUrl = config.webhookUrl.trim().let { if (it == "null") "" else it }
+        val safeConfig = config.copy(
+            provider = "SwapnoPay Verified MFS",
+            webhookSecret = cleanSecret,
+            webhookUrl = cleanUrl
+        )
+        val invalidPolicy = safeConfig.minAmount <= 0.0 || safeConfig.maxAmount < safeConfig.minAmount ||
+            safeConfig.dailyLimit < safeConfig.maxAmount || safeConfig.retryCount !in 1..10
+        val invalidEmail = safeConfig.emailNotificationsEnabled && safeConfig.emailOnSuccess &&
+            !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(safeConfig.notificationEmail.trim())
+        val invalidWebhook = safeConfig.webhookUrl.isNotBlank() && !isSafeGatewayCallbackUrl(safeConfig.webhookUrl)
+        val invalidCallback = listOf(safeConfig.successCallbackUrl, safeConfig.failureCallbackUrl, safeConfig.cancelCallbackUrl)
+            .filter(String::isNotBlank).any { !isSafeGatewayCallbackUrl(it) }
+        if (invalidPolicy || invalidEmail || invalidCallback || invalidWebhook) {
+            _gatewaySettingsStatus.value = when {
+                invalidPolicy -> "Invalid limits: min ≤ max ≤ daily limit; retries 1–10"
+                invalidEmail -> "Enter a valid merchant receipt email"
+                invalidWebhook -> "Webhook must be a valid public URL"
+                else -> "Callbacks must be public HTTPS URLs"
+            }
+            logFirebaseStatus("Gateway settings were not saved because validation failed.")
+            return
+        }
+        _gatewayConfig.value = safeConfig
+        persistGatewayConfigLocally(safeConfig)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val active = resolveActiveForGateway()
             if (active != null) {
                 val payload = org.json.JSONObject().apply {
@@ -647,20 +709,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     val receivingNums = org.json.JSONObject()
                     val accountTypesObj = org.json.JSONObject()
                     val qrCodesObj = org.json.JSONObject()
-                    val dbNumbers = repository.getMerchantNumbers(_activeProfile.value.id)
+                    val dbNumbers = repository.getMerchantNumbers(_activeProfile.value.id).ifEmpty {
+                        repository.getMerchantNumbers("")
+                    }
                     val activeNums = (if (dbNumbers.isNotEmpty()) dbNumbers else merchantNumbers.value.map { MerchantNumberEntity(it.number, _activeProfile.value.id, it.method, it.type, it.isActive, it.isDefault, it.qrCodeUrl) })
                         .filter { it.isActive && !repository.isFakePhoneNumber(it.number) }
-                    activeNums.forEach { num ->
-                        receivingNums.put(num.method, num.number)
-                        accountTypesObj.put(num.method, num.accountType)
-                        if (!num.qrCodeUrl.isNullOrBlank()) {
-                            qrCodesObj.put(num.method, num.qrCodeUrl)
-                        }
+
+                    val defaultEntry = activeNums.firstOrNull { it.isDefault } ?: activeNums.firstOrNull()
+                    if (defaultEntry != null) {
+                        put("default_number", defaultEntry.number)
+                        put("default_method", defaultEntry.method)
                     }
-                    put("receiving_numbers", receivingNums)
-                    put("account_types", accountTypesObj)
-                    put("qr_codes", qrCodesObj)
-                    put("replace_receiving_numbers", true)
+
+                    if (activeNums.isNotEmpty()) {
+                        activeNums.forEach { num ->
+                            receivingNums.put(num.method, num.number)
+                            accountTypesObj.put(num.method, num.accountType)
+                            if (!num.qrCodeUrl.isNullOrBlank()) {
+                                qrCodesObj.put(num.method, num.qrCodeUrl)
+                            }
+                        }
+                        put("receiving_numbers", receivingNums)
+                        put("account_types", accountTypesObj)
+                        put("qr_codes", qrCodesObj)
+                        put("replace_receiving_numbers", true)
+                    }
                 }
 
                 val conn = java.net.URL("https://api.swapnopay.top/v1/payment/merchant-config").openConnection() as java.net.HttpURLConnection
@@ -739,14 +812,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         return@fetchRecords
                     }
                     val current = _gatewayConfig.value
-                    _gatewayConfig.value = current.copy(
+                    val remoteWhUrl = if (remote.has("webhook_url") && !remote.isNull("webhook_url")) {
+                        remote.optString("webhook_url", "").trim().let { if (it == "null") "" else it }
+                    } else ""
+                    val effectiveWhUrl = if (remoteWhUrl.isNotBlank()) remoteWhUrl else current.webhookUrl
+
+                    val remoteWhSec = if (remote.has("webhook_secret") && !remote.isNull("webhook_secret")) {
+                        remote.optString("webhook_secret", "").trim().let { if (it == "null") "" else it }
+                    } else ""
+                    val effectiveWhSec = if (remoteWhSec.isNotBlank()) remoteWhSec else current.webhookSecret
+
+                    val newCfg = current.copy(
                         minAmount = remote.optDouble("min_amount", current.minAmount),
                         maxAmount = remote.optDouble("max_amount", current.maxAmount),
                         dailyLimit = remote.optDouble("daily_limit", current.dailyLimit),
                         retryCount = remote.optInt("receipt_retry_limit", current.retryCount),
                         autoFailover = remote.optBoolean("auto_receipt_retry", current.autoFailover),
-                        webhookUrl = remote.optString("webhook_url", current.webhookUrl),
-                        webhookSecret = remote.optString("webhook_secret", current.webhookSecret),
+                        webhookUrl = effectiveWhUrl,
+                        webhookSecret = effectiveWhSec,
                         emailNotificationsEnabled = remote.optBoolean("customer_receipts_enabled", true) || remote.optBoolean("merchant_receipts_enabled", true),
                         customerReceiptsEnabled = remote.optBoolean("customer_receipts_enabled", true),
                         notificationEmail = remote.optString("merchant_receipt_email", current.notificationEmail),
@@ -755,6 +838,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         failureCallbackUrl = remote.optString("failure_callback_url", current.failureCallbackUrl),
                         cancelCallbackUrl = remote.optString("cancel_callback_url", current.cancelCallbackUrl)
                     )
+                    _gatewayConfig.value = newCfg
+                    persistGatewayConfigLocally(newCfg)
+                    if (effectiveWhSec.isBlank()) {
+                        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            com.example.data.remote.SupabaseClient.fetchRecords(
+                                active.supabaseUrl, active.anonKey, active.authSessionToken,
+                                "merchants", "webhook_secret",
+                                merchantId = null,
+                                onSuccess = { mRows ->
+                                    val mSec = mRows.optJSONObject(0)?.optString("webhook_secret", "")?.trim()?.let { if (it == "null") "" else it } ?: ""
+                                    if (mSec.isNotBlank()) {
+                                        val updatedWithSec = _gatewayConfig.value.copy(webhookSecret = mSec)
+                                        _gatewayConfig.value = updatedWithSec
+                                        persistGatewayConfigLocally(updatedWithSec)
+                                    }
+                                },
+                                onFailure = { _ -> }
+                            )
+                        }
+                    }
                     _gatewaySettingsStatus.value = "Loaded from merchant database"
                 },
                 onFailure = {
@@ -834,8 +937,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             val qrCodes = configObj.optJSONObject("qr_codes")
 
                             repository.purgeFakeMerchantNumbers()
+                            val defaultNum = configObj.optString("default_number", "").filter(Char::isDigit)
+                            val defaultMethod = configObj.optString("default_method", "").trim()
+                            val enabledMethodsObj = configObj.optJSONObject("enabled_methods")
                             if (receivingNums != null && receivingNums.length() > 0) {
                                 val keys = receivingNums.keys()
+                                val parsedEntities = mutableListOf<MerchantNumberEntity>()
                                 while (keys.hasNext()) {
                                     val methodKey = keys.next()
                                     val rawNumber = receivingNums.optString(methodKey, "")
@@ -851,24 +958,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                         val accType = accountTypes?.optString(methodKey, "Personal")?.ifBlank { "Personal" } ?: "Personal"
                                         val qrUrl = qrCodes?.optNullableString(methodKey)
                                         val isMethodActive = when (normMethod.lowercase()) {
-                                            "bkash" -> configObj.optBoolean("bkash_enabled", true)
-                                            "nagad" -> configObj.optBoolean("nagad_enabled", true)
-                                            "rocket" -> configObj.optBoolean("rocket_enabled", true)
-                                            "upay" -> configObj.optBoolean("upay_enabled", true)
+                                            "bkash" -> enabledMethodsObj?.optBoolean("bKash", true) ?: configObj.optBoolean("bkash_enabled", true)
+                                            "nagad" -> enabledMethodsObj?.optBoolean("Nagad", true) ?: configObj.optBoolean("nagad_enabled", true)
+                                            "rocket" -> enabledMethodsObj?.optBoolean("Rocket", true) ?: configObj.optBoolean("rocket_enabled", true)
+                                            "upay" -> enabledMethodsObj?.optBoolean("Upay", true) ?: configObj.optBoolean("upay_enabled", true)
                                             else -> true
                                         }
-                                        val entity = MerchantNumberEntity(
-                                            number = normalized,
-                                            merchantId = effectiveMid,
-                                            method = normMethod,
-                                            accountType = accType,
-                                            isActive = isMethodActive,
-                                            isDefault = false,
-                                            qrCodeUrl = qrUrl,
-                                            updatedAt = System.currentTimeMillis()
+                                        val isDef = defaultNum.isNotBlank() && (normalized == defaultNum) &&
+                                            (if (defaultMethod.isNotBlank()) normMethod.equals(defaultMethod, ignoreCase = true) else (normMethod.equals("bKash", ignoreCase = true) || parsedEntities.none { it.isDefault }))
+                                        parsedEntities.add(
+                                            MerchantNumberEntity(
+                                                number = normalized,
+                                                merchantId = effectiveMid,
+                                                method = normMethod,
+                                                accountType = accType,
+                                                isActive = isMethodActive,
+                                                isDefault = isDef,
+                                                qrCodeUrl = qrUrl,
+                                                updatedAt = System.currentTimeMillis()
+                                            )
                                         )
-                                        repository.upsertMerchantNumber(entity)
                                     }
+                                }
+                                if (parsedEntities.isNotEmpty()) {
+                                    repository.upsertMerchantNumbers(parsedEntities)
+                                }
+                            } else {
+                                val localNumbers = repository.getMerchantNumbers(effectiveMid)
+                                    .filter { it.isActive && !repository.isFakePhoneNumber(it.number) }
+                                if (localNumbers.isNotEmpty()) {
+                                    syncMerchantConfigToAdminDatabase()
                                 }
                             }
 
@@ -877,13 +996,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             val minAmt = configObj.optDouble("min_amount", current.minAmount)
                             val maxAmt = configObj.optDouble("max_amount", current.maxAmount)
                             val dailyLim = configObj.optDouble("daily_limit", current.dailyLimit)
-                            val whUrl = configObj.optString("webhook_url", current.webhookUrl)
-                            val whSec = configObj.optString("webhook_secret", current.webhookSecret)
+                            val rawWhUrl = if (configObj.has("webhook_url") && !configObj.isNull("webhook_url")) {
+                                configObj.optString("webhook_url", "")
+                            } else ""
+                            val whUrl = if (rawWhUrl == "null" || rawWhUrl.isBlank()) {
+                                current.webhookUrl.takeIf { it != "null" } ?: ""
+                            } else rawWhUrl
+
+                            val rawWhSec = if (configObj.has("webhook_secret") && !configObj.isNull("webhook_secret")) {
+                                configObj.optString("webhook_secret", "")
+                            } else ""
+                            val whSec = if (rawWhSec == "null" || rawWhSec.isBlank()) {
+                                current.webhookSecret.takeIf { it != "null" } ?: ""
+                            } else rawWhSec
                             val updatedMethods = current.activeMethods.toMutableMap().apply {
+                                if (enabledMethodsObj != null) {
+                                    if (enabledMethodsObj.has("bKash")) put("bKash", enabledMethodsObj.optBoolean("bKash"))
+                                    if (enabledMethodsObj.has("Nagad")) put("Nagad", enabledMethodsObj.optBoolean("Nagad"))
+                                    if (enabledMethodsObj.has("Rocket")) put("Rocket", enabledMethodsObj.optBoolean("Rocket"))
+                                    if (enabledMethodsObj.has("Upay")) put("Upay", enabledMethodsObj.optBoolean("Upay"))
+                                }
                                 if (configObj.has("bkash_enabled")) put("bKash", configObj.optBoolean("bkash_enabled"))
                                 if (configObj.has("nagad_enabled")) put("Nagad", configObj.optBoolean("nagad_enabled"))
                                 if (configObj.has("rocket_enabled")) put("Rocket", configObj.optBoolean("rocket_enabled"))
                                 if (configObj.has("upay_enabled")) put("Upay", configObj.optBoolean("upay_enabled"))
+                                receivingNums?.keys()?.forEach { k ->
+                                    val mName = when (k.lowercase()) {
+                                        "bkash" -> "bKash"
+                                        "nagad" -> "Nagad"
+                                        "rocket" -> "Rocket"
+                                        "upay" -> "Upay"
+                                        else -> k
+                                    }
+                                    if (receivingNums.optString(k).filter(Char::isDigit).length in 10..15) {
+                                        put(mName, true)
+                                    }
+                                }
                             }
                             val newGatewayConfig = current.copy(
                                 minAmount = minAmt,
@@ -894,6 +1042,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 activeMethods = updatedMethods
                             )
                             _gatewayConfig.value = newGatewayConfig
+                            persistGatewayConfigLocally(newGatewayConfig)
                             break
                         }
                     }
@@ -917,6 +1066,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         java.security.SecureRandom().nextBytes(randomBytes)
         val hex = randomBytes.joinToString("") { "%02x".format(it) }
         return "whsec_$hex"
+    }
+
+    fun regenerateWebhookSecret(onComplete: ((String) -> Unit)? = null) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val newSecret = generateWebhookSecret()
+            val current = _gatewayConfig.value
+            val updated = current.copy(webhookSecret = newSecret)
+            saveGatewayConfig(updated)
+            logFirebaseStatus("Regenerated dynamic webhook secret: $newSecret")
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                onComplete?.invoke(newSecret)
+            }
+        }
     }
 
     fun testWebhookEndpoint(
@@ -1356,7 +1518,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("SplashInit", "Env prep error: ${e.message}")
             }
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(400)
             updateSplashStep(1, isCompleted = true, isRunning = false)
             logFirebaseStatus("Splash Step 1/4: Application environment & Room DB ready")
 
@@ -1369,7 +1531,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             localAccountReady.await()
             checkCurrentUser()
             val session = verifyEncryptedSessionToken()
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(400)
             updateSplashStep(2, isCompleted = true, isRunning = false)
             logFirebaseStatus("Splash Step 2/4: Encrypted session token validated (Email: ${session.email ?: "Guest"}, Active: ${session.isValid})")
 
@@ -1381,7 +1543,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             val isBiometricEnabled = securityPrefs.getBoolean("is_biometric_locked", false)
             _isBiometricLocked.value = isBiometricEnabled
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(400)
             updateSplashStep(3, isCompleted = true, isRunning = false)
             logFirebaseStatus("Splash Step 3/4: Biometric flag: ${if (isBiometricEnabled) "LOCKED (PIN Check)" else "UNLOCKED"}")
 
@@ -1390,10 +1552,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _splashProgress.value = 1.0f
             _splashStatusText.value = "Auto-routing to target screen..."
             updateSplashStep(4, isRunning = true)
-            kotlinx.coroutines.delay(400)
+            kotlinx.coroutines.delay(300)
             updateSplashStep(4, isCompleted = true, isRunning = false)
-            // Brief smooth transition (200ms)
-            kotlinx.coroutines.delay(200)
+            // Brief smooth transition
+            kotlinx.coroutines.delay(150)
 
             var accountLookupFailed = false
             if (session.isValid) {
@@ -3362,9 +3524,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         repository.insertMerchantProfile(restored)
         repository.switchProfile(restored.id)
         repository.deletePlaceholderMerchantProfiles()
+        repository.reassignAllDataToMerchant(restored.id)
         repository.reassignMerchantData("merchant_default", restored.id)
         repository.reassignMerchantData("00000000-0000-0000-0000-000000000001", restored.id)
         repository.reassignMerchantData(repository.installationId, restored.id)
+        syncMerchantConfigToAdminDatabase()
         syncAllCachedFormsToVps()
         startObservingPaymentFormsCache()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -3660,6 +3824,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 fetchMerchantApiKey()
+                repository.reassignAllDataToMerchant(account.merchantId)
+                syncMerchantConfigToAdminDatabase()
                 refreshGatewayConfig()
                 pullAllMerchantDataFromRemote(account.merchantId)
                 val isEffectivelyOnboarded = account.isOnboarded || (account.exists && account.businessName.isNotBlank() && !account.businessName.matches(Regex("^(my store|my business|google user|facebook user|demo store|business setup required)$", RegexOption.IGNORE_CASE)))
@@ -4344,6 +4510,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         performDirectSocialLogin("Facebook", onSuccess)
     }
 
+    private val _isLoggingOut = MutableStateFlow(false)
+    val isLoggingOut: StateFlow<Boolean> = _isLoggingOut.asStateFlow()
+
     fun clearAllSessionAndOnboardingData() {
         setUserEmail(null)
         _supabaseUrlInput.value = ""
@@ -4353,6 +4522,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _onboardingBusinessName.value = ""
         _onboardingPhone.value = ""
         _authError.value = null
+        _appPin.value = ""
+        _isAppLocked.value = false
+        _isBiometricLocked.value = false
+        _merchantApiKey.value = ""
         _sessionInfo.value = EncryptedSessionInfo(isValid = false)
         try {
             securityPrefs.edit().clear().apply()
@@ -4384,23 +4557,102 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun logout(onComplete: () -> Unit) {
-        supportRefreshJob?.cancel()
-        supabaseRefreshJob?.cancel()
-        _supportChatList.value = emptyList()
-        _mySupportTicketsList.value = emptyList()
-        clearAllSessionAndOnboardingData()
-        viewModelScope.launch {
-            platformSessionMutex.withLock {
-                repository.observeSupabaseProfiles().firstOrNull().orEmpty().forEach { profile ->
-                    repository.insertSupabaseProfile(profile.copy(authEmail = "", authSessionToken = "",
-                        authRefreshToken = "", authTokenExpiresAt = 0L, isActive = false))
+    fun logout(onComplete: () -> Unit = {}) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _isLoggingOut.value = true
+            try {
+                // 1. Cancel background polling and session refresh jobs
+                supportRefreshJob?.cancel()
+                supabaseRefreshJob?.cancel()
+
+                val currentMerchantId = _activeProfile.value.id
+                val currentMerchantSupabase = resolveMerchantForOps()
+
+                // 2. Pre-Logout Supabase Push Sync (Guarantees zero data loss before purging)
+                if (currentMerchantSupabase != null &&
+                    currentMerchantSupabase.supabaseUrl.isNotBlank() &&
+                    currentMerchantSupabase.anonKey.isNotBlank() &&
+                    currentMerchantId.isNotBlank() &&
+                    currentMerchantId != "merchant_default"
+                ) {
+                    logFirebaseStatus("Pre-logout: Syncing all data to Supabase to prevent data loss...")
+                    kotlinx.coroutines.withTimeoutOrNull(25_000L) {
+                        try {
+                            pushAllScreensToSupabaseInternal(
+                                overrideMerchantId = currentMerchantId,
+                                overrideProfile = currentMerchantSupabase
+                            )
+                            logFirebaseStatus("Pre-logout: All merchant records successfully synced to Supabase.")
+                        } catch (e: Exception) {
+                            android.util.Log.w("AppViewModel", "Pre-logout sync warning: ${e.message}")
+                        }
+                    }
                 }
+
+                // 3. Purge all Room database business records for the tenant
+                logFirebaseStatus("Pre-logout: Purging local cached business records...")
+                repository.purgeAllTenantBusinessData()
+
+                // 4. Reset Supabase profile authentication tokens
+                platformSessionMutex.withLock {
+                    repository.observeSupabaseProfiles().firstOrNull().orEmpty().forEach { profile ->
+                        if (profile.isPlatformProfile()) {
+                            repository.insertSupabaseProfile(
+                                profile.copy(
+                                    authEmail = "",
+                                    authSessionToken = "",
+                                    authRefreshToken = "",
+                                    authTokenExpiresAt = 0L,
+                                    isActive = false
+                                )
+                            )
+                        } else {
+                            repository.deleteSupabaseProfile(profile.id)
+                        }
+                    }
+                }
+
+                // 5. Clean in-memory states and session credentials
+                clearAllSessionAndOnboardingData()
+
+                _posCart.value = emptyList()
+                _lastScannedQrStatus.value = null
+                _activePaymentDetails.value = null
+                _supportChatList.value = emptyList()
+                _mySupportTicketsList.value = emptyList()
+                hostedFormsList.value = emptyList()
+                formFieldsList.value = emptyList()
+                formProductsList.value = emptyList()
+                formPagesList.value = listOf(FormPageItem())
+                formSubmissionsList.value = emptyList()
+                hostedFormRouteStatus.value = emptyMap()
+                registeredMerchantsFromSupabase.value = emptyList()
+                _webShopState.value = WebShopState()
+                _staffMonitorState.value = MerchantStaffMonitorState()
+                supabaseSyncLog.value = emptyList()
+                _activeSupabaseProfile.value = null
+                _activeMerchantSupabaseProfile.value = null
+                supabaseConnected.value = false
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    navigateTo("Login")
+                    onComplete()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Error during logout: ${e.message}", e)
+                // Ensure user can still log out even if an error occurs
+                clearAllSessionAndOnboardingData()
+                _posCart.value = emptyList()
+                _activeSupabaseProfile.value = null
+                _activeMerchantSupabaseProfile.value = null
+                supabaseConnected.value = false
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    navigateTo("Login")
+                    onComplete()
+                }
+            } finally {
+                _isLoggingOut.value = false
             }
-            _activeSupabaseProfile.value = null
-            supabaseConnected.value = false
-            navigateTo("Login")
-            onComplete()
         }
     }
 
@@ -4734,7 +4986,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val merchantNumbers: StateFlow<List<MerchantNumber>> = activeProfile
         .flatMapLatest { profile -> repository.observeMerchantNumbers(profile.id) }
         .map { rows ->
-            rows.distinctBy { it.number }.map { MerchantNumber(it.number, it.method, it.accountType, it.isActive, it.isDefault, it.qrCodeUrl) }
+            rows.distinctBy { "${it.method.lowercase()}:${it.number}" }.map { MerchantNumber(it.number, it.method, it.accountType, it.isActive, it.isDefault, it.qrCodeUrl) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -6116,16 +6368,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun activateLocalProfileForBackend(profile: SupabaseProfileEntity) {
         var localProfile = repository.getMerchantProfileById(profile.id)
+        val previous = _activeProfile.value
+        repository.reassignAllDataToMerchant(profile.id)
+        if (previous.id != profile.id) {
+            repository.reassignMerchantData(previous.id, profile.id)
+        }
         if (localProfile == null) {
-            val previous = _activeProfile.value
-            if (previous.id == "00000000-0000-0000-0000-000000000001") {
-                repository.reassignMerchantData(previous.id, profile.id)
-            }
             localProfile = previous.copy(id = profile.id, businessName = profile.businessName)
             repository.insertMerchantProfile(localProfile)
         }
         repository.switchProfile(localProfile.id)
         _activeProfile.value = localProfile
+        syncMerchantConfigToAdminDatabase()
         sendDeviceHeartbeat()
     }
 
@@ -10010,10 +10264,6 @@ function executePayment() {
         val publishErrors = linkedMapOf<String, String>()
         val theme = formThemeConfig.value
         if (theme.enablePayment) {
-            val hasPricing = formProductsList.value.isNotEmpty() || formFieldsList.value.any { it.type in listOf(FormFieldType.PRODUCT, FormFieldType.PRODUCT_LIST, FormFieldType.CUSTOM_AMOUNT) }
-            if (hasPricing && formFieldsList.value.none { it.type == FormFieldType.PHONE && it.isRequired }) {
-                publishErrors["payment_phone"] = "Payment forms require a required phone field for payer matching."
-            }
             if (theme.currencyCode != "BDT") {
                 publishErrors["payment_currency"] = "The connected mobile payment gateway currently settles in BDT."
             }
@@ -11147,38 +11397,94 @@ function executePayment() {
         saveGatewayConfig(gatewayConfig.value)
     }
 
-    fun addMerchantNumber(number: String, method: String, type: String, qrCodeUrl: String? = null) {
+    fun addMerchantNumber(number: String, method: String, type: String, qrCodeUrl: String? = null, isDefault: Boolean = false) {
         val normalized = number.filter(Char::isDigit)
         if (normalized.length !in 10..15 || method !in setOf("bKash", "Nagad", "Rocket", "Upay")) {
             logFirebaseStatus("Invalid merchant payment number or method.")
             return
         }
         viewModelScope.launch {
+            val shouldBeDefault = isDefault || merchantNumbers.value.none { it.isActive && it.isDefault }
             val entity = MerchantNumberEntity(
                 number = normalized,
                 merchantId = activeProfile.value.id,
                 method = method,
                 accountType = type.trim().ifEmpty { "Personal" },
-                qrCodeUrl = qrCodeUrl?.trim()?.ifEmpty { null }
+                qrCodeUrl = qrCodeUrl?.trim()?.ifEmpty { null },
+                isDefault = shouldBeDefault
             )
-            repository.upsertMerchantNumber(entity)
+            if (shouldBeDefault) {
+                repository.setDefaultMerchantNumber(activeProfile.value.id, entity)
+                merchantNumbers.value.filter { it.isDefault }.forEach { oldDefault ->
+                    if (oldDefault.number != normalized || !oldDefault.method.equals(method, ignoreCase = true)) {
+                        syncMerchantNumberToSupabase(
+                            MerchantNumberEntity(oldDefault.number, activeProfile.value.id, oldDefault.method, oldDefault.type, oldDefault.isActive, false)
+                        )
+                    }
+                }
+            } else {
+                repository.upsertMerchantNumber(entity)
+            }
             syncMerchantNumberToSupabase(entity)
             syncMerchantConfigToAdminDatabase()
         }
     }
 
-    fun toggleMerchantNumber(number: String) {
-        merchantNumbers.value.find { it.number == number }?.let { current ->
+    fun addMerchantNumbers(number: String, methods: List<String>, type: String, qrCodeUrl: String? = null, isDefault: Boolean = false, defaultMethod: String? = null) {
+        val normalized = number.filter(Char::isDigit)
+        if (normalized.length !in 10..15) {
+            logFirebaseStatus("Invalid merchant payment number.")
+            return
+        }
+        viewModelScope.launch {
+            val validMethods = methods.filter { it in setOf("bKash", "Nagad", "Rocket", "Upay") }
+            val shouldSetAnyDefault = isDefault || merchantNumbers.value.none { it.isActive && it.isDefault }
+            val chosenDefaultMethod = if (shouldSetAnyDefault) (defaultMethod ?: validMethods.firstOrNull()) else null
+            val entities = validMethods.map { m ->
+                val isThisDefault = shouldSetAnyDefault && m.equals(chosenDefaultMethod, ignoreCase = true)
+                MerchantNumberEntity(
+                    number = normalized,
+                    merchantId = activeProfile.value.id,
+                    method = m,
+                    accountType = type.trim().ifEmpty { "Personal" },
+                    qrCodeUrl = qrCodeUrl?.trim()?.ifEmpty { null },
+                    isDefault = isThisDefault
+                )
+            }
+            if (entities.isNotEmpty()) {
+                if (shouldSetAnyDefault) {
+                    val defaultEntity = entities.find { it.isDefault } ?: entities.first()
+                    repository.setDefaultMerchantNumber(activeProfile.value.id, defaultEntity)
+                    entities.filter { !it.isDefault }.forEach { repository.upsertMerchantNumber(it) }
+                    merchantNumbers.value.filter { it.isDefault }.forEach { oldDefault ->
+                        if (oldDefault.number != normalized || !oldDefault.method.equals(defaultEntity.method, ignoreCase = true)) {
+                            syncMerchantNumberToSupabase(
+                                MerchantNumberEntity(oldDefault.number, activeProfile.value.id, oldDefault.method, oldDefault.type, oldDefault.isActive, false)
+                            )
+                        }
+                    }
+                } else {
+                    repository.upsertMerchantNumbers(entities)
+                }
+                entities.forEach { syncMerchantNumberToSupabase(it) }
+                syncMerchantConfigToAdminDatabase()
+            }
+        }
+    }
+
+    fun toggleMerchantNumber(number: String, method: String? = null) {
+        val current = merchantNumbers.value.find { it.number == number && (method == null || it.method.equals(method, ignoreCase = true)) }
+        if (current != null) {
             viewModelScope.launch {
                 val entity = MerchantNumberEntity(
-                        number = current.number,
-                        merchantId = activeProfile.value.id,
-                        method = current.method,
-                        accountType = current.type,
-                        isActive = !current.isActive,
-                        isDefault = current.isDefault,
-                        qrCodeUrl = current.qrCodeUrl
-                    )
+                    number = current.number,
+                    merchantId = activeProfile.value.id,
+                    method = current.method,
+                    accountType = current.type,
+                    isActive = !current.isActive,
+                    isDefault = current.isDefault,
+                    qrCodeUrl = current.qrCodeUrl
+                )
                 repository.upsertMerchantNumber(entity)
                 syncMerchantNumberToSupabase(entity)
                 syncMerchantConfigToAdminDatabase()
@@ -11186,8 +11492,9 @@ function executePayment() {
         }
     }
 
-    fun setMerchantNumberDefault(number: String) {
-        merchantNumbers.value.find { it.number == number }?.let { current ->
+    fun setMerchantNumberDefault(number: String, method: String? = null) {
+        val current = merchantNumbers.value.find { it.number == number && (method == null || it.method.equals(method, ignoreCase = true)) }
+        if (current != null) {
             viewModelScope.launch {
                 val entity = MerchantNumberEntity(
                     number = current.number,
@@ -11195,13 +11502,14 @@ function executePayment() {
                     method = current.method,
                     accountType = current.type,
                     isActive = current.isActive,
-                    isDefault = true
+                    isDefault = true,
+                    qrCodeUrl = current.qrCodeUrl
                 )
                 repository.setDefaultMerchantNumber(
                     activeProfile.value.id,
                     entity
                 )
-                merchantNumbers.value.filter { it.number != number && it.isDefault }.forEach { oldDefault ->
+                merchantNumbers.value.filter { (it.number != number || (method != null && !it.method.equals(method, ignoreCase = true))) && it.isDefault }.forEach { oldDefault ->
                     syncMerchantNumberToSupabase(
                         MerchantNumberEntity(oldDefault.number, activeProfile.value.id, oldDefault.method, oldDefault.type, oldDefault.isActive, false)
                     )
@@ -11212,8 +11520,8 @@ function executePayment() {
         }
     }
 
-    fun deleteMerchantNumber(number: String, onResult: ((Boolean, String) -> Unit)? = null) {
-        val current = merchantNumbers.value.find { it.number == number }
+    fun deleteMerchantNumber(number: String, method: String? = null, onResult: ((Boolean, String) -> Unit)? = null) {
+        val current = merchantNumbers.value.find { it.number == number && (method == null || it.method.equals(method, ignoreCase = true)) }
         if (current == null) {
             onResult?.invoke(false, "Payment number not found.")
             return
@@ -11222,7 +11530,7 @@ function executePayment() {
             try {
                 val mId = activeProfile.value.id
                 // 1. Delete from local Room database
-                repository.deleteMerchantNumber(mId, number)
+                repository.deleteMerchantNumber(mId, number, method)
 
                 // 2. If deleted number was the default, automatically assign the next active number as default
                 if (current.isDefault) {
@@ -11237,7 +11545,7 @@ function executePayment() {
                 // 3. Delete from Supabase cloud database
                 val active = resolveActiveForGateway()
                 if (active != null && active.supabaseUrl.isNotBlank() && active.anonKey.isNotBlank()) {
-                    val remoteId = merchantNumberRemoteId(mId, number)
+                    val remoteId = merchantNumberRemoteId(mId, number, current.method)
                     try {
                         com.example.data.remote.SupabaseClient.deleteRecord(
                             url = active.supabaseUrl,
@@ -11246,7 +11554,7 @@ function executePayment() {
                             tableName = "merchant_numbers",
                             primaryKeyCol = "id",
                             primaryKeyVal = remoteId,
-                            onSuccess = { logFirebaseStatus("Deleted remote merchant number: $number") },
+                            onSuccess = { logFirebaseStatus("Deleted remote merchant number: $number (${current.method})") },
                             onFailure = { err -> logFirebaseStatus("Remote merchant number delete notice: $err") }
                         )
                     } catch (e: Exception) {
@@ -11256,7 +11564,7 @@ function executePayment() {
 
                 // 4. Sync updated receiving numbers to backend payment gateway
                 syncMerchantConfigToAdminDatabase()
-                logFirebaseStatus("Merchant number deleted: $number")
+                logFirebaseStatus("Merchant number deleted: $number (${current.method})")
                 onResult?.invoke(true, "Payment number $number deleted successfully.")
             } catch (e: Exception) {
                 logFirebaseStatus("Failed to delete merchant number: ${e.message}")
@@ -11268,7 +11576,7 @@ function executePayment() {
     private suspend fun syncMerchantNumberToSupabase(entity: MerchantNumberEntity) {
         val active = resolveActiveForGateway() ?: return
         if (active.supabaseUrl.isBlank() || active.anonKey.isBlank()) return
-        val id = merchantNumberRemoteId(entity.merchantId, entity.number)
+        val id = merchantNumberRemoteId(entity.merchantId, entity.number, entity.method)
         val payload = org.json.JSONObject().apply {
             put("id", id)
             put("merchant_id", entity.merchantId)
@@ -11292,8 +11600,23 @@ function executePayment() {
         }
     }
 
-    private fun merchantNumberRemoteId(merchantId: String, number: String): String =
-        java.util.UUID.nameUUIDFromBytes("$merchantId:$number".toByteArray(Charsets.UTF_8)).toString()
+    private fun merchantNumberRemoteId(merchantId: String, number: String, method: String = ""): String =
+        if (method.isNotBlank()) {
+            java.util.UUID.nameUUIDFromBytes("$merchantId:$number:${method.lowercase()}".toByteArray(Charsets.UTF_8)).toString()
+        } else {
+            java.util.UUID.nameUUIDFromBytes("$merchantId:$number".toByteArray(Charsets.UTF_8)).toString()
+        }
+
+    fun clearTransactionLogs(onComplete: (() -> Unit)? = null) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val mId = activeProfile.value.id
+            repository.clearAllPayments(mId)
+            logFirebaseStatus("Cleared all payment transaction logs.")
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                onComplete?.invoke()
+            }
+        }
+    }
 
     fun generateCsvContent(list: List<CachedPaymentEntity> = payments.value): String {
         val sb = StringBuilder()
@@ -11571,360 +11894,408 @@ function executePayment() {
         if (!succeeded) throw java.io.IOException(failure)
     }
 
+    suspend fun pushAllScreensToSupabaseInternal(
+        overrideMerchantId: String? = null,
+        overrideProfile: com.example.data.local.SupabaseProfileEntity? = null
+    ): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val active = overrideProfile ?: resolveMerchantForOps() ?: run {
+            logFirebaseStatus("Cloud sync skipped: please configure and connect your merchant Supabase project.")
+            return@withContext false
+        }
+        val url = active.supabaseUrl
+        val key = active.anonKey
+        val token = active.authSessionToken
+        val merchantId = overrideMerchantId?.ifBlank { activeProfile.value.id } ?: activeProfile.value.id
+        isSupabaseSyncing.value = true
+        logFirebaseStatus("Starting full multi-screen Supabase DB sync for $merchantId...")
+
+        val syncLogs = mutableListOf<String>()
+        var syncFailureCount = 0
+
+        // 1. Sync Customers Screen Data
+        try {
+            val customersList = repository.observeCustomers(merchantId).firstOrNull() ?: emptyList()
+            for (cust in customersList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", cust.id)
+                    put("merchant_id", cust.merchantId.ifBlank { merchantId })
+                    put("name", cust.name)
+                    put("phone", cust.phone)
+                    put("email", cust.email ?: org.json.JSONObject.NULL)
+                    put("address", cust.address ?: org.json.JSONObject.NULL)
+                    put("opening_balance", cust.openingBalance)
+                    put("current_balance", cust.currentBalance)
+                    put("status", cust.status)
+                    put("created_at", toIsoTimestamp(cust.createdAt))
+                }
+                upsertRemoteOrThrow(url, key, token, "customers", json)
+            }
+            syncLogs.add("Customers synced (${customersList.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Customers failed: ${e.message}")
+            Log.e("SupabaseSync", "Customers sync err: ${e.message}")
+        }
+
+        // 2. Sync Suppliers Screen Data
+        try {
+            val suppliersList = repository.observeSuppliers(merchantId).firstOrNull() ?: emptyList()
+            for (sup in suppliersList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", sup.id)
+                    put("merchant_id", sup.merchantId.ifBlank { merchantId })
+                    put("name", sup.name)
+                    put("phone", sup.phone)
+                    put("email", sup.email ?: org.json.JSONObject.NULL)
+                    put("address", sup.address ?: org.json.JSONObject.NULL)
+                    put("opening_balance", sup.openingBalance)
+                    put("current_balance", sup.currentBalance)
+                    put("created_at", toIsoTimestamp(sup.createdAt))
+                }
+                upsertRemoteOrThrow(url, key, token, "suppliers", json)
+            }
+            syncLogs.add("Suppliers synced (${suppliersList.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Suppliers failed: ${e.message}")
+            Log.e("SupabaseSync", "Suppliers sync err: ${e.message}")
+        }
+
+        // 3. Sync Products & Inventory Screen Data
+        try {
+            val productsList = repository.observeProducts(merchantId).firstOrNull() ?: emptyList()
+            for (p in productsList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", p.id)
+                    put("merchant_id", p.merchantId.ifBlank { merchantId })
+                    put("name", p.name)
+                    put("code", p.code ?: org.json.JSONObject.NULL)
+                    put("category", p.category ?: "General")
+                    put("purchase_price", p.purchasePrice)
+                    put("sale_price", p.salePrice)
+                    put("stock_quantity", p.stockQuantity)
+                    put("min_stock_threshold", p.minStockThreshold)
+                    put("unit", p.unit)
+                    put("qr_code", p.qrCode ?: org.json.JSONObject.NULL)
+                    put("image_url", p.imageUrl ?: org.json.JSONObject.NULL)
+                    put("created_at", toIsoTimestamp(p.createdAt))
+                }
+                upsertRemoteOrThrow(url, key, token, "products", json)
+            }
+            syncLogs.add("Products & Inventory synced (${productsList.size} items)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Products failed: ${e.message}")
+            Log.e("SupabaseSync", "Products sync err: ${e.message}")
+        }
+
+        // Product variants are independent inventory records and must be uploaded alongside their parent products.
+        try {
+            val variants = repository.observeProductVariants(merchantId).firstOrNull() ?: emptyList()
+            for (variant in variants) {
+                val json = org.json.JSONObject().apply {
+                    put("id", variant.id)
+                    put("merchant_id", variant.merchantId.ifBlank { merchantId })
+                    put("product_id", variant.productId)
+                    put("variant_name", variant.variantName)
+                    put("supplier_id", variant.supplierId ?: org.json.JSONObject.NULL)
+                    put("qr_code", variant.qrCode)
+                    put("cost_price", variant.costPrice)
+                    put("asking_price", variant.askingPrice)
+                    put("sale_price", variant.salePrice)
+                    put("stock_quantity", variant.stockQuantity)
+                    put("created_at", toIsoTimestamp(variant.createdAt))
+                }
+                upsertRemoteOrThrow(url, key, token, "product_variants", json)
+            }
+            syncLogs.add("Product variants synced (${variants.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Product variants failed: ${e.message}")
+            Log.e("SupabaseSync", "Product variants sync err: ${e.message}")
+        }
+
+        try {
+            val movements = repository.observeStockTransactions(merchantId).firstOrNull() ?: emptyList()
+            for (movement in movements) {
+                val json = org.json.JSONObject().apply {
+                    put("id", movement.id)
+                    put("merchant_id", movement.merchantId.ifBlank { merchantId })
+                    put("product_id", movement.productId)
+                    put("variant_id", movement.variantId ?: org.json.JSONObject.NULL)
+                    put("type", movement.type)
+                    put("quantity", movement.quantity)
+                    put("price", movement.price)
+                    put("customer_id", movement.customerId ?: org.json.JSONObject.NULL)
+                    put("supplier_id", movement.supplierId ?: org.json.JSONObject.NULL)
+                    put("reference_note", movement.referenceNote ?: org.json.JSONObject.NULL)
+                    put("created_at", toIsoTimestamp(movement.createdAt))
+                }
+                upsertRemoteOrThrow(url, key, token, "stock_transactions", json)
+            }
+            syncLogs.add("Stock movements synced (${movements.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Stock movements failed: ${e.message}")
+            Log.e("SupabaseSync", "Stock movements sync err: ${e.message}")
+        }
+
+        // 4. Sync Ledger Transactions
+        try {
+            val txList = repository.observeLedgerTransactions(merchantId).firstOrNull() ?: emptyList()
+            for (tx in txList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", tx.id)
+                    put("merchant_id", tx.merchantId.ifBlank { merchantId })
+                    put("customer_id", tx.customerId ?: org.json.JSONObject.NULL)
+                    put("supplier_id", tx.supplierId ?: org.json.JSONObject.NULL)
+                    put("type", tx.type)
+                    put("amount", tx.amount)
+                    put("date", toIsoTimestamp(tx.date))
+                    put("note", tx.note ?: org.json.JSONObject.NULL)
+                    put("payment_method", tx.paymentMethod)
+                    put("invoice_no", tx.invoiceNo ?: org.json.JSONObject.NULL)
+                }
+                upsertRemoteOrThrow(url, key, token, "ledger_transactions", json)
+            }
+            syncLogs.add("Ledger transactions synced (${txList.size} entries)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Ledger failed: ${e.message}")
+            Log.e("SupabaseSync", "Ledger transactions sync err: ${e.message}")
+        }
+
+        // 5. Sync POS Sales & History
+        try {
+            val salesList = repository.observePosSales(merchantId).firstOrNull() ?: emptyList()
+            for (s in salesList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", s.id)
+                    put("merchant_id", s.merchantId.ifBlank { merchantId })
+                    put("invoice_no", s.invoiceNo)
+                    put("customer_name", s.customerName)
+                    put("customer_phone", s.customerPhone)
+                    put("subtotal", s.subtotal)
+                    put("discount", s.discount)
+                    put("net_total", s.netTotal)
+                    put("cash_received", s.cashReceived)
+                    put("change_due", s.changeDue)
+                    put("payment_method", s.paymentMethod)
+                    put("payment_status", s.paymentStatus)
+                    put("item_count", s.itemCount)
+                    val cartArray = try { org.json.JSONArray(s.cartItemsJson.ifEmpty { "[]" }) } catch (e: Exception) { org.json.JSONArray() }
+                    put("cart_items", cartArray)
+                    put("timestamp", toIsoTimestamp(s.timestamp))
+                }
+                upsertRemoteOrThrow(url, key, token, "pos_sales", json)
+            }
+            syncLogs.add("POS Sales synced (${salesList.size} invoices)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("POS sales failed: ${e.message}")
+            Log.e("SupabaseSync", "POS sales sync err: ${e.message}")
+        }
+
+        // 6. Sync Expenses Screen Data
+        try {
+            val expList = repository.observeExpenses(merchantId).firstOrNull() ?: emptyList()
+            for (exp in expList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", exp.id)
+                    put("merchant_id", exp.merchantId.ifBlank { merchantId })
+                    put("category", exp.category)
+                    put("amount", exp.amount)
+                    put("date", toIsoTimestamp(exp.date))
+                    put("description", exp.description ?: org.json.JSONObject.NULL)
+                    put("payment_method", exp.paymentMethod)
+                }
+                upsertRemoteOrThrow(url, key, token, "expenses", json)
+            }
+            syncLogs.add("Expenses synced (${expList.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Expenses failed: ${e.message}")
+            Log.e("SupabaseSync", "Expenses sync err: ${e.message}")
+        }
+
+        // 7. Finance accounts and payments must go through guarded RPCs.
+        try {
+            if (!syncPendingFinanceData()) {
+                throw java.io.IOException("One or more finance operations remain queued")
+            }
+            syncLogs.add("DPS, loans, EMI schedules and installment payments synchronized")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Finance failed: ${e.message}")
+            Log.e("SupabaseSync", "Finance sync err: ${e.message}")
+        }
+
+        // 8. Business Analytics
+        try {
+            val analytics = repository.observeBusinessAnalytics(merchantId).firstOrNull() ?: businessAnalytics.value
+            analytics?.let { item ->
+                val json = org.json.JSONObject().apply {
+                    put("id", item.id)
+                    put("merchant_id", item.merchantId.ifBlank { merchantId })
+                    put("total_revenue", item.totalRevenue)
+                    put("cash_received", item.cashReceived)
+                    put("total_dues", item.totalDues)
+                    put("total_payables", item.totalPayables)
+                    put("total_expenses", item.totalExpenses)
+                    put("net_profit", item.netProfit)
+                    put("last_updated", toIsoTimestamp(item.lastUpdated))
+                }
+                upsertRemoteOrThrow(url, key, token, "business_analytics", json)
+            }
+            syncLogs.add("Business analytics synced")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Business analytics failed: ${e.message}")
+            Log.e("SupabaseSync", "Business analytics sync err: ${e.message}")
+        }
+
+        // 9. Sync Employees & Team Roles Data
+        try {
+            val empList = repository.observeEmployees(merchantId).firstOrNull().orEmpty().map(::employeeEntityToItem).ifEmpty { employees.value }
+            for (emp in empList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", emp.id)
+                    put("merchant_id", merchantId)
+                    put("name", emp.name)
+                    put("designation", emp.designation)
+                    put("role", emp.role)
+                    put("email", emp.email)
+                    put("phone", emp.phone)
+                    put("department", emp.department)
+                    put("status", emp.status)
+                    put("avatar_url", emp.avatarUrl ?: org.json.JSONObject.NULL)
+                    put("permissions", org.json.JSONArray(emp.permissions))
+                    put("joined_date", normalizeEmployeeJoinedDate(emp.joinedDate))
+                    put("updated_at", toIsoTimestamp(System.currentTimeMillis()))
+                }
+                upsertRemoteOrThrow(url, key, token, "employees", json)
+            }
+            syncLogs.add("Employees & Team Roles synced (${empList.size} members)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Employees failed: ${e.message}")
+            Log.e("SupabaseSync", "Employees sync err: ${e.message}")
+        }
+
+        // 10. Sync Merchant Numbers
+        try {
+            val numbers = repository.observeMerchantNumbers(merchantId).firstOrNull() ?: emptyList()
+            for (number in numbers) {
+                val json = org.json.JSONObject().apply {
+                    put("id", merchantNumberRemoteId(number.merchantId, number.number))
+                    put("merchant_id", number.merchantId)
+                    put("number", number.number)
+                    put("type", number.method)
+                    put("account_type", number.accountType)
+                    put("active", number.isActive)
+                    put("is_default", number.isDefault)
+                    put("qr_code_url", number.qrCodeUrl ?: org.json.JSONObject.NULL)
+                }
+                upsertRemoteOrThrow(url, key, token, "merchant_numbers", json)
+            }
+            syncLogs.add("Merchant payment numbers synced (${numbers.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            syncLogs.add("Merchant payment numbers failed: ${e.message}")
+            Log.e("SupabaseSync", "Merchant numbers sync err: ${e.message}")
+        }
+
+        // 11. Sync Dirty Payment Forms
+        var paymentFormsReadyToPull = true
+        try {
+            val dirtyForms = repository.observePaymentFormCache(merchantId).firstOrNull()
+                .orEmpty().filter(PaymentFormCacheEntity::isDirty)
+            for (form in dirtyForms) {
+                upsertRemoteOrThrow(
+                    url, key, token, "payment_forms", org.json.JSONObject(form.payloadJson)
+                )
+                repository.upsertPaymentFormCache(form.copy(isDirty = false))
+            }
+            if (dirtyForms.isNotEmpty()) syncLogs.add("Offline payment forms uploaded (${dirtyForms.size} records)")
+        } catch (e: Exception) {
+            paymentFormsReadyToPull = false
+            syncFailureCount++
+            syncLogs.add("Payment forms failed: ${e.message}")
+            Log.e("SupabaseSync", "Payment forms sync err: ${e.message}")
+        }
+
+        // 12. Sync Dirty Form Submissions
+        var submissionsReadyToPull = true
+        try {
+            val dirtySubmissions = repository.observeFormSubmissionCache(merchantId).firstOrNull()
+                .orEmpty().filter(FormSubmissionCacheEntity::isDirty)
+            for (submission in dirtySubmissions) {
+                upsertRemoteOrThrow(
+                    url, key, token, "form_submissions", org.json.JSONObject(submission.payloadJson)
+                )
+                repository.upsertFormSubmissionCache(submission.copy(isDirty = false))
+            }
+            if (dirtySubmissions.isNotEmpty()) syncLogs.add("Offline form submissions uploaded (${dirtySubmissions.size} records)")
+        } catch (e: Exception) {
+            submissionsReadyToPull = false
+            syncFailureCount++
+            syncLogs.add("Form submissions failed: ${e.message}")
+            Log.e("SupabaseSync", "Form submissions sync err: ${e.message}")
+        }
+
+        // 13. Sync Orders
+        try {
+            val ordersList = repository.observeOrders(merchantId).firstOrNull() ?: emptyList()
+            for (order in ordersList) {
+                val json = org.json.JSONObject().apply {
+                    put("id", order.id)
+                    put("tran_id", order.id)
+                    put("amount", order.amount)
+                    put("cus_phone", order.customerPhone)
+                    put("cus_name", order.customerName)
+                    put("status", order.status)
+                    put("payment_method", order.method)
+                    put("expires_at", toIsoTimestamp(order.expiresAt))
+                    put("metadata", org.json.JSONObject().put("notes", order.notes))
+                }
+                upsertRemoteOrThrow(url, key, token, "orders", json)
+            }
+            if (ordersList.isNotEmpty()) syncLogs.add("Orders synced (${ordersList.size} records)")
+        } catch (e: Exception) {
+            syncFailureCount++
+            Log.e("SupabaseSync", "Orders sync err: ${e.message}")
+        }
+
+        // 14. Sync Merchant Profile to central / platform
+        try {
+            val prof = _activeProfile.value
+            if (prof.id.isNotBlank() && prof.id != "merchant_default") {
+                syncMerchantSetupToBackend(
+                    prof.id, prof.email, prof.businessName,
+                    prof.phone, prof.businessType, prof.website, prof.photoUrl
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("SupabaseSync", "Merchant profile sync err: ${e.message}")
+        }
+
+        // Do not overwrite a dirty offline row when its upload failed.
+        if (paymentFormsReadyToPull) fetchPaymentForms()
+        if (submissionsReadyToPull) fetchFormSubmissions()
+
+        supabaseSyncLog.value = syncLogs
+        supabaseLastSyncTime.value = System.currentTimeMillis()
+        isSupabaseSyncing.value = false
+        syncFailureCount == 0
+    }
+
     fun syncAllScreensToSupabase() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val active = resolveMerchantForOps() ?: run {
-                logFirebaseStatus("Cloud sync skipped: please configure and connect your merchant Supabase project.")
-                return@launch
-            }
-            val url = active.supabaseUrl
-            val key = active.anonKey
-            val token = active.authSessionToken
-            val merchantId = activeProfile.value.id
-            isSupabaseSyncing.value = true
-            logFirebaseStatus("Starting full multi-screen Supabase DB sync...")
-
-            val syncLogs = mutableListOf<String>()
-            var syncFailureCount = 0
-
-            // 1. Sync Customers Screen Data
-            try {
-                val customersList = repository.observeCustomers(merchantId).firstOrNull() ?: emptyList()
-                for (cust in customersList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", cust.id)
-                        put("merchant_id", cust.merchantId.ifBlank { merchantId })
-                        put("name", cust.name)
-                        put("phone", cust.phone)
-                        put("email", cust.email ?: org.json.JSONObject.NULL)
-                        put("address", cust.address ?: org.json.JSONObject.NULL)
-                        put("opening_balance", cust.openingBalance)
-                        put("current_balance", cust.currentBalance)
-                        put("status", cust.status)
-                        put("created_at", toIsoTimestamp(cust.createdAt))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "customers", json)
-                }
-                syncLogs.add("Customers synced (${customersList.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Customers failed: ${e.message}")
-                Log.e("SupabaseSync", "Customers sync err: ${e.message}")
-            }
-
-            // 2. Sync Suppliers Screen Data
-            try {
-                val suppliersList = repository.observeSuppliers(merchantId).firstOrNull() ?: emptyList()
-                for (sup in suppliersList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", sup.id)
-                        put("merchant_id", sup.merchantId.ifBlank { merchantId })
-                        put("name", sup.name)
-                        put("phone", sup.phone)
-                        put("email", sup.email ?: org.json.JSONObject.NULL)
-                        put("address", sup.address ?: org.json.JSONObject.NULL)
-                        put("opening_balance", sup.openingBalance)
-                        put("current_balance", sup.currentBalance)
-                        put("created_at", toIsoTimestamp(sup.createdAt))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "suppliers", json)
-                }
-                syncLogs.add("Suppliers synced (${suppliersList.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Suppliers failed: ${e.message}")
-                Log.e("SupabaseSync", "Suppliers sync err: ${e.message}")
-            }
-
-            // 3. Sync Products & Inventory Screen Data
-            try {
-                val productsList = repository.observeProducts(merchantId).firstOrNull() ?: emptyList()
-                for (p in productsList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", p.id)
-                        put("merchant_id", p.merchantId.ifBlank { merchantId })
-                        put("name", p.name)
-                        put("code", p.code ?: org.json.JSONObject.NULL)
-                        put("category", p.category ?: "General")
-                        put("purchase_price", p.purchasePrice)
-                        put("sale_price", p.salePrice)
-                        put("stock_quantity", p.stockQuantity)
-                        put("min_stock_threshold", p.minStockThreshold)
-                        put("unit", p.unit)
-                        put("qr_code", p.qrCode ?: org.json.JSONObject.NULL)
-                        put("image_url", p.imageUrl ?: org.json.JSONObject.NULL)
-                        put("created_at", toIsoTimestamp(p.createdAt))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "products", json)
-                }
-                syncLogs.add("Products & Inventory synced (${productsList.size} items)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Products failed: ${e.message}")
-                Log.e("SupabaseSync", "Products sync err: ${e.message}")
-            }
-
-            // Product variants are independent inventory records and must be
-            // uploaded alongside their parent products.
-            try {
-                val variants = repository.observeProductVariants(merchantId).firstOrNull() ?: emptyList()
-                for (variant in variants) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", variant.id)
-                        put("merchant_id", variant.merchantId.ifBlank { merchantId })
-                        put("product_id", variant.productId)
-                        put("variant_name", variant.variantName)
-                        put("supplier_id", variant.supplierId ?: org.json.JSONObject.NULL)
-                        put("qr_code", variant.qrCode)
-                        put("cost_price", variant.costPrice)
-                        put("asking_price", variant.askingPrice)
-                        put("sale_price", variant.salePrice)
-                        put("stock_quantity", variant.stockQuantity)
-                        put("created_at", toIsoTimestamp(variant.createdAt))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "product_variants", json)
-                }
-                syncLogs.add("Product variants synced (${variants.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Product variants failed: ${e.message}")
-                Log.e("SupabaseSync", "Product variants sync err: ${e.message}")
-            }
-
-            try {
-                val movements = repository.observeStockTransactions(merchantId).firstOrNull() ?: emptyList()
-                for (movement in movements) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", movement.id)
-                        put("merchant_id", movement.merchantId.ifBlank { merchantId })
-                        put("product_id", movement.productId)
-                        put("variant_id", movement.variantId ?: org.json.JSONObject.NULL)
-                        put("type", movement.type)
-                        put("quantity", movement.quantity)
-                        put("price", movement.price)
-                        put("customer_id", movement.customerId ?: org.json.JSONObject.NULL)
-                        put("supplier_id", movement.supplierId ?: org.json.JSONObject.NULL)
-                        put("reference_note", movement.referenceNote ?: org.json.JSONObject.NULL)
-                        put("created_at", toIsoTimestamp(movement.createdAt))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "stock_transactions", json)
-                }
-                syncLogs.add("Stock movements synced (${movements.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Stock movements failed: ${e.message}")
-                Log.e("SupabaseSync", "Stock movements sync err: ${e.message}")
-            }
-
-            // 4. Sync Ledger Transactions
-            try {
-                val txList = repository.observeLedgerTransactions(merchantId).firstOrNull() ?: emptyList()
-                for (tx in txList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", tx.id)
-                        put("merchant_id", tx.merchantId.ifBlank { merchantId })
-                        put("customer_id", tx.customerId ?: org.json.JSONObject.NULL)
-                        put("supplier_id", tx.supplierId ?: org.json.JSONObject.NULL)
-                        put("type", tx.type)
-                        put("amount", tx.amount)
-                        put("date", toIsoTimestamp(tx.date))
-                        put("note", tx.note ?: org.json.JSONObject.NULL)
-                        put("payment_method", tx.paymentMethod)
-                        put("invoice_no", tx.invoiceNo ?: org.json.JSONObject.NULL)
-                    }
-                    upsertRemoteOrThrow(url, key, token, "ledger_transactions", json)
-                }
-                syncLogs.add("Ledger transactions synced (${txList.size} entries)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Ledger failed: ${e.message}")
-                Log.e("SupabaseSync", "Ledger transactions sync err: ${e.message}")
-            }
-
-            // 5. Sync POS Sales & History
-            try {
-                val salesList = repository.observePosSales(merchantId).firstOrNull() ?: emptyList()
-                for (s in salesList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", s.id)
-                        put("merchant_id", s.merchantId.ifBlank { merchantId })
-                        put("invoice_no", s.invoiceNo)
-                        put("customer_name", s.customerName)
-                        put("customer_phone", s.customerPhone)
-                        put("subtotal", s.subtotal)
-                        put("discount", s.discount)
-                        put("net_total", s.netTotal)
-                        put("cash_received", s.cashReceived)
-                        put("change_due", s.changeDue)
-                        put("payment_method", s.paymentMethod)
-                        put("payment_status", s.paymentStatus)
-                        put("item_count", s.itemCount)
-                        val cartArray = try { org.json.JSONArray(s.cartItemsJson.ifEmpty { "[]" }) } catch (e: Exception) { org.json.JSONArray() }
-                        put("cart_items", cartArray)
-                        put("timestamp", toIsoTimestamp(s.timestamp))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "pos_sales", json)
-                }
-                syncLogs.add("POS Sales synced (${salesList.size} invoices)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("POS sales failed: ${e.message}")
-                Log.e("SupabaseSync", "POS sales sync err: ${e.message}")
-            }
-
-            // 6. Sync Expenses Screen Data
-            try {
-                val expList = repository.observeExpenses(merchantId).firstOrNull() ?: emptyList()
-                for (exp in expList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", exp.id)
-                        put("merchant_id", exp.merchantId.ifBlank { merchantId })
-                        put("category", exp.category)
-                        put("amount", exp.amount)
-                        put("date", toIsoTimestamp(exp.date))
-                        put("description", exp.description ?: org.json.JSONObject.NULL)
-                        put("payment_method", exp.paymentMethod)
-                    }
-                    upsertRemoteOrThrow(url, key, token, "expenses", json)
-                }
-                syncLogs.add("Expenses synced (${expList.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Expenses failed: ${e.message}")
-                Log.e("SupabaseSync", "Expenses sync err: ${e.message}")
-            }
-
-            // 7. Finance accounts and payments must go through guarded RPCs.
-            try {
-                if (!syncPendingFinanceData()) {
-                    throw java.io.IOException("One or more finance operations remain queued")
-                }
-                syncLogs.add("DPS, loans, EMI schedules and installment payments synchronized")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Finance failed: ${e.message}")
-                Log.e("SupabaseSync", "Finance sync err: ${e.message}")
-            }
-
-            try {
-                businessAnalytics.value?.let { analytics ->
-                    val json = org.json.JSONObject().apply {
-                        put("id", analytics.id)
-                        put("merchant_id", analytics.merchantId.ifBlank { merchantId })
-                        put("total_revenue", analytics.totalRevenue)
-                        put("cash_received", analytics.cashReceived)
-                        put("total_dues", analytics.totalDues)
-                        put("total_payables", analytics.totalPayables)
-                        put("total_expenses", analytics.totalExpenses)
-                        put("net_profit", analytics.netProfit)
-                        put("last_updated", toIsoTimestamp(analytics.lastUpdated))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "business_analytics", json)
-                }
-                syncLogs.add("Business analytics synced")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Business analytics failed: ${e.message}")
-                Log.e("SupabaseSync", "Business analytics sync err: ${e.message}")
-            }
-
-            // 8. Sync Employees & Team Roles Data
-            try {
-                val empList = employees.value
-                for (emp in empList) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", emp.id)
-                        put("merchant_id", merchantId)
-                        put("name", emp.name)
-                        put("designation", emp.designation)
-                        put("role", emp.role)
-                        put("email", emp.email)
-                        put("phone", emp.phone)
-                        put("department", emp.department)
-                        put("status", emp.status)
-                        put("avatar_url", emp.avatarUrl ?: org.json.JSONObject.NULL)
-                        put("permissions", org.json.JSONArray(emp.permissions))
-                        put("joined_date", normalizeEmployeeJoinedDate(emp.joinedDate))
-                        put("updated_at", toIsoTimestamp(System.currentTimeMillis()))
-                    }
-                    upsertRemoteOrThrow(url, key, token, "employees", json)
-                }
-                syncLogs.add("Employees & Team Roles synced (${empList.size} members)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Employees failed: ${e.message}")
-                Log.e("SupabaseSync", "Employees sync err: ${e.message}")
-            }
-
-            try {
-                val numbers = repository.observeMerchantNumbers(merchantId).firstOrNull() ?: emptyList()
-                for (number in numbers) {
-                    val json = org.json.JSONObject().apply {
-                        put("id", merchantNumberRemoteId(number.merchantId, number.number))
-                        put("merchant_id", number.merchantId)
-                        put("number", number.number)
-                        put("type", number.method)
-                        put("account_type", number.accountType)
-                        put("active", number.isActive)
-                        put("is_default", number.isDefault)
-                        put("qr_code_url", number.qrCodeUrl ?: org.json.JSONObject.NULL)
-                    }
-                    upsertRemoteOrThrow(url, key, token, "merchant_numbers", json)
-                }
-                syncLogs.add("Merchant payment numbers synced (${numbers.size} records)")
-            } catch (e: Exception) {
-                syncFailureCount++
-                syncLogs.add("Merchant payment numbers failed: ${e.message}")
-                Log.e("SupabaseSync", "Merchant numbers sync err: ${e.message}")
-            }
-
-            var paymentFormsReadyToPull = true
-            try {
-                val dirtyForms = repository.observePaymentFormCache(merchantId).firstOrNull()
-                    .orEmpty().filter(PaymentFormCacheEntity::isDirty)
-                for (form in dirtyForms) {
-                    upsertRemoteOrThrow(
-                        url, key, token, "payment_forms", org.json.JSONObject(form.payloadJson)
-                    )
-                    repository.upsertPaymentFormCache(form.copy(isDirty = false))
-                }
-                syncLogs.add("Offline payment forms uploaded (${dirtyForms.size} records)")
-            } catch (e: Exception) {
-                paymentFormsReadyToPull = false
-                syncFailureCount++
-                syncLogs.add("Payment forms failed: ${e.message}")
-                Log.e("SupabaseSync", "Payment forms sync err: ${e.message}")
-            }
-
-            var submissionsReadyToPull = true
-            try {
-                val dirtySubmissions = repository.observeFormSubmissionCache(merchantId).firstOrNull()
-                    .orEmpty().filter(FormSubmissionCacheEntity::isDirty)
-                for (submission in dirtySubmissions) {
-                    upsertRemoteOrThrow(
-                        url, key, token, "form_submissions", org.json.JSONObject(submission.payloadJson)
-                    )
-                    repository.upsertFormSubmissionCache(submission.copy(isDirty = false))
-                }
-                syncLogs.add("Offline form submissions uploaded (${dirtySubmissions.size} records)")
-            } catch (e: Exception) {
-                submissionsReadyToPull = false
-                syncFailureCount++
-                syncLogs.add("Form submissions failed: ${e.message}")
-                Log.e("SupabaseSync", "Form submissions sync err: ${e.message}")
-            }
-
-            // Do not overwrite a dirty offline row when its upload failed.
-            if (paymentFormsReadyToPull) fetchPaymentForms()
-            if (submissionsReadyToPull) fetchFormSubmissions()
-
-            supabaseSyncLog.value = syncLogs
-            supabaseLastSyncTime.value = System.currentTimeMillis()
-            isSupabaseSyncing.value = false
-            if (syncFailureCount == 0) {
+            val success = pushAllScreensToSupabaseInternal()
+            if (success) {
                 logFirebaseStatus("Completed Supabase sync across all database-backed screens.")
             } else {
-                logFirebaseStatus("Supabase sync finished with $syncFailureCount failed data groups. See sync log.")
+                logFirebaseStatus("Supabase sync finished with some warnings. See sync log.")
             }
         }
     }
@@ -12688,6 +13059,40 @@ function executePayment() {
         logFirebaseStatus("POS Cart: Added ${product.name} (qty: $qty)")
     }
 
+    fun addVariantToPosCart(product: ProductItemEntity, variant: ProductVariantEntity, qty: Double = 1.0) {
+        val currentList = _posCart.value.toMutableList()
+        val existingIndex = currentList.indexOfFirst { it.variantId == variant.id }
+        if (existingIndex >= 0) {
+            val item = currentList[existingIndex]
+            if (variant.stockQuantity > 0.0 && item.quantity + qty > variant.stockQuantity) {
+                _lastScannedQrStatus.value = "Stock limit reached for ${product.name} (${variant.variantName}) (Available: ${variant.stockQuantity.toInt()})"
+                return
+            }
+            currentList[existingIndex] = item.copy(quantity = item.quantity + qty)
+        } else {
+            if (variant.stockQuantity <= 0.0) {
+                _lastScannedQrStatus.value = "${product.name} (${variant.variantName}) is out of stock"
+            }
+            currentList.add(
+                PosCartItem(
+                    variantId = variant.id,
+                    productId = variant.productId,
+                    qrCode = variant.qrCode,
+                    productName = product.name,
+                    variantName = variant.variantName,
+                    category = product.category ?: "General",
+                    askingPrice = if (variant.askingPrice > 0.0) variant.askingPrice else variant.salePrice,
+                    sellingPrice = variant.salePrice,
+                    costPrice = variant.costPrice,
+                    quantity = qty
+                )
+            )
+        }
+        _posCart.value = currentList
+        _lastScannedQrStatus.value = "Added ${product.name} (${variant.variantName}) to cart"
+        logFirebaseStatus("POS Cart: Added variant ${variant.variantName} of ${product.name} (qty: $qty)")
+    }
+
     fun scanQrCodeToPosCart(scannedQr: String) {
         if (scannedQr.trim().isEmpty()) return
         viewModelScope.launch {
@@ -12786,11 +13191,12 @@ function executePayment() {
         paymentType: String, // "Cash", "MFS", "CustomerCredit"
         customerId: String? = null,
         discount: Double = 0.0,
+        cashReceived: Double? = null,
         onSuccess: (orderId: String, totalAmount: Double, sale: PosSaleEntity) -> Unit,
         onError: (String) -> Unit
     ) {
         if (!hasPremiumAccess()) {
-            onError("αª╕αª╛αª¼αª╕αºìαªòαºìαª░αª┐αª¬αª╢αª¿αºçαª░ αª«αºçαª»αª╝αª╛αªª αª╢αºçαª╖αÑñ POS αª╕αºçαª▓ αª╕αª«αºìαª¬αª¿αºìαª¿ αªòαª░αªñαºç αªàαª¿αºüαªùαºìαª░αª╣ αªòαª░αºç αª╕αª╛αª¼αª╕αºìαªòαºìαª░αª┐αª¬αª╢αª¿ αª░αª┐αª¿αª┐αªë αªòαª░αºüαª¿αÑñ")
+            onError("সাবস্ক্রিপশনের মেয়াদ শেষ। POS সেল সম্পন্ন করতে অনুগ্রহ করে সাবস্ক্রিপশন রিনিউ করুন।")
             return
         }
         val cartItems = _posCart.value
@@ -12811,10 +13217,6 @@ function executePayment() {
             val merchantId = activeProfile.value.id
             val invoiceNo = "INV-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}-${orderId.take(6).uppercase()}"
             val customer = customerId?.let { id -> customers.value.firstOrNull { it.id == id } }
-            if ((paymentType == "CustomerCredit" || paymentType == "Due") && customer == null) {
-                onError("Select a valid customer before recording a due sale")
-                return@launch
-            }
 
             val movements = cartItems.map { item ->
                 val isRealVariant = productVariants.value.any { it.id == item.variantId }
@@ -12852,6 +13254,31 @@ function executePayment() {
                 "Card" -> "Card"
                 else -> "Cash"
             }
+
+            val effectiveReceived = when {
+                cashReceived != null -> cashReceived
+                normalizedMethod == "Due" -> 0.0
+                else -> totalSaleAmount
+            }
+
+            val changeDue = if (effectiveReceived > totalSaleAmount) (effectiveReceived - totalSaleAmount) else 0.0
+            val dueRemainder = if (normalizedMethod == "Due") {
+                if (cashReceived != null && cashReceived > 0.0) (totalSaleAmount - cashReceived).coerceAtLeast(0.0) else totalSaleAmount
+            } else {
+                (totalSaleAmount - effectiveReceived).coerceAtLeast(0.0)
+            }
+
+            val paymentStatus = when {
+                normalizedMethod == "Due" && dueRemainder >= totalSaleAmount -> "DUE"
+                dueRemainder > 0.0 -> "PARTIAL"
+                else -> "PAID"
+            }
+
+            if ((normalizedMethod == "Due" || dueRemainder > 0.0) && customer == null) {
+                onError("Select a valid customer before recording a due or partial sale")
+                return@launch
+            }
+
             val sale = PosSaleEntity(
                 id = orderId,
                 merchantId = merchantId,
@@ -12862,25 +13289,25 @@ function executePayment() {
                 subtotal = subtotal,
                 discount = appliedDiscount,
                 netTotal = totalSaleAmount,
-                cashReceived = if (normalizedMethod == "Due") 0.0 else totalSaleAmount,
-                changeDue = 0.0,
+                cashReceived = effectiveReceived,
+                changeDue = changeDue,
                 paymentMethod = normalizedMethod,
-                paymentStatus = if (normalizedMethod == "Due") "DUE" else "PAID",
+                paymentStatus = paymentStatus,
                 itemCount = cartItems.sumOf { it.quantity.toInt() },
                 cartItemsJson = cartJson.toString(),
                 timestamp = System.currentTimeMillis(),
                 isSynced = false
             )
-            val creditEntry = if (normalizedMethod == "Due" && customerId != null) {
+            val creditEntry = if (dueRemainder > 0.0 && customerId != null) {
                 LedgerTransactionEntity(
                     id = java.util.UUID.randomUUID().toString(),
                     merchantId = merchantId,
                     customerId = customerId,
                     type = "credit",
-                    amount = totalSaleAmount,
-                    note = "POS credit sale $invoiceNo",
+                    amount = dueRemainder,
+                    note = "POS ${if (paymentStatus == "PARTIAL") "partial due sale" else "credit sale"} $invoiceNo",
                     productDetailsJson = cartJson.toString(),
-                    paymentMethod = "Due",
+                    paymentMethod = if (paymentStatus == "PARTIAL") "$normalizedMethod+Due" else "Due",
                     invoiceNo = invoiceNo
                 )
             } else null
@@ -13924,6 +14351,249 @@ function executePayment() {
                 )
             }
             onResult(true, "${normalizedProduct.name} updated")
+        }
+    }
+
+    fun bindProductQrCode(
+        productId: String,
+        qrCode: String,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val trimmed = qrCode.trim()
+        if (trimmed.isEmpty()) {
+            onResult(false, "QR/Barcode cannot be empty")
+            return
+        }
+        viewModelScope.launch {
+            val merchantId = activeProfile.value.id
+            val current = repository.getProductById(productId, merchantId)
+            if (current == null) {
+                onResult(false, "Product not found")
+                return@launch
+            }
+            val existingProd = repository.getProductByCode(trimmed, merchantId)
+            if (existingProd != null && existingProd.id != productId) {
+                onResult(false, "This QR/Barcode is already assigned to '${existingProd.name}'")
+                return@launch
+            }
+            val existingVariant = repository.getVariantByQrCode(trimmed, merchantId)
+            if (existingVariant != null && existingVariant.productId != productId) {
+                onResult(false, "This QR/Barcode is already assigned to a variant of another product")
+                return@launch
+            }
+            val updated = current.copy(code = trimmed, qrCode = trimmed)
+            try {
+                repository.updateProductWithStockAdjustment(updated, null)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Failed to bind QR code")
+                return@launch
+            }
+            logFirebaseStatus("Bound QR '$trimmed' to product: ${current.name}")
+            val active = resolveMerchantForOps()
+            if (active != null && active.supabaseUrl.isNotEmpty() && active.anonKey.isNotEmpty()) {
+                val payload = org.json.JSONObject().apply {
+                    put("p_product", org.json.JSONObject().apply {
+                        put("id", updated.id)
+                        put("merchant_id", updated.merchantId)
+                        put("name", updated.name)
+                        put("code", updated.code)
+                        put("qr_code", updated.qrCode)
+                        put("category", updated.category ?: "General")
+                        put("purchase_price", updated.purchasePrice)
+                        put("sale_price", updated.salePrice)
+                        put("cost_price", updated.costPrice)
+                        put("asking_price", updated.askingPrice)
+                        put("unit", updated.unit)
+                        put("expected_stock", updated.stockQuantity)
+                        put("target_stock", updated.stockQuantity)
+                        put("image_url", updated.imageUrl ?: org.json.JSONObject.NULL)
+                    })
+                    put("p_adjustment", org.json.JSONObject.NULL)
+                }
+                com.example.data.remote.SupabaseClient.callRpc(
+                    active.supabaseUrl, active.anonKey, active.authSessionToken,
+                    "update_product_atomic", payload,
+                    onSuccess = { },
+                    onFailure = { logFirebaseStatus("Bound QR locally; cloud sync failed: $it") }
+                )
+            }
+            onResult(true, "QR Code '$trimmed' bound to '${current.name}' successfully!")
+        }
+    }
+
+    fun addProductVariant(
+        productId: String,
+        variantName: String,
+        qrCode: String,
+        costPrice: Double,
+        askingPrice: Double,
+        salePrice: Double,
+        quantity: Double,
+        supplierId: String? = null,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val trimmedName = variantName.trim()
+        val trimmedQr = qrCode.trim()
+        if (trimmedName.isEmpty()) {
+            onResult(false, "Variant name is required")
+            return
+        }
+        if (trimmedQr.isEmpty()) {
+            onResult(false, "QR/Barcode is required for variant")
+            return
+        }
+        if (costPrice < 0.0 || askingPrice < 0.0 || salePrice < 0.0 || quantity < 0.0 ||
+            !costPrice.isFinite() || !askingPrice.isFinite() || !salePrice.isFinite() || !quantity.isFinite()) {
+            onResult(false, "Valid non-negative prices and quantity are required")
+            return
+        }
+        viewModelScope.launch {
+            val merchantId = activeProfile.value.id
+            val currentProduct = repository.getProductById(productId, merchantId)
+            if (currentProduct == null) {
+                onResult(false, "Product not found")
+                return@launch
+            }
+            val existingVariant = repository.getVariantByQrCode(trimmedQr, merchantId)
+            if (existingVariant != null) {
+                onResult(false, "QR code '$trimmedQr' is already used by variant '${existingVariant.variantName}'")
+                return@launch
+            }
+            val existingProduct = repository.getProductByCode(trimmedQr, merchantId)
+            if (existingProduct != null && existingProduct.id != productId) {
+                onResult(false, "QR code '$trimmedQr' is already used by product '${existingProduct.name}'")
+                return@launch
+            }
+            val variantId = java.util.UUID.randomUUID().toString()
+            val variant = ProductVariantEntity(
+                id = variantId,
+                merchantId = merchantId,
+                productId = productId,
+                variantName = trimmedName,
+                supplierId = supplierId,
+                qrCode = trimmedQr,
+                costPrice = costPrice,
+                askingPrice = askingPrice,
+                salePrice = salePrice,
+                stockQuantity = 0.0
+            )
+            val tx = if (quantity > 0.0) StockTransactionEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                merchantId = merchantId,
+                productId = productId,
+                variantId = variantId,
+                type = "in",
+                quantity = quantity,
+                price = costPrice,
+                referenceNote = "Added variant $trimmedName"
+            ) else null
+
+            try {
+                repository.insertProductVariant(variant)
+                if (tx != null) {
+                    repository.recordStockTransaction(tx)
+                }
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Failed to save variant")
+                return@launch
+            }
+            logFirebaseStatus("Added variant '$trimmedName' to product '${currentProduct.name}'")
+            onResult(true, "Variant '$trimmedName' added successfully!")
+        }
+    }
+
+    fun addUnitVariantsForEachQuantity(
+        productId: String,
+        unitPrefix: String,
+        qrCodes: List<String>,
+        costPrice: Double,
+        askingPrice: Double,
+        salePrice: Double,
+        supplierId: String? = null,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        if (qrCodes.isEmpty()) {
+            onResult(false, "At least one QR code is required")
+            return
+        }
+        val prefix = unitPrefix.trim().ifEmpty { "Unit" }
+        viewModelScope.launch {
+            val merchantId = activeProfile.value.id
+            val currentProduct = repository.getProductById(productId, merchantId)
+            if (currentProduct == null) {
+                onResult(false, "Product not found")
+                return@launch
+            }
+            val distinctQrs = qrCodes.map { it.trim() }
+            if (distinctQrs.distinct().size != distinctQrs.size) {
+                onResult(false, "QR codes in the list must all be unique")
+                return@launch
+            }
+            for (code in distinctQrs) {
+                val existV = repository.getVariantByQrCode(code, merchantId)
+                if (existV != null) {
+                    onResult(false, "QR code '$code' is already used by variant '${existV.variantName}'")
+                    return@launch
+                }
+                val existP = repository.getProductByCode(code, merchantId)
+                if (existP != null && existP.id != productId) {
+                    onResult(false, "QR code '$code' is already used by product '${existP.name}'")
+                    return@launch
+                }
+            }
+
+            val variants = mutableListOf<ProductVariantEntity>()
+            val transactions = mutableListOf<StockTransactionEntity>()
+
+            distinctQrs.forEachIndexed { idx, qr ->
+                val variantId = java.util.UUID.randomUUID().toString()
+                variants += ProductVariantEntity(
+                    id = variantId,
+                    merchantId = merchantId,
+                    productId = productId,
+                    variantName = "$prefix #${idx + 1}",
+                    supplierId = supplierId,
+                    qrCode = qr,
+                    costPrice = costPrice,
+                    askingPrice = askingPrice,
+                    salePrice = salePrice,
+                    stockQuantity = 0.0
+                )
+                transactions += StockTransactionEntity(
+                    id = java.util.UUID.randomUUID().toString(),
+                    merchantId = merchantId,
+                    productId = productId,
+                    variantId = variantId,
+                    type = "in",
+                    quantity = 1.0,
+                    price = costPrice,
+                    referenceNote = "Serialized unit $prefix #${idx + 1}"
+                )
+            }
+
+            try {
+                repository.insertProductVariants(variants)
+                repository.recordStockTransactions(transactions)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Failed to save unit QR codes")
+                return@launch
+            }
+            logFirebaseStatus("Added ${variants.size} serialized units to '${currentProduct.name}'")
+            onResult(true, "${variants.size} units added with individual QR codes!")
+        }
+    }
+
+    fun deleteProductVariant(
+        variantId: String,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.deleteProductVariantById(variantId)
+                onResult(true, "Variant deleted successfully")
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Failed to delete variant")
+            }
         }
     }
 
@@ -14989,7 +15659,7 @@ function executePayment() {
                                     context = getApplication(),
                                     recipientPhone = phone,
                                     message = msg,
-                                    simSlot = 0
+                                    simSlot = _selectedSimSlot.value
                                 ) { success, err ->
                                     if (success) {
                                         logFirebaseStatus("Copilot SMS sent to $phone")
@@ -15477,9 +16147,7 @@ function executePayment() {
             - αªòαºâαªñαª£αºìαª₧αªñαª╛ αª¬αºìαª░αªòαª╛αª╢ αªòαª░αºç
             - αªªαºìαª░αºüαªñ αª¬αª░αª┐αª╢αºïαªºαºçαª░ αªàαª¿αºüαª░αºïαªº αªòαª░αºç
             - WhatsApp-αªÅ αª¬αª╛αªáαª╛αª¿αºïαª░ αªëαª¬αª»αºïαªùαºÇ (αº⌐-αº¬ αª▓αª╛αªçαª¿αºçαª░ αª«αªºαºìαª»αºç)
-            αª¬αºìαª░αªñαª┐αªƒαª┐ αª¼αª╛αª░αºìαªñαª╛ αªåαª▓αª╛αªªαª╛ αª╕αºçαªòαª╢αª¿
-... [truncated for diff preview]
-            αª¬αºìαª░αªñαª┐αªƒαª┐ αª¼αª╛αª░αºìαªñαª╛ αªåαª▓αª╛αªªαª╛ αª╕αºçαªòαª╢αª¿αºç αªªαª┐αª¿ αªÅαª¼αªé "---" αªªαª┐αª»αª╝αºç αªåαª▓αª╛αªªαª╛ αªòαª░αºüαª¿αÑñ
+            প্রতিটি বার্তা আলাদা সেকশনে দিন এবং "---" দিয়ে আলাদা করুন
         """.trimIndent()
 
         runAiFeature(system, "αª¼αªòαºçαª»αª╝αª╛ αªùαºìαª░αª╛αª╣αªò αªñαª╛αª▓αª┐αªòαª╛:\n$overdueText") { result ->
@@ -18617,7 +19285,7 @@ data class FormThemeConfig(
     var enableClosingTimeline: Boolean = false,
     var closingDeadlineEpoch: Long = 0L,
     var closingDeadlineStr: String = "",
-    var closedMessage: String = "This form is no longer accepting responses / αª╕αª«αª»αª╝αª╕αºÇαª«αª╛ αª╢αºçαª╖ αª╣αª»αª╝αºç αªùαºçαª¢αºç",
+    var closedMessage: String = "This form is no longer accepting responses / সময়সীমা শেষ হয়ে গেছে",
     var showCountdownTimer: Boolean = true,
     var enableCsvBackend: Boolean = false,
     var csvFileName: String = "",

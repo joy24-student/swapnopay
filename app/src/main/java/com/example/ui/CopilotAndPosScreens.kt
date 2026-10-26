@@ -93,6 +93,7 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 private fun LegacyNotificationsScreen(viewModel: AppViewModel) {
     val payments by viewModel.payments.collectAsState()
+    val orders by viewModel.orders.collectAsState()
     val appeals by viewModel.appeals.collectAsState()
     val devices by viewModel.devices.collectAsState()
 
@@ -110,11 +111,18 @@ private fun LegacyNotificationsScreen(viewModel: AppViewModel) {
     )
 
     // Build notification list dynamically from real data to make it live and aligned
-    val notifications = remember(payments, appeals, devices, showAllRead) {
+    val notifications = remember(payments, orders, appeals, devices, showAllRead) {
         val list = mutableListOf<LocalNotification>()
 
+        fun isPaymentMatched(p: CachedPaymentEntity): Boolean {
+            return p.status.equals("MATCHED", ignoreCase = true) ||
+                   p.status.equals("PAID", ignoreCase = true) ||
+                   !p.orderId.isNullOrBlank() ||
+                   orders.any { o -> o.status.equals("PAID", ignoreCase = true) && (o.notes.contains(p.id, ignoreCase = true) || o.id.equals(p.orderId, ignoreCase = true)) }
+        }
+
         // 1. Matched Payments
-        payments.filter { it.status == "MATCHED" }.take(5).forEachIndexed { idx, p ->
+        payments.filter { isPaymentMatched(it) }.take(5).forEachIndexed { idx, p ->
             list.add(
                 LocalNotification(
                     id = "not_matched_$idx",
@@ -128,7 +136,7 @@ private fun LegacyNotificationsScreen(viewModel: AppViewModel) {
         }
 
         // 2. Unmatched Payments
-        payments.filter { it.status == "UNMATCHED" }.take(3).forEachIndexed { idx, p ->
+        payments.filter { !isPaymentMatched(it) }.take(3).forEachIndexed { idx, p ->
             list.add(
                 LocalNotification(
                     id = "not_unmatched_$idx",
@@ -2410,6 +2418,7 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showDateDialog by remember { mutableStateOf(false) }
+    var showClearLogDialog by remember { mutableStateOf(false) }
 
     // Dialog input states
     var inputAccount by remember { mutableStateOf("bKash") }
@@ -2421,7 +2430,10 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
     // Filter payments based on tab, account, search
     val filteredPayments = payments.filter { p ->
         // Tab Filter
-        val isMatched = p.status.equals("PAID", ignoreCase = true) || p.status.equals("Matched", ignoreCase = true)
+        val isMatched = p.status.equals("PAID", ignoreCase = true) || 
+                        p.status.equals("Matched", ignoreCase = true) ||
+                        !p.orderId.isNullOrBlank() ||
+                        orders.any { o -> o.status.equals("PAID", ignoreCase = true) && (o.notes.contains(p.id, ignoreCase = true) || o.id.equals(p.orderId, ignoreCase = true)) }
         val tabMatch = when (selectedTab) {
             "Matched" -> isMatched
             "Unmatched" -> !isMatched
@@ -2529,6 +2541,24 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.Search, null, tint = if (isDarkMode) Color(0xFFF5C518) else Color(0xFF0F172A), modifier = Modifier.size(18.dp))
+                        }
+
+                        // Clear Logs Button
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isDarkMode) Color(0xFF261010) else Color(0xFFFEF2F2))
+                                .border(BorderStroke(1.dp, if (isDarkMode) Color(0xFF7F1D1D) else Color(0xFFFECACA)), CircleShape)
+                                .clickable { showClearLogDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Clear Logs",
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -2787,7 +2817,10 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
                                 "rocket" -> RocketPurple
                                 else -> SuccessGreen
                             }
-                            val isMatched = payment.status.equals("PAID", ignoreCase = true) || payment.status.equals("Matched", ignoreCase = true)
+                            val isMatched = payment.status.equals("PAID", ignoreCase = true) || 
+                                            payment.status.equals("Matched", ignoreCase = true) ||
+                                            !payment.orderId.isNullOrBlank() ||
+                                            orders.any { o -> o.status.equals("PAID", ignoreCase = true) && (o.notes.contains(payment.id, ignoreCase = true) || o.id.equals(payment.orderId, ignoreCase = true)) }
 
                             Card(
                                 modifier = Modifier
@@ -3008,6 +3041,91 @@ fun TransactionLedgerScreen(viewModel: AppViewModel) {
                 }
             }
         }
+    }
+
+    if (showClearLogDialog) {
+        val isBangla = languageState == "bn" || languageState.equals("Bangla", ignoreCase = true) || languageState == "বাংলা"
+        AlertDialog(
+            onDismissRequest = { showClearLogDialog = false },
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = if (isBangla) "লেনদেন লগ মুছে ফেলবেন?" else "Clear Transaction Logs?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = textMainColor,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Text(
+                    text = if (isBangla) "আপনি কি নিশ্চিত যে সমস্ত লেনদেন লগ মুছে ফেলতে চান? এটি লেজার থেকে ক্যাশ করা লেনদেন রেকর্ডগুলি মুছে দেবে।"
+                    else "Are you sure you want to clear all transaction records? This will remove cached payment transaction records from your ledger.",
+                    fontSize = 13.5.sp,
+                    color = textMutedColor,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearTransactionLogs {
+                            android.widget.Toast.makeText(
+                                context,
+                                if (isBangla) "লেনদেন লগ সফলভাবে মুছে ফেলা হয়েছে!" else "Transaction logs cleared successfully!",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        showClearLogDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFDC2626),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = if (isBangla) "ক্লিয়ার লগ (মুছে ফেলুন)" else "Clear Logs",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showClearLogDialog = false },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = if (isBangla) "বাতিল" else "Cancel",
+                        color = textMutedColor,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+            },
+            containerColor = surfaceColor,
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 }
 

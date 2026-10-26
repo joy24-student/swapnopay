@@ -1048,7 +1048,7 @@ fun SplashScreen(viewModel: AppViewModel) {
             .background(splashBgColor),
         contentAlignment = Alignment.Center
     ) {
-        // Full splash background branding image (fully visible without cropping)
+        // Full splash background branding image (fully visible without cropping or zooming)
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(splashImgRes)
@@ -1066,15 +1066,15 @@ fun SplashScreen(viewModel: AppViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
-                .padding(bottom = 28.dp)
+                .padding(bottom = 24.dp)
         ) {
             CircularProgressIndicator(
                 color = splashSubTextColor,
-                strokeWidth = 2.5.dp,
-                modifier = Modifier.size(30.dp)
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(24.dp)
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Real-time security log footer
             Row(
@@ -1085,12 +1085,12 @@ fun SplashScreen(viewModel: AppViewModel) {
                     imageVector = Icons.Default.Lock,
                     contentDescription = "Encrypted",
                     tint = if (isDarkMode) Color(0xFF818CF8).copy(alpha = 0.8f) else Color(0xFF4F46E5),
-                    modifier = Modifier.size(13.dp)
+                    modifier = Modifier.size(12.dp)
                 )
                 Text(
-                    text = "Secure Local Session • Supabase Auth",
+                    text = "SwapnoPay • Secure Local Session • Supabase Auth",
                     fontSize = 11.sp,
-                    color = if (isDarkMode) Color.White.copy(alpha = 0.5f) else Color(0xFF475569)
+                    color = if (isDarkMode) Color.White.copy(alpha = 0.6f) else Color(0xFF475569)
                 )
             }
         }
@@ -14718,7 +14718,7 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("All", "bKash", "Nagad", "Rocket").forEach { tab ->
+                listOf("All", "bKash", "Nagad", "Rocket", "Upay").forEach { tab ->
                     val isSelected = selectedTab == tab
                     Box(
                         modifier = Modifier
@@ -14748,6 +14748,60 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if (filteredNumbers.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = AppCardBg),
+                            border = BorderStroke(1.dp, AppCardBorderColor),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .background(BrandLightPurple, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = BrandPurple,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = if (numbers.isEmpty()) "No Payment Numbers Configured" else "No $selectedTab Numbers Found",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTextPrimary,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (numbers.isEmpty())
+                                        "Add your bKash, Nagad, Rocket, or Upay accounts so customers can pay and SMS verification can match transactions."
+                                    else
+                                        "You have not added any $selectedTab numbers yet. Tap 'Add New Number' below to configure one.",
+                                    fontSize = 13.sp,
+                                    color = AppTextSecondary,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Render payments methods
                 items(filteredNumbers) { num ->
                     Card(
@@ -14871,7 +14925,7 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                                         }
                                     } else {
                                         TextButton(
-                                            onClick = { viewModel.setMerchantNumberDefault(num.number) },
+                                            onClick = { viewModel.setMerchantNumberDefault(num.number, num.method) },
                                             contentPadding = PaddingValues(0.dp),
                                             modifier = Modifier.height(24.dp)
                                         ) {
@@ -14886,7 +14940,7 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
 
                                     Switch(
                                         checked = num.isActive,
-                                        onCheckedChange = { viewModel.toggleMerchantNumber(num.number) },
+                                        onCheckedChange = { viewModel.toggleMerchantNumber(num.number, num.method) },
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.White,
                                             checkedTrackColor = BrandPurple,
@@ -15046,7 +15100,7 @@ fun PaymentMethodsScreen(viewModel: AppViewModel) {
                 confirmButton = {
                     Button(
                         onClick = {
-                            viewModel.deleteMerchantNumber(target.number)
+                            viewModel.deleteMerchantNumber(target.number, target.method)
                             numberToDelete = null
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -15094,6 +15148,7 @@ fun AddNumberDialog(viewModel: AppViewModel, onDismiss: () -> Unit) {
     var selectedType by remember { mutableStateOf("Personal") }
     var qrCodeUrl by remember { mutableStateOf("") }
     var applyToAllGateways by remember { mutableStateOf(false) }
+    var isDefault by remember { mutableStateOf(false) }
 
     EnterpriseGestureModal(
         onDismissRequest = onDismiss,
@@ -15188,6 +15243,28 @@ fun AddNumberDialog(viewModel: AppViewModel, onDismiss: () -> Unit) {
                 )
             }
 
+            // Set as default receiving account checkbox
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isDefault = !isDefault }
+                    .padding(vertical = 4.dp)
+            ) {
+                Checkbox(
+                    checked = isDefault,
+                    onCheckedChange = { isDefault = it },
+                    colors = CheckboxDefaults.colors(checkedColor = BrandPurple)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Set as default receiving account ($selectedMethod)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.DarkGray
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
@@ -15195,11 +15272,9 @@ fun AddNumberDialog(viewModel: AppViewModel, onDismiss: () -> Unit) {
                     if (number.isNotEmpty()) {
                         val qr = qrCodeUrl.ifBlank { null }
                         if (applyToAllGateways) {
-                            listOf("bKash", "Nagad", "Rocket", "Upay").forEach { m ->
-                                viewModel.addMerchantNumber(number, m, selectedType, qr)
-                            }
+                            viewModel.addMerchantNumbers(number, listOf("bKash", "Nagad", "Rocket", "Upay"), selectedType, qr, isDefault = isDefault, defaultMethod = selectedMethod)
                         } else {
-                            viewModel.addMerchantNumber(number, selectedMethod, selectedType, qr)
+                            viewModel.addMerchantNumber(number, selectedMethod, selectedType, qr, isDefault = isDefault)
                         }
                         onDismiss()
                     }
@@ -15739,6 +15814,7 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
     val merchantApiKeyPreview by viewModel.merchantApiKeyPreview.collectAsState()
     val isGeneratingApiKey by viewModel.isGeneratingApiKey.collectAsState()
     var isKeyRevealed by remember { mutableStateOf(false) }
+    var isWebhookSecretRevealed by remember { mutableStateOf(false) }
     var showRegenerateDialog by remember { mutableStateOf(false) }
     SideEffect { isDarkModeGlobal = isDarkMode }
     LaunchedEffect(gatewayProfile.id) {
@@ -15791,9 +15867,11 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
     var showEditRulesDialog by remember { mutableStateOf(false) }
     var showEditWebhookDialog by remember { mutableStateOf(false) }
     var showEditNotificationsDialog by remember { mutableStateOf(false) }
-    val activeMethods = remember(gatewayNumbers) {
+    val activeMethods = remember(gatewayNumbers, gatewayConfigState) {
         listOf("bKash", "Nagad", "Rocket", "Upay").associateWith { method ->
-            gatewayNumbers.any { it.method.equals(method, ignoreCase = true) && it.isActive }
+            val hasActiveNumber = gatewayNumbers.any { it.method.equals(method, ignoreCase = true) && it.isActive && it.number.isNotBlank() }
+            val isConfiguredInGateway = gatewayConfigState.activeMethods[method] == true
+            hasActiveNumber || isConfiguredInGateway
         }
     }
     val gatewayOperational = isDbOnline && (isGatewayPermissionGranted || activeMethods.values.any { it })
@@ -16510,6 +16588,267 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                                 }
                             }
 
+                            HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+
+                            // 1c. DYNAMIC WEBHOOK SECRET KEY BOX
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    text = if (isBangla) "মার্চেন্ট ওয়েবহুক সিক্রেট কি (Webhook Secret)" else "Dynamic Webhook Secret (HMAC-SHA256)",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textMain
+                                )
+                                Text(
+                                    text = if (isBangla) "পেমেন্ট গেটওয়ে ওয়েবহুক সিগনেচার যাচাই করতে এই ডায়নামিক সিক্রেট কি ব্যবহার করুন" else "Verify payment notification HMAC signatures using this secret key",
+                                    fontSize = 11.5.sp,
+                                    color = textMuted
+                                )
+                            }
+
+                            val rawSecret = gatewayConfigState.webhookSecret.trim()
+                            val effectiveWebhookSecret = if (rawSecret == "null") "" else rawSecret
+                            val displaySecret = if (effectiveWebhookSecret.isNotBlank()) {
+                                if (isWebhookSecretRevealed) effectiveWebhookSecret else effectiveWebhookSecret.take(12) + "••••••••••••••••"
+                            } else {
+                                if (isBangla) "নতুন সিক্রেট তৈরি করুন" else "Tap New Secret to generate"
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E1E24) else Color(0xFFF1F5F9),
+                                border = BorderStroke(1.dp, cardBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = displaySecret,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (effectiveWebhookSecret.isNotBlank()) textMain else textMuted,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { isWebhookSecretRevealed = !isWebhookSecretRevealed },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isWebhookSecretRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = if (isWebhookSecretRevealed) "Hide Secret" else "Show Secret",
+                                            tint = goldColor,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (effectiveWebhookSecret.isNotBlank()) {
+                                                clipboardManager.setText(AnnotatedString(effectiveWebhookSecret))
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    if (isBangla) "ওয়েবহুক সিক্রেট কপি করা হয়েছে!" else "Webhook Secret copied to clipboard!",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        enabled = effectiveWebhookSecret.isNotBlank(),
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.ContentCopy,
+                                            contentDescription = "Copy Webhook Secret",
+                                            tint = if (effectiveWebhookSecret.isNotBlank()) goldColor else textMuted,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (effectiveWebhookSecret.isNotBlank()) {
+                                            clipboardManager.setText(AnnotatedString(effectiveWebhookSecret))
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                if (isBangla) "ওয়েবহুক সিক্রেট কপি করা হয়েছে!" else "Webhook Secret copied to clipboard!",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    enabled = effectiveWebhookSecret.isNotBlank(),
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = goldColor,
+                                        contentColor = Color.Black,
+                                        disabledContainerColor = if (isDarkMode) Color(0xFF27272A) else Color(0xFFE2E8F0),
+                                        disabledContentColor = textMuted
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.ContentCopy, 
+                                        null, 
+                                        modifier = Modifier.size(15.dp), 
+                                        tint = if (effectiveWebhookSecret.isNotBlank()) Color.Black else textMuted
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isBangla) "সিক্রেট কপি করুন" else "Copy Secret",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (effectiveWebhookSecret.isNotBlank()) Color.Black else textMuted
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.regenerateWebhookSecret { newSec ->
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                if (isBangla) "নতুন ওয়েবহুক সিক্রেট তৈরি করা হয়েছে!" else "New Webhook Secret generated!",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, cardBorder)
+                                ) {
+                                    Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(15.dp), tint = textMain)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isBangla) "নতুন সিক্রেট" else "New Secret",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textMain
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+
+                            // 1d. AUTOMATIC WEBHOOK & IPN ROUTING CARD
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (isBangla) "স্বয়ংক্রিয় ওয়েবহুক ও আইপিএন রাউটিং" else "Automatic Webhook & IPN Routing",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textMain
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .background(SuccessGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isBangla) "স্বয়ংক্রিয় সক্রিয়" else "AUTO-MANAGED",
+                                            color = SuccessGreen,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = if (isBangla) "পেমেন্ট সফল হলে আপনার অনলাইন স্টোর এবং ফর্মসমূহে স্বয়ংক্রিয়ভাবে নোটিফিকেশন পৌঁছে যায়। কোনো ম্যানুয়াল ইউআরএল কনফিগারেশনের প্রয়োজন নেই।" else "Payment events are automatically routed to your e-commerce store & hosted forms. No manual URL assignment required.",
+                                    fontSize = 11.5.sp,
+                                    color = textMuted
+                                )
+                            }
+
+                            val rawUrl = gatewayConfigState.webhookUrl.trim()
+                            val effectiveWebhookUrl = if (rawUrl == "null") "" else rawUrl
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkMode) Color(0xFF1E1E24) else Color(0xFFF1F5F9),
+                                border = BorderStroke(1.dp, cardBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = SuccessGreen,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = if (isBangla) "ইনস্ট্যান্ট পেমেন্ট নোটিফিকেশন সক্রিয়" else "Instant Payment Notifications Active",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textMain
+                                            )
+                                        }
+                                        if (effectiveWebhookUrl.isNotBlank()) {
+                                            IconButton(
+                                                onClick = {
+                                                    clipboardManager.setText(AnnotatedString(effectiveWebhookUrl))
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        if (isBangla) "ওয়েবহুক ইউআরএল কপি করা হয়েছে!" else "Webhook URL copied to clipboard!",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
+                                                },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.ContentCopy,
+                                                    contentDescription = "Copy Webhook URL",
+                                                    tint = goldColor,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (effectiveWebhookUrl.isNotBlank()) {
+                                        Text(
+                                            text = effectiveWebhookUrl,
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = textMuted,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    } else {
+                                        Text(
+                                            text = if (isBangla) "SwapnoPay ক্লাউড গেটওয়ে স্বয়ংক্রিয়ভাবে আপনার স্টোর ডোমেন ও ফর্মের সাথে যুক্ত।" else "SwapnoPay automatically routes to your storefront slug & hosted form IDs.",
+                                            fontSize = 11.sp,
+                                            color = textMuted
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
+
                             OutlinedButton(
                                 onClick = {
                                     val merchantNameParam = java.net.URLEncoder.encode(gatewayProfile.businessName.ifBlank { "Store Merchant" }, "UTF-8")
@@ -17219,28 +17558,36 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
         if (showEditWebhookDialog) {
             AlertDialog(
                 onDismissRequest = { showEditWebhookDialog = false },
-                title = { Text("Edit Default Callbacks", fontWeight = FontWeight.Bold) },
+                title = { Text(if (isBangla) "কাস্টম রিডাইরেক্ট লিঙ্ক সম্পাদনা" else "Edit Custom Redirect URLs", fontWeight = FontWeight.Bold) },
                 text = {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
+                        Text(
+                            text = if (isBangla) "পেমেন্ট সম্পন্ন, ব্যর্থ বা বাতিল হলে গ্রাহককে এই ইউআরএলগুলোতে রিডাইরেক্ট করা হবে (ঐচ্ছিক)।" else "Optional customer redirect endpoints on payment success, failure, or cancellation.",
+                            fontSize = 12.sp,
+                            color = textMuted
+                        )
                         OutlinedTextField(
                             value = successCallbackUrl,
                             onValueChange = { successCallbackUrl = it },
                             label = { Text("Success Callback URL") },
+                            placeholder = { Text("https://example.com/success") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = failureCallbackUrl,
                             onValueChange = { failureCallbackUrl = it },
                             label = { Text("Failure Callback URL") },
+                            placeholder = { Text("https://example.com/failed") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = cancelCallbackUrl,
                             onValueChange = { cancelCallbackUrl = it },
                             label = { Text("Cancel Callback URL") },
+                            placeholder = { Text("https://example.com/cancelled") },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -17252,21 +17599,21 @@ fun PaymentGatewaySettingsScreen(viewModel: AppViewModel) {
                             val current = viewModel.gatewayConfig.value
                             viewModel.saveGatewayConfig(
                                 current.copy(
-                                    successCallbackUrl = successCallbackUrl,
-                                    failureCallbackUrl = failureCallbackUrl,
-                                    cancelCallbackUrl = cancelCallbackUrl
+                                    successCallbackUrl = successCallbackUrl.trim(),
+                                    failureCallbackUrl = failureCallbackUrl.trim(),
+                                    cancelCallbackUrl = cancelCallbackUrl.trim()
                                 )
                             )
-                            android.widget.Toast.makeText(context, "Callbacks and webhook saved.", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, if (isBangla) "কলব্যাক সফলভাবে সংরক্ষিত হয়েছে!" else "Redirect callbacks saved successfully!", android.widget.Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = goldColor, contentColor = Color.Black)
                     ) {
-                        Text("Save Callbacks")
+                        Text(if (isBangla) "সংরক্ষণ করুন" else "Save Settings")
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showEditWebhookDialog = false }) {
-                        Text("Cancel")
+                        Text(if (isBangla) "বাতিল" else "Cancel")
                     }
                 }
             )
@@ -20131,6 +20478,7 @@ fun SMSLogsScreen(viewModel: AppViewModel) {
     var isSearching by remember { mutableStateOf(false) }
 
     val payments by viewModel.payments.collectAsState()
+    val orders by viewModel.orders.collectAsState()
 
     // 1. Filter by tab selection (bKash, Nagad, Rocket, Upay)
     val tabFiltered = remember(smsList, selectedTab, payments) {
@@ -20362,9 +20710,16 @@ fun SMSLogsScreen(viewModel: AppViewModel) {
                             }
 
                             items(smsInGroup) { sms ->
-                                val isMatched = remember(payments, sms.trxId, sms.status) {
+                                val isMatched = remember(payments, orders, sms.trxId, sms.status) {
                                     sms.status.equals("MATCHED", ignoreCase = true) ||
-                                    payments.any { it.id.equals(sms.trxId, ignoreCase = true) && (it.status.equals("MATCHED", ignoreCase = true) || it.status.equals("PAID", ignoreCase = true)) }
+                                    payments.any { p -> 
+                                        p.id.equals(sms.trxId, ignoreCase = true) && 
+                                        (p.status.equals("MATCHED", ignoreCase = true) || p.status.equals("PAID", ignoreCase = true) || !p.orderId.isNullOrBlank()) 
+                                    } ||
+                                    orders.any { o -> 
+                                        o.status.equals("PAID", ignoreCase = true) && 
+                                        (o.notes.contains(sms.trxId, ignoreCase = true) || o.id.equals(sms.trxId, ignoreCase = true)) 
+                                    }
                                 }
 
                                 Card(

@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.RingtoneManager
 import android.os.Build
@@ -70,228 +71,285 @@ class AbirAdminFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
-        val data = remoteMessage.data
-        val notification = remoteMessage.notification
+        try {
+            val data = remoteMessage.data
+            val notification = remoteMessage.notification
 
-        val type = data["type"] ?: data["action"] ?: ""
-        val title = data["title"] ?: notification?.title ?: getString(R.string.app_name)
-        val body = data["body"] ?: data["message"] ?: notification?.body ?: ""
-        val targetUrl = data["url"] ?: data["target_url"] ?: ""
+            val type = data["type"] ?: data["action"] ?: ""
+            val title = data["title"] ?: notification?.title ?: getString(R.string.app_name)
+            val body = data["body"] ?: data["message"] ?: notification?.body ?: ""
+            val targetUrl = data["url"] ?: data["target_url"] ?: ""
 
-        val threadId = data["thread_id"] ?: ""
-        if (type.equals("call", ignoreCase = true) || data.containsKey("incoming_call")) {
-            // Instant Incoming Customer Call trigger (Direct screen wake + CallStyle heads-up)
-            triggerInstantIncomingCall(title, body, targetUrl, threadId)
-        } else if (type.equals("order", ignoreCase = true) || data.containsKey("order_id")) {
-            // Realtime New Order Alert
-            showNewOrderNotification(title, body, targetUrl)
-        } else {
-            // General Admin Status Bar Notification (Inquiries, Alerts)
-            showAdminAlertNotification(title, body, targetUrl)
+            val threadId = data["thread_id"] ?: ""
+            if (type.equals("call", ignoreCase = true) || data.containsKey("incoming_call")) {
+                // Instant Incoming Customer Call trigger (Direct screen wake + CallStyle heads-up)
+                triggerInstantIncomingCall(title, body, targetUrl, threadId)
+            } else if (type.equals("order", ignoreCase = true) || data.containsKey("order_id")) {
+                // Realtime New Order Alert
+                showNewOrderNotification(title, body, targetUrl)
+            } else {
+                // General Admin Status Bar Notification (Inquiries, Alerts)
+                showAdminAlertNotification(title, body, targetUrl)
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun getSafeAppLogo(): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = 4 // Downsample 800x800 -> 200x200 to prevent TransactionTooLargeException
+            }
+            val raw = BitmapFactory.decodeResource(resources, R.drawable.app_logo, options) ?: return null
+            Bitmap.createScaledBitmap(raw, 128, 128, true)
+        } catch (e: Throwable) {
+            null
         }
     }
 
     private fun triggerInstantIncomingCall(callerName: String, callNote: String, targetUrl: String = "", threadId: String = "") {
-        // Wake the screen up even if phone is locked or asleep
         try {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            @Suppress("DEPRECATION")
-            val wakeLock = powerManager?.newWakeLock(
-                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                "abiradmin:IncomingCallWakeLock"
-            )
-            wakeLock?.acquire(30000L)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        val defaultCallUrl = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
-        var baseCallUrl = if (targetUrl.isNotBlank()) targetUrl else defaultCallUrl
-        if (threadId.isNotBlank() && !baseCallUrl.contains("thread_id=")) {
-            baseCallUrl += if (baseCallUrl.contains("?")) "&thread_id=$threadId" else "?thread_id=$threadId"
-        }
-        val resolvedCallUrl = if (!baseCallUrl.contains("auto_answer=")) {
-            if (baseCallUrl.contains("?")) "$baseCallUrl&auto_answer=1" else "$baseCallUrl?auto_answer=1"
-        } else {
-            baseCallUrl
-        }
-
-        val callIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            putExtra("caller_name", callerName)
-            putExtra("call_note", callNote)
-            putExtra("thread_id", threadId)
-            putExtra("target_url", resolvedCallUrl)
-        }
-
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this,
-            2001,
-            callIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val declineIntent = Intent(this, AdminCallActionReceiver::class.java).apply {
-            action = AdminCallActionReceiver.ACTION_DECLINE_CALL
-        }
-        val declinePendingIntent = PendingIntent.getBroadcast(
-            this,
-            2002,
-            declineIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val answerCallIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("call_answered", true)
-            putExtra("thread_id", threadId)
-            putExtra("target_url", resolvedCallUrl)
-        }
-        val answerPendingIntent = PendingIntent.getActivity(
-            this,
-            2003,
-            answerCallIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        val shopLogoBitmap = try {
-            BitmapFactory.decodeResource(resources, R.drawable.app_logo)
-        } catch (e: Exception) {
-            null
-        }
-
-        val callerPerson = Person.Builder()
-            .setName(callerName)
-            .setIcon(IconCompat.createWithResource(this, R.drawable.app_logo))
-            .setImportant(true)
-            .build()
-
-        val callStyle = NotificationCompat.CallStyle.forIncomingCall(
-            callerPerson,
-            declinePendingIntent,
-            answerPendingIntent
-        )
-
-        val inForeground = try { AbirAdminApp.instance.isAppInForeground } catch (e: Exception) { false }
-
-        val callNotificationBuilder = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_CALLS)
-            .setSmallIcon(R.drawable.ic_stat_shop)
-            .setContentTitle(callerName)
-            .setContentText(if (callNote.isNotBlank()) callNote else getString(R.string.incoming_call_subtitle))
-            .setStyle(callStyle)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setAutoCancel(true)
-            .setColor(ContextCompat.getColor(this, R.color.brand_gold))
-            .addAction(R.drawable.ic_call, "Answer", answerPendingIntent)
-            .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
-
-        if (!inForeground) {
-            callNotificationBuilder.setSound(soundUri)
-            callNotificationBuilder.setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000, 1000))
-            callNotificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
-            callNotificationBuilder.setContentIntent(fullScreenPendingIntent)
-        } else {
-            callNotificationBuilder.setContentIntent(answerPendingIntent)
-        }
-
-        if (shopLogoBitmap != null) {
-            callNotificationBuilder.setLargeIcon(shopLogoBitmap)
-        }
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(9999, callNotificationBuilder.build())
-
-        // Directly launch the activity ONLY when phone is asleep, locked, or app is in background
-        if (!inForeground) {
+            // Wake the screen up even if phone is locked or asleep
             try {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(this)) {
-                    startActivity(callIntent)
-                }
+                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                @Suppress("DEPRECATION")
+                val wakeLock = powerManager?.newWakeLock(
+                    PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                    "abiradmin:IncomingCallWakeLock"
+                )
+                wakeLock?.acquire(30000L)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+
+            val defaultCallUrl = "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
+            var baseCallUrl = if (targetUrl.isNotBlank()) targetUrl else defaultCallUrl
+            if (threadId.isNotBlank() && !baseCallUrl.contains("thread_id=")) {
+                baseCallUrl += if (baseCallUrl.contains("?")) "&thread_id=$threadId" else "?thread_id=$threadId"
+            }
+            val resolvedCallUrl = if (!baseCallUrl.contains("auto_answer=")) {
+                if (baseCallUrl.contains("?")) "$baseCallUrl&auto_answer=1" else "$baseCallUrl?auto_answer=1"
+            } else {
+                baseCallUrl
+            }
+
+            val callIntent = Intent(this, IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                putExtra("caller_name", callerName)
+                putExtra("call_note", callNote)
+                putExtra("thread_id", threadId)
+                putExtra("target_url", resolvedCallUrl)
+            }
+
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                this,
+                2001,
+                callIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val declineIntent = Intent(this, AdminCallActionReceiver::class.java).apply {
+                action = AdminCallActionReceiver.ACTION_DECLINE_CALL
+            }
+            val declinePendingIntent = PendingIntent.getBroadcast(
+                this,
+                2002,
+                declineIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val answerCallIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("call_answered", true)
+                putExtra("thread_id", threadId)
+                putExtra("target_url", resolvedCallUrl)
+            }
+            val answerPendingIntent = PendingIntent.getActivity(
+                this,
+                2003,
+                answerCallIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            val inForeground = try { AbirAdminApp.instance.isAppInForeground } catch (e: Exception) { false }
+            val shopLogoBitmap = getSafeAppLogo()
+
+            val callNotificationBuilder = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_CALLS)
+                .setSmallIcon(R.drawable.ic_stat_shop)
+                .setContentTitle(callerName)
+                .setContentText(if (callNote.isNotBlank()) callNote else getString(R.string.incoming_call_subtitle))
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setAutoCancel(true)
+                .setColor(ContextCompat.getColor(this, R.color.brand_gold))
+
+            if (shopLogoBitmap != null) {
+                callNotificationBuilder.setLargeIcon(shopLogoBitmap)
+            }
+
+            var callStyleApplied = false
+            try {
+                val callerPerson = Person.Builder()
+                    .setName(callerName)
+                    .setIcon(IconCompat.createWithResource(this, R.drawable.ic_stat_shop))
+                    .setImportant(true)
+                    .build()
+
+                val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                    callerPerson,
+                    declinePendingIntent,
+                    answerPendingIntent
+                )
+                callNotificationBuilder.setStyle(callStyle)
+                callStyleApplied = true
+            } catch (e: Throwable) {
+                callNotificationBuilder.setStyle(
+                    NotificationCompat.BigTextStyle().bigText(if (callNote.isNotBlank()) callNote else "Incoming Call")
+                )
+            }
+
+            if (!callStyleApplied) {
+                callNotificationBuilder.addAction(R.drawable.ic_call, "Answer", answerPendingIntent)
+                callNotificationBuilder.addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
+            }
+
+            if (!inForeground) {
+                callNotificationBuilder.setSound(soundUri)
+                callNotificationBuilder.setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000, 1000))
+                callNotificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
+                callNotificationBuilder.setContentIntent(fullScreenPendingIntent)
+            } else {
+                callNotificationBuilder.setContentIntent(answerPendingIntent)
+            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            try {
+                notificationManager.notify(9999, callNotificationBuilder.build())
+            } catch (e: Throwable) {
+                try {
+                    val fallback = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_CALLS)
+                        .setSmallIcon(R.drawable.ic_stat_shop)
+                        .setContentTitle(callerName)
+                        .setContentText(if (callNote.isNotBlank()) callNote else "Incoming Call")
+                        .setPriority(NotificationCompat.PRIORITY_MAX)
+                        .setCategory(NotificationCompat.CATEGORY_CALL)
+                        .setFullScreenIntent(fullScreenPendingIntent, true)
+                        .setContentIntent(answerPendingIntent)
+                        .addAction(R.drawable.ic_call, "Answer", answerPendingIntent)
+                        .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
+                        .build()
+                    notificationManager.notify(9999, fallback)
+                } catch (fallbackEx: Throwable) {
+                    fallbackEx.printStackTrace()
+                }
+            }
+
+            // Directly launch the activity ONLY when phone is asleep, locked, or app is in background
+            if (!inForeground) {
+                try {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(this)) {
+                        startActivity(callIntent)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } catch (globalEx: Throwable) {
+            globalEx.printStackTrace()
         }
     }
 
     private fun showNewOrderNotification(title: String, message: String, url: String) {
-        val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/order.php"
-        val clickIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("target_url", destinationUrl)
+        try {
+            val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/order.php"
+            val clickIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("target_url", destinationUrl)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                System.currentTimeMillis().toInt(),
+                clickIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val largeIcon = getSafeAppLogo()
+
+            val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ORDERS)
+                .setSmallIcon(R.drawable.ic_stat_shop)
+                .setContentTitle(if (title.isNotBlank()) title else "🛍️ New Customer Order")
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setAutoCancel(true)
+                .setSound(soundUri)
+                .setVibrate(longArrayOf(0, 300, 150, 300))
+                .setColor(ContextCompat.getColor(this, R.color.brand_gold))
+                .setContentIntent(pendingIntent)
+
+            if (largeIcon != null) {
+                notification.setLargeIcon(largeIcon)
+            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationId = (System.currentTimeMillis() % 100000).toInt()
+            notificationManager.notify(notificationId, notification.build())
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            clickIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.app_logo)
-
-        val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ORDERS)
-            .setSmallIcon(R.drawable.ic_stat_shop)
-            .setLargeIcon(largeIcon)
-            .setContentTitle(if (title.isNotBlank()) title else "🛍️ New Customer Order")
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_EVENT)
-            .setAutoCancel(true)
-            .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 300, 150, 300))
-            .setColor(ContextCompat.getColor(this, R.color.brand_gold))
-            .setContentIntent(pendingIntent)
-            .build()
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
-        notificationManager.notify(notificationId, notification)
     }
 
     private fun showAdminAlertNotification(title: String, message: String, url: String) {
-        val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
-        val clickIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("target_url", destinationUrl)
+        try {
+            val destinationUrl = if (url.isNotBlank()) url else "https://shop.swapnopay.top/abir-luxe-shop-bd-0558/admin/live-chat.php"
+            val clickIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("target_url", destinationUrl)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                System.currentTimeMillis().toInt(),
+                clickIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val largeIcon = getSafeAppLogo()
+
+            val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ALERTS)
+                .setSmallIcon(R.drawable.ic_stat_shop)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setSound(soundUri)
+                .setVibrate(longArrayOf(0, 200, 200, 200))
+                .setColor(ContextCompat.getColor(this, R.color.brand_gold))
+                .setContentIntent(pendingIntent)
+
+            if (largeIcon != null) {
+                notification.setLargeIcon(largeIcon)
+            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationId = (System.currentTimeMillis() % 100000).toInt()
+            notificationManager.notify(notificationId, notification.build())
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            clickIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.app_logo)
-
-        val notification = NotificationCompat.Builder(this, AbirAdminApp.CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.drawable.ic_stat_shop)
-            .setLargeIcon(largeIcon)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-            .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 200, 200, 200))
-            .setColor(ContextCompat.getColor(this, R.color.brand_gold))
-            .setContentIntent(pendingIntent)
-            .build()
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
-        notificationManager.notify(notificationId, notification)
     }
 }
 

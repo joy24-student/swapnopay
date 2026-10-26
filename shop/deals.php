@@ -29,10 +29,26 @@ if (isset($_SESSION['customer']['cust_id'])) {
 $curatedDeals = [];
 $categoriesList = [];
 
+// Fetch real active coupons communicating with tbl_coupon
+$activeCouponsMap = [];
+$topActiveCoupon = null;
+try {
+    $cpStmt = $pdo->query("SELECT * FROM tbl_coupon WHERE status = 'active' AND (end_date >= CURRENT_DATE OR end_date IS NULL) ORDER BY discount_value DESC");
+    if ($cpStmt) {
+        $cList = $cpStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($cList as $cRow) {
+            $activeCouponsMap[$cRow['coupon_code']] = $cRow;
+            if (!$topActiveCoupon) {
+                $topActiveCoupon = $cRow;
+            }
+        }
+    }
+} catch (Throwable $_) {}
+
 // Fetch real discounted or active products from database
 try {
     $dbDealsStmt = $pdo->query("
-        SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_feature, ecat_id
+        SELECT p_id, p_name, p_current_price, p_old_price, p_featured_photo, p_feature, ecat_id, coupon_code
         FROM tbl_product 
         WHERE p_is_active = 1 
         ORDER BY (CASE WHEN p_old_price > p_current_price THEN 0 ELSE 1 END), (p_old_price - p_current_price) DESC, p_id DESC 
@@ -81,6 +97,14 @@ try {
         $imgUrl = $photo ? (str_starts_with($photo, 'http') ? $photo : (function_exists('get_media_url') ? get_media_url($photo) : BASE_URL . 'assets/uploads/' . $photo)) : BASE_URL . 'assets/images/no-image.png';
         $prodUrl = function_exists('getProductURL') ? getProductURL($pId, $dbItem['p_name'], BASE_URL) : BASE_URL . 'product.php?id=' . $pId;
 
+        // Resolve real active coupon code for this product
+        $couponCodeStr = '';
+        if (!empty($dbItem['coupon_code']) && isset($activeCouponsMap[$dbItem['coupon_code']])) {
+            $couponCodeStr = $dbItem['coupon_code'];
+        } elseif ($topActiveCoupon) {
+            $couponCodeStr = $topActiveCoupon['coupon_code'];
+        }
+
         $curatedDeals[] = [
             'id' => $pId,
             'category' => 'all',
@@ -91,7 +115,7 @@ try {
             'discount' => $hasDiscount ? ('-' . $discPct . '%') : 'HOT DEAL',
             'rating' => $ratingStr,
             'reviews' => $reviewsStr,
-            'coupon' => $hasDiscount ? ('SAVE' . min(50, max(10, $discPct))) : 'SPECIAL',
+            'coupon' => $couponCodeStr,
             'img' => $imgUrl,
             'url' => $prodUrl
         ];
@@ -107,13 +131,23 @@ require_once('header.php');
 
 <div class="sn-deals-page-wrap">
     
-    <!-- 2. Hero Banner Card ("Up to 70% OFF") -->
+    <!-- 2. Hero Banner Card -->
+    <?php
+    $heroDiscountLabel = '70%';
+    $heroCouponCode = '';
+    if ($topActiveCoupon) {
+        $heroDiscountLabel = ($topActiveCoupon['discount_type'] === 'percentage') 
+            ? ((int)$topActiveCoupon['discount_value'] . '%') 
+            : (LANG_VALUE_1 . number_format((float)$topActiveCoupon['discount_value']));
+        $heroCouponCode = $topActiveCoupon['coupon_code'];
+    }
+    ?>
     <div class="sn-deals-hero-card">
         <!-- Top Right Corner Badge -->
         <div class="sn-deals-hero-badge-corner">
             <div class="sn-corner-circle-badge">
                 <span>Up to</span>
-                <strong>70%</strong>
+                <strong><?php echo htmlspecialchars($heroDiscountLabel); ?></strong>
                 <span>OFF</span>
             </div>
         </div>
@@ -125,25 +159,27 @@ require_once('header.php');
                 <span>Limited Time Deal</span>
             </div>
             <h2 class="sn-deals-hero-heading">
-                Up to <span class="sn-highlight-yellow">70% OFF</span><br>Top Electronics & More!
+                Up to <span class="sn-highlight-yellow"><?php echo htmlspecialchars($heroDiscountLabel); ?> OFF</span><br>Top Electronics &amp; More!
             </h2>
             <p class="sn-deals-hero-sub">Big brands. Bigger savings.</p>
             
-            <div class="sn-deals-code-pill" onclick="copyDealCoupon('DEAL70', this)" role="button" tabindex="0" title="Click to copy coupon code DEAL70">
+            <?php if (!empty($heroCouponCode)): ?>
+            <div class="sn-deals-code-pill" onclick="copyDealCoupon('<?php echo htmlspecialchars($heroCouponCode); ?>', this)" role="button" tabindex="0" title="Click to copy coupon code <?php echo htmlspecialchars($heroCouponCode); ?>">
                 <div class="sn-code-tag-icon">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                     </svg>
                 </div>
                 <span class="sn-code-label">Use Code</span>
-                <span class="sn-code-text">DEAL70</span>
-                <button type="button" class="sn-code-copy-btn" aria-label="Copy DEAL70">
+                <span class="sn-code-text"><?php echo htmlspecialchars($heroCouponCode); ?></span>
+                <button type="button" class="sn-code-copy-btn" aria-label="Copy <?php echo htmlspecialchars($heroCouponCode); ?>">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                 </button>
             </div>
+            <?php endif; ?>
         </div>
 
         <!-- Right Collage Image -->
@@ -217,6 +253,7 @@ require_once('header.php');
 
                 <!-- Actions: Coupon Pill & Shop Now Button -->
                 <div class="sn-deal-actions-row">
+                    <?php if (!empty($item['coupon'])): ?>
                     <div class="sn-deal-coupon-pill" onclick="copyDealCoupon('<?php echo htmlspecialchars($item['coupon']); ?>', this)" title="Click to copy <?php echo htmlspecialchars($item['coupon']); ?>">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
@@ -232,8 +269,9 @@ require_once('header.php');
                             </svg>
                         </span>
                     </div>
+                    <?php endif; ?>
 
-                    <a href="<?php echo htmlspecialchars($item['url']); ?>" class="sn-deal-btn-shop">
+                    <a href="<?php echo htmlspecialchars($item['url']); ?>" class="sn-deal-btn-shop" style="<?php echo empty($item['coupon']) ? 'flex: 1;' : ''; ?>">
                         <span>Shop Now</span>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </a>

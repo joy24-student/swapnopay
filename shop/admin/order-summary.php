@@ -95,6 +95,10 @@ if (isset($_GET['print']) && $_GET['print'] == '1') {
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <style>
+            @page {
+                size: landscape;
+                margin: 6mm 8mm;
+            }
             body { margin: 0; padding: 24px 12px; background: #f8fafc; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #0f172a; }
             .print-floating-bar {
                 position: fixed;
@@ -194,8 +198,8 @@ require_once __DIR__ . '/header.php';
    PRINT SPECIFIC HIGH-FIDELITY STYLESHEET (ADMIN PANEL VIEW)
    ========================================================= */
 @page {
-    size: A4 portrait;
-    margin: 8mm 10mm;
+    size: landscape;
+    margin: 6mm 8mm;
 }
 
 @media print {

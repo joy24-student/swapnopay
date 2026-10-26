@@ -49,7 +49,7 @@ android {
     create("merchant") {
       dimension = "role"
       applicationId = "com.swapnopay"
-      manifestPlaceholders["appName"] = "SwapnoPay Merchant"
+      manifestPlaceholders["appName"] = "SwapnoPay"
       buildConfigField("String", "APP_FLAVOR_ROLE", "\"MERCHANT\"")
     }
     create("employee") {
