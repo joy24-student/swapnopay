@@ -1348,6 +1348,8 @@ object SupabaseClient {
         appealId: String,
         action: String, // "APPROVED", "REJECTED"
         orderId: String?,
+        merchantId: String? = null,
+        trxId: String? = null,
         onSuccess: () -> Unit,
         onFailure: (String) -> Unit
     ) {
@@ -1356,8 +1358,11 @@ object SupabaseClient {
 
         val bodyJson = JSONObject().apply {
             put("appeal_id", appealId)
+            put("status", action)
             put("action", action)
             put("order_id", orderId ?: JSONObject.NULL)
+            if (!merchantId.isNullOrBlank()) put("merchant_id", merchantId)
+            if (!trxId.isNullOrBlank()) put("trx_id", trxId)
         }.toString()
 
         val request = Request.Builder()

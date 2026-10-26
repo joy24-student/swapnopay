@@ -11366,26 +11366,55 @@ function executePayment() {
         }
     }
 
+    val isAppealsRefreshing = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    fun refreshAppeals(onComplete: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            isAppealsRefreshing.value = true
+            try {
+                val effectiveMid = activeProfile.value.id
+                val aOk = repository.syncAppealsFromSupabase(effectiveMid)
+                val pOk = repository.syncPaymentsFromSupabase(effectiveMid)
+                val oOk = repository.syncOrdersFromSupabase(effectiveMid)
+                val success = aOk || pOk || oOk
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onComplete?.invoke(success)
+                }
+            } catch (e: Exception) {
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onComplete?.invoke(false)
+                }
+            } finally {
+                isAppealsRefreshing.value = false
+            }
+        }
+    }
+
     fun resolveAppeal(appealId: String, status: String) {
         if (status !in setOf("APPROVED", "REJECTED")) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val appeal = appeals.value.find { it.id == appealId } ?: return@launch
             val active = resolveActiveForGateway()
-            if (active == null) {
-                logFirebaseStatus("Appeal resolution requires an authenticated network connection.")
-                return@launch
-            }
+            val effectiveUrl = active?.supabaseUrl ?: "https://api.swapnopay.top"
+            val effectiveAnonKey = active?.anonKey ?: ""
+            val effectiveToken = active?.authSessionToken ?: effectiveAnonKey
+
             com.example.data.remote.SupabaseClient.resolveAppeal(
-                active.supabaseUrl,
-                active.anonKey,
-                active.authSessionToken,
+                effectiveUrl,
+                effectiveAnonKey,
+                effectiveToken,
                 appeal.id,
                 status,
                 appeal.orderId,
+                merchantId = appeal.merchantId.ifBlank { active?.id ?: activeProfile.value.id },
+                trxId = appeal.trxId,
                 onSuccess = {
                     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         repository.updateAppealStatus(appealId, status)
-                        triggerSync()
+                        if (status == "APPROVED" && appeal.trxId.isNotBlank()) {
+                            repository.updatePaymentStatus(appeal.trxId, "MATCHED", appeal.orderId)
+                        }
+                        refreshAppeals()
                     }
                 },
                 onFailure = { logFirebaseStatus("Appeal resolution failed: $it") }

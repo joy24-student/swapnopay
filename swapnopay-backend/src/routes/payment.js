@@ -1592,10 +1592,31 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   // Sends notification email to customer via mailer service
   // ──────────────────────────────────────────────────────────────────────────
   router.post('/resolve-appeal', async (req, res) => {
-    const { appeal_id, order_id, status, trx_id, amount, customer_email, customer_phone, merchant_id, note, send_email = true } = req.body || {}
+    const { appeal_id, order_id, status, action, trx_id, amount, customer_email, customer_phone, merchant_id, note, send_email = true } = req.body || {}
 
-    if (!appeal_id || !status) {
-      return res.status(400).json({ ok: false, error: 'Missing required: appeal_id, status' })
+    const rawStatus = String(status || action || '').trim().toUpperCase()
+    const normalizedStatus = rawStatus === 'APPROVED' ? 'APPROVED' : (rawStatus === 'REJECTED' ? 'REJECTED' : null)
+    if (!appeal_id || !normalizedStatus) {
+      return res.status(400).json({ ok: false, error: 'Missing required: appeal_id and valid status/action (APPROVED or REJECTED)' })
+    }
+
+    // Auto-discover target appeal & order details if missing
+    let targetAppeal = null
+    let effectiveMerchantId = merchant_id || null
+    let effectiveOrderId = order_id || null
+    let effectiveTrxId = trx_id || null
+
+    const admin = getAdminClient()
+    if (admin) {
+      try {
+        const { data: aRow } = await admin.from('appeals').select('*,orders(*)').eq('id', appeal_id).maybeSingle()
+        if (aRow) {
+          targetAppeal = aRow
+          if (!effectiveMerchantId) effectiveMerchantId = aRow.merchant_id || aRow.orders?.merchant_id
+          if (!effectiveOrderId) effectiveOrderId = aRow.order_id
+          if (!effectiveTrxId) effectiveTrxId = aRow.trx_id
+        }
+      } catch (_) {}
     }
 
     try {
@@ -1722,15 +1743,95 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         }
       }
 
-      // 3. Broadcast via socket to widget & merchant room
-      if (order_id) {
-        io.to(`order:${order_id}`).emit('payment_status_update', {
-          order_id,
+      // 3. Outbound Webhook Callback Dispatch to External Website / Merchant Shop
+      if (normalizedStatus === 'APPROVED' && effectiveOrderId) {
+        try {
+          let ord = targetAppeal?.orders
+          if (!ord && effectiveMerchantId) {
+            try {
+              const creds = await getMerchantCredentials(effectiveMerchantId)
+              if (creds?.supabase_url) {
+                const { createClient } = await import('@supabase/supabase-js')
+                const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
+                const mClient = createClient(creds.supabase_url, mKey, { auth: { persistSession: false, autoRefreshToken: false } })
+                const { data: oData } = await mClient.from('orders').select('*').eq('id', effectiveOrderId).maybeSingle()
+                if (oData) ord = oData
+              }
+            } catch (_) {}
+          }
+
+          const creds = await getMerchantCredentials(effectiveMerchantId).catch(() => null)
+          let targetWebhookUrl = ord?.callback_url || creds?.webhook_url
+          if (!targetWebhookUrl && effectiveMerchantId) {
+            const { getShopInfoForMerchant } = await import('../services/adminSupabase.js')
+            const shopInfo = getShopInfoForMerchant(effectiveMerchantId)
+            if (shopInfo?.base_url) {
+              targetWebhookUrl = `${shopInfo.base_url.replace(/\/+$/, '')}/payment/swapnopay/webhook.php`
+            } else if (shopInfo?.shop_slug) {
+              targetWebhookUrl = `https://shop.swapnopay.top/${shopInfo.shop_slug}/payment/swapnopay/webhook.php`
+            }
+          }
+
+          if (targetWebhookUrl) {
+            const { postSafeWebhook } = await import('../utils/urlValidator.js')
+            const { getMerchantActiveApiKey } = await import('../services/adminSupabase.js')
+            const crypto = await import('crypto')
+            const keyRecord = await getMerchantActiveApiKey(effectiveMerchantId).catch(() => null)
+            const signingKey = keyRecord?.api_key || creds?.webhook_secret || 'swapnopay_secret'
+            const effectiveTranId = ord?.tran_id || effectiveOrderId
+
+            const callbackPayload = {
+              event: 'payment.status_changed',
+              event_id: `evt_appeal_${Date.now()}_${effectiveTrxId || 'resolved'}`,
+              order_id: effectiveOrderId,
+              tran_id: effectiveTranId,
+              payment_id: effectiveTranId,
+              merchant_id: effectiveMerchantId,
+              status: 'PAID',
+              amount: Number(ord?.amount || amount || 0),
+              currency: ord?.currency || 'BDT',
+              payment_method: ord?.payment_method || 'bKash',
+              trx_id: effectiveTrxId,
+              paid_at: new Date().toISOString(),
+              appeal_resolved: true
+            }
+
+            const signature = crypto.createHmac('sha256', signingKey)
+              .update(JSON.stringify(callbackPayload)).digest('hex')
+
+            await postSafeWebhook(targetWebhookUrl, callbackPayload, 6000, {
+              'x-swapnopay-signature': signature,
+              'x-webhook-secret': creds?.webhook_secret || '',
+              'content-type': 'application/json'
+            }).catch(whErr => console.warn('[resolve-appeal] Webhook dispatch notice:', whErr.message))
+            console.log(`[resolve-appeal] Outbound webhook dispatched to ${targetWebhookUrl}`)
+          }
+        } catch (whEx) {
+          console.warn('[resolve-appeal] Outbound webhook exception:', whEx.message)
+        }
+      }
+
+      // 4. Broadcast via socket to widget & merchant room
+      const targetRoomOrderId = effectiveOrderId || order_id
+      if (targetRoomOrderId) {
+        io.to(`order:${targetRoomOrderId}`).emit('payment_status_update', {
+          order_id: targetRoomOrderId,
           status: normalizedStatus === 'APPROVED' ? 'PAID' : 'APPEAL_REJECTED',
           appeal_id,
-          trx_id,
+          trx_id: effectiveTrxId || trx_id,
           resolved_at: new Date().toISOString()
         })
+        if (normalizedStatus === 'APPROVED') {
+          io.to(`order:${targetRoomOrderId}`).emit('payment_status', {
+            order_id: targetRoomOrderId,
+            tran_id: targetRoomOrderId,
+            status: 'PAID',
+            trx_id: effectiveTrxId || trx_id,
+            amount: Number(amount || 0),
+            payment_method: 'bKash',
+            paid_at: new Date().toISOString()
+          })
+        }
       }
 
       res.json({

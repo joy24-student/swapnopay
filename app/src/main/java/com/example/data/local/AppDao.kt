@@ -92,7 +92,7 @@ interface AppDao {
     suspend fun updatePaymentStatus(trxId: String, status: String, orderId: String? = null)
 
     // Appeals
-    @Query("SELECT * FROM appeals WHERE merchantId = :merchantId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM appeals WHERE merchantId = :merchantId OR merchantId = 'merchant_default' OR merchantId = '00000000-0000-0000-0000-000000000001' OR merchantId = '' OR :merchantId = '' OR :merchantId = 'merchant_default' OR :merchantId = '00000000-0000-0000-0000-000000000001' ORDER BY timestamp DESC")
     fun observeAppeals(merchantId: String): Flow<List<AppealEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

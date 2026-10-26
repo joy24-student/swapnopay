@@ -11302,42 +11302,86 @@ fun LegacyTransactionsScreen(viewModel: AppViewModel) {
 @Composable
 fun AppealsScreen(viewModel: AppViewModel) {
     val appeals by viewModel.appeals.collectAsState()
+    val isRefreshing by viewModel.isAppealsRefreshing.collectAsState()
+
+    // 1. Instant fetch on screen open
+    LaunchedEffect(Unit) {
+        viewModel.refreshAppeals()
+    }
+
+    // 2. Continuous real-time auto-poll every 4 seconds while viewing Appeals Hub
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(4000)
+            viewModel.refreshAppeals()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // Header Bar with Back Button
+        // Header Bar with Back Button and Real-Time Refresh Indicator
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (isDarkModeGlobal) Color(0xFF1E1F26) else Color.White)
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(if (isDarkModeGlobal) Color(0xFF2C2D35) else Color(0xFFF1F5F9), CircleShape)
+                        .border(BorderStroke(1.dp, if (isDarkModeGlobal) Color(0xFF474555) else Color(0xFFE2E8F0)), CircleShape)
+                        .clickable { viewModel.goBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Text(
+                    text = "Appeals Hub",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B)
+                )
+            }
+
+            // Real-Time Refresh Button
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .background(if (isDarkModeGlobal) Color(0xFF2C2D35) else Color(0xFFF1F5F9), CircleShape)
                     .border(BorderStroke(1.dp, if (isDarkModeGlobal) Color(0xFF474555) else Color(0xFFE2E8F0)), CircleShape)
-                    .clickable { viewModel.goBack() },
+                    .clickable { viewModel.refreshAppeals() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B),
-                    modifier = Modifier.size(20.dp)
-                )
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = BrandPurple
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-            Text(
-                text = "Appeals Hub",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDarkModeGlobal) Color.White else Color(0xFF1E293B)
-            )
         }
         // Tabs
         Row(
