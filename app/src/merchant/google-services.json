@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "146792831857",
+    "project_id": "swapnopay-ca7ae",
+    "storage_bucket": "swapnopay-ca7ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:146792831857:android:2a2a8d97b4f98cd85534d0",
+        "android_client_info": {
+          "package_name": "com.swapnopay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWlxFDdFblwZoeXzBv9oDQWQq2Beqms9A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
