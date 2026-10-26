@@ -1743,15 +1743,16 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
                   await mClient
                     .from('payments')
                     .insert({
+                      merchant_id: finalMerchantId,
                       trx_id: String(finalTrxId).trim().toUpperCase(),
                       amount: Number(merchantOrderRecord?.amount || targetAppeal?.amount || amount || 0),
                       sender_number: merchantOrderRecord?.cus_phone || targetAppeal?.cus_phone || customer_phone || null,
                       status: 'MATCHED',
                       matched_order_id: finalOrderId,
-                      payment_method: merchantOrderRecord?.payment_method || 'bKash',
-                      created_at: new Date().toISOString()
+                      sms_hash: crypto.createHash('sha256').update(`${finalTrxId}-${Date.now()}`).digest('hex'),
+                      sms_timestamp: new Date().toISOString()
                     })
-                    .catch(() => {})
+                    .catch((pErr) => console.warn('[resolve-appeal] Payment insert notice:', pErr.message))
                 }
               }
             }
