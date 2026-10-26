@@ -5,22 +5,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
-import com.example.data.repository.AppRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
 import com.example.NotificationHelper
 import com.example.R
+import com.example.data.repository.AppRepository
+import kotlinx.coroutines.*
+import java.util.Collections
+import java.util.HashSet
 
 class SmsMonitoringService : Service() {
 
@@ -28,6 +28,8 @@ class SmsMonitoringService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + job)
     private lateinit var repository: AppRepository
     private var smsReceiver: BroadcastReceiver? = null
+    private var smsContentObserver: ContentObserver? = null
+    private val processedSmsIds = Collections.synchronizedSet(HashSet<Long>())
 
     companion object {
         const val CHANNEL_ID = "SmsMonitoringChannel"
@@ -41,12 +43,13 @@ class SmsMonitoringService : Service() {
 
         repository = AppRepository(applicationContext)
         startSmsReceiver()
+        startSmsContentObserver()
         repository.startSmsQueueAutoRetry(scope)
         startHeartbeatLoop()
 
         scope.launch {
-            val activeProfile = repository.getActiveSupabaseProfile()
-            val merchantId = activeProfile?.id ?: "00000000-0000-0000-0000-000000000001"
+            scanRecentInboxSms(lookbackHours = 4L)
+            val merchantId = repository.resolveEffectiveMerchantId()
             SmsGatewayEngine.startOutboxQueueProcessor(applicationContext, merchantId)
         }
 
@@ -55,6 +58,9 @@ class SmsMonitoringService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         promoteToForeground()
+        scope.launch {
+            scanRecentInboxSms(lookbackHours = 2L)
+        }
         return START_STICKY
     }
 
@@ -96,7 +102,7 @@ class SmsMonitoringService : Service() {
                 if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
                     val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
                     if (messages.isEmpty()) return
-                    
+
                     // Group multipart SMS pieces by sender address and concatenate their text
                     val fullBodyMap = LinkedHashMap<String, StringBuilder>()
                     for (msg in messages) {
@@ -115,7 +121,7 @@ class SmsMonitoringService : Service() {
                 }
             }
         }
-        
+
         try {
             androidx.core.content.ContextCompat.registerReceiver(
                 this,
@@ -125,6 +131,78 @@ class SmsMonitoringService : Service() {
             )
         } catch (e: Exception) {
             Log.e("SmsMonitoringService", "Failed to register dynamic SMS receiver: ${e.message}", e)
+        }
+    }
+
+    private fun startSmsContentObserver() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.READ_SMS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w("SmsMonitoringService", "READ_SMS permission not granted; ContentObserver not registered.")
+            return
+        }
+
+        try {
+            smsContentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean, uri: Uri?) {
+                    super.onChange(selfChange, uri)
+                    scope.launch {
+                        scanRecentInboxSms(lookbackHours = 1L)
+                    }
+                }
+            }
+            contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, smsContentObserver!!)
+            Log.d("SmsMonitoringService", "Telephony.Sms.CONTENT_URI ContentObserver registered successfully.")
+        } catch (e: Exception) {
+            Log.e("SmsMonitoringService", "Failed to register SMS ContentObserver: ${e.message}", e)
+        }
+    }
+
+    suspend fun scanRecentInboxSms(lookbackHours: Long = 2L) {
+        withContext(Dispatchers.IO) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    applicationContext,
+                    android.Manifest.permission.READ_SMS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                return@withContext
+            }
+            try {
+                val minTimestamp = System.currentTimeMillis() - (lookbackHours * 3600 * 1000L)
+                val cursor = applicationContext.contentResolver.query(
+                    Telephony.Sms.Inbox.CONTENT_URI,
+                    arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE),
+                    "${Telephony.Sms.DATE} >= ?",
+                    arrayOf(minTimestamp.toString()),
+                    "${Telephony.Sms.DATE} DESC"
+                )
+                cursor?.use {
+                    val idCol = it.getColumnIndex(Telephony.Sms._ID)
+                    val addrCol = it.getColumnIndex(Telephony.Sms.ADDRESS)
+                    val bodyCol = it.getColumnIndex(Telephony.Sms.BODY)
+                    while (it.moveToNext()) {
+                        val smsId = if (idCol >= 0) it.getLong(idCol) else -1L
+                        if (smsId != -1L && processedSmsIds.contains(smsId)) {
+                            continue
+                        }
+                        val sender = if (addrCol >= 0) it.getString(addrCol) ?: "" else ""
+                        val body = if (bodyCol >= 0) it.getString(bodyCol) ?: "" else ""
+                        if (sender.isNotBlank() && body.isNotBlank()) {
+                            if (repository.isAllowedSender(sender, body) && repository.isIncomingMoneyAlert(sender, body)) {
+                                Log.d("SmsMonitoringService", "scanRecentInboxSms caught matching SMS from $sender (id: $smsId)")
+                                val processed = repository.processIncomingSms(sender, body)
+                                if (smsId != -1L) {
+                                    processedSmsIds.add(smsId)
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("SmsMonitoringService", "Error scanning recent inbox SMS: ${e.message}")
+            }
         }
     }
 
@@ -174,13 +252,15 @@ class SmsMonitoringService : Service() {
             while (isActive) {
                 delay(60_000L)
                 try {
+                    // Safety check inbox for any missed SMS during sleep
+                    scanRecentInboxSms(lookbackHours = 1L)
+
                     val bm = applicationContext.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
                     val batteryPct = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
 
                     repository.sendDeviceHeartbeat(applicationContext, batteryPct)
 
-                    val p = repository.getActiveSupabaseProfile()
-                    val mId = p?.id ?: "00000000-0000-0000-0000-000000000001"
+                    val mId = repository.resolveEffectiveMerchantId()
                     SmsGatewayEngine.syncExternalGatewayJobs(applicationContext, mId, "")
 
                     // Background check for new admin broadcast notices and form submissions when user not in app
@@ -204,6 +284,7 @@ class SmsMonitoringService : Service() {
                             if (debtors.isNotEmpty()) {
                                 val template = prefs.getString("due_sms_template", null)
                                     ?: "প্রিয় {name}, {store}-এ আপনার বাকি {due} টাকা পরিশোধের অনুরোধ জানাচ্ছি। ধন্যবাদ।"
+                                val p = repository.getActiveSupabaseProfile()
                                 val storeName = p?.businessName?.ifBlank { "SwapnoPay Store" } ?: "SwapnoPay Store"
                                 val simSlot = prefs.getInt("selected_sim_slot", 0)
 
@@ -288,8 +369,7 @@ class SmsMonitoringService : Service() {
 
             try {
                 // 2. Check form submissions from central API for active merchant
-                val activeProfile = repository.getActiveSupabaseProfile()
-                val mId = activeProfile?.id ?: "00000000-0000-0000-0000-000000000001"
+                val mId = repository.resolveEffectiveMerchantId()
                 if (mId.isNotBlank() && mId != "00000000-0000-0000-0000-000000000001") {
                     val formSubUrl = java.net.URL("https://api.swapnopay.top/v1/forms/recent-submissions?merchant_id=${java.net.URLEncoder.encode(mId, "UTF-8")}")
                     val formConn = formSubUrl.openConnection() as java.net.HttpURLConnection
@@ -340,6 +420,13 @@ class SmsMonitoringService : Service() {
                 unregisterReceiver(it)
             } catch (e: Exception) {
                 Log.w("SmsMonitoringService", "Error unregistering receiver: ${e.message}")
+            }
+        }
+        smsContentObserver?.let {
+            try {
+                contentResolver.unregisterContentObserver(it)
+            } catch (e: Exception) {
+                Log.w("SmsMonitoringService", "Error unregistering content observer: ${e.message}")
             }
         }
         job.cancel()

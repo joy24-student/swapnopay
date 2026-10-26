@@ -48,9 +48,11 @@ class MainActivity : FragmentActivity() {
         isRequestingPermission = false
         // Start service if RECEIVE_SMS or SEND_SMS was granted (either unlocks gateway functionality)
         val smsReceivedGranted = permissions[Manifest.permission.RECEIVE_SMS] ?: false
+        val smsReadGranted = permissions[Manifest.permission.READ_SMS] ?: false
         val smsSendGranted = permissions[Manifest.permission.SEND_SMS] ?: false
-        val hasSms = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        if (smsReceivedGranted || smsSendGranted || hasSms) {
+        val hasSms = (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) ||
+                     (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED)
+        if (smsReceivedGranted || smsReadGranted || smsSendGranted || hasSms) {
             startSmsService()
         }
     }
@@ -66,6 +68,7 @@ class MainActivity : FragmentActivity() {
     private fun getMissingPermissions(): List<String> {
         val permissionsNeeded = mutableListOf(
             Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.READ_SMS,
             Manifest.permission.SEND_SMS,
             Manifest.permission.READ_PHONE_STATE
         )
@@ -208,10 +211,12 @@ class MainActivity : FragmentActivity() {
             isAppInBackground = false
             // Switching between other mobile tabs/apps and returning should not trigger app lock
         }
+        startSmsService()
     }
 
     private fun checkAndRequestPermissions() {
-        val hasSms = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        val hasSms = (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) ||
+                     (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED)
         if (hasSms) {
             startSmsService()
         }
@@ -235,7 +240,8 @@ class MainActivity : FragmentActivity() {
 
     private fun startSmsService() {
         runCatching {
-            val hasSms = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+            val hasSms = (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) ||
+                         (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED)
             if (!hasSms) return@runCatching
             val serviceIntent = Intent(this, SmsMonitoringService::class.java)
             ContextCompat.startForegroundService(this, serviceIntent)

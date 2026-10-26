@@ -807,6 +807,28 @@ class AppRepository(private val context: Context) {
         dao.reassignMerchantData(oldId, newId)
     }
 
+    suspend fun resolveEffectiveMerchantId(): String {
+        val merchantProfile = dao.getMerchantProfile()
+        if (merchantProfile != null && merchantProfile.id.isNotBlank() &&
+            merchantProfile.id != "merchant_default" &&
+            merchantProfile.id != "00000000-0000-0000-0000-000000000001" &&
+            merchantProfile.id != installationId) {
+            return merchantProfile.id
+        }
+        val customProfile = getMerchantSupabaseProfile()
+        if (customProfile != null && customProfile.id.isNotBlank() &&
+            customProfile.id != "00000000-0000-0000-0000-000000000001" &&
+            customProfile.id != installationId) {
+            return customProfile.id
+        }
+        val active = getActiveSupabaseProfile()
+        if (active != null && active.id.isNotBlank() &&
+            active.id != "00000000-0000-0000-0000-000000000001") {
+            return active.id
+        }
+        return merchantProfile?.id ?: activeProfileId
+    }
+
     // SMS Parsing & Automation Engine
     suspend fun processIncomingSms(sender: String, body: String): Boolean {
         // 1. Sender Identification filter
@@ -827,9 +849,7 @@ class AppRepository(private val context: Context) {
             return false
         }
 
-        val merchantId = dao.getMerchantProfile()?.id
-            ?: getActiveSupabaseProfile()?.id
-            ?: activeProfileId
+        val merchantId = resolveEffectiveMerchantId()
         val smsEntity = SmsQueueEntity(
             merchantId = merchantId,
             amount = parsed.amount,
@@ -877,7 +897,7 @@ class AppRepository(private val context: Context) {
             dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
         }
 
-        // 2. Also attempt upload to custom Supabase database if configured
+        // 2. Also attempt upload to merchant / custom Supabase database if configured
         val success = uploadSmsToSupabase(smsEntity.copy(id = insertedId.toInt()))
         if (success && !reported) {
             dao.updateSmsStatus(insertedId.toInt(), "SYNCED")
@@ -940,22 +960,36 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun uploadSmsToSupabase(sms: SmsQueueEntity): Boolean = withContext(Dispatchers.IO) {
-        val active = getAuthenticatedSupabaseProfile() ?: return@withContext false
-        if (active.supabaseUrl.isEmpty() || active.anonKey.isEmpty()) return@withContext false
+        val targetProfile = getMerchantSupabaseProfile() ?: getAuthenticatedSupabaseProfile() ?: return@withContext false
+        if (targetProfile.supabaseUrl.isEmpty() || targetProfile.anonKey.isEmpty()) return@withContext false
         
         var success = false
-        val token = active.authSessionToken.ifBlank { active.anonKey }
+        val token = if (targetProfile.serviceRoleKey.isNotBlank()) {
+            targetProfile.serviceRoleKey
+        } else if (targetProfile.authSessionToken.isNotBlank()) {
+            targetProfile.authSessionToken
+        } else {
+            targetProfile.anonKey
+        }
+
+        val method = when {
+            sms.rawBody.contains("nagad", ignoreCase = true) -> "Nagad"
+            sms.rawBody.contains("upay", ignoreCase = true) -> "Upay"
+            sms.rawBody.contains("rocket", ignoreCase = true) -> "Rocket"
+            else -> "bKash"
+        }
+        
         try {
-            // 1. Direct match or check existing order match on merchant DB FIRST
+            // 1. Direct match or check existing order match on target DB FIRST
             val matchedOrderId = com.example.data.remote.SupabaseClient.matchAndUpdatePendingOrder(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
+                url = targetProfile.supabaseUrl,
+                anonKey = targetProfile.anonKey,
                 token = token,
                 merchantId = sms.merchantId,
                 trxId = sms.trxId,
                 amount = sms.amount,
                 sender = sms.sender,
-                method = "bKash",
+                method = method,
                 timestamp = sms.timestamp
             )
             val isOrderMatched = !matchedOrderId.isNullOrBlank()
@@ -967,8 +1001,8 @@ class AppRepository(private val context: Context) {
 
             // 2. Insert into merchant DB sms_logs
             com.example.data.remote.SupabaseClient.insertSmsLog(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
+                url = targetProfile.supabaseUrl,
+                anonKey = targetProfile.anonKey,
                 token = token,
                 merchantId = sms.merchantId,
                 deviceId = installationId,
@@ -987,8 +1021,8 @@ class AppRepository(private val context: Context) {
 
             // 3. Insert into merchant DB payments table
             com.example.data.remote.SupabaseClient.insertPayment(
-                url = active.supabaseUrl,
-                anonKey = active.anonKey,
+                url = targetProfile.supabaseUrl,
+                anonKey = targetProfile.anonKey,
                 token = token,
                 merchantId = sms.merchantId,
                 trxId = sms.trxId,
@@ -1011,7 +1045,7 @@ class AppRepository(private val context: Context) {
             while (true) {
                 kotlinx.coroutines.delay(60000) // Retry every 60 seconds
                 try {
-                    val merchantId = getActiveSupabaseProfile()?.id ?: activeProfileId
+                    val merchantId = resolveEffectiveMerchantId()
                     val pending = dao.getPendingSms(merchantId)
                     if (pending.isNotEmpty()) {
                         android.util.Log.d("AppRepository", "Offline SMS Queue: Retrying ${pending.size} pending SMS uploads.")
@@ -1087,9 +1121,21 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    private fun normalizeBengaliDigits(input: String): String {
+        val bnDigits = "০১২৩৪৫৬৭৮৯"
+        val enDigits = "0123456789"
+        var result = input
+        for (i in bnDigits.indices) {
+            result = result.replace(bnDigits[i], enDigits[i])
+        }
+        return result
+    }
+
     fun isAllowedSender(address: String?, body: String? = null): Boolean {
         val s = address?.lowercase()?.trim() ?: ""
         val clean = s.filter { it.isLetterOrDigit() }
+        
+        // Known MFS sender headers and shortcodes
         if (s == "bkash" || s == "nagad" || s == "upay" || s == "rocket" || s == "16216" ||
             s.endsWith("bkash") || s.endsWith("nagad") || s.endsWith("upay") || s.endsWith("rocket") || s.endsWith("16216") ||
             clean.contains("bkash") ||
@@ -1102,11 +1148,37 @@ class AppRepository(private val context: Context) {
             clean == "16268" || clean.endsWith("16268")) {
             return true
         }
+
+        // Even if sender name is numeric or unlisted, if SMS has TrxID and incoming money cues, accept it
         if (!body.isNullOrBlank()) {
             val bodyLower = body.lowercase()
-            val hasMfs = bodyLower.contains("bkash") || bodyLower.contains("nagad") || bodyLower.contains("upay") || bodyLower.contains("rocket")
-            val hasTrx = bodyLower.contains("trxid") || bodyLower.contains("txnid") || bodyLower.contains("transaction id") || bodyLower.contains("trans id")
-            if (hasMfs && hasTrx) {
+            val hasTrx = bodyLower.contains("trxid") ||
+                         bodyLower.contains("txnid") ||
+                         bodyLower.contains("trx id") ||
+                         bodyLower.contains("txn id") ||
+                         bodyLower.contains("transaction id") ||
+                         bodyLower.contains("trans id") ||
+                         bodyLower.contains("trx:") ||
+                         bodyLower.contains("ট্রানজেকশন") ||
+                         bodyLower.contains("আইডি")
+                         
+            val hasMoneyOrMfs = bodyLower.contains("bkash") ||
+                                bodyLower.contains("nagad") ||
+                                bodyLower.contains("upay") ||
+                                bodyLower.contains("rocket") ||
+                                bodyLower.contains("received") ||
+                                bodyLower.contains("payment") ||
+                                bodyLower.contains("cash in") ||
+                                bodyLower.contains("cash-in") ||
+                                bodyLower.contains("credited") ||
+                                bodyLower.contains("deposit") ||
+                                bodyLower.contains("টাকা") ||
+                                bodyLower.contains("পেয়েছেন") ||
+                                bodyLower.contains("পেলেন") ||
+                                bodyLower.contains("জমা") ||
+                                bodyLower.contains("পেমেন্ট")
+                                
+            if (hasTrx && hasMoneyOrMfs) {
                 return true
             }
         }
@@ -1126,7 +1198,25 @@ class AppRepository(private val context: Context) {
                           clean == "16268" || clean.endsWith("16268") ||
                           bodyLower.contains("bkash") || bodyLower.contains("nagad") || bodyLower.contains("upay") || bodyLower.contains("rocket")
 
-        if (!isMfsSender) return false
+        val hasTrx = bodyLower.contains("trxid") ||
+                     bodyLower.contains("txnid") ||
+                     bodyLower.contains("trx id") ||
+                     bodyLower.contains("txn id") ||
+                     bodyLower.contains("transaction id") ||
+                     bodyLower.contains("trans id") ||
+                     bodyLower.contains("trx:") ||
+                     bodyLower.contains("ট্রানজেকশন") ||
+                     bodyLower.contains("আইডি")
+
+        // Must be an MFS sender OR have explicit transaction identifier
+        if (!isMfsSender && !hasTrx) return false
+
+        // Discard outgoing alerts (cash out, send money, bill pay) unless received keyword is present
+        if (bodyLower.contains("cash out") || bodyLower.contains("send money") || bodyLower.contains("pay bill") || bodyLower.contains("airtime purchase")) {
+            if (!bodyLower.contains("received") && !bodyLower.contains("পেয়েছেন") && !bodyLower.contains("পেলেন")) {
+                return false
+            }
+        }
 
         return bodyLower.contains("received") ||
                bodyLower.contains("payment") ||
@@ -1136,7 +1226,11 @@ class AppRepository(private val context: Context) {
                bodyLower.contains("deposit") ||
                bodyLower.contains("transferred") ||
                bodyLower.contains("money received") ||
-               bodyLower.contains("received taka")
+               bodyLower.contains("received taka") ||
+               bodyLower.contains("পেয়েছেন") ||
+               bodyLower.contains("পেলেন") ||
+               bodyLower.contains("জমা") ||
+               bodyLower.contains("পেমেন্ট")
     }
 
     private fun parseSmsDateToMillis(dateStr: String, isRocket: Boolean): Long {
@@ -1169,6 +1263,7 @@ class AppRepository(private val context: Context) {
     )
 
     suspend fun parseSms(sender: String, body: String): ParsedSms? {
+        val normalizedBody = normalizeBengaliDigits(body)
         val senderLower = sender.lowercase().trim()
         val cleanSender = sender.lowercase().filter { it.isLetterOrDigit() }
         val mfsName = when {
@@ -1180,14 +1275,14 @@ class AppRepository(private val context: Context) {
             cleanSender.contains("nagad") || cleanSender.endsWith("16167") -> "Nagad"
             cleanSender.contains("upay") || cleanSender.endsWith("16268") -> "Upay"
             cleanSender.contains("rocket") || cleanSender.endsWith("16216") -> "Rocket"
-            body.contains("bkash", ignoreCase = true) -> "bKash"
-            body.contains("nagad", ignoreCase = true) -> "Nagad"
-            body.contains("upay", ignoreCase = true) -> "Upay"
-            body.contains("rocket", ignoreCase = true) -> "Rocket"
-            body.contains("money received.", ignoreCase = true) -> "Nagad"
-            body.contains("a/c:", ignoreCase = true) && (body.contains("cash-in", ignoreCase = true) || body.contains("txnid:", ignoreCase = true)) -> "Rocket"
-            body.contains("you have received", ignoreCase = true) || body.contains("trxid", ignoreCase = true) -> "bKash"
-            else -> return null
+            normalizedBody.contains("bkash", ignoreCase = true) -> "bKash"
+            normalizedBody.contains("nagad", ignoreCase = true) -> "Nagad"
+            normalizedBody.contains("upay", ignoreCase = true) -> "Upay"
+            normalizedBody.contains("rocket", ignoreCase = true) -> "Rocket"
+            normalizedBody.contains("money received.", ignoreCase = true) -> "Nagad"
+            normalizedBody.contains("a/c:", ignoreCase = true) && (normalizedBody.contains("cash-in", ignoreCase = true) || normalizedBody.contains("txnid:", ignoreCase = true)) -> "Rocket"
+            normalizedBody.contains("you have received", ignoreCase = true) || normalizedBody.contains("trxid", ignoreCase = true) -> "bKash"
+            else -> "bKash"
         }
         
         try {
@@ -1197,11 +1292,10 @@ class AppRepository(private val context: Context) {
                 val flags = if (isDotAll) Pattern.CASE_INSENSITIVE or Pattern.DOTALL else Pattern.CASE_INSENSITIVE
                 
                 val pattern = Pattern.compile(patternEntity.regexPattern, flags)
-                val matcher = pattern.matcher(body)
+                val matcher = pattern.matcher(normalizedBody)
                 if (matcher.find()) {
                     val groupCount = matcher.groupCount()
                     if (patternEntity.mfsName.equals("Rocket", ignoreCase = true)) {
-                        // Rocket: Group 1 amount, Group 2 trxId, Group 3 dateStr (optional)
                         val amountStr = if (groupCount >= 1) matcher.group(1)?.replace(",", "") ?: "0.0" else "0.0"
                         val amount = amountStr.toDoubleOrNull() ?: 0.0
                         val trxId = if (groupCount >= 2) matcher.group(2) ?: "Unknown" else "Unknown"
@@ -1209,69 +1303,80 @@ class AppRepository(private val context: Context) {
                         val timestamp = if (dateStr.isNotBlank()) parseSmsDateToMillis(dateStr, isRocket = true) else System.currentTimeMillis()
                         
                         val rocketAccPattern = Pattern.compile("A/C:\\s*(\\*+\\d+)", Pattern.CASE_INSENSITIVE)
-                        val accMatcher = rocketAccPattern.matcher(body)
+                        val accMatcher = rocketAccPattern.matcher(normalizedBody)
                         val senderPhone = if (accMatcher.find()) accMatcher.group(1) ?: "Rocket Payer" else "Rocket Payer"
                         
-                        return ParsedSms(
-                            amount = amount,
-                            senderPhone = senderPhone,
-                            trxId = trxId,
-                            receiver = "rocket_merchant",
-                            method = "Rocket",
-                            timestamp = timestamp
-                        )
+                        if (amount > 0.0 && trxId != "Unknown") {
+                            return ParsedSms(
+                                amount = amount,
+                                senderPhone = senderPhone,
+                                trxId = trxId,
+                                receiver = "rocket_merchant",
+                                method = "Rocket",
+                                timestamp = timestamp
+                            )
+                        }
                     } else {
-                        // bKash, Nagad, Upay: Group 1 amount, Group 2 senderPhone, Group 3 trxId, Group 4 dateStr (optional)
                         val amountStr = if (groupCount >= 1) matcher.group(1)?.replace(",", "") ?: "0.0" else "0.0"
                         val amount = amountStr.toDoubleOrNull() ?: 0.0
                         val senderPhone = if (groupCount >= 2) matcher.group(2) ?: "Unknown" else "Unknown"
                         val trxId = if (groupCount >= 3) matcher.group(3) ?: "Unknown" else "Unknown"
                         val dateStr = if (groupCount >= 4) matcher.group(4) ?: "" else ""
                         val timestamp = if (dateStr.isNotBlank()) parseSmsDateToMillis(dateStr, isRocket = false) else System.currentTimeMillis()
-                        return ParsedSms(
-                            amount = amount,
-                            senderPhone = senderPhone,
-                            trxId = trxId,
-                            receiver = "${mfsName.lowercase()}_merchant",
-                            method = mfsName,
-                            timestamp = timestamp
-                        )
+                        if (amount > 0.0 && trxId != "Unknown") {
+                            return ParsedSms(
+                                amount = amount,
+                                senderPhone = senderPhone,
+                                trxId = trxId,
+                                receiver = "${mfsName.lowercase()}_merchant",
+                                method = mfsName,
+                                timestamp = timestamp
+                            )
+                        }
                     }
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
             android.util.Log.e("AppRepository", "Cached regex pattern matching failed: ${e.message}")
         }
 
         // Resilient Fallback Parser for Bangladeshi MFS Masked SMS (bKash, Nagad, Upay, Rocket)
         try {
-            // 1. Extract Amount: "Tk 1,500.00", "Amount: Tk 500", "Taka 250"
-            val amtPattern = Pattern.compile("(?:Amount:\\s*)?(?:Tk|Taka|BDT|Tk\\.)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
-            val amtMatcher = amtPattern.matcher(body)
+            // 1. Extract Amount: "Tk 1,500.00", "Amount: Tk 500", "Taka 250", "টাকা ১১.০০", "৳১১"
+            val amtPattern = Pattern.compile("(?:Amount:\\s*|Tk\\.?\\s*|Taka\\s*|BDT\\s*|টাকা\\s*|৳\\s*)([0-9,]+(?:\\.[0-9]+)?)", Pattern.CASE_INSENSITIVE)
+            val amtMatcher = amtPattern.matcher(normalizedBody)
             val amount = if (amtMatcher.find()) {
                 amtMatcher.group(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
             } else 0.0
 
-            // 2. Extract TrxID / TxnID: "TrxID 9ABCDE", "TxnID: 12345", "TxnId: 888"
-            val trxPattern = Pattern.compile("(?:TrxID|TxnID|TxnId|Trx ID|Trans ID)[:\\s]+([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE)
-            val trxMatcher = trxPattern.matcher(body)
+            // 2. Extract TrxID / TxnID: "TrxID 9ABCDE", "TxnID: 12345", "Trx ID: DJ...", "আইডি: ..."
+            val trxPattern = Pattern.compile("(?:TrxID|TxnID|TxnId|Trx ID|Txn ID|Trans ID|Transaction ID|আইডি)[:\\s]+([A-Za-z0-9_-]+)", Pattern.CASE_INSENSITIVE)
+            val trxMatcher = trxPattern.matcher(normalizedBody)
             val trxId = if (trxMatcher.find()) {
-                trxMatcher.group(1) ?: "TRX_${System.currentTimeMillis()}"
+                trxMatcher.group(1)?.trim() ?: ""
             } else {
-                "TRX_${System.currentTimeMillis()}"
+                val standaloneTrx = Pattern.compile("\\b([A-Z0-9]{8,14})\\b").matcher(normalizedBody)
+                var candidate = ""
+                while (standaloneTrx.find()) {
+                    val word = standaloneTrx.group(1) ?: ""
+                    if (word.any { it.isLetter() } && word.any { it.isDigit() }) {
+                        candidate = word
+                        break
+                    }
+                }
+                candidate.ifBlank { "TRX_${System.currentTimeMillis()}" }
             }
 
             // 3. Extract Sender Phone / Account: "from 01712***789", "Sender: 018***", "A/C: *017***"
-            val senderPattern = Pattern.compile("(?:from|Sender:?|from A/C:?|A/C:?)\\s*([0-9*xX+ -]{6,18})", Pattern.CASE_INSENSITIVE)
-            val senderMatcher = senderPattern.matcher(body)
+            val senderPattern = Pattern.compile("(?:from|Sender:?|from A/C:?|A/C:?|হতে|থেকে)\\s*([0-9*xX+ -]{6,18})", Pattern.CASE_INSENSITIVE)
+            val senderMatcher = senderPattern.matcher(normalizedBody)
             val senderPhone = if (senderMatcher.find()) {
                 senderMatcher.group(1)?.trim() ?: "Payer"
             } else "Payer"
 
             // 4. Extract Date / Time if available
             val datePattern = Pattern.compile("(\\d{2}/\\d{2}/\\d{4}\\s+\\d{2}:\\d{2})|(\\d{2}-[A-Za-z]{3}-\\d{2}\\s+\\d{2}:\\d{2}(?::\\d{2})?\\s*[ap]m)", Pattern.CASE_INSENSITIVE)
-            val dateMatcher = datePattern.matcher(body)
+            val dateMatcher = datePattern.matcher(normalizedBody)
             val timestamp = if (dateMatcher.find()) {
                 val matched = dateMatcher.group(0) ?: ""
                 parseSmsDateToMillis(matched, isRocket = (mfsName == "Rocket"))

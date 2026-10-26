@@ -1663,6 +1663,8 @@ function handleTransferred() {
   if (step2Trx) {
     const appealTrx = document.getElementById("appeal-trx");
     if (appealTrx) appealTrx.value = step2Trx;
+    const procTrx = document.getElementById("proc-trx-input");
+    if (procTrx) procTrx.value = step2Trx;
   }
 
   // Persist verification session into sessionStorage to survive browser reload
@@ -1727,7 +1729,7 @@ function handleTransferred() {
     if (timerDisplay) timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
     // Enable skip after 3 minutes (120 seconds remaining)
-    if (procSeconds <= 120 && skipBtn.disabled) {
+    if (procSeconds <= 270 && skipBtn.disabled) {
       skipBtn.disabled = false;
       skipBtn.className = "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-md";
       updateProcessingScreenText();
@@ -2044,7 +2046,7 @@ function checkAndRestoreVerifyingSession() {
       const skipBtn      = document.getElementById("btn-skip-processing");
 
       if (skipBtn) {
-        if (procSeconds <= 120) {
+        if (procSeconds <= 270) {
           skipBtn.disabled = false;
           skipBtn.className = "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-md";
         } else {
@@ -2084,5 +2086,59 @@ function checkAndRestoreVerifyingSession() {
     }
   } catch (err) {
     console.warn("[session] Error restoring verification session:", err);
+  }
+}
+
+function reverifyWithTrxId() {
+  const inp = document.getElementById("proc-trx-input");
+  const trx = (inp?.value || "").trim().toUpperCase();
+  const helpEl = document.getElementById("proc-trx-help");
+  if (!trx || trx.length < 4) {
+    if (helpEl) {
+      helpEl.innerText = currentLang === 'en' ? "Please enter a valid TrxID." : "অনুগ্রহ করে একটি সঠিক TrxID লিখুন।";
+      helpEl.className = "text-[9px] text-red-500 font-bold mt-1";
+    }
+    return;
+  }
+
+  const step2Inp = document.getElementById("step2-trx-input");
+  if (step2Inp) step2Inp.value = trx;
+  const appealTrx = document.getElementById("appeal-trx");
+  if (appealTrx) appealTrx.value = trx;
+
+  if (helpEl) {
+    helpEl.innerText = currentLang === 'en' ? "Verifying TrxID " + trx + "..." : "TrxID " + trx + " যাচাই করা হচ্ছে...";
+    helpEl.className = "text-[9px] text-blue-600 font-bold mt-1";
+  }
+
+  if (backendUrl && orderId && orderId !== "demo_order_id") {
+    fetch(`${backendUrl}/v1/payment/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        order_id:        orderId,
+        merchant_id:     merchantId || null,
+        payment_method:  selectedMethod,
+        trx_id:          trx,
+        customer_phone:  document.getElementById("customer-phone")?.value?.trim() || null,
+        amount:          payableAmount ? parseFloat(String(payableAmount).replace(/,/g, '')) : null
+      })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'PAID') {
+          paymentResolved = true;
+          if (pollingInterval) clearInterval(pollingInterval);
+          clearVerifyingSession();
+          showSuccessScreen(data);
+          const target = data.redirect_url || successUrl;
+          if (target && target !== '/') {
+            setTimeout(() => { window.location.href = target; }, 3000);
+          }
+        } else {
+          checkOrderStatus();
+        }
+      })
+      .catch(err => console.warn('[reverify] Notify failed:', err));
   }
 }

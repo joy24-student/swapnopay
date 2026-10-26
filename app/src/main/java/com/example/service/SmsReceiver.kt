@@ -3,6 +3,7 @@ package com.example.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import com.example.data.repository.AppRepository
@@ -39,6 +40,18 @@ class SmsReceiver : BroadcastReceiver() {
                     val fullBody = bodyBuilder.toString()
                     Log.d("SmsReceiver", "Static receiver intercepted full SMS from: $sender (length: ${fullBody.length})")
                     repository.processIncomingSms(sender, fullBody)
+                }
+
+                // Ensure foreground monitoring service is active
+                try {
+                    val serviceIntent = Intent(context, SmsMonitoringService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
+                } catch (se: Exception) {
+                    Log.w("SmsReceiver", "Could not wake SmsMonitoringService: ${se.message}")
                 }
             } catch (e: Exception) {
                 Log.e("SmsReceiver", "Error processing incoming SMS via static receiver", e)
