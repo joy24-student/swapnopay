@@ -127,15 +127,16 @@ object NotificationHelper {
     fun markAsNotified(context: Context, id: String) {
         if (id.isBlank()) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val currentSet = prefs.getStringSet(KEY_NOTIFIED_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        val existing = prefs.getStringSet(KEY_NOTIFIED_IDS, emptySet()) ?: emptySet()
+        val currentSet = HashSet(existing)
         if (currentSet.size > MAX_TRACKED_IDS) {
             val list = currentSet.toList()
-            val trimmed = list.subList(list.size / 2, list.size).toMutableSet()
+            val trimmed = HashSet(list.subList(list.size / 2, list.size))
             trimmed.add(id)
-            prefs.edit().putStringSet(KEY_NOTIFIED_IDS, trimmed).apply()
+            prefs.edit().putStringSet(KEY_NOTIFIED_IDS, trimmed).commit()
         } else {
             currentSet.add(id)
-            prefs.edit().putStringSet(KEY_NOTIFIED_IDS, currentSet).apply()
+            prefs.edit().putStringSet(KEY_NOTIFIED_IDS, currentSet).commit()
         }
     }
 

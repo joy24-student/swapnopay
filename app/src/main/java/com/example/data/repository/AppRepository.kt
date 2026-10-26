@@ -518,7 +518,9 @@ class AppRepository(private val context: Context) {
                                     customerPhone = obj.optString("customer_phone").ifBlank { obj.optString("cus_phone").ifBlank { order?.optString("cus_phone").orEmpty() } },
                                     trxId = obj.getString("trx_id"),
                                     timestamp = parseIsoDateToMillis(obj.optString("created_at")),
-                                    status = obj.optString("status", "PENDING_REVIEW")
+                                    status = obj.optString("status", "PENDING_REVIEW"),
+                                    note = obj.optString("note", ""),
+                                    screenshotUrl = obj.optString("screenshot_url", "").ifBlank { obj.optString("screenshot", "") }
                                 )
                                 dao.insertAppeal(appeal)
                             }
@@ -566,7 +568,9 @@ class AppRepository(private val context: Context) {
                         customerPhone = obj.optString("cus_phone").ifBlank { order?.optString("cus_phone").orEmpty() },
                         trxId = obj.getString("trx_id"),
                         timestamp = parseIsoDateToMillis(obj.optString("created_at")),
-                        status = obj.optString("status", "PENDING_REVIEW")
+                        status = obj.optString("status", "PENDING_REVIEW"),
+                        note = obj.optString("note", ""),
+                        screenshotUrl = obj.optString("screenshot_url", "").ifBlank { obj.optString("screenshot", "") }
                     )
                     dao.insertAppeal(appeal)
                 }
@@ -1032,6 +1036,10 @@ class AppRepository(private val context: Context) {
 
     suspend fun updateAppealStatus(id: String, status: String) {
         dao.updateAppealStatus(id, status)
+    }
+
+    suspend fun updatePaymentStatus(trxId: String, status: String, orderId: String? = null) {
+        dao.updatePaymentStatus(trxId, status, orderId)
     }
 
     // Prepopulate database with realistic business data so the user gets an immediately usable, gorgeous UI

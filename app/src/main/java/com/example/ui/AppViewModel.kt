@@ -2792,7 +2792,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         _isAccountSuspended.value = suspended
 
                         if (!notice.isNullOrBlank()) {
-                            publishFirebaseNotice("Platform Announcement", notice, "PLATFORM")
+                            _marqueeNotice.value = notice
+                            val context = getApplication<Application>().applicationContext
+                            val noticeId = "platform_control_${notice.hashCode()}"
+                            if (!com.example.NotificationHelper.hasBeenNotified(context, noticeId)) {
+                                com.example.NotificationHelper.showAdminNotification(
+                                    context = context,
+                                    title = "SwapnoPay Notice",
+                                    message = notice,
+                                    noticeId = noticeId,
+                                    severity = "INFO"
+                                )
+                            }
                         }
                         logFirebaseStatus("Platform permissions updated: Gateway: $gatewayPerm, Fee: $feeRate%, Suspended: $suspended")
                     }
@@ -3174,15 +3185,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun sendLocalNotification(title: String, message: String) {
         try {
             val context = getApplication<Application>().applicationContext
-            val noticeId = "local_${System.currentTimeMillis()}_${(1000..9999).random()}"
-            com.example.NotificationHelper.showAdminNotification(
-                context = context,
-                title = title,
-                message = message,
-                noticeId = noticeId,
-                severity = "HIGH"
-            )
-            logFirebaseStatus("Sent system notification: $title")
+            val noticeId = "local_${(title + message).hashCode()}"
+            if (!com.example.NotificationHelper.hasBeenNotified(context, noticeId)) {
+                com.example.NotificationHelper.showAdminNotification(
+                    context = context,
+                    title = title,
+                    message = message,
+                    noticeId = noticeId,
+                    severity = "HIGH"
+                )
+                logFirebaseStatus("Sent system notification: $title")
+            }
         } catch (e: Exception) {
             logFirebaseStatus("Notification permission or setup error: ${e.message}")
         }
@@ -5094,11 +5107,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val rows = fetched ?: return false
         repository.upsertMerchantNotifications(rows)
 
-        // Post status bar notification for any new unread notices
+        // Post status bar notification for any new unread notices (only once, never duplicated)
         try {
             val context = getApplication<Application>().applicationContext
+            val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
             for (item in rows) {
-                if (item.readAt == null && !com.example.NotificationHelper.hasBeenNotified(context, item.id)) {
+                if (item.readAt == null && item.createdAt > oneDayAgo && !com.example.NotificationHelper.hasBeenNotified(context, item.id)) {
                     com.example.NotificationHelper.showAdminNotification(
                         context = context,
                         title = item.title.ifBlank { "SwapnoPay Notice" },
@@ -5110,26 +5124,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             Log.w("AppViewModel", "Notice statusbar delivery error: ${e.message}")
-        }
-
-        // Automatically detect new broadcast notices from Admin Panel
-        try {
-            val unreadBroadcast = rows.firstOrNull { it.readAt == null && (it.entityType == "BROADCAST" || it.type in setOf("ANNOUNCEMENT", "ALERT", "SYSTEM", "PROMOTION")) }
-            if (unreadBroadcast != null && _adminNoticePopup.value == null) {
-                val dismissed = getDismissedNoticeIds()
-                if (!dismissed.contains(unreadBroadcast.id)) {
-                    _adminNoticePopup.value = AdminNoticePopup(
-                        id = unreadBroadcast.id,
-                        title = unreadBroadcast.title.ifBlank { "αªàαºìαª»αª╛αªíαª«αª┐αª¿ αª¿αºïαªƒαª┐αª╢" },
-                        message = unreadBroadcast.message,
-                        severity = unreadBroadcast.severity.ifBlank { "INFO" },
-                        type = unreadBroadcast.type.ifBlank { "ANNOUNCEMENT" },
-                        timestamp = unreadBroadcast.createdAt
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("AppViewModel", "Notice popup detection error: ${e.message}")
         }
 
         return true
@@ -18212,57 +18206,10 @@ function executePayment() {
                         val notice = json.optString("system_notice").takeIf { it.isNotBlank() }
                         if (notice != null) {
                             _marqueeNotice.value = notice
-                        }
-
-                        if (latestObj != null) {
-                            val bId = latestObj.optString("batch_id").ifBlank { latestObj.optString("id") }.ifBlank { "notice_${notice.hashCode()}" }
-                            val bTitle = latestObj.optString("title").ifBlank { "≡ƒôó αªàαºìαª»αª╛αªíαª«αª┐αª¿ αª¿αºïαªƒαª┐αª╢" }
-                            val bMsg = latestObj.optString("message").ifBlank { notice ?: "" }
-                            val bSev = latestObj.optString("severity", "INFO")
-                            val bType = latestObj.optString("type", "ANNOUNCEMENT")
-                            if (bMsg.isNotBlank() && !dismissed.contains(bId)) {
-                                if (_adminNoticePopup.value == null) {
-                                    withContext(Dispatchers.Main) {
-                                        _adminNoticePopup.value = AdminNoticePopup(
-                                            id = bId,
-                                            title = bTitle,
-                                            message = bMsg,
-                                            severity = bSev,
-                                            type = bType,
-                                            timestamp = parseRemoteTimestamp(latestObj.optString("created_at"))
-                                        )
-                                    }
-                                }
-                                com.example.NotificationHelper.showAdminNotification(
-                                    context = getApplication(),
-                                    title = bTitle,
-                                    message = bMsg,
-                                    noticeId = bId,
-                                    severity = bSev
-                                )
-                            }
-                        } else if (notice != null) {
-                            val noticeId = "notice_${notice.hashCode()}"
-                            if (!dismissed.contains(noticeId)) {
-                                if (_adminNoticePopup.value == null) {
-                                    withContext(Dispatchers.Main) {
-                                        _adminNoticePopup.value = AdminNoticePopup(
-                                            id = noticeId,
-                                            title = "≡ƒôó αªàαºìαª»αª╛αªíαª«αª┐αª¿ αª¿αºïαªƒαª┐αª╢",
-                                            message = notice,
-                                            severity = "INFO",
-                                            type = "ANNOUNCEMENT",
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                    }
-                                }
-                                com.example.NotificationHelper.showAdminNotification(
-                                    context = getApplication(),
-                                    title = "≡ƒôó αªàαºìαª»αª╛αªíαª«αª┐αª¿ αª¿αºïαªƒαª┐αª╢",
-                                    message = notice,
-                                    noticeId = noticeId,
-                                    severity = "INFO"
-                                )
+                        } else if (latestObj != null) {
+                            val bMsg = latestObj.optString("message").takeIf { it.isNotBlank() }
+                            if (bMsg != null) {
+                                _marqueeNotice.value = bMsg
                             }
                         }
                     }

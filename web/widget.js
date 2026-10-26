@@ -27,9 +27,38 @@ let webSocket        = null;
 let socketClient     = null;
 let socketHeartbeatInterval = null;
 let paymentResolved  = false;     // race-condition guard: only handle first resolution
+let isVerifyingPayment = false;   // prevents page reload / navigation during verification
 let procSeconds = 300;
 let procInterval = null;
 let currentLang  = "en";
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Browser reload & navigation prevention during payment verification
+// ──────────────────────────────────────────────────────────────────────────────
+window.addEventListener("beforeunload", function (e) {
+  const procView = document.getElementById("processing-view");
+  const isVerifying = (procView && !procView.classList.contains("hidden")) || isVerifyingPayment;
+  if (isVerifying && !paymentResolved) {
+    e.preventDefault();
+    e.returnValue = "Payment verification is in progress. Please do not leave or reload this page.";
+    return e.returnValue;
+  }
+});
+
+// Prevent accidental Enter key submissions from triggering a page reload or unexpected navigation
+window.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" || e.keyCode === 13) {
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON")) {
+      e.preventDefault();
+      if (e.target.id === "step2-trx-input") {
+        handleTransferred();
+      } else if (e.target.id === "appeal-trx" || e.target.id === "appeal-note") {
+        submitAppeal();
+      }
+    }
+  }
+}, true);
+
 
 const FAKE_NUMBERS = [
   '01711223344', '01811223344', '019112233441', '01928092777',
@@ -283,6 +312,9 @@ window.onload = function () {
     fetchOrderFromMerchantDB();
     connectSupabaseRealtime(supabaseUrl, supabaseAnonKey, orderId);
   }
+
+  // Check if payment verification was in progress before reload
+  checkAndRestoreVerifyingSession();
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -531,7 +563,7 @@ function loadGatewayConfig(merchantIdParam) {
         if (enabled && !firstEnabled) firstEnabled = method;
       });
 
-      if (firstEnabled) {
+      if (firstEnabled && !isVerifyingPayment) {
         const colors = { bKash: '#E2125A', Nagad: '#EC5A24', Rocket: '#8C3494', Upay: '#10B981' };
         const reqMethod = new URLSearchParams(window.location.search).get("method");
         const defaultMethod = config.default_method && methods[config.default_method] !== false ? config.default_method : null;
@@ -606,6 +638,7 @@ function handleDeviceStatus(deviceActive, lastSeen, deviceCount) {
 
   // If merchant has no valid receiving numbers configured yet, display polite setup notice
   if (!hasReceivingNumbers) {
+    if (isVerifyingPayment) return;
     showMerchantOfflineView(lastSeen, 'NO_NUMBERS');
     const banner = document.getElementById("merchant-offline-banner");
     if (banner) banner.classList.add("hidden");
@@ -1612,6 +1645,7 @@ function handleTransferred() {
   // Show processing overlay
   document.getElementById("processing-view").classList.remove("hidden");
   paymentResolved = false; // reset guard for this payment attempt
+  isVerifyingPayment = true;
   updateFlowStage(3);
 
   procSeconds = 300;
@@ -1629,6 +1663,23 @@ function handleTransferred() {
   if (step2Trx) {
     const appealTrx = document.getElementById("appeal-trx");
     if (appealTrx) appealTrx.value = step2Trx;
+  }
+
+  // Persist verification session into sessionStorage to survive browser reload
+  if (orderId && orderId !== "demo_order_id") {
+    try {
+      sessionStorage.setItem("swapnopay_verifying_" + orderId, JSON.stringify({
+        orderId: orderId,
+        merchantId: merchantId || null,
+        method: selectedMethod,
+        trxId: step2Trx,
+        customerPhone: document.getElementById("customer-phone")?.value?.trim() || null,
+        startedAt: Date.now(),
+        totalSeconds: 300
+      }));
+    } catch (e) {
+      console.warn("[session] Unable to save verification state to sessionStorage:", e);
+    }
   }
 
   if (backendUrl && orderId !== "demo_order_id") {
@@ -1666,6 +1717,7 @@ function handleTransferred() {
     procSeconds--;
     if (procSeconds <= 0) {
       clearInterval(procInterval);
+      clearVerifyingSession();
       skipProcessingAndAppeal();
       return;
     }
@@ -1685,11 +1737,14 @@ function handleTransferred() {
 
 function skipProcessingAndAppeal() {
   if (procInterval) clearInterval(procInterval);
+  clearVerifyingSession();
   document.getElementById("processing-view").classList.add("hidden");
   goToStep(3);
 }
 
 function showSuccessScreen(orderRecord) {
+  paymentResolved = true;
+  clearVerifyingSession();
   clearInterval(timerInterval);
   clearInterval(procInterval);
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
@@ -1760,6 +1815,8 @@ function cancelOrder() {
 }
 
 function goToCancelledScreen() {
+  paymentResolved = true;
+  clearVerifyingSession();
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
   ["cancel-view", "success-view", "processing-view", "merchant-offline-view"].forEach(id => {
     const el = document.getElementById(id);
@@ -1878,6 +1935,7 @@ function submitAppeal() {
         alert(currentLang === "en"
           ? "Dispute appeal submitted successfully! Your merchant has been notified and will review your payment."
           : "আপিল সফলভাবে মার্চেন্টের কাছে পাঠানো হয়েছে! মার্চেন্ট পর্যালোচনা করে আপনার অর্ডারটি অনুমোদন করবেন।");
+        clearVerifyingSession();
         goToStep(1);
       } else {
         alert((currentLang === "en" ? "Failed to submit appeal: " : "আপিল জমা দেওয়া ব্যর্থ হয়েছে: ") + (respData.error || "Please verify details."));
@@ -1932,3 +1990,99 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("appeal-trx-error-msg")?.classList.add("hidden");
   });
 });
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Session Persistence & Recovery during verification
+// ──────────────────────────────────────────────────────────────────────────────
+function clearVerifyingSession() {
+  isVerifyingPayment = false;
+  if (orderId && orderId !== "demo_order_id") {
+    try {
+      sessionStorage.removeItem("swapnopay_verifying_" + orderId);
+    } catch (e) {}
+  }
+}
+
+function checkAndRestoreVerifyingSession() {
+  if (!orderId || orderId === "demo_order_id") return;
+  try {
+    const raw = sessionStorage.getItem("swapnopay_verifying_" + orderId);
+    if (!raw) return;
+    const session = JSON.parse(raw);
+    if (!session || !session.startedAt) return;
+
+    const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
+    const totalSecs = session.totalSeconds || 300;
+    const remaining = totalSecs - elapsed;
+
+    if (remaining > 5) {
+      console.log(`[session] Restoring active verification session (${remaining}s remaining) for order ${orderId}`);
+      isVerifyingPayment = true;
+      paymentResolved = false;
+
+      if (session.method) {
+        selectedMethod = session.method;
+        const methodColorMap = { bKash: "#E2125A", Nagad: "#EC5A24", Rocket: "#8C3494", Upay: "#10B981" };
+        selectMFS(session.method, methodColorMap[session.method] || "#E2125A");
+      }
+
+      goToStep(2);
+      if (session.trxId) {
+        const step2Inp = document.getElementById("step2-trx-input");
+        if (step2Inp) step2Inp.value = session.trxId;
+        const appealInp = document.getElementById("appeal-trx");
+        if (appealInp) appealInp.value = session.trxId;
+      }
+
+      const procView = document.getElementById("processing-view");
+      if (procView) procView.classList.remove("hidden");
+      updateFlowStage(3);
+
+      procSeconds = remaining;
+      const timerDisplay = document.getElementById("proc-countdown-timer");
+      const skipBtn      = document.getElementById("btn-skip-processing");
+
+      if (skipBtn) {
+        if (procSeconds <= 120) {
+          skipBtn.disabled = false;
+          skipBtn.className = "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-md";
+        } else {
+          skipBtn.disabled = true;
+          skipBtn.className = "w-full py-2.5 bg-gray-100 text-gray-400 border border-gray-200 rounded-xl font-bold text-[11px] transition-colors cursor-not-allowed";
+        }
+      }
+      updateProcessingScreenText();
+      const mins = Math.floor(procSeconds / 60);
+      const secs = procSeconds % 60;
+      if (timerDisplay) timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+      startStatusPolling();
+
+      if (procInterval) clearInterval(procInterval);
+      procInterval = setInterval(() => {
+        procSeconds--;
+        if (procSeconds <= 0) {
+          clearInterval(procInterval);
+          clearVerifyingSession();
+          skipProcessingAndAppeal();
+          return;
+        }
+
+        const m = Math.floor(procSeconds / 60);
+        const s = procSeconds % 60;
+        if (timerDisplay) timerDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        if (procSeconds <= 120 && skipBtn && skipBtn.disabled) {
+          skipBtn.disabled = false;
+          skipBtn.className = "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-md";
+          updateProcessingScreenText();
+        }
+      }, 1000);
+    } else {
+      sessionStorage.removeItem("swapnopay_verifying_" + orderId);
+    }
+  } catch (err) {
+    console.warn("[session] Error restoring verification session:", err);
+  }
+}

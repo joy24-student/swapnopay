@@ -54,7 +54,9 @@ data class AppealEntity(
     val customerPhone: String,
     val trxId: String,
     val timestamp: Long,
-    val status: String // "PENDING_REVIEW", "APPROVED", "REJECTED"
+    val status: String, // "PENDING_REVIEW", "APPROVED", "REJECTED"
+    @ColumnInfo(defaultValue = "''") val note: String = "",
+    @ColumnInfo(defaultValue = "''") val screenshotUrl: String = ""
 )
 
 @Entity(tableName = "merchant_profile")

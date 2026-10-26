@@ -41,6 +41,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import org.json.JSONObject
 import org.json.JSONArray
 import com.example.data.remote.GeminiLiveSessionManager
@@ -11411,70 +11413,178 @@ fun AppealsScreen(viewModel: AppViewModel) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(appeals) { appeal ->
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = AppCardBg),
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("#${appeal.id}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(formatTime(appeal.timestamp), fontSize = 11.sp, color = AppTextSecondary)
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            AppealDetailRow(label = "Customer", value = appeal.customerName)
-                            AppealDetailRow(label = "Phone", value = appeal.customerPhone)
-                            AppealDetailRow(label = "Amount", value = "৳ ${appeal.amount}")
-                            AppealDetailRow(label = "TrxID", value = appeal.trxId)
-                            Spacer(modifier = Modifier.height(16.dp))
+                items(appeals, key = { it.id }) { appeal ->
+                    AppealCard(
+                        appeal = appeal,
+                        onResolve = { status -> viewModel.resolveAppeal(appeal.id, status) }
+                    )
+                }
+            }
+        }
+    }
+}
 
-                            if (appeal.status == "PENDING_REVIEW") {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.resolveAppeal(appeal.id, "REJECTED") },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Reject", fontWeight = FontWeight.Bold)
-                                    }
-                                    Button(
-                                        onClick = { viewModel.resolveAppeal(appeal.id, "APPROVED") },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Approve", color = Color.White, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            if (appeal.status == "APPROVED") Color(0xFFD1FAE5) else Color(0xFFFEE2E2),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = appeal.status,
-                                        color = if (appeal.status == "APPROVED") SuccessGreen else ErrorRed,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
+@Composable
+fun AppealCard(
+    appeal: AppealEntity,
+    onResolve: (String) -> Unit
+) {
+    var showFullScreenshot by remember { mutableStateOf(false) }
+
+    if (showFullScreenshot && appeal.screenshotUrl.isNotBlank()) {
+        Dialog(
+            onDismissRequest = { showFullScreenshot = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.94f))
+                    .clickable { showFullScreenshot = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "পেমেন্ট প্রমাণ / Payment Proof",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { showFullScreenshot = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                         }
                     }
+                    AsyncImage(
+                        model = resolveCoilImageModel(appeal.screenshotUrl),
+                        contentDescription = "Full Payment Proof",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+            }
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCardBg),
+        border = CardDefaults.outlinedCardBorder()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("#${appeal.id}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(formatTime(appeal.timestamp), fontSize = 11.sp, color = AppTextSecondary)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            AppealDetailRow(label = "Customer", value = appeal.customerName)
+            AppealDetailRow(label = "Phone", value = appeal.customerPhone)
+            AppealDetailRow(label = "Amount", value = "৳ ${appeal.amount}")
+            AppealDetailRow(label = "TrxID", value = appeal.trxId)
+            if (appeal.note.isNotBlank()) {
+                AppealDetailRow(label = "Customer Note", value = appeal.note)
+            }
+
+            if (appeal.screenshotUrl.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "পেমেন্ট প্রমাণ / Screenshot:",
+                    fontSize = 12.sp,
+                    color = AppTextSecondary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDarkModeGlobal) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                        .clickable { showFullScreenshot = true }
+                ) {
+                    AsyncImage(
+                        model = resolveCoilImageModel(appeal.screenshotUrl),
+                        contentDescription = "Payment Screenshot",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Text("বড় করে দেখুন", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (appeal.status == "PENDING_REVIEW") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onResolve("REJECTED") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Reject", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = { onResolve("APPROVED") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPurple),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Approve", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (appeal.status == "APPROVED") Color(0xFFD1FAE5) else Color(0xFFFEE2E2),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = appeal.status,
+                        color = if (appeal.status == "APPROVED") SuccessGreen else ErrorRed,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }

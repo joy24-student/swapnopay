@@ -175,13 +175,40 @@ $$;
 DO $$ BEGIN GRANT EXECUTE ON FUNCTION public.fn_normalize_merchant_id() TO postgres, authenticated, service_role, anon;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- 3b. Ensure appeals table has merchant_id column and permissive RLS policies for customer appeals
+-- 3b. Ensure appeals, payments, orders, and notifications schema integrity across all Supabase accounts
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
+  -- A. Appeals Table Schema & Permissive Policies
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'appeals') THEN
     EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS merchant_id UUID REFERENCES public.merchants(id)';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS screenshot_url TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS amount NUMERIC(12,2) DEFAULT 0';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS resolved_by UUID';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ';
+    EXECUTE 'ALTER TABLE public.appeals ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()';
+    
+    -- Drop strict foreign key constraint on resolved_by so merchant UUIDs from outside auth.users don't fail
+    FOR r IN (
+      SELECT constraint_name
+      FROM information_schema.table_constraints
+      WHERE table_schema = 'public' AND table_name = 'appeals' AND constraint_type = 'FOREIGN KEY'
+        AND constraint_name LIKE '%resolved_by%'
+    ) LOOP
+      EXECUTE format('ALTER TABLE public.appeals DROP CONSTRAINT IF EXISTS %I', r.constraint_name);
+    END LOOP;
+
+    EXECUTE 'ALTER TABLE public.appeals DROP CONSTRAINT IF EXISTS appeals_status_check';
+    EXECUTE 'ALTER TABLE public.appeals ADD CONSTRAINT appeals_status_check CHECK (status IS NULL OR UPPER(status) IN (''PENDING_REVIEW'', ''APPROVED'', ''REJECTED'', ''RESOLVED'', ''CONFIRMED''))';
+
     EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_merchant_id ON public.appeals(merchant_id)';
     EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_order_id ON public.appeals(order_id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_trx_id ON public.appeals(trx_id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_appeals_status ON public.appeals(status)';
+
     EXECUTE 'ALTER TABLE public.appeals ENABLE ROW LEVEL SECURITY';
     EXECUTE 'DROP POLICY IF EXISTS "appeals_anon_insert" ON public.appeals';
     EXECUTE 'CREATE POLICY "appeals_anon_insert" ON public.appeals FOR INSERT WITH CHECK (true)';
@@ -190,12 +217,61 @@ BEGIN
     EXECUTE 'DROP POLICY IF EXISTS "appeals_anon_update" ON public.appeals';
     EXECUTE 'CREATE POLICY "appeals_anon_update" ON public.appeals FOR UPDATE USING (true)';
   END IF;
+
+  -- B. Orders Table Schema & Constraints
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'orders') THEN
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_status TEXT DEFAULT ''PENDING''';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS matched_trx_id TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS callback_url TEXT';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS success_url TEXT';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS fail_url TEXT';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cancel_url TEXT';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT ''bKash''';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cus_name TEXT';
+    EXECUTE 'ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cus_phone TEXT';
+    EXECUTE 'ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_status_check';
+    EXECUTE 'ALTER TABLE public.orders ADD CONSTRAINT orders_status_check CHECK (status IS NULL OR UPPER(status) IN (''PENDING'', ''PAID'', ''EXPIRED'', ''CANCELLED'', ''CONFIRMED'', ''APPROVED'', ''COMPLETED''))';
     EXECUTE 'ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_order_status_check';
-    EXECUTE 'ALTER TABLE public.orders ADD CONSTRAINT orders_order_status_check CHECK (order_status IS NULL OR UPPER(order_status) IN (''PENDING'', ''CONFIRMED'', ''PROCESSING'', ''SHIPPED'', ''DELIVERED'', ''CANCELLED'', ''PAID'', ''COMPLETED''))';
+    EXECUTE 'ALTER TABLE public.orders ADD CONSTRAINT orders_order_status_check CHECK (order_status IS NULL OR UPPER(order_status) IN (''PENDING'', ''CONFIRMED'', ''PROCESSING'', ''SHIPPED'', ''DELIVERED'', ''CANCELLED'', ''PAID'', ''COMPLETED'', ''APPROVED''))';
+  END IF;
+
+  -- C. Payments Table Schema & Defaults
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'payments') THEN
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT ''bKash''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS method TEXT DEFAULT ''bKash''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS sender TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS sender_number TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS sms_raw TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS sms_hash TEXT DEFAULT ''''';
+    EXECUTE 'ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS sms_timestamp TIMESTAMPTZ DEFAULT now()';
+    EXECUTE 'ALTER TABLE public.payments ALTER COLUMN sms_hash DROP NOT NULL';
+    EXECUTE 'ALTER TABLE public.payments ALTER COLUMN sms_hash SET DEFAULT md5(random()::text || clock_timestamp()::text)';
+    EXECUTE 'ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_status_check';
+    EXECUTE 'ALTER TABLE public.payments ADD CONSTRAINT payments_status_check CHECK (status IS NULL OR UPPER(status) IN (''MATCHED'', ''UNMATCHED'', ''DUPLICATE'', ''PAID'', ''PENDING'', ''REVERSED''))';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_payments_merchant_id ON public.payments(merchant_id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_payments_trx_id ON public.payments(trx_id)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status)';
+  END IF;
+
+  -- D. Merchant Notifications Table Schema & RPC
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'merchant_notifications') THEN
+    EXECUTE 'ALTER TABLE public.merchant_notifications ADD COLUMN IF NOT EXISTS entity_type TEXT';
+    EXECUTE 'ALTER TABLE public.merchant_notifications ADD COLUMN IF NOT EXISTS entity_id TEXT';
+    EXECUTE 'ALTER TABLE public.merchant_notifications DROP CONSTRAINT IF EXISTS merchant_notifications_severity_check';
+    EXECUTE 'ALTER TABLE public.merchant_notifications ADD CONSTRAINT merchant_notifications_severity_check CHECK (severity IS NULL OR UPPER(severity) IN (''INFO'', ''SUCCESS'', ''WARNING'', ''ERROR'', ''HIGH'', ''ALERT'', ''CRITICAL'', ''URGENT''))';
   END IF;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+
+-- E. RPC: mark_merchant_notification_read
+CREATE OR REPLACE FUNCTION public.mark_merchant_notification_read(p_notification_id UUID, p_read_at TIMESTAMPTZ DEFAULT now())
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.merchant_notifications SET read_at = p_read_at WHERE id = p_notification_id;
+END;
+$$;
+DO $$ BEGIN GRANT EXECUTE ON FUNCTION public.mark_merchant_notification_read TO postgres, authenticated, anon, service_role;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. (Re)attach the self-provisioning trigger to every business table
 DO $$

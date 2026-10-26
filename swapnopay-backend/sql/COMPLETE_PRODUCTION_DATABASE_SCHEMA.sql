@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   cus_phone TEXT NOT NULL,
   cus_email TEXT,
   cus_name TEXT,
-  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','PAID','EXPIRED','CANCELLED')),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','PAID','EXPIRED','CANCELLED','CONFIRMED','APPROVED','COMPLETED')),
   product_name TEXT,
   product_category TEXT,
   callback_url TEXT,
@@ -266,7 +266,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   shipping_cost NUMERIC(12,2) DEFAULT 0.00,
   discount_amount NUMERIC(12,2) DEFAULT 0.00,
   total_amount NUMERIC(12,2) DEFAULT 0.00,
-  order_status TEXT DEFAULT 'PENDING' CHECK (order_status IN ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED')),
+  order_status TEXT DEFAULT 'PENDING' CHECK (order_status IN ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PAID', 'COMPLETED', 'APPROVED')),
   customer_note TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -338,12 +338,16 @@ CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   merchant_id UUID REFERENCES public.merchants ON DELETE CASCADE NOT NULL DEFAULT public.current_merchant_id(),
   trx_id TEXT,
-  amount NUMERIC(12,2) NOT NULL,
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  payment_method TEXT DEFAULT 'bKash',
+  method TEXT DEFAULT 'bKash',
+  sender TEXT,
   sender_number TEXT,
   merchant_number TEXT,
-  sms_timestamp TIMESTAMPTZ,
-  sms_hash TEXT UNIQUE NOT NULL,
-  status TEXT NOT NULL DEFAULT 'UNMATCHED' CHECK (status IN ('MATCHED','UNMATCHED','DUPLICATE')),
+  sms_raw TEXT DEFAULT '',
+  sms_timestamp TIMESTAMPTZ DEFAULT now(),
+  sms_hash TEXT DEFAULT md5(random()::text || clock_timestamp()::text),
+  status TEXT NOT NULL DEFAULT 'UNMATCHED' CHECK (status IN ('MATCHED','UNMATCHED','DUPLICATE','PAID','PENDING','REVERSED')),
   matched_order_id UUID REFERENCES public.orders,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -385,11 +389,13 @@ CREATE TABLE IF NOT EXISTS public.appeals (
   merchant_id UUID REFERENCES public.merchants(id),
   trx_id TEXT NOT NULL,
   cus_phone TEXT,
+  customer_name TEXT,
+  amount NUMERIC(12,2) DEFAULT 0.00,
   order_id UUID REFERENCES public.orders,
   note TEXT,
   screenshot_url TEXT,
-  status TEXT DEFAULT 'PENDING_REVIEW' CHECK (status IN ('PENDING_REVIEW','APPROVED','REJECTED')),
-  resolved_by UUID REFERENCES auth.users,
+  status TEXT DEFAULT 'PENDING_REVIEW' CHECK (status IN ('PENDING_REVIEW','APPROVED','REJECTED','RESOLVED','CONFIRMED')),
+  resolved_by UUID,
   resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -419,9 +425,9 @@ CREATE TABLE IF NOT EXISTS public.merchant_notifications (
   type TEXT NOT NULL,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
-  severity TEXT NOT NULL DEFAULT 'INFO' CHECK (severity IN ('INFO','SUCCESS','WARNING','ERROR')),
+  severity TEXT NOT NULL DEFAULT 'INFO' CHECK (severity IN ('INFO','SUCCESS','WARNING','ERROR','HIGH','ALERT','CRITICAL','URGENT')),
   entity_type TEXT,
-  entity_id UUID,
+  entity_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   read_at TIMESTAMPTZ
 );
