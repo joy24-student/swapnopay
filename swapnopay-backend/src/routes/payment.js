@@ -1589,7 +1589,8 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
   // ──────────────────────────────────────────────────────────────────────────
   // POST /v1/payment/resolve-appeal
   // Merchant or AI Copilot resolves an appeal (APPROVED / REJECTED)
-  // Sends notification email to customer via mailer service
+  // Updates Admin DB + Merchant DB, marks order PAID, registers MATCHED payment,
+  // dispatches canonical HMAC webhook to external website, and notifies client socket
   // ──────────────────────────────────────────────────────────────────────────
   router.post('/resolve-appeal', async (req, res) => {
     const { appeal_id, order_id, status, action, trx_id, amount, customer_email, customer_phone, merchant_id, note, send_email = true } = req.body || {}
@@ -1619,93 +1620,139 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       } catch (_) {}
     }
 
-    try {
-      console.log(`[payment/resolve-appeal] Resolving appeal: ${appeal_id} -> ${normalizedStatus} (order: ${effectiveOrderId || order_id})`)
+    const finalOrderId = effectiveOrderId || order_id
+    const finalMerchantId = effectiveMerchantId || merchant_id
+    const finalTrxId = effectiveTrxId || trx_id
 
-      // 1. Update appeal and order records in Supabase Cloud DB
+    try {
+      console.log(`[payment/resolve-appeal] Resolving appeal: ${appeal_id} -> ${normalizedStatus} (order: ${finalOrderId}, merchant: ${finalMerchantId})`)
+
+      // 1. Update appeal and order records in Supabase Cloud Admin DB
       try {
-        const admin = getAdminClient()
         if (admin) {
           await admin
             .from('appeals')
             .update({
               status: normalizedStatus,
               resolved_at: new Date().toISOString(),
-              resolved_by: merchant_id || 'merchant'
+              resolved_by: finalMerchantId || 'merchant'
             })
             .eq('id', appeal_id)
 
-          if (normalizedStatus === 'APPROVED' && order_id) {
+          if (normalizedStatus === 'APPROVED' && finalOrderId) {
             await admin
               .from('orders')
               .update({
                 status: 'PAID',
                 paid_at: new Date().toISOString(),
-                matched_trx_id: trx_id,
+                matched_trx_id: finalTrxId,
                 manual_match: true
               })
-              .eq('id', order_id)
+              .eq('id', finalOrderId)
           }
 
           // Insert merchant notification record
           await admin.from('merchant_notifications').insert({
             id: crypto.randomUUID(),
-            merchant_id: merchant_id || '00000000-0000-0000-0000-000000000001',
+            merchant_id: finalMerchantId || '00000000-0000-0000-0000-000000000001',
             title: `Appeal ${normalizedStatus === 'APPROVED' ? 'Approved' : 'Rejected'}`,
-            message: `Dispute for TrxID: ${trx_id || 'N/A'} was marked as ${normalizedStatus}.`,
+            message: `Dispute for TrxID: ${finalTrxId || 'N/A'} was marked as ${normalizedStatus}.`,
             type: 'APPEAL',
             severity: normalizedStatus === 'APPROVED' ? 'SUCCESS' : 'INFO',
             read: false,
             metadata: {
               entity_type: 'APPEAL',
               appeal_id,
-              order_id,
+              order_id: finalOrderId,
               status: normalizedStatus
             },
             created_at: new Date().toISOString()
           })
         }
       } catch (dbErr) {
-        console.warn('[payment/resolve-appeal] Notice updating appeal status in DB:', dbErr.message)
+        console.warn('[payment/resolve-appeal] Notice updating appeal status in Admin DB:', dbErr.message)
       }
 
-      // 1b. Also update appeal and order in merchant's own Supabase DB
-      if (merchant_id) {
+      // 1b. Also update appeal, order and payments in merchant's own Supabase DB
+      let merchantOrderRecord = null
+      if (finalMerchantId) {
         try {
-          const creds = await getMerchantCredentials(merchant_id).catch(() => null)
+          const creds = await getMerchantCredentials(finalMerchantId).catch(() => null)
           if (creds?.supabase_url && (creds?.supabase_anon_key || creds?.supabase_service_role_key)) {
             const { createClient } = await import('@supabase/supabase-js')
             const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
             const mClient = createClient(creds.supabase_url, mKey, { auth: { persistSession: false, autoRefreshToken: false } })
-            await mClient
-              .from('appeals')
-              .update({
-                status: normalizedStatus,
-                resolved_at: new Date().toISOString(),
-                resolved_by: merchant_id || 'merchant'
-              })
-              .eq('id', appeal_id)
 
-            if (normalizedStatus === 'APPROVED' && order_id) {
+            // Update appeals table on merchant DB (safe against foreign key constraint on resolved_by)
+            try {
+              const { error: appErr } = await mClient
+                .from('appeals')
+                .update({
+                  status: normalizedStatus,
+                  resolved_at: new Date().toISOString(),
+                  resolved_by: finalMerchantId
+                })
+                .eq('id', appeal_id)
+              if (appErr) throw appErr
+            } catch (fkErr) {
+              await mClient
+                .from('appeals')
+                .update({
+                  status: normalizedStatus,
+                  resolved_at: new Date().toISOString(),
+                  resolved_by: null
+                })
+                .eq('id', appeal_id)
+            }
+
+            // Retrieve full order record from merchant DB for webhooks and redirects
+            if (finalOrderId) {
+              const { data: oRow } = await mClient.from('orders').select('*').eq('id', finalOrderId).maybeSingle()
+              if (oRow) merchantOrderRecord = oRow
+            }
+
+            if (normalizedStatus === 'APPROVED' && finalOrderId) {
               await mClient
                 .from('orders')
                 .update({
                   status: 'PAID',
                   order_status: 'CONFIRMED',
                   paid_at: new Date().toISOString(),
-                  matched_trx_id: trx_id,
+                  matched_trx_id: finalTrxId,
                   manual_match: true
                 })
-                .eq('id', order_id)
+                .eq('id', finalOrderId)
 
-              if (trx_id) {
-                await mClient
+              if (finalTrxId) {
+                // If payment already exists in merchant DB, mark it MATCHED; if not, insert it so the ledger is complete
+                const { data: existPay } = await mClient
                   .from('payments')
-                  .update({
-                    status: 'MATCHED',
-                    matched_order_id: order_id
-                  })
-                  .ilike('trx_id', String(trx_id).trim())
+                  .select('id')
+                  .ilike('trx_id', String(finalTrxId).trim())
+                  .maybeSingle()
+
+                if (existPay?.id) {
+                  await mClient
+                    .from('payments')
+                    .update({
+                      status: 'MATCHED',
+                      matched_order_id: finalOrderId
+                    })
+                    .eq('id', existPay.id)
+                } else {
+                  await mClient
+                    .from('payments')
+                    .insert({
+                      trx_id: String(finalTrxId).trim().toUpperCase(),
+                      amount: Number(merchantOrderRecord?.amount || targetAppeal?.amount || amount || 0),
+                      sender_number: merchantOrderRecord?.cus_phone || targetAppeal?.cus_phone || customer_phone || null,
+                      status: 'MATCHED',
+                      matched_order_id: finalOrderId,
+                      payment_method: merchantOrderRecord?.payment_method || 'bKash',
+                      created_at: new Date().toISOString()
+                    })
+                    .catch(() => {})
+                }
               }
             }
           }
@@ -1719,14 +1766,14 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         try {
           const { sendPaymentReceipt } = await import('../services/mailer.js')
           await sendPaymentReceipt('customer', customer_email, {
-            order_id: order_id || appeal_id,
-            tran_id: trx_id || appeal_id,
-            amount: amount || '0.00',
+            order_id: finalOrderId || appeal_id,
+            tran_id: finalTrxId || appeal_id,
+            amount: amount || merchantOrderRecord?.amount || '0.00',
             currency: 'BDT',
             status: normalizedStatus === 'APPROVED' ? 'PAID' : 'APPEAL_REJECTED',
             payment_method: 'MFS',
             merchant_name: 'SwapnoPay Merchant',
-            merchant_id: merchant_id || null,
+            merchant_id: finalMerchantId || null,
             product_name: `Payment Appeal (${normalizedStatus})`,
             verification: normalizedStatus === 'APPROVED' ? 'MERCHANT_APPROVED_APPEAL' : 'APPEAL_REJECTED',
             notes: note || (normalizedStatus === 'APPROVED' ? 'Your payment appeal was verified and approved.' : 'Your payment appeal could not be verified.'),
@@ -1743,27 +1790,17 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       }
 
       // 3. Outbound Webhook Callback Dispatch to External Website / Merchant Shop
-      if (normalizedStatus === 'APPROVED' && effectiveOrderId) {
+      let targetWebhookUrl = null
+      let webhookDispatched = false
+      if (normalizedStatus === 'APPROVED' && finalOrderId) {
         try {
-          let ord = targetAppeal?.orders
-          if (!ord && effectiveMerchantId) {
-            try {
-              const creds = await getMerchantCredentials(effectiveMerchantId)
-              if (creds?.supabase_url) {
-                const { createClient } = await import('@supabase/supabase-js')
-                const mKey = creds.supabase_service_role_key || creds.supabase_anon_key
-                const mClient = createClient(creds.supabase_url, mKey, { auth: { persistSession: false, autoRefreshToken: false } })
-                const { data: oData } = await mClient.from('orders').select('*').eq('id', effectiveOrderId).maybeSingle()
-                if (oData) ord = oData
-              }
-            } catch (_) {}
-          }
+          const creds = await getMerchantCredentials(finalMerchantId).catch(() => null)
+          const ord = { ...(targetAppeal?.orders || {}), ...(merchantOrderRecord || {}) }
 
-          const creds = await getMerchantCredentials(effectiveMerchantId).catch(() => null)
-          let targetWebhookUrl = ord?.callback_url || creds?.webhook_url
-          if (!targetWebhookUrl && effectiveMerchantId) {
+          targetWebhookUrl = ord?.callback_url || creds?.webhook_url
+          if (!targetWebhookUrl && finalMerchantId) {
             const { getShopInfoForMerchant } = await import('../services/adminSupabase.js')
-            const shopInfo = getShopInfoForMerchant(effectiveMerchantId)
+            const shopInfo = getShopInfoForMerchant(finalMerchantId)
             if (shopInfo?.base_url) {
               targetWebhookUrl = `${shopInfo.base_url.replace(/\/+$/, '')}/payment/swapnopay/webhook.php`
             } else if (shopInfo?.shop_slug) {
@@ -1775,35 +1812,40 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
             const { postSafeWebhook } = await import('../utils/urlValidator.js')
             const { getMerchantActiveApiKey } = await import('../services/adminSupabase.js')
             const crypto = await import('crypto')
-            const keyRecord = await getMerchantActiveApiKey(effectiveMerchantId).catch(() => null)
-            const signingKey = keyRecord?.api_key || creds?.webhook_secret || 'swapnopay_secret'
-            const effectiveTranId = ord?.tran_id || effectiveOrderId
+            const keyRecord = await getMerchantActiveApiKey(finalMerchantId).catch(() => null)
+            const signingKey = creds?.webhook_secret || keyRecord?.api_key || creds?.api_key || 'swapnopay_secret'
+            const effectiveTranId = ord?.tran_id || finalOrderId
 
             const callbackPayload = {
               event: 'payment.status_changed',
-              event_id: `evt_appeal_${Date.now()}_${effectiveTrxId || 'resolved'}`,
-              order_id: effectiveOrderId,
+              event_id: `evt_appeal_${Date.now()}_${finalTrxId || 'resolved'}`,
+              order_id: finalOrderId,
               tran_id: effectiveTranId,
               payment_id: effectiveTranId,
-              merchant_id: effectiveMerchantId,
+              merchant_id: finalMerchantId,
               status: 'PAID',
               amount: Number(ord?.amount || amount || 0),
               currency: ord?.currency || 'BDT',
               payment_method: ord?.payment_method || 'bKash',
-              trx_id: effectiveTrxId,
+              trx_id: finalTrxId,
               paid_at: new Date().toISOString(),
               appeal_resolved: true
             }
 
-            const signature = crypto.createHmac('sha256', signingKey)
-              .update(JSON.stringify(callbackPayload)).digest('hex')
+            const payloadStr = JSON.stringify(callbackPayload)
+            const ts = Math.floor(Date.now() / 1000)
+            const signedPayload = `${ts}.${payloadStr}`
+            const hexSig = crypto.createHmac('sha256', signingKey).update(signedPayload).digest('hex')
+            const signatureHeader = `t=${ts},v1=${hexSig}`
 
-            await postSafeWebhook(targetWebhookUrl, callbackPayload, 6000, {
-              'x-swapnopay-signature': signature,
+            await postSafeWebhook(targetWebhookUrl, callbackPayload, 7000, {
+              'x-swapnopay-signature': signatureHeader,
+              'x-signature': hexSig,
               'x-webhook-secret': creds?.webhook_secret || '',
               'content-type': 'application/json'
             }).catch(whErr => console.warn('[resolve-appeal] Webhook dispatch notice:', whErr.message))
-            console.log(`[resolve-appeal] Outbound webhook dispatched to ${targetWebhookUrl}`)
+            webhookDispatched = true
+            console.log(`[resolve-appeal] Outbound canonical webhook dispatched to ${targetWebhookUrl}`)
           }
         } catch (whEx) {
           console.warn('[resolve-appeal] Outbound webhook exception:', whEx.message)
@@ -1811,25 +1853,24 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
       }
 
       // 4. Broadcast via socket to widget & merchant room
-      const targetRoomOrderId = effectiveOrderId || order_id
+      const targetRoomOrderId = finalOrderId
+      const finalSuccessRedirect = merchantOrderRecord?.success_url || targetAppeal?.orders?.success_url || null
       if (targetRoomOrderId) {
-        io.to(`order:${targetRoomOrderId}`).emit('payment_status_update', {
+        const statusPayload = {
           order_id: targetRoomOrderId,
           status: normalizedStatus === 'APPROVED' ? 'PAID' : 'APPEAL_REJECTED',
           appeal_id,
-          trx_id: effectiveTrxId || trx_id,
+          trx_id: finalTrxId,
+          amount: Number(merchantOrderRecord?.amount || targetAppeal?.orders?.amount || amount || 0),
+          redirect_url: finalSuccessRedirect,
           resolved_at: new Date().toISOString()
-        })
-        if (normalizedStatus === 'APPROVED') {
-          io.to(`order:${targetRoomOrderId}`).emit('payment_status', {
-            order_id: targetRoomOrderId,
-            tran_id: targetRoomOrderId,
-            status: 'PAID',
-            trx_id: effectiveTrxId || trx_id,
-            amount: Number(amount || 0),
-            payment_method: 'bKash',
-            paid_at: new Date().toISOString()
-          })
+        }
+
+        io.to(`order:${targetRoomOrderId}`).emit('payment_status_update', statusPayload)
+        io.to(`order:${targetRoomOrderId}`).emit('payment_status', statusPayload)
+        if (finalMerchantId) {
+          io.to(`merchant:${finalMerchantId}`).emit('payment_status_update', statusPayload)
+          io.to(`merchant:${finalMerchantId}`).emit('payment_status', statusPayload)
         }
       }
 
@@ -1837,6 +1878,9 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
         ok: true,
         appeal_id,
         status: normalizedStatus,
+        order_id: finalOrderId,
+        webhook_dispatched: webhookDispatched,
+        target_webhook_url: targetWebhookUrl,
         email_sent: Boolean(send_email && customer_email),
         message: `Appeal marked as ${normalizedStatus} successfully.`
       })

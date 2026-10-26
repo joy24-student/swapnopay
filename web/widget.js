@@ -1030,24 +1030,25 @@ function connectSwapnoPaySocket(url, orderIdParam) {
       socketClient.on(`device_status:${effWatchMid}`, handleLiveDeviceUpdate);
     }
 
-    // ── Payment status event — emitted by backend after /v1/payment/verify ──
-    socketClient.on('payment_status', (data) => {
-      console.log('[socket.io] payment_status received:', data);
+    // ── Payment status event — emitted by backend after /v1/payment/verify or /v1/payment/resolve-appeal ──
+    const handleResolvedPayment = (data) => {
+      console.log('[socket.io] payment status event received:', data);
       if (paymentResolved) return;  // race-condition guard
 
-      const { status, redirect_url } = data;
+      const rawStatus = String(data?.status || '').toUpperCase();
+      const redirect_url = data?.redirect_url;
 
-      if (status === 'PAID') {
+      if (['PAID', 'CONFIRMED', 'COMPLETED', 'APPROVED'].includes(rawStatus) || String(data?.order_status || '').toUpperCase() === 'CONFIRMED') {
         paymentResolved = true;
+        clearInterval(timerInterval);
+        clearInterval(procInterval);
+        if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
         showSuccessScreen(data);
-        // Subscription orders receive their app callback in the checkout URL.
-        // The normal payment verifier may not have a merchant-store order from
-        // which to reconstruct redirect_url, so preserve that supplied callback.
         const target = redirect_url || successUrl;
         if (target && target !== '/') {
-          setTimeout(() => { window.location.href = target; }, 4000);
+          setTimeout(() => { window.location.href = target; }, 3500);
         }
-      } else if (status === 'FAILED') {
+      } else if (rawStatus === 'FAILED') {
         paymentResolved = true;
         clearInterval(timerInterval);
         clearInterval(procInterval);
@@ -1055,7 +1056,7 @@ function connectSwapnoPaySocket(url, orderIdParam) {
         if (target && target !== '/') {
           setTimeout(() => { window.location.href = target; }, 2000);
         }
-      } else if (status === 'CANCELLED') {
+      } else if (rawStatus === 'CANCELLED') {
         paymentResolved = true;
         goToCancelledScreen();
         const target = redirect_url || cancelUrl;
@@ -1063,7 +1064,10 @@ function connectSwapnoPaySocket(url, orderIdParam) {
           setTimeout(() => { window.location.href = target; }, 2000);
         }
       }
-    });
+    };
+
+    socketClient.on('payment_status', handleResolvedPayment);
+    socketClient.on('payment_status_update', handleResolvedPayment);
 
     // ── Backend acknowledged payment_pending — show active matching indicator ──
     socketClient.on('payment_pending', (data) => {
@@ -1119,19 +1123,23 @@ function startStatusPolling() {
       .then(r => r.json())
       .then(data => {
         if (!data || !data.ok || paymentResolved) return;
-        if (data.status === 'PAID') {
+        const rawStatus = String(data.status || '').toUpperCase();
+        const rawOrdStatus = String(data.order_status || data.order?.order_status || '').toUpperCase();
+        if (['PAID', 'CONFIRMED', 'COMPLETED', 'APPROVED'].includes(rawStatus) || rawOrdStatus === 'CONFIRMED') {
           paymentResolved = true;
           clearInterval(pollingInterval);
           pollingInterval = null;
+          clearInterval(procInterval);
           showSuccessScreen(data.order || data);
           const target = data.redirect_url || successUrl;
           if (target && target !== '/') {
             setTimeout(() => { window.location.href = target; }, 3000);
           }
-        } else if (data.status === 'CANCELLED') {
+        } else if (rawStatus === 'CANCELLED') {
           paymentResolved = true;
           clearInterval(pollingInterval);
           pollingInterval = null;
+          clearInterval(procInterval);
           goToCancelledScreen();
         }
       })
