@@ -1620,8 +1620,7 @@ export function paymentRouter(io, heartbeatMap = new Map()) {
     }
 
     try {
-      const normalizedStatus = String(status).toUpperCase() === 'APPROVED' ? 'APPROVED' : 'REJECTED'
-      console.log(`[payment/resolve-appeal] Resolving appeal: ${appeal_id} -> ${normalizedStatus} (order: ${order_id})`)
+      console.log(`[payment/resolve-appeal] Resolving appeal: ${appeal_id} -> ${normalizedStatus} (order: ${effectiveOrderId || order_id})`)
 
       // 1. Update appeal and order records in Supabase Cloud DB
       try {
