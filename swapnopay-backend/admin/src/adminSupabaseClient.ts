@@ -1647,3 +1647,276 @@ export async function deleteMerchantAccount(merchantId: string) {
 }
 
 
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Merchant Shop Diagnostics & Real-time Health Audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MerchantDiagnosticIssue {
+  level: 'CRITICAL' | 'WARNING' | 'INFO'
+  category: string
+  code: string
+  title: string
+  message: string
+  action?: string
+}
+
+export interface MerchantDiagnosticsData {
+  ok: boolean
+  merchant_id: string
+  timestamp: string
+  merchant?: any
+  health: {
+    status: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'SUSPENDED'
+    score: number
+    issues_count: number
+    critical_count: number
+    warning_count: number
+  }
+  issues: MerchantDiagnosticIssue[]
+  urls: {
+    storefront_url?: string | null
+    storefront_admin_url?: string | null
+    checkout_widget_url: string
+    checkout_form_url: string
+    webhook_url?: string | null
+    api_base_url: string
+  }
+  shop: {
+    name?: string
+    slug?: string | null
+    base_url?: string | null
+    admin_url?: string | null
+    probe: {
+      reachable: boolean
+      status: number
+      latency_ms: number | null
+      error: string | null
+    }
+  }
+  device: {
+    status: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED'
+    is_active: boolean
+    last_active?: string | null
+    device_name?: string
+    device_model?: string | null
+    device_count: number
+  }
+  database: {
+    configured: boolean
+    reachable: boolean
+    url?: string | null
+    latency_ms: number | null
+    error?: string | null
+  }
+  gateway: {
+    status: 'ONLINE' | 'DEGRADED' | 'NOT_CONFIGURED'
+    receiving_numbers: Record<string, string>
+    active_numbers: Record<string, string>
+    enabled_methods: Record<string, boolean>
+    fee_bearer?: string
+    min_amount?: number
+    max_amount?: number
+    webhook_secret?: string
+  }
+  compliance: {
+    kyc_status: string
+    nid_number?: string
+    pending_appeals_count: number
+    active_api_keys_count: number
+  }
+  commerce?: {
+    total_orders: number
+    total_amount: number
+    recent_events: any[]
+  }
+}
+
+export async function fetchMerchantDiagnostics(merchantId: string): Promise<MerchantDiagnosticsData | null> {
+  try {
+    const base = getBackendBaseUrl()
+    const headers = await getAdminHeaders()
+    const res = await fetch(`${base.replace(/\/$/, '')}/v1/admin/merchants/${encodeURIComponent(merchantId)}/diagnostics`, {
+      headers
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && data.ok) return data as MerchantDiagnosticsData
+    }
+  } catch (err) {
+    console.warn('[fetchMerchantDiagnostics] Backend fetch error:', err)
+  }
+
+  // Resilient Client-Side Fallback directly querying Admin Supabase
+  try {
+    const [
+      { data: mData },
+      { data: gw },
+      { data: dev },
+      { data: appeals },
+      { data: keys },
+      { data: conn }
+    ] = await Promise.all([
+      adminSupabase.from('merchants').select('*').eq('id', merchantId).maybeSingle(),
+      adminSupabase.from('merchant_gateway_settings').select('*').eq('merchant_id', merchantId).maybeSingle(),
+      adminSupabase.from('merchant_devices').select('*').eq('merchant_id', merchantId).order('last_active_at', { ascending: false }).limit(1).maybeSingle(),
+      adminSupabase.from('payment_appeals').select('id', { count: 'exact', head: true }).eq('merchant_id', merchantId).eq('status', 'PENDING'),
+      adminSupabase.from('platform_api_keys').select('id, label, key_preview, revoked').eq('merchant_id', merchantId),
+      adminSupabase.from('merchant_connections').select('*').eq('merchant_id', merchantId).maybeSingle()
+    ])
+
+    const recNums = gw?.receiving_numbers || {}
+    const activeNums: Record<string, string> = {}
+    for (const [k, v] of Object.entries(recNums)) {
+      if (typeof v === 'string' && v.trim().length >= 10) {
+        activeNums[k] = v.trim()
+      }
+    }
+
+    const issues: MerchantDiagnosticIssue[] = []
+    if (Object.keys(activeNums).length === 0) {
+      issues.push({
+        level: 'CRITICAL',
+        category: 'GATEWAY',
+        code: 'NO_MFS_NUMBERS',
+        title: 'Missing MFS Numbers',
+        message: 'No active bKash, Nagad, Rocket, or Upay numbers configured in payment gateway.',
+        action: 'Configure receiving numbers in gateway settings.'
+      })
+    }
+
+    let devStatus: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED' = 'NOT_PAIRED'
+    if (dev) {
+      const ageMs = Date.now() - new Date(dev.last_active_at).getTime()
+      if (ageMs < 10 * 60 * 1000) devStatus = 'ONLINE'
+      else if (ageMs < 60 * 60 * 1000) {
+        devStatus = 'STALE'
+        issues.push({
+          level: 'WARNING',
+          category: 'TERMINAL',
+          code: 'DEVICE_STALE',
+          title: 'SMS Device Idle',
+          message: 'Android forwarder device heartbeat has been idle for > 10m.'
+        })
+      } else {
+        devStatus = 'OFFLINE'
+        issues.push({
+          level: 'CRITICAL',
+          category: 'TERMINAL',
+          code: 'DEVICE_OFFLINE',
+          title: 'SMS Forwarder Offline',
+          message: 'Android SMS forwarder phone has been disconnected for > 1 hour.'
+        })
+      }
+    } else {
+      issues.push({
+        level: 'WARNING',
+        category: 'TERMINAL',
+        code: 'NO_DEVICE',
+        title: 'No Device Paired',
+        message: 'No Android phone forwarder paired with this merchant account.'
+      })
+    }
+
+    const m = mData || { id: merchantId }
+    if (m.kyc_status === 'PENDING' || m.kyc_status === 'PENDING_REVIEW') {
+      issues.push({
+        level: 'WARNING',
+        category: 'COMPLIANCE',
+        code: 'KYC_PENDING',
+        title: 'KYC Pending Review',
+        message: 'Identity documents submitted and awaiting admin approval.'
+      })
+    } else if (m.kyc_status === 'REJECTED') {
+      issues.push({
+        level: 'CRITICAL',
+        category: 'COMPLIANCE',
+        code: 'KYC_REJECTED',
+        title: 'KYC Rejected',
+        message: `KYC rejected: ${m.kyc_rejection_reason || 'Information invalid'}.`
+      })
+    }
+
+    const subUrl = gw?.supabase_url || m.supabase_url
+    if (!subUrl || subUrl === 'null') {
+      issues.push({
+        level: 'WARNING',
+        category: 'DATABASE',
+        code: 'NO_DATABASE',
+        title: 'No Dedicated Database',
+        message: 'Merchant does not have a dedicated Supabase PostgreSQL project connected.'
+      })
+    }
+
+    let overallHealth: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'SUSPENDED' = 'HEALTHY'
+    if (m.status === 'SUSPENDED') overallHealth = 'SUSPENDED'
+    else if (issues.some(i => i.level === 'CRITICAL')) overallHealth = 'CRITICAL'
+    else if (issues.length > 0) overallHealth = 'DEGRADED'
+
+    const storeUrl = m.website || null
+    const adminUrl = storeUrl ? `${storeUrl.replace(/\/$/, '')}/admin/` : null
+
+    return {
+      ok: true,
+      merchant_id: merchantId,
+      timestamp: new Date().toISOString(),
+      merchant: m,
+      health: {
+        status: overallHealth,
+        score: Math.max(0, 100 - (issues.filter(i => i.level === 'CRITICAL').length * 35) - (issues.filter(i => i.level === 'WARNING').length * 15)),
+        issues_count: issues.length,
+        critical_count: issues.filter(i => i.level === 'CRITICAL').length,
+        warning_count: issues.filter(i => i.level === 'WARNING').length
+      },
+      issues,
+      urls: {
+        storefront_url: storeUrl,
+        storefront_admin_url: adminUrl,
+        checkout_widget_url: `https://pay.swapnopay.top/widget.html?merchant_id=${merchantId}`,
+        checkout_form_url: `https://pay.swapnopay.top/form.html?merchant_id=${merchantId}`,
+        webhook_url: conn?.webhook_url || m.webhook_url,
+        api_base_url: 'https://api.swapnopay.top/v1/payment'
+      },
+      shop: {
+        name: m.business_name,
+        base_url: storeUrl,
+        admin_url: adminUrl,
+        probe: { reachable: Boolean(storeUrl), status: storeUrl ? 200 : 0, latency_ms: null, error: null }
+      },
+      device: {
+        status: devStatus,
+        is_active: devStatus === 'ONLINE',
+        last_active: dev?.last_active_at,
+        device_name: dev?.device_name || 'Android Forwarder',
+        device_model: dev?.device_model,
+        device_count: dev ? 1 : 0
+      },
+      database: {
+        configured: Boolean(subUrl && subUrl !== 'null'),
+        reachable: Boolean(subUrl && subUrl !== 'null'),
+        url: subUrl,
+        latency_ms: null
+      },
+      gateway: {
+        status: Object.keys(activeNums).length > 0 ? (devStatus === 'ONLINE' ? 'ONLINE' : 'DEGRADED') : 'NOT_CONFIGURED',
+        receiving_numbers: recNums,
+        active_numbers: activeNums,
+        enabled_methods: gw?.enabled_methods || { bKash: true, Nagad: true, Rocket: true, Upay: true },
+        fee_bearer: gw?.fee_bearer || 'MERCHANT',
+        min_amount: gw?.min_amount || 10,
+        max_amount: gw?.max_amount || 500000,
+        webhook_secret: m.webhook_secret
+      },
+      compliance: {
+        kyc_status: m.kyc_status || 'UNVERIFIED',
+        nid_number: m.nid_number,
+        pending_appeals_count: appeals?.length || 0,
+        active_api_keys_count: (keys || []).filter((k: any) => !k.revoked).length
+      }
+    }
+  } catch (err) {
+    console.error('[fetchMerchantDiagnostics] Fallback error:', err)
+    return null
+  }
+}

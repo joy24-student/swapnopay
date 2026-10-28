@@ -4714,7 +4714,7 @@ fun LoginScreen(viewModel: AppViewModel) {
         viewModel.isExternalActivityExpected = true
         // Google and Facebook OAuth credentials and callbacks are registered on SwapnoPay Platform Supabase.
         // It must ALWAYS use the Platform Supabase auth URL and never switch to merchant databases.
-        val authBaseUrl = "https://tldubojeokgyoclxnzkb.supabase.co"
+        val authBaseUrl = PLATFORM_SUPABASE_URL
         val oauthUrl = "$authBaseUrl/auth/v1/authorize?provider=$provider&redirect_to=swapnopay://auth-callback"
         val uri = android.net.Uri.parse(oauthUrl)
         val chromeIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {

@@ -38,6 +38,8 @@ import {
   broadcastNotification,
   listBroadcastHistory,
   deleteBroadcastBatch,
+  getMerchantDetailedDiagnostics,
+  getMerchantsOverviewWithDiagnostics,
 } from '../services/adminSupabase.js'
 
 const router = Router()
@@ -216,6 +218,28 @@ router.post('/test-email', async (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────
 // MERCHANT MANAGEMENT API ENDPOINTS
 // ────────────────────────────────────────────────────────────────────────────
+
+// GET /v1/admin/merchants-overview — List all merchants with health, running status, storefront URLs, and detected issues
+router.get('/merchants-overview', async (_req, res) => {
+  try {
+    const list = await getMerchantsOverviewWithDiagnostics()
+    res.json({ ok: true, count: list.length, merchants: list })
+  } catch (err) {
+    console.error('[admin/merchants-overview GET]', err.message)
+    res.status(500).json({ error: 'Failed to fetch merchants overview: ' + err.message })
+  }
+})
+
+// GET /v1/admin/merchants/:id/diagnostics — Exhaustive real-time shop diagnostics and health audit
+router.get('/merchants/:id/diagnostics', async (req, res) => {
+  try {
+    const result = await getMerchantDetailedDiagnostics(req.params.id)
+    res.json(result)
+  } catch (err) {
+    console.error('[admin/merchants/:id/diagnostics GET]', err.message)
+    res.status(500).json({ ok: false, error: 'Diagnostics failed: ' + err.message })
+  }
+})
 
 // GET /v1/admin/merchants — List all merchants
 router.get('/merchants', async (_req, res) => {
