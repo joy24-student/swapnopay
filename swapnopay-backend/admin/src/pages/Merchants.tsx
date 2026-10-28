@@ -37,7 +37,8 @@ import {
   RefreshCw,
   Activity,
   Zap,
-  Info
+  Info,
+  Link2
 } from 'lucide-react'
 
 export interface MerchantRecord {
