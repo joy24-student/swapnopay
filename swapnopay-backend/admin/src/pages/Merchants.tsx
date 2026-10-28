@@ -64,6 +64,7 @@ export interface MerchantRecord {
   shop_slug?: string | null
   health?: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'SUSPENDED'
   device_status?: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED'
+  device_model?: string | null
   device_last_active?: string | null
   issues?: { level: 'CRITICAL' | 'WARNING' | 'INFO'; code: string; message: string }[]
   issues_count?: number
@@ -106,23 +107,50 @@ export default function Merchants() {
       const [
         { data: merchantsData },
         { data: gwsData },
-        { data: devsData },
+        { data: mobileDevsData },
+        { data: legacyDevsData },
         { data: appealsData }
       ] = await Promise.all([
         adminSupabase.from('merchants').select('*').order('created_at', { ascending: false }),
         adminSupabase.from('merchant_gateway_settings').select('*'),
+        adminSupabase.from('devices').select('id, merchant_id, user_id, device_model, os_version, battery_level, online, last_sync, disabled, created_at'),
         adminSupabase.from('merchant_devices').select('*'),
         adminSupabase.from('payment_appeals').select('id, merchant_id, status').eq('status', 'PENDING')
       ])
 
       const gwMap = new Map()
       for (const g of gwsData || []) {
-        gwMap.set(g.merchant_id, g)
+        if (g.merchant_id) gwMap.set(g.merchant_id, g)
       }
 
+      // Combine devices, prioritizing online forwarders
+      const allDevs = [
+        ...(mobileDevsData || []).map((d: any) => ({
+          ...d,
+          is_mobile: true,
+          last_active: d.last_sync || d.created_at,
+          model: d.device_model || 'Android Terminal'
+        })),
+        ...(legacyDevsData || []).map((d: any) => ({
+          ...d,
+          is_mobile: false,
+          last_active: d.last_active_at || d.registered_at,
+          model: d.device_model || d.device_name || 'Terminal'
+        }))
+      ]
+
+      allDevs.sort((a: any, b: any) => {
+        if (a.online && !b.online) return -1
+        if (!a.online && b.online) return 1
+        const tsA = a.last_active ? new Date(a.last_active).getTime() : 0
+        const tsB = b.last_active ? new Date(b.last_active).getTime() : 0
+        return tsB - tsA
+      })
+
       const devMap = new Map()
-      for (const d of devsData || []) {
-        devMap.set(d.merchant_id, d)
+      for (const d of allDevs) {
+        if (d.merchant_id && !devMap.has(d.merchant_id)) devMap.set(d.merchant_id, d)
+        if (d.user_id && !devMap.has(d.user_id)) devMap.set(d.user_id, d)
       }
 
       const appealCounts = new Map()
@@ -130,40 +158,60 @@ export default function Merchants() {
         appealCounts.set(a.merchant_id, (appealCounts.get(a.merchant_id) || 0) + 1)
       }
 
+      const THIRTY_MIN = 30 * 60 * 1000
+
       const enriched: MerchantRecord[] = (merchantsData || []).map((m: any) => {
         const cleanId = m.id
         const gw = gwMap.get(cleanId) || (m.user_id ? gwMap.get(m.user_id) : null) || {}
         const dev = devMap.get(cleanId) || (m.user_id ? devMap.get(m.user_id) : null) || null
         const pendingAppeals = appealCounts.get(cleanId) || 0
 
+        const effectiveBusinessName = (m.business_name && m.business_name.trim()) ||
+          gw.merchant_name ||
+          (m.email ? m.email.split('@')[0] : 'Merchant')
+
         const issues: { level: 'CRITICAL' | 'WARNING' | 'INFO'; code: string; message: string }[] = []
 
         // MFS numbers check
         const recNums = gw.receiving_numbers || {}
-        let hasNumbers = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10)
+        let hasNumbers = Object.values(recNums).some((v: any) => typeof v === 'string' && v.trim().length >= 10)
         if (!hasNumbers && ((gw.default_number && String(gw.default_number).length >= 10) || (m.phone && String(m.phone).length >= 10))) {
           hasNumbers = true
         }
         if (!hasNumbers) {
-          issues.push({ level: 'CRITICAL', code: 'NO_MFS', message: 'No MFS numbers set' })
+          if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+            issues.push({ level: 'INFO', code: 'ONBOARDING_PENDING', message: 'Setup pending (No numbers yet)' })
+          } else {
+            issues.push({ level: 'CRITICAL', code: 'NO_MFS', message: 'No MFS numbers set' })
+          }
         }
 
         const logoUrl = gw.merchant_logo_url || m.logo_url || m.photo_url || null
 
         // Terminal device check
         let devStatus: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED' = 'NOT_PAIRED'
+        let devModel: string | null = dev?.model || null
+        let devLastActive: string | null = dev?.last_active || null
+
         if (dev) {
-          const ageMs = Date.now() - new Date(dev.last_active_at).getTime()
-          if (ageMs < 10 * 60 * 1000) devStatus = 'ONLINE'
-          else if (ageMs < 60 * 60 * 1000) {
+          const syncTs = dev.last_active ? new Date(dev.last_active).getTime() : 0
+          const ageMs = syncTs > 0 ? (Date.now() - syncTs) : Infinity
+
+          if (dev.online === true || ageMs < THIRTY_MIN) {
+            devStatus = 'ONLINE'
+          } else if (ageMs < 24 * 60 * 60 * 1000) {
             devStatus = 'STALE'
-            issues.push({ level: 'WARNING', code: 'PHONE_IDLE', message: 'SMS phone idle > 10m' })
+            issues.push({ level: 'WARNING', code: 'PHONE_IDLE', message: 'SMS phone idle' })
           } else {
             devStatus = 'OFFLINE'
-            issues.push({ level: 'CRITICAL', code: 'PHONE_OFFLINE', message: 'SMS phone offline' })
+            issues.push({ level: 'WARNING', code: 'PHONE_OFFLINE', message: 'SMS phone offline' })
           }
         } else {
-          issues.push({ level: 'WARNING', code: 'NO_PHONE', message: 'No SMS phone paired' })
+          if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+            issues.push({ level: 'INFO', code: 'DEVICE_PENDING', message: 'Terminal setup pending' })
+          } else {
+            issues.push({ level: 'WARNING', code: 'NO_PHONE', message: 'No SMS phone paired' })
+          }
         }
 
         // KYC check
@@ -176,7 +224,11 @@ export default function Merchants() {
         // DB check
         const subUrl = gw.supabase_url || m.supabase_url
         if (!subUrl || subUrl === 'null') {
-          issues.push({ level: 'WARNING', code: 'NO_DB', message: 'No dedicated DB' })
+          if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+            issues.push({ level: 'INFO', code: 'NO_DB', message: 'Dedicated database pending' })
+          } else {
+            issues.push({ level: 'WARNING', code: 'NO_DB', message: 'No dedicated DB' })
+          }
         }
 
         if (pendingAppeals > 0) {
@@ -188,21 +240,23 @@ export default function Merchants() {
           health = 'SUSPENDED'
         } else if (issues.some(i => i.level === 'CRITICAL')) {
           health = 'CRITICAL'
-        } else if (issues.length > 0) {
+        } else if (issues.some(i => i.level === 'WARNING')) {
           health = 'DEGRADED'
         }
 
-        const shopUrl = m.website || (m.business_name ? `https://shop.swapnopay.top/${m.business_name.toLowerCase().replace(/[^a-z0-9]/g, '')}/` : null)
+        const shopUrl = m.website || (effectiveBusinessName ? `https://shop.swapnopay.top/${effectiveBusinessName.toLowerCase().replace(/[^a-z0-9]/g, '')}/` : null)
 
         return {
           ...m,
+          business_name: effectiveBusinessName,
           logo_url: logoUrl,
           health,
           issues,
           issues_count: issues.length,
           shop_url: shopUrl,
           device_status: devStatus,
-          device_last_active: dev?.last_active_at,
+          device_model: devModel,
+          device_last_active: devLastActive,
           has_mfs_numbers: hasNumbers
         }
       })
@@ -455,7 +509,8 @@ export default function Merchants() {
             </thead>
             <tbody>
               {filteredRows.map(r => {
-                const initial = (r.business_name || 'M')[0].toUpperCase()
+                const businessTitle = r.business_name || r.name || r.email?.split('@')[0] || 'Merchant'
+                const initial = (businessTitle || 'M')[0].toUpperCase()
                 const isSuspended = r.status === 'SUSPENDED'
                 const isVerifiedKyc = r.kyc_status === 'VERIFIED'
                 const isPendingKyc = r.kyc_status === 'PENDING' || r.kyc_status === 'PENDING_REVIEW'
@@ -475,7 +530,7 @@ export default function Merchants() {
                         {r.logo_url ? (
                           <img
                             src={r.logo_url}
-                            alt={r.business_name}
+                            alt={businessTitle}
                             style={{
                               width: 34,
                               height: 34,
@@ -512,7 +567,7 @@ export default function Merchants() {
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13.5 }}>
-                            {r.business_name}
+                            {businessTitle}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
                             <span style={{ fontSize: 11, color: 'var(--text-subtle)', fontFamily: 'var(--font-mono)' }}>
@@ -570,7 +625,12 @@ export default function Merchants() {
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No storefront</span>
                       )}
                       <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {r.phone || r.email || 'No contact'}
+                        {r.phone ? (
+                          <span style={{ fontWeight: 600 }}>📞 {r.phone}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-subtle)' }}>No phone</span>
+                        )}
+                        {r.email ? <span style={{ marginLeft: 6, opacity: 0.85 }}>({r.email})</span> : null}
                       </div>
                     </td>
 
@@ -606,6 +666,11 @@ export default function Merchants() {
                            r.device_status === 'OFFLINE' ? 'Offline' : 'Not Linked'}
                         </span>
                       </div>
+                      {r.device_model && (
+                        <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                          {r.device_model}
+                        </div>
+                      )}
                     </td>
 
                     {/* Issues & Diagnostics */}
@@ -632,9 +697,9 @@ export default function Merchants() {
                                 fontWeight: 700,
                                 padding: '2px 6px',
                                 borderRadius: 4,
-                                background: iss.level === 'CRITICAL' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
-                                color: iss.level === 'CRITICAL' ? '#EF4444' : '#D97706',
-                                border: `1px solid ${iss.level === 'CRITICAL' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}`
+                                background: iss.level === 'CRITICAL' ? 'rgba(239,68,68,0.12)' : iss.level === 'INFO' ? 'rgba(59,130,246,0.12)' : 'rgba(245,158,11,0.12)',
+                                color: iss.level === 'CRITICAL' ? '#EF4444' : iss.level === 'INFO' ? '#2563EB' : '#D97706',
+                                border: `1px solid ${iss.level === 'CRITICAL' ? 'rgba(239,68,68,0.25)' : iss.level === 'INFO' ? 'rgba(59,130,246,0.25)' : 'rgba(245,158,11,0.25)'}`
                               }}
                               title={iss.message}
                             >

@@ -5027,32 +5027,73 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
  */
 export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
   const adminClient = getAdminClient()
+  
+  // Fetch data in parallel
   const [
     { data: merchants },
     { data: gws },
-    { data: devs },
-    { data: appeals }
+    { data: mobileDevs },
+    { data: legacyDevs },
+    { data: appeals },
+    authUsersRes
   ] = await Promise.all([
     adminClient.from('merchants').select('*').order('created_at', { ascending: false }),
     adminClient.from('merchant_gateway_settings').select('*'),
+    adminClient.from('devices').select('id, merchant_id, user_id, device_model, os_version, battery_level, online, last_sync, disabled, created_at'),
     adminClient.from('merchant_devices').select('*'),
-    adminClient.from('payment_appeals').select('id, merchant_id, status').eq('status', 'PENDING')
+    adminClient.from('payment_appeals').select('id, merchant_id, status').eq('status', 'PENDING'),
+    adminClient.auth.admin.listUsers({ perPage: 200 }).catch(() => ({ data: { users: [] } }))
   ])
+
+  // Build Auth User Metadata map for OAuth profiles (Facebook, Google, etc.)
+  const userMetaMap = new Map()
+  for (const u of authUsersRes?.data?.users || []) {
+    if (u.id) userMetaMap.set(u.id, u.user_metadata || {})
+    if (u.email) userMetaMap.set(u.email.toLowerCase().trim(), u.user_metadata || {})
+  }
 
   const gwMap = new Map()
   for (const g of gws || []) {
-    gwMap.set(g.merchant_id, g)
+    if (g.merchant_id) gwMap.set(g.merchant_id, g)
   }
 
+  // Combine modern forwarder devices (devices table) and legacy devices (merchant_devices table)
+  const allDevs = [
+    ...(mobileDevs || []).map(d => ({
+      ...d,
+      is_mobile: true,
+      last_active: d.last_sync || d.created_at,
+      model: d.device_model || 'Android Terminal'
+    })),
+    ...(legacyDevs || []).map(d => ({
+      ...d,
+      is_mobile: false,
+      last_active: d.last_active_at || d.registered_at,
+      model: d.device_model || d.device_name || 'Terminal'
+    }))
+  ]
+
+  // Sort devices: online first, then latest activity timestamp
+  allDevs.sort((a, b) => {
+    if (a.online && !b.online) return -1
+    if (!a.online && b.online) return 1
+    const tsA = a.last_active ? new Date(a.last_active).getTime() : 0
+    const tsB = b.last_active ? new Date(b.last_active).getTime() : 0
+    return tsB - tsA
+  })
+
   const devMap = new Map()
-  for (const d of devs || []) {
-    devMap.set(d.merchant_id, d)
+  for (const d of allDevs) {
+    if (d.merchant_id && !devMap.has(d.merchant_id)) devMap.set(d.merchant_id, d)
+    if (d.user_id && !devMap.has(d.user_id)) devMap.set(d.user_id, d)
   }
 
   const appealCounts = new Map()
   for (const a of appeals || []) {
     appealCounts.set(a.merchant_id, (appealCounts.get(a.merchant_id) || 0) + 1)
   }
+
+  const THIRTY_MIN = 30 * 60 * 1000
 
   return (merchants || []).map(m => {
     const cleanId = m.id
@@ -5061,55 +5102,97 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
     const shop = getShopInfoForMerchant(cleanId) || (m.user_id ? getShopInfoForMerchant(m.user_id) : null)
     const pendingAppeals = appealCounts.get(cleanId) || 0
 
-    // Issues analysis
-    const issues = []
+    // OAuth user fallback resolution
+    const uMeta = (m.user_id ? userMetaMap.get(m.user_id) : null) || (m.email ? userMetaMap.get(m.email.toLowerCase().trim()) : null) || {}
+    const metaName = uMeta.full_name || uMeta.name || null
+    const metaAvatar = uMeta.avatar_url || uMeta.picture || null
 
-    // MFS Numbers
-    const recNums = gw.receiving_numbers || {}
-    let hasAnyNumber = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10 && !isFakeNumber(v))
-    if (!hasAnyNumber && ((gw.default_number && !isFakeNumber(gw.default_number)) || (m.phone && !isFakeNumber(m.phone)))) {
-      hasAnyNumber = true
-    }
-    if (!hasAnyNumber) {
-      issues.push({ level: 'CRITICAL', code: 'NO_MFS_NUMBERS', message: 'No MFS numbers' })
+    const effectiveBusinessName = (m.business_name && m.business_name.trim()) ||
+      gw.merchant_name ||
+      metaName ||
+      shop?.store_name ||
+      (m.email ? m.email.split('@')[0] : 'Merchant')
+
+    // Persist empty OAuth profiles back to DB in background
+    if ((!m.business_name && metaName) || (!m.logo_url && metaAvatar)) {
+      Promise.resolve(adminClient.from('merchants').update({
+        ...(metaName && !m.business_name ? { business_name: metaName } : {}),
+        ...(metaAvatar && !m.logo_url ? { logo_url: metaAvatar, photo_url: metaAvatar } : {})
+      }).eq('id', cleanId)).catch(() => {})
     }
 
     // Logo resolution
     const logoUrl = cleanMerchantLogoUrl(gw.merchant_logo_url) ||
       cleanMerchantLogoUrl(m.logo_url) ||
       cleanMerchantLogoUrl(m.photo_url) ||
+      cleanMerchantLogoUrl(metaAvatar) ||
       cleanMerchantLogoUrl(shop?.logo_url) ||
       null
 
-    // Device
+    // Issues analysis
+    const issues = []
+
+    // MFS Numbers check
+    const recNums = gw.receiving_numbers || {}
+    let hasAnyNumber = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10 && !isFakeNumber(v))
+    if (!hasAnyNumber && ((gw.default_number && !isFakeNumber(gw.default_number)) || (m.phone && !isFakeNumber(m.phone)))) {
+      hasAnyNumber = true
+    }
+    if (!hasAnyNumber) {
+      if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+        issues.push({ level: 'INFO', code: 'ONBOARDING_PENDING', message: 'Setup pending (No MFS numbers yet)' })
+      } else {
+        issues.push({ level: 'CRITICAL', code: 'NO_MFS_NUMBERS', message: 'No MFS numbers configured' })
+      }
+    }
+
+    // Terminal device resolution
     let devStatus = 'NOT_PAIRED'
-    if (dev) {
-      const lastActive = dev.last_active_at ? new Date(dev.last_active_at).getTime() : 0
-      const ageMs = Date.now() - lastActive
-      if (ageMs < 10 * 60 * 1000) {
+    let devModel = dev?.model || null
+    let devLastActive = dev?.last_active || null
+
+    const hb = heartbeatMap && (heartbeatMap.get(cleanId) || (m.user_id ? heartbeatMap.get(m.user_id) : null))
+    const hbAge = hb ? (Date.now() - hb.ts) : Infinity
+
+    if (hbAge < THIRTY_MIN) {
+      devStatus = 'ONLINE'
+      devLastActive = new Date(hb.ts).toISOString()
+    } else if (dev) {
+      const syncTs = dev.last_active ? new Date(dev.last_active).getTime() : 0
+      const ageMs = syncTs > 0 ? (Date.now() - syncTs) : Infinity
+
+      if (dev.online === true || ageMs < THIRTY_MIN) {
         devStatus = 'ONLINE'
-      } else if (ageMs < 60 * 60 * 1000) {
+      } else if (ageMs < 24 * 60 * 60 * 1000) {
         devStatus = 'STALE'
         issues.push({ level: 'WARNING', code: 'DEVICE_STALE', message: 'SMS phone idle' })
       } else {
         devStatus = 'OFFLINE'
-        issues.push({ level: 'CRITICAL', code: 'DEVICE_OFFLINE', message: 'SMS phone offline' })
+        issues.push({ level: 'WARNING', code: 'DEVICE_OFFLINE', message: 'SMS phone offline' })
       }
     } else {
-      issues.push({ level: 'WARNING', code: 'NO_DEVICE', message: 'No SMS phone' })
+      if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+        issues.push({ level: 'INFO', code: 'DEVICE_SETUP_PENDING', message: 'SMS terminal pairing pending' })
+      } else {
+        issues.push({ level: 'WARNING', code: 'NO_DEVICE', message: 'No SMS phone paired' })
+      }
     }
 
-    // KYC
+    // KYC check
     if (m.kyc_status === 'PENDING' || m.kyc_status === 'PENDING_REVIEW') {
-      issues.push({ level: 'WARNING', code: 'KYC_PENDING', message: 'KYC pending' })
+      issues.push({ level: 'WARNING', code: 'KYC_PENDING', message: 'KYC review pending' })
     } else if (m.kyc_status === 'REJECTED') {
       issues.push({ level: 'CRITICAL', code: 'KYC_REJECTED', message: 'KYC rejected' })
     }
 
-    // DB
+    // DB check
     const subUrl = gw.supabase_url || m.supabase_url
     if (!subUrl || subUrl === 'null') {
-      issues.push({ level: 'WARNING', code: 'NO_DATABASE', message: 'No dedicated DB' })
+      if (m.kyc_status === 'UNVERIFIED' && !m.onboarded_at) {
+        issues.push({ level: 'INFO', code: 'NO_DATABASE', message: 'Dedicated database pending' })
+      } else {
+        issues.push({ level: 'WARNING', code: 'NO_DATABASE', message: 'No dedicated DB' })
+      }
     }
 
     // Appeals
@@ -5117,13 +5200,13 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
       issues.push({ level: 'WARNING', code: 'APPEALS', message: `${pendingAppeals} disputes` })
     }
 
-    // Health
+    // Health calculation
     let health = 'HEALTHY'
     if (m.status === 'SUSPENDED') {
       health = 'SUSPENDED'
     } else if (issues.some(i => i.level === 'CRITICAL')) {
       health = 'CRITICAL'
-    } else if (issues.length > 0) {
+    } else if (issues.some(i => i.level === 'WARNING')) {
       health = 'DEGRADED'
     }
 
@@ -5132,6 +5215,7 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
 
     return {
       ...m,
+      business_name: effectiveBusinessName,
       logo_url: logoUrl,
       health,
       issues,
@@ -5140,7 +5224,8 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
       shop_url: shopUrl,
       checkout_url: checkoutUrl,
       device_status: devStatus,
-      device_last_active: dev?.last_active_at,
+      device_model: devModel,
+      device_last_active: devLastActive,
       has_mfs_numbers: hasAnyNumber,
       pending_appeals_count: pendingAppeals
     }
