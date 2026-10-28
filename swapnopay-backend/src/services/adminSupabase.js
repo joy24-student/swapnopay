@@ -59,21 +59,31 @@ export function getShopInfoForMerchant(merchantId) {
   const cleanId = String(merchantId).trim().toLowerCase()
   const rawIdNoHyphen = cleanId.replace(/-/g, '')
   try {
-    const runtimeDir = path.resolve(process.env.SHOP_RUNTIME_DIR || path.join(DATA_DIR, 'shop-runtime'))
-    const slugsDir = path.join(runtimeDir, 'slugs')
-    if (fs.existsSync(slugsDir)) {
-      const files = fs.readdirSync(slugsDir)
-      for (const f of files) {
-        if (!f.endsWith('.json')) continue
-        try {
-          const raw = fs.readFileSync(path.join(slugsDir, f), 'utf8')
-          const data = JSON.parse(raw)
-          if (!data?.merchant_id) continue
-          const fileMid = String(data.merchant_id).trim().toLowerCase()
-          if (fileMid === cleanId || fileMid.replace(/-/g, '') === rawIdNoHyphen) {
-            return data
-          }
-        } catch (_) {}
+    const candidateDirs = [
+      process.env.SHOP_RUNTIME_DIR,
+      path.join(DATA_DIR, 'shop-runtime'),
+      path.resolve(process.cwd(), 'data', 'shop-runtime'),
+      path.resolve(process.cwd(), 'swapnopay-backend', 'data', 'shop-runtime'),
+      '/var/www/swapnopay/swapnopay-backend/data/shop-runtime',
+      '/var/www/swapnopay/data/shop-runtime',
+    ].filter(Boolean)
+
+    for (const runtimeDir of candidateDirs) {
+      const slugsDir = path.join(runtimeDir, 'slugs')
+      if (fs.existsSync(slugsDir)) {
+        const files = fs.readdirSync(slugsDir)
+        for (const f of files) {
+          if (!f.endsWith('.json')) continue
+          try {
+            const raw = fs.readFileSync(path.join(slugsDir, f), 'utf8')
+            const data = JSON.parse(raw)
+            if (!data?.merchant_id) continue
+            const fileMid = String(data.merchant_id).trim().toLowerCase()
+            if (fileMid === cleanId || fileMid.replace(/-/g, '') === rawIdNoHyphen) {
+              return data
+            }
+          } catch (_) {}
+        }
       }
     }
   } catch (_) {}
@@ -4590,8 +4600,14 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
     console.warn('[diagnostics] merchants fetch error:', err.message)
   }
 
-  // 2. Fetch gateway settings
+  // 2. Fetch full gateway configuration via unified resolver
+  let gwConfig = null
   let gwSettings = null
+  try {
+    gwConfig = await getMerchantGatewayConfig(cleanId, heartbeatMap)
+  } catch (err) {
+    console.warn('[diagnostics] getMerchantGatewayConfig error:', err.message)
+  }
   try {
     const { data } = await adminClient.from('merchant_gateway_settings').select('*').eq('merchant_id', cleanId).maybeSingle()
     gwSettings = data
@@ -4601,6 +4617,12 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
 
   // 3. Fetch device status
   const devStatus = await getMerchantDeviceStatus(cleanId, heartbeatMap)
+  if (gwConfig?.device_active) {
+    devStatus.active = true
+    if (!devStatus.last_seen && gwConfig.device_last_seen) {
+      devStatus.last_seen = gwConfig.device_last_seen
+    }
+  }
   let deviceInfo = null
   try {
     const { data: devRow } = await adminClient.from('merchant_devices').select('*').eq('merchant_id', cleanId).order('last_active_at', { ascending: false }).limit(1).maybeSingle()
@@ -4642,39 +4664,67 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
     }
   } catch (_) {}
 
-  // 9. Probe storefront reachability
-  let storefrontProbe = { reachable: false, status: 0, latency_ms: null, error: null }
-  const candidateStoreUrl = shopInfo?.base_url || mData?.website || (shopInfo?.shop_slug ? `https://shop.swapnopay.top/${shopInfo.shop_slug}/` : null)
-  if (candidateStoreUrl && candidateStoreUrl.startsWith('http')) {
-    const probeUrl = candidateStoreUrl.replace(/\/$/, '') + '/health.php'
+  // 9. Effective Merchant Logo
+  const effectiveLogoUrl = cleanMerchantLogoUrl(gwConfig?.merchant_logo_url) ||
+    cleanMerchantLogoUrl(mData?.logo_url) ||
+    cleanMerchantLogoUrl(mData?.photo_url) ||
+    cleanMerchantLogoUrl(shopInfo?.logo_url) ||
+    null
+
+  if (mData) {
+    mData.logo_url = effectiveLogoUrl
+    if (!mData.business_name || isPlaceholderMerchantName(mData.business_name)) {
+      mData.business_name = gwConfig?.merchant_name || shopInfo?.store_name || mData.business_name || 'SwapnoFlix'
+    }
+  }
+
+  // 10. Storefront URLs and Honest HTTP Probes
+  const hostedStoreUrl = shopInfo?.base_url || (shopInfo?.shop_slug ? `https://shop.swapnopay.top/${shopInfo.shop_slug}/` : null)
+  const externalWebsiteUrl = (mData?.website && mData.website.startsWith('http')) ? mData.website : null
+  const primaryStoreUrl = hostedStoreUrl || externalWebsiteUrl
+
+  async function probeHttpEndpoint(url) {
+    if (!url || !url.startsWith('http')) {
+      return { reachable: false, status: 0, latency_ms: null, error: 'No URL configured' }
+    }
     const t0 = Date.now()
     try {
-      const res = await fetch(probeUrl, { method: 'GET', signal: AbortSignal.timeout(2500) })
-      storefrontProbe = {
-        reachable: res.ok || res.status < 500,
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'User-Agent': 'SwapnoPay-Diagnostic-Probe/1.0' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(4000)
+      })
+      // Only 2xx and 3xx status codes count as reachable and online!
+      const isOk = res.status >= 200 && res.status < 400
+      return {
+        reachable: isOk,
         status: res.status,
         latency_ms: Date.now() - t0,
-        error: res.ok ? null : `HTTP ${res.status}`
+        error: isOk ? null : `HTTP ${res.status}`
       }
-    } catch (e) {
-      try {
-        const res2 = await fetch(candidateStoreUrl, { method: 'HEAD', signal: AbortSignal.timeout(2000) })
-        storefrontProbe = {
-          reachable: res2.ok || res2.status < 500,
-          status: res2.status,
-          latency_ms: Date.now() - t0,
-          error: null
-        }
-      } catch (err2) {
-        storefrontProbe = { reachable: false, status: 0, latency_ms: null, error: err2.message }
+    } catch (err) {
+      return {
+        reachable: false,
+        status: 0,
+        latency_ms: Date.now() - t0,
+        error: err.message
       }
     }
   }
 
-  // 10. Ping merchant dedicated Supabase DB
+  const storefrontProbe = hostedStoreUrl
+    ? await probeHttpEndpoint(hostedStoreUrl)
+    : (primaryStoreUrl ? await probeHttpEndpoint(primaryStoreUrl) : { reachable: false, status: 0, latency_ms: null, error: 'No storefront' })
+
+  const externalProbe = (externalWebsiteUrl && externalWebsiteUrl !== hostedStoreUrl)
+    ? await probeHttpEndpoint(externalWebsiteUrl)
+    : null
+
+  // 11. Ping merchant dedicated Supabase DB
   let dbProbe = { configured: false, reachable: false, latency_ms: null, url: null, error: null }
-  const merchantSupabaseUrl = gwSettings?.supabase_url || shopInfo?.supabase_url || mData?.supabase_url
-  const merchantAnonKey = gwSettings?.supabase_anon_key || shopInfo?.supabase_anon_key || mData?.supabase_anon_key
+  const merchantSupabaseUrl = gwConfig?.supabase_url || gwSettings?.supabase_url || shopInfo?.supabase_url || mData?.supabase_url
+  const merchantAnonKey = gwConfig?.supabase_anon_key || gwSettings?.supabase_anon_key || shopInfo?.supabase_anon_key || mData?.supabase_anon_key
   if (merchantSupabaseUrl && merchantSupabaseUrl !== 'null' && merchantSupabaseUrl.startsWith('http')) {
     dbProbe.configured = true
     dbProbe.url = merchantSupabaseUrl
@@ -4692,11 +4742,11 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
     }
   }
 
-  // 11. Analyze issues & health
+  // 12. Analyze issues & health
   const issues = []
 
-  // Check MFS Numbers
-  const recNums = gwSettings?.receiving_numbers || {}
+  // Check MFS Numbers from unified gwConfig (fallback to gwSettings or profile phone)
+  const recNums = gwConfig?.receiving_numbers || gwSettings?.receiving_numbers || {}
   const activeNumbers = {}
   let totalConfiguredNumbers = 0
   for (const [method, num] of Object.entries(recNums)) {
@@ -4704,6 +4754,16 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
       activeNumbers[canonicalMethodName(method)] = num.trim()
       totalConfiguredNumbers++
     }
+  }
+
+  // Fallback unified number if specific methods were not individually saved
+  const fallbackSingleNumber = gwConfig?.default_number || gwSettings?.default_number || mData?.phone || null
+  if (totalConfiguredNumbers === 0 && fallbackSingleNumber && !isFakeNumber(fallbackSingleNumber)) {
+    ['bKash', 'Nagad', 'Rocket', 'Upay'].forEach(m => {
+      recNums[m] = fallbackSingleNumber
+      activeNumbers[m] = fallbackSingleNumber
+    })
+    totalConfiguredNumbers = 4
   }
 
   if (totalConfiguredNumbers === 0) {
@@ -4727,7 +4787,8 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
   }
 
   // Check SMS Terminal Device
-  if (devStatus.active) {
+  const isDeviceLive = devStatus.active || gwConfig?.device_active
+  if (isDeviceLive) {
     // Online
   } else if (deviceInfo?.last_active_at) {
     const ageMs = Date.now() - new Date(deviceInfo.last_active_at).getTime()
@@ -4763,15 +4824,26 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
   }
 
   // Check Storefront Health
-  if (candidateStoreUrl) {
+  if (hostedStoreUrl) {
+    if (!storefrontProbe.reachable) {
+      issues.push({
+        level: 'CRITICAL',
+        category: 'STOREFRONT',
+        code: 'STOREFRONT_UNREACHABLE',
+        title: 'Hosted Storefront Unreachable',
+        message: `HTTP probe to ${hostedStoreUrl} failed (${storefrontProbe.error || 'Connection refused'}).`,
+        action: 'Check Nginx reverse proxy or static assets on server.'
+      })
+    }
+  } else if (primaryStoreUrl) {
     if (!storefrontProbe.reachable) {
       issues.push({
         level: 'CRITICAL',
         category: 'STOREFRONT',
         code: 'STOREFRONT_UNREACHABLE',
         title: 'Storefront Down or Unreachable',
-        message: `HTTP probe to ${candidateStoreUrl} failed (${storefrontProbe.error || 'Connection refused'}).`,
-        action: 'Check Nginx vhost or PHP-FPM service.'
+        message: `HTTP probe to ${primaryStoreUrl} failed (${storefrontProbe.error || 'Connection refused'}).`,
+        action: 'Check custom domain DNS or server.'
       })
     }
   } else {
@@ -4782,6 +4854,18 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
       title: 'No Storefront Launched',
       message: 'This merchant does not have an active storefront web instance.',
       action: 'Provision storefront from Shop Management.'
+    })
+  }
+
+  // Non-fatal warning if external website is 404/down while hosted store is running
+  if (externalWebsiteUrl && externalProbe && !externalProbe.reachable && storefrontProbe.reachable) {
+    issues.push({
+      level: 'WARNING',
+      category: 'STOREFRONT',
+      code: 'EXTERNAL_WEBSITE_404',
+      title: 'External Website Unreachable',
+      message: `External domain ${externalWebsiteUrl} returned ${externalProbe.error || 'unreachable'}. SwapnoPay hosted store is online and operating normally.`,
+      action: 'Update DNS or web server routing for the external domain.'
     })
   }
 
@@ -4858,9 +4942,9 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
   }
 
   // Construct URLs
-  const merchantSlug = shopInfo?.shop_slug || (candidateStoreUrl?.includes('/shop/') ? candidateStoreUrl.split('/shop/')[1]?.replace(/\/$/, '') : null)
-  const storefrontUrl = candidateStoreUrl || (merchantSlug ? `https://shop.swapnopay.top/${merchantSlug}/` : null)
-  const storefrontAdminUrl = storefrontUrl ? `${storefrontUrl.replace(/\/$/, '')}/admin/` : null
+  const merchantSlug = shopInfo?.shop_slug || (hostedStoreUrl?.includes('.top/') ? hostedStoreUrl.split('.top/')[1]?.replace(/\/$/, '') : null)
+  const storefrontUrl = hostedStoreUrl || primaryStoreUrl
+  const storefrontAdminUrl = hostedStoreUrl ? `${hostedStoreUrl.replace(/\/$/, '')}/admin/` : null
   const checkoutWidgetUrl = `https://pay.swapnopay.top/widget.html?merchant_id=${cleanId}`
   const checkoutFormUrl = `https://pay.swapnopay.top/form.html?merchant_id=${cleanId}`
   const webhookUrl = connectionSettings?.webhook_url || mData?.webhook_url || null
@@ -4871,6 +4955,7 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
     merchant_id: cleanId,
     timestamp: new Date().toISOString(),
     merchant: mData,
+    logo_url: effectiveLogoUrl,
     health: {
       status: overallHealth,
       score: healthScore,
@@ -4881,6 +4966,8 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
     issues,
     urls: {
       storefront_url: storefrontUrl,
+      hosted_storefront_url: hostedStoreUrl,
+      external_website_url: externalWebsiteUrl,
       storefront_admin_url: storefrontAdminUrl,
       checkout_widget_url: checkoutWidgetUrl,
       checkout_form_url: checkoutFormUrl,
@@ -4891,16 +4978,19 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
       name: shopInfo?.store_name || mData?.business_name,
       slug: merchantSlug,
       base_url: storefrontUrl,
+      hosted_url: hostedStoreUrl,
+      external_url: externalWebsiteUrl,
       admin_url: storefrontAdminUrl,
-      probe: storefrontProbe
+      probe: storefrontProbe,
+      external_probe: externalProbe
     },
     device: {
-      status: devStatus.active ? 'ONLINE' : (deviceInfo ? 'OFFLINE' : 'NOT_PAIRED'),
-      is_active: devStatus.active,
-      last_active: deviceInfo?.last_active_at || devStatus.last_seen,
+      status: isDeviceLive ? 'ONLINE' : (deviceInfo ? 'OFFLINE' : 'NOT_PAIRED'),
+      is_active: isDeviceLive,
+      last_active: deviceInfo?.last_active_at || devStatus.last_seen || gwConfig?.device_last_seen,
       device_name: deviceInfo?.device_name || 'Generic Android Terminal',
       device_model: deviceInfo?.device_model || null,
-      device_count: devStatus.device_count || (deviceInfo ? 1 : 0)
+      device_count: devStatus.device_count || (deviceInfo ? 1 : (isDeviceLive ? 1 : 0))
     },
     database: {
       configured: dbProbe.configured,
@@ -4910,14 +5000,17 @@ export async function getMerchantDetailedDiagnostics(merchantId, heartbeatMap = 
       error: dbProbe.error
     },
     gateway: {
-      status: totalConfiguredNumbers > 0 ? (devStatus.active ? 'ONLINE' : 'DEGRADED') : 'NOT_CONFIGURED',
+      status: totalConfiguredNumbers > 0 ? (isDeviceLive ? 'ONLINE' : 'DEGRADED') : 'NOT_CONFIGURED',
       receiving_numbers: recNums,
       active_numbers: activeNumbers,
-      enabled_methods: gwSettings?.enabled_methods || { bKash: true, Nagad: true, Rocket: true, Upay: true },
-      fee_bearer: gwSettings?.fee_bearer || 'MERCHANT',
-      min_amount: gwSettings?.min_amount || 10,
-      max_amount: gwSettings?.max_amount || 500000,
-      webhook_secret: mData?.webhook_secret
+      account_types: gwConfig?.account_types || {},
+      qr_codes: gwConfig?.qr_codes || {},
+      default_number: fallbackSingleNumber,
+      enabled_methods: gwConfig?.enabled_methods || gwSettings?.enabled_methods || { bKash: true, Nagad: true, Rocket: true, Upay: true },
+      fee_bearer: gwConfig?.fee_bearer || gwSettings?.fee_bearer || 'MERCHANT',
+      min_amount: gwConfig?.min_amount || gwSettings?.min_amount || 10,
+      max_amount: gwConfig?.max_amount || gwSettings?.max_amount || 500000,
+      webhook_secret: mData?.webhook_secret || gwConfig?.webhook_secret
     },
     compliance: {
       kyc_status: kycStatus,
@@ -4973,10 +5066,20 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
 
     // MFS Numbers
     const recNums = gw.receiving_numbers || {}
-    const hasAnyNumber = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10 && !isFakeNumber(v))
+    let hasAnyNumber = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10 && !isFakeNumber(v))
+    if (!hasAnyNumber && ((gw.default_number && !isFakeNumber(gw.default_number)) || (m.phone && !isFakeNumber(m.phone)))) {
+      hasAnyNumber = true
+    }
     if (!hasAnyNumber) {
       issues.push({ level: 'CRITICAL', code: 'NO_MFS_NUMBERS', message: 'No MFS numbers' })
     }
+
+    // Logo resolution
+    const logoUrl = cleanMerchantLogoUrl(gw.merchant_logo_url) ||
+      cleanMerchantLogoUrl(m.logo_url) ||
+      cleanMerchantLogoUrl(m.photo_url) ||
+      cleanMerchantLogoUrl(shop?.logo_url) ||
+      null
 
     // Device
     let devStatus = 'NOT_PAIRED'
@@ -5029,6 +5132,7 @@ export async function getMerchantsOverviewWithDiagnostics(heartbeatMap = null) {
 
     return {
       ...m,
+      logo_url: logoUrl,
       health,
       issues,
       issues_count: issues.length,

@@ -220,9 +220,9 @@ router.post('/test-email', async (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────
 
 // GET /v1/admin/merchants-overview — List all merchants with health, running status, storefront URLs, and detected issues
-router.get('/merchants-overview', async (_req, res) => {
+router.get('/merchants-overview', async (req, res) => {
   try {
-    const list = await getMerchantsOverviewWithDiagnostics()
+    const list = await getMerchantsOverviewWithDiagnostics(req.heartbeatMap || req.app?.get('heartbeatMap'))
     res.json({ ok: true, count: list.length, merchants: list })
   } catch (err) {
     console.error('[admin/merchants-overview GET]', err.message)
@@ -233,7 +233,7 @@ router.get('/merchants-overview', async (_req, res) => {
 // GET /v1/admin/merchants/:id/diagnostics — Exhaustive real-time shop diagnostics and health audit
 router.get('/merchants/:id/diagnostics', async (req, res) => {
   try {
-    const result = await getMerchantDetailedDiagnostics(req.params.id)
+    const result = await getMerchantDetailedDiagnostics(req.params.id, req.heartbeatMap || req.app?.get('heartbeatMap'))
     res.json(result)
   } catch (err) {
     console.error('[admin/merchants/:id/diagnostics GET]', err.message)

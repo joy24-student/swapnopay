@@ -372,9 +372,12 @@ export default function MerchantDetail() {
   // Diagnostics shortcut helpers
   const healthStatus = diagnostics?.health?.status || (merchant.status === 'SUSPENDED' ? 'SUSPENDED' : 'HEALTHY');
   const healthScore = diagnostics?.health?.score ?? 100;
+  const merchantLogo = diagnostics?.logo_url || diagnostics?.shop?.logo_url || merchant?.logo_url || merchant?.photo_url || null;
   const issues = diagnostics?.issues || [];
-  const storefrontUrl = diagnostics?.urls?.storefront_url || merchant.website || null;
-  const storefrontAdminUrl = diagnostics?.urls?.storefront_admin_url || (storefrontUrl ? `${storefrontUrl.replace(/\/$/, '')}/admin/` : null);
+  const hostedStoreUrl = diagnostics?.urls?.hosted_storefront_url || diagnostics?.shop?.hosted_url || (diagnostics?.shop?.slug ? `https://shop.swapnopay.top/${diagnostics.shop.slug}/` : null);
+  const externalWebsiteUrl = diagnostics?.urls?.external_website_url || diagnostics?.shop?.external_url || (merchant?.website && !merchant.website.includes('shop.swapnopay.top') ? merchant.website : null);
+  const storefrontUrl = hostedStoreUrl || diagnostics?.urls?.storefront_url || merchant?.website || null;
+  const storefrontAdminUrl = diagnostics?.urls?.storefront_admin_url || (hostedStoreUrl ? `${hostedStoreUrl.replace(/\/$/, '')}/admin/` : (storefrontUrl ? `${storefrontUrl.replace(/\/$/, '')}/admin/` : null));
   const checkoutWidgetUrl = diagnostics?.urls?.checkout_widget_url || `https://pay.swapnopay.top/widget.html?merchant_id=${merchant.id}`;
   const checkoutFormUrl = diagnostics?.urls?.checkout_form_url || `https://pay.swapnopay.top/form.html?merchant_id=${merchant.id}`;
   const receivingNumbers = diagnostics?.gateway?.receiving_numbers || {};
@@ -394,17 +397,56 @@ export default function MerchantDetail() {
     <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* ──────────────── Top Navigation Bar ──────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Link to="/merchants" style={{ textDecoration: 'none' }}>
             <button className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <ArrowLeft size={14} />
               <span>Back to Merchants</span>
             </button>
           </Link>
+
+          {/* Merchant Logo Avatar */}
+          <div style={{ position: 'relative' }}>
+            {merchantLogo ? (
+              <img
+                src={merchantLogo}
+                alt={merchant.business_name || 'Merchant Logo'}
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 10,
+                  objectFit: 'cover',
+                  border: '1.5px solid var(--border-default)',
+                  background: 'var(--bg-surface)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                }}
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div style={{
+                width: 46,
+                height: 46,
+                borderRadius: 10,
+                background: 'var(--brand-subtle)',
+                color: 'var(--brand-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: 18,
+                border: '1.5px solid var(--border-default)'
+              }}>
+                {(merchant.business_name || merchant.name || 'M')[0].toUpperCase()}
+              </div>
+            )}
+          </div>
+
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>{merchant.business_name || merchant.name || 'Merchant Shop'}</span>
-              <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, fontWeight: 700, background: 'var(--bg-subtle)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, fontWeight: 700, background: 'var(--brand-subtle)', color: 'var(--brand-primary)', fontFamily: 'var(--font-mono)' }}>
                 {merchant.subscription_tier || 'STARTER'}
               </span>
             </h1>
@@ -707,10 +749,10 @@ export default function MerchantDetail() {
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Customer Storefront URL
+                Hosted Storefront URL
               </span>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: storefrontUrl ? 'var(--success)' : 'var(--text-muted)' }}>
-                {storefrontUrl ? '● Active' : '○ Not Configured'}
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: (storefrontUrl && diagnostics?.shop?.probe?.reachable) ? 'var(--success)' : 'var(--danger)' }}>
+                {storefrontUrl ? (diagnostics?.shop?.probe?.reachable ? '● Online (HTTP 200)' : `○ ${diagnostics?.shop?.probe?.error || 'Unreachable'}`) : '○ Not Configured'}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -736,6 +778,38 @@ export default function MerchantDetail() {
               )}
             </div>
           </div>
+
+          {/* URL 1b: External Website URL (if configured) */}
+          {externalWebsiteUrl && externalWebsiteUrl !== hostedStoreUrl && (
+            <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  External / Custom Website
+                </span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: diagnostics?.shop?.external_probe?.reachable ? 'var(--success)' : 'var(--warning)' }}>
+                  {diagnostics?.shop?.external_probe?.reachable ? '● Reachable' : `○ ${diagnostics?.shop?.external_probe?.error || 'Not Found'}`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <input
+                  className="input"
+                  readOnly
+                  value={externalWebsiteUrl}
+                  style={{ fontSize: 11.5, fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)' }}
+                />
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => copyToClipboard(externalWebsiteUrl, 'external_website_url')}
+                  title="Copy External Website URL"
+                >
+                  <Copy size={12} color={copiedField === 'external_website_url' ? 'var(--success)' : 'currentColor'} />
+                </button>
+                <a href={externalWebsiteUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" title="Open External Website">
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* URL 2: Storefront Merchant Admin */}
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}>
@@ -852,8 +926,9 @@ export default function MerchantDetail() {
             { key: 'Rocket', name: 'Rocket (DBBL)', color: '#8C3494', ussd: '*322#', defaultMode: 'Send Money' },
             { key: 'Upay', name: 'Upay (UCB)', color: '#005696', ussd: '*268#', defaultMode: 'Send Money' },
           ].map(prov => {
-            const num = receivingNumbers[prov.key] || receivingNumbers[prov.key.toLowerCase()] || '';
-            const isConfigured = Boolean(num && num.length >= 10);
+            const num = receivingNumbers[prov.key] || receivingNumbers[prov.key.toLowerCase()] || activeNumbers[prov.key] || activeNumbers[prov.key.toLowerCase()] || diagnostics?.gateway?.default_number || '';
+            const acctType = diagnostics?.gateway?.account_types?.[prov.key] || diagnostics?.gateway?.account_types?.[prov.key.toLowerCase()] || 'Personal';
+            const isConfigured = Boolean(num && String(num).trim().length >= 10);
 
             return (
               <div
@@ -883,7 +958,7 @@ export default function MerchantDetail() {
                 </div>
                 <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
                   <span>USSD: {prov.ussd}</span>
-                  <span>Type: Personal</span>
+                  <span>Type: {acctType}</span>
                 </div>
               </div>
             );
@@ -950,6 +1025,89 @@ export default function MerchantDetail() {
               </button>
             </div>
           </div>
+
+          {/* Logo Showcase Row in Profile */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: 12,
+            background: 'var(--bg-subtle)',
+            borderRadius: 8,
+            border: '1px solid var(--border-default)',
+            marginBottom: 14
+          }}>
+            {merchantLogo ? (
+              <img
+                src={merchantLogo}
+                alt={merchant.business_name || 'Logo'}
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 8,
+                  objectFit: 'cover',
+                  border: '1px solid var(--border-default)',
+                  background: 'var(--bg-surface)'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: 52,
+                height: 52,
+                borderRadius: 8,
+                background: 'var(--bg-surface)',
+                border: '1.5px dashed var(--border-default)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted)',
+                fontSize: 11,
+                fontWeight: 600
+              }}>
+                No Logo
+              </div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                Storefront & Brand Logo
+              </div>
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: merchantLogo ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                marginTop: 2
+              }}>
+                {merchantLogo || 'No custom logo uploaded'}
+              </div>
+              {merchantLogo && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <button
+                    onClick={() => copyToClipboard(merchantLogo, 'logo_url')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: 10.5, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Copy size={11} color={copiedField === 'logo_url' ? 'var(--success)' : 'currentColor'} />
+                    <span>Copy Logo URL</span>
+                  </button>
+                  <a
+                    href={merchantLogo}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: 10.5, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={11} />
+                    <span>Open High-Res</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
             <div><strong>Business Name:</strong> {merchant.business_name || merchant.name || '--'}</div>
             <div><strong>Email:</strong> {merchant.email || '--'}</div>

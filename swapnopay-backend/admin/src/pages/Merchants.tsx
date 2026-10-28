@@ -68,6 +68,7 @@ export interface MerchantRecord {
   issues?: { level: 'CRITICAL' | 'WARNING' | 'INFO'; code: string; message: string }[]
   issues_count?: number
   has_mfs_numbers?: boolean
+  logo_url?: string | null
 }
 
 export default function Merchants() {
@@ -139,10 +140,15 @@ export default function Merchants() {
 
         // MFS numbers check
         const recNums = gw.receiving_numbers || {}
-        const hasNumbers = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10)
+        let hasNumbers = Object.values(recNums).some(v => typeof v === 'string' && v.trim().length >= 10)
+        if (!hasNumbers && ((gw.default_number && String(gw.default_number).length >= 10) || (m.phone && String(m.phone).length >= 10))) {
+          hasNumbers = true
+        }
         if (!hasNumbers) {
           issues.push({ level: 'CRITICAL', code: 'NO_MFS', message: 'No MFS numbers set' })
         }
+
+        const logoUrl = gw.merchant_logo_url || m.logo_url || m.photo_url || null
 
         // Terminal device check
         let devStatus: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED' = 'NOT_PAIRED'
@@ -190,6 +196,7 @@ export default function Merchants() {
 
         return {
           ...m,
+          logo_url: logoUrl,
           health,
           issues,
           issues_count: issues.length,
@@ -465,19 +472,42 @@ export default function Merchants() {
                     {/* Merchant & Store */}
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--brand-subtle)',
-                          color: 'var(--brand-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: 13,
-                          flexShrink: 0
-                        }}>
+                        {r.logo_url ? (
+                          <img
+                            src={r.logo_url}
+                            alt={r.business_name}
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: 'var(--radius-sm)',
+                              objectFit: 'cover',
+                              border: '1px solid var(--border-default)',
+                              background: 'var(--bg-surface)',
+                              flexShrink: 0
+                            }}
+                            onError={(e) => {
+                              const target = e.target as HTMLElement;
+                              target.style.display = 'none';
+                              const sibling = target.nextElementSibling as HTMLElement;
+                              if (sibling) sibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--brand-subtle)',
+                            color: 'var(--brand-primary)',
+                            display: r.logo_url ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: 13,
+                            flexShrink: 0
+                          }}
+                        >
                           {initial}
                         </div>
                         <div>
@@ -755,6 +785,58 @@ export default function Merchants() {
       >
         {selectedMerchant && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Merchant Identity Snippet with Logo */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: 12,
+              background: 'var(--bg-subtle)',
+              borderRadius: 8,
+              border: '1px solid var(--border-default)'
+            }}>
+              {selectedMerchant.logo_url ? (
+                <img
+                  src={selectedMerchant.logo_url}
+                  alt={selectedMerchant.business_name}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 8,
+                    objectFit: 'cover',
+                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-surface)'
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 8,
+                  background: 'var(--brand-subtle)',
+                  color: 'var(--brand-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: 16
+                }}>
+                  {(selectedMerchant.business_name || 'M')[0].toUpperCase()}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {selectedMerchant.business_name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {selectedMerchant.email || selectedMerchant.phone || 'ID: ' + selectedMerchant.id.slice(0, 8)}
+                </div>
+              </div>
+            </div>
+
             {/* Quick Diagnostic Card */}
             <div style={{
               background: 'var(--bg-surface)',

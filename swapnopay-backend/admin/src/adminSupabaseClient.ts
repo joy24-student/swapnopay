@@ -1667,6 +1667,7 @@ export interface MerchantDiagnosticsData {
   merchant_id: string
   timestamp: string
   merchant?: any
+  logo_url?: string | null
   health: {
     status: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'SUSPENDED'
     score: number
@@ -1677,6 +1678,8 @@ export interface MerchantDiagnosticsData {
   issues: MerchantDiagnosticIssue[]
   urls: {
     storefront_url?: string | null
+    hosted_storefront_url?: string | null
+    external_website_url?: string | null
     storefront_admin_url?: string | null
     checkout_widget_url: string
     checkout_form_url: string
@@ -1687,6 +1690,8 @@ export interface MerchantDiagnosticsData {
     name?: string
     slug?: string | null
     base_url?: string | null
+    hosted_url?: string | null
+    external_url?: string | null
     admin_url?: string | null
     probe: {
       reachable: boolean
@@ -1694,6 +1699,12 @@ export interface MerchantDiagnosticsData {
       latency_ms: number | null
       error: string | null
     }
+    external_probe?: {
+      reachable: boolean
+      status: number
+      latency_ms: number | null
+      error: string | null
+    } | null
   }
   device: {
     status: 'ONLINE' | 'STALE' | 'OFFLINE' | 'NOT_PAIRED'
@@ -1714,6 +1725,9 @@ export interface MerchantDiagnosticsData {
     status: 'ONLINE' | 'DEGRADED' | 'NOT_CONFIGURED'
     receiving_numbers: Record<string, string>
     active_numbers: Record<string, string>
+    account_types?: Record<string, string>
+    qr_codes?: Record<string, string>
+    default_number?: string | null
     enabled_methods: Record<string, boolean>
     fee_bearer?: string
     min_amount?: number
