@@ -101,10 +101,10 @@
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
 
   <!-- Main Container (Responsive Grid layout) -->
-  <main class="w-full max-w-md md:max-w-4xl bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden relative grid grid-cols-1 md:grid-cols-12 min-h-[850px] md:min-h-[600px] md:max-h-[850px]">
+  <main class="w-full max-w-md md:max-w-4xl bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden relative grid grid-cols-1 md:grid-cols-12 md:min-h-[640px]">
     
     <!-- LEFT PANEL: Summary & Brand (Cols 1-5) -->
-    <section class="col-span-1 md:col-span-5 bg-gray-50/70 border-b md:border-b-0 md:border-r border-gray-100 p-6 md:p-8 flex flex-col justify-between">
+    <section class="col-span-1 md:col-span-5 bg-gray-50/70 border-b md:border-b-0 md:border-r border-gray-100 p-4 sm:p-6 md:p-8 flex flex-col justify-between">
       <div>
         
         <!-- Header Brand Info -->
@@ -116,22 +116,22 @@
               <p class="text-[11px] font-bold text-amber-900 mb-0.5">Merchant Device Offline</p>
               <p class="text-[10px] text-amber-700 mb-2">The merchant's device is currently offline. Payments may not be verified automatically.</p>
               <div class="flex gap-2">
-                <button type="button" onclick="retryDeviceCheck()" class="text-[10px] font-bold bg-amber-500 text-white px-2.5 py-1 rounded-lg hover:bg-amber-600 transition-colors">Retry</button>
+                <button type="button" onclick="retryDeviceCheck()" class="text-[10px] font-bold bg-amber-500 text-white px-2.5 py-1 rounded-lg hover:bg-amber-600 transition-colors cursor-pointer">Retry</button>
                 <a id="merchant-contact-btn" href="#" class="text-[10px] font-bold bg-white border border-amber-300 text-amber-700 px-2.5 py-1 rounded-lg hover:bg-amber-50 transition-colors">Call Merchant</a>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="flex justify-between items-center mb-6">
-          <div class="flex items-center gap-2">
-            <div id="avatar" class="avatar-fallback bg-[#3D2C1A]">D</div>
-            <div>
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div id="avatar" class="avatar-fallback bg-[#3D2C1A] flex-shrink-0">D</div>
+            <div class="min-w-0">
               <div class="flex items-center gap-1">
-                <h1 class="font-bold text-gray-900 text-sm md:text-base" id="merchant-name">DreamMart</h1>
-                <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>
+                <h1 class="font-bold text-gray-900 text-sm md:text-base truncate" id="merchant-name">DreamMart</h1>
+                <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>
               </div>
-              <div class="flex items-center gap-1.5 mt-0.5">
+              <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <p class="text-[10px] text-gray-400" data-translate="verifiedSecure">Verified Secure</p>
                 <span class="text-gray-300 text-[10px]">•</span>
                 <div id="realtime-device-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all duration-300 bg-amber-50 text-amber-700 border-amber-200">
@@ -143,35 +143,41 @@
                 </div>
               </div>
             </div>
+          </div>
 
           <!-- Language Selector -->
-          <div class="flex gap-1">
-            <button type="button" class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-blue-600 text-white border-blue-600" id="lang-en" onclick="setLanguage('en')">EN</button>
-            <button type="button" class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-white text-gray-500 border-gray-200" id="lang-bn" onclick="setLanguage('bn')">বাংলা</button>
+          <div class="flex gap-1 flex-shrink-0 ml-2">
+            <button type="button" class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-blue-600 text-white border-blue-600 cursor-pointer" id="lang-en" onclick="setLanguage('en')">EN</button>
+            <button type="button" class="text-[10px] px-2 py-0.5 rounded font-black border transition-colors bg-white text-gray-500 border-gray-200 cursor-pointer" id="lang-bn" onclick="setLanguage('bn')">বাংলা</button>
           </div>
         </div>
 
         <!-- Total Amount -->
-        <div class="mb-5 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-          <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1" data-translate="amtPaid">Total Amount</p>
-          <p class="text-2xl md:text-3xl font-black text-blue-600" id="amount-text">৳1,500.00</p>
+        <div class="mb-4 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5" data-translate="amtPaid">Total Amount</p>
+            <p class="text-2xl md:text-3xl font-black text-blue-600" id="amount-text">৳1,500.00</p>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-lg border border-blue-100 inline-block font-mono" id="summary-order-badge">ORD-XXXX</span>
+          </div>
         </div>
 
         <!-- Mobile Toggle Button -->
-        <button type="button" class="md:hidden w-full flex justify-between items-center py-2 px-3.5 bg-gray-100 hover:bg-gray-200/70 transition-colors rounded-xl text-[11px] font-bold text-gray-600 mb-4" onclick="toggleSummaryMobile()">
+        <button type="button" class="md:hidden w-full flex justify-between items-center py-2 px-3.5 bg-gray-100 hover:bg-gray-200/70 transition-colors rounded-xl text-[11px] font-bold text-gray-600 mb-3 cursor-pointer" onclick="toggleSummaryMobile()">
           <span id="summary-toggle-text" data-translate="orderInfo">Order Details & Instructions</span>
           <span class="material-symbols-outlined text-[16px]" id="summary-toggle-icon">expand_more</span>
         </button>
 
         <!-- Collapsible Content (Details & Instructions) -->
-        <div id="collapsible-summary" class="hidden md:block space-y-4">
+        <div id="collapsible-summary" class="hidden md:block space-y-3">
           <!-- Order Information -->
-          <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm text-xs">
+          <div class="bg-white border border-gray-100 rounded-2xl p-3.5 shadow-sm text-xs">
             <h4 class="font-bold text-gray-700 mb-2 border-b border-gray-100 pb-1.5" data-translate="orderInfo">Order Details</h4>
-            <div class="space-y-2">
+            <div class="space-y-1.5">
               <div class="flex justify-between">
                 <span class="text-gray-400" data-translate="orderIdLabel">Order ID</span>
-                <span class="font-bold text-gray-800" id="summary-order-id">ORD-XXXX</span>
+                <span class="font-bold text-gray-800 font-mono" id="summary-order-id">ORD-XXXX</span>
               </div>
               <div class="flex flex-col">
                 <span class="text-gray-400 mb-0.5" data-translate="descLabel">Description</span>
@@ -181,9 +187,12 @@
           </div>
 
           <!-- Instructions Card -->
-          <div class="bg-blue-50/50 border border-blue-50 p-4 rounded-2xl text-xs">
-            <h4 class="font-bold text-blue-900 mb-2" data-translate="scanPay">Scan & Pay Instructions</h4>
-            <ol class="space-y-1.5 text-blue-800 font-medium" id="instructions-list">
+          <div class="bg-blue-50/60 border border-blue-100 p-3.5 rounded-2xl text-xs">
+            <div class="flex items-center gap-1.5 mb-2 text-blue-900 font-bold">
+              <span class="material-symbols-outlined text-[15px]">info</span>
+              <h4 data-translate="scanPay">Scan & Pay Instructions</h4>
+            </div>
+            <ol class="space-y-1 text-blue-800 font-medium text-[11px]" id="instructions-list">
               <li>1. Open your bKash App</li>
               <li>2. Go to Send Money or Scan</li>
               <li>3. Enter the Merchant Wallet Number</li>
@@ -272,43 +281,59 @@
             </div>
 
             <h2 class="text-base font-bold text-gray-800 mb-0.5" data-translate="choosePay">Choose Payment Method</h2>
-            <p class="text-[11px] text-gray-400 mb-4" data-translate="selectPref">Select your preferred payment option</p>
+            <p class="text-[11px] text-gray-400 mb-3" data-translate="selectPref">Select your preferred payment option</p>
 
-            <div class="grid grid-cols-2 gap-2 mb-4" id="mfs-options-container">
+            <div class="grid grid-cols-2 gap-2.5 mb-3" id="mfs-options-container">
               <!-- bKash option -->
-              <div class="border border-pink-500 bg-pink-50/10 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('bKash', '#E2125A')" id="opt-bkash">
+              <div class="border border-pink-500 bg-pink-50/10 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option transition-all hover:scale-[1.02]" onclick="selectMFS('bKash', '#E2125A')" id="opt-bkash">
                 <img src="BKash-Icon2-Logo.wine.svg" alt="bKash" class="w-9 h-9 object-contain" />
                 <span class="text-xs font-bold text-gray-700">bKash</span>
               </div>
               <!-- Nagad option -->
-              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Nagad', '#EC5A24')" id="opt-nagad">
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option transition-all hover:scale-[1.02]" onclick="selectMFS('Nagad', '#EC5A24')" id="opt-nagad">
                 <img src="Nagad-Logo.wine.svg" alt="Nagad" class="w-9 h-9 object-contain" />
                 <span class="text-xs font-bold text-gray-700">Nagad</span>
               </div>
               <!-- Rocket option -->
-              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Rocket', '#8C3494')" id="opt-rocket">
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option transition-all hover:scale-[1.02]" onclick="selectMFS('Rocket', '#8C3494')" id="opt-rocket">
                 <img src="Rocket.png" alt="Rocket" class="w-9 h-9 object-contain" />
                 <span class="text-xs font-bold text-gray-700">Rocket</span>
               </div>
               <!-- Upay option -->
-              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option" onclick="selectMFS('Upay', '#10B981')" id="opt-upay">
+              <div class="border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 cursor-pointer shadow-sm mfs-option transition-all hover:scale-[1.02]" onclick="selectMFS('Upay', '#10B981')" id="opt-upay">
                 <img src="upay-seeklogo.png" alt="Upay" class="w-9 h-9 object-contain" />
                 <span class="text-xs font-bold text-gray-700">Upay</span>
               </div>
             </div>
 
-            <div class="mb-4">
+            <!-- Selected Method Guidance Box -->
+            <div id="step1-guide-box" class="bg-blue-50/70 border border-blue-100 rounded-xl p-3 mb-3.5 text-xs transition-all">
+              <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                  <img id="step1-guide-icon" src="BKash-Icon2-Logo.wine.svg" alt="MFS" class="w-4 h-4 object-contain" />
+                  <span class="font-bold text-gray-800 text-xs" id="step1-guide-title">bKash Payment</span>
+                </div>
+                <span id="step1-guide-type" class="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase">Send Money</span>
+              </div>
+              <p class="text-[11px] text-gray-600 font-medium leading-relaxed" id="step1-guide-desc">
+                Enter your bKash mobile number below. You will receive the merchant wallet details and step-by-step instructions to transfer on the next step.
+              </p>
+            </div>
+
+            <div class="mb-3.5">
               <label class="block text-[11px] font-bold text-gray-600 mb-1.5" id="phone-label" data-translate="payNumber">Payment Number (Your bKash Number) *</label>
-              <div class="flex border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors bg-white">
+              <div class="flex border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors bg-white shadow-xs">
                 <span class="bg-gray-50 border-r border-gray-200 px-3 py-2 text-xs text-gray-500 flex items-center font-bold">+880</span>
                 <input type="tel" class="w-full px-3.5 py-2 outline-none text-xs text-gray-800 font-semibold" placeholder="Enter 11 digit mobile number" id="customer-phone">
               </div>
               <p class="text-rose-500 text-[10px] font-bold mt-1.5 hidden" id="phone-error-msg" data-translate="phoneError">Please enter a valid 11-digit mobile number.</p>
             </div>
 
-            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex gap-2.5 text-blue-700 mb-4">
-              <span class="material-symbols-outlined text-lg mt-0.5">info</span>
-              <p class="text-[11px] leading-relaxed font-medium" data-translate="payRequest">You will receive the transaction reference number and merchant wallet account details on the next step.</p>
+            <div class="bg-amber-50/70 border border-amber-100 rounded-xl p-3 flex gap-2 text-amber-800 text-xs">
+              <span class="material-symbols-outlined text-[17px] text-amber-600 mt-0.5">verified_user</span>
+              <p class="text-[11px] leading-relaxed font-medium" id="step1-note-text">
+                Your payment is protected by 256-bit automated verification. You will review wallet details before sending.
+              </p>
             </div>
           </div>
 
@@ -333,23 +358,26 @@
             </div>
 
             <!-- Selected Payment Method Card -->
-            <div class="flex items-center justify-between p-2.5 border border-rose-100 bg-white rounded-xl shadow-sm mb-3">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 flex items-center justify-center border border-gray-100 rounded-lg">
+            <div class="flex items-center justify-between p-2.5 border border-rose-100 bg-white rounded-xl shadow-xs mb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 flex items-center justify-center border border-gray-100 rounded-lg p-1 bg-white">
                   <img alt="MFS Logo" class="w-7 h-7 object-contain" id="mfs-selected-logo" src="BKash-Icon2-Logo.wine.svg">
                 </div>
-                <span class="text-xs font-bold text-gray-800" id="mfs-selected-name">bKash</span>
+                <div>
+                  <span class="text-xs font-bold text-gray-800 block" id="mfs-selected-name">bKash</span>
+                  <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider" id="mfs-selected-type-badge">Send Money</span>
+                </div>
               </div>
-              <button type="button" class="text-rose-500 text-xs font-semibold border border-rose-200 px-3 py-1 rounded-lg hover:bg-rose-50 transition-colors" onclick="goToStep(1)">Change</button>
+              <button type="button" class="text-rose-600 text-xs font-semibold border border-rose-200 px-3 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer" onclick="goToStep(1)">Change</button>
             </div>
 
-            <!-- Mobile Countdown Timer -->
-            <div class="bg-rose-50 py-2 px-3 rounded-xl flex items-center justify-between mb-3 border border-rose-100 md:hidden" id="timer-box-mobile">
+            <!-- Countdown Timer -->
+            <div class="bg-rose-50 py-2 px-3 rounded-xl flex items-center justify-between mb-3 border border-rose-100" id="timer-box-mobile">
               <div class="flex items-center gap-1.5 text-rose-600">
                 <span class="material-symbols-outlined text-[16px]">schedule</span>
                 <span class="text-[9px] font-bold" data-translate="timerHint">Complete the payment within</span>
               </div>
-              <div class="flex gap-1 items-center font-bold text-rose-600 text-xs">
+              <div class="flex gap-1 items-center font-bold text-rose-600 text-xs font-mono">
                 <span id="min-mobile">10</span>:<span id="sec-mobile">00</span>
               </div>
             </div>
@@ -378,9 +406,9 @@
               <!-- Merchant Number -->
               <div>
                 <label class="block text-[10px] font-bold text-gray-600 mb-0.5" id="merchant-num-label" data-translate="merchantNum">Merchant Number</label>
-                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-semibold outline-none" readonly id="merchant-num-display" value="017XXXXXXXX">
-                  <button type="button" class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors" onclick="copyNumber()">
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50 focus-within:border-blue-500 shadow-xs">
+                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-bold outline-none font-mono" readonly id="merchant-num-display" value="017XXXXXXXX">
+                  <button type="button" class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors cursor-pointer" onclick="copyNumber()">
                     <span data-translate="copy">Copy</span>
                     <span class="material-symbols-outlined text-[14px]">content_copy</span>
                   </button>
@@ -390,23 +418,62 @@
               <!-- Amount -->
               <div>
                 <label class="block text-[10px] font-bold text-gray-600 mb-0.5" data-translate="amount">Amount</label>
-                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-900 font-extrabold outline-none" readonly id="amount-text-input" value="৳1,500.00">
-                  <button type="button" class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors" onclick="copyAmount()">
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50 focus-within:border-blue-500 shadow-xs">
+                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-900 font-black outline-none font-mono" readonly id="amount-text-input" value="৳1,500.00">
+                  <button type="button" class="flex items-center gap-1 px-3 py-2 bg-white border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-50 transition-colors cursor-pointer" onclick="copyAmount()">
                     <span data-translate="copy">Copy</span>
                     <span class="material-symbols-outlined text-[14px]">content_copy</span>
                   </button>
                 </div>
               </div>
 
+              <!-- STEP 2 PAYMENT INSTRUCTIONS CARD -->
+              <div class="bg-gradient-to-br from-slate-50 to-blue-50/50 border border-blue-100/90 rounded-2xl p-3.5 shadow-xs text-xs my-2" id="step2-instructions-box">
+                <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-blue-100">
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-xs">
+                      <i class="fa-solid fa-list-check"></i>
+                    </span>
+                    <div>
+                      <h3 class="font-bold text-gray-900 text-xs leading-none" id="step2-instructions-title">Payment Instructions</h3>
+                      <p class="text-[9px] text-gray-500 mt-0.5" id="step2-instructions-subtitle">Follow these steps to complete payment</p>
+                    </div>
+                  </div>
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 tracking-wider" id="step2-type-badge">Send Money</span>
+                </div>
+
+                <ol class="space-y-2 text-[11px] text-gray-700 font-medium leading-snug" id="step2-instructions-list">
+                  <!-- Populated dynamically by updateLabelsForMfs() in widget.js -->
+                </ol>
+
+                <div class="mt-2.5 pt-2 border-t border-dashed border-blue-200/60 flex items-center justify-between text-[10px]">
+                  <div class="flex items-center gap-1 text-blue-800 font-semibold">
+                    <span class="material-symbols-outlined text-[14px] text-amber-500">dialpad</span>
+                    <span id="step2-ussd-code">Dial *247# (USSD)</span>
+                  </div>
+                  <button type="button" class="text-blue-600 font-bold hover:text-blue-800 transition-colors flex items-center gap-0.5 cursor-pointer" onclick="copyNumber()">
+                    <span class="material-symbols-outlined text-[13px]">content_copy</span>
+                    <span id="step2-copy-num-text">Copy Number</span>
+                  </button>
+                </div>
+              </div>
+
               <!-- Transaction ID (TrxID) -->
               <div>
-                <label class="block text-[10px] font-bold text-gray-600 mb-0.5">
-                  <span>Transaction ID (TrxID)</span> <span class="text-gray-400 font-normal">(পেমেন্ট পরবর্তী TrxID লিখুন)</span>
-                </label>
-                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-white">
-                  <input class="w-full bg-transparent px-3.5 py-2 text-xs text-gray-800 font-semibold outline-none uppercase" id="step2-trx-input" placeholder="e.g. 9H8B7G6F5E" autocomplete="off" />
+                <div class="flex items-center justify-between mb-0.5">
+                  <label class="block text-[10px] font-bold text-gray-700" for="step2-trx-input">
+                    <span>Transaction ID (TrxID)</span> <span class="text-red-500 font-bold">*</span>
+                  </label>
+                  <span class="text-[9px] text-gray-400 font-medium">(পেমেন্ট পরবর্তী TrxID লিখুন)</span>
                 </div>
+                <div class="relative flex border border-gray-200 rounded-xl overflow-hidden bg-white focus-within:border-blue-500 shadow-xs">
+                  <input class="w-full bg-transparent px-3.5 py-2.5 text-xs text-gray-900 font-mono font-bold outline-none uppercase placeholder:font-sans placeholder:font-normal placeholder:text-gray-400" id="step2-trx-input" placeholder="e.g. 9H8B7G6F5E" autocomplete="off" oninput="this.value = this.value.toUpperCase().replace(/\s+/g, '')" />
+                  <button type="button" class="flex items-center gap-1 px-3 py-2 bg-gray-50 border-l border-gray-200 text-blue-600 font-bold text-[10px] hover:bg-gray-100 transition-colors cursor-pointer" onclick="pasteTrxId()">
+                    <span>Paste</span>
+                    <span class="material-symbols-outlined text-[14px]">content_paste</span>
+                  </button>
+                </div>
+                <p class="text-[9px] text-gray-400 mt-1" id="step2-trx-help">You will find the TrxID in the confirmation SMS or in your MFS app statement.</p>
               </div>
             </div>
           </div>
@@ -803,7 +870,7 @@
         </div>
       </div>
 
-    </div>
+    </section>
 
   </main>
 
@@ -829,30 +896,58 @@
     </div>
   </div>
 
-  <!-- Floating Help Button -->
-  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+  <!-- Floating Help Backdrop & Modal -->
+  <div id="support-backdrop" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 transition-opacity" onclick="toggleSupportPopup(false)"></div>
+
+  <div class="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex flex-col items-end gap-2">
     <!-- Hidden Support Popup Panel -->
-    <div id="support-popup" class="hidden bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-60 mb-2 transition-all duration-300">
-      <div class="flex items-center gap-2 mb-3">
-        <span class="material-symbols-outlined text-blue-600 text-lg">support_agent</span>
-        <div>
-          <h4 class="font-bold text-xs text-gray-800" data-translate="helplineTitle">Need Help?</h4>
-          <p class="text-[9px] text-gray-400" data-translate="helplineSub">24/7 Helpline Support</p>
+    <div id="support-popup" class="hidden bg-white border border-gray-100 rounded-2xl shadow-2xl p-4 w-72 mb-2 transition-all duration-300">
+      <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <span class="material-symbols-outlined text-lg">support_agent</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-gray-800" data-translate="helplineTitle">Need Help?</h4>
+            <p class="text-[9px] text-gray-400" data-translate="helplineSub">Customer & Payment Support</p>
+          </div>
         </div>
+        <button type="button" onclick="toggleSupportPopup(false)" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+          <span class="material-symbols-outlined text-base">close</span>
+        </button>
       </div>
-      <div class="flex gap-2">
-        <a href="tel:+8809612345678" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
-          <span class="material-symbols-outlined text-xs">phone</span>
-          <span>Call</span>
+
+      <div class="space-y-2 text-xs">
+        <a id="support-merchant-call" href="tel:+8801863054816" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-xl text-[11px] transition-colors flex items-center justify-between shadow-xs">
+          <span class="flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">phone</span>
+            <span id="support-call-text">Call Merchant</span>
+          </span>
+          <span class="text-[10px] opacity-90 font-mono" id="support-merchant-num">Direct</span>
         </a>
-        <a href="mailto:support@swapnopay.com" class="flex-1 bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
-          <span class="material-symbols-outlined text-xs">mail</span>
-          <span>Email</span>
+
+        <a id="support-merchant-wa" href="https://wa.me/8801863054816" target="_blank" rel="noopener noreferrer" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-[11px] transition-colors flex items-center justify-between shadow-xs">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+            <span>WhatsApp Support</span>
+          </span>
+          <span class="text-[10px] opacity-90">Chat</span>
         </a>
+
+        <div class="pt-2 border-t border-gray-100 flex gap-2">
+          <a href="tel:+8809612345678" class="flex-1 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
+            <span class="material-symbols-outlined text-xs text-blue-600">headset_mic</span>
+            <span>Helpline</span>
+          </a>
+          <a href="mailto:support@swapnopay.com" class="flex-1 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 font-bold py-1.5 rounded-lg text-[10px] transition-colors flex items-center justify-center gap-1">
+            <span class="material-symbols-outlined text-xs text-blue-600">mail</span>
+            <span>Email</span>
+          </a>
+        </div>
       </div>
     </div>
     <!-- Core Floating Circle Trigger -->
-    <button type="button" onclick="toggleSupportPopup()" class="w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all border border-blue-500/20 active:scale-95">
+    <button type="button" onclick="toggleSupportPopup()" class="w-11 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all border border-blue-500/20 active:scale-95 cursor-pointer" title="Need Help?">
       <span class="material-symbols-outlined text-2xl" id="support-icon-symbol">support_agent</span>
     </button>
   </div>

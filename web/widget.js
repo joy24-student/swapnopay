@@ -287,8 +287,10 @@ window.onload = function () {
     document.getElementById("merchant-num-display").value = receiverNumber;
     updateQrCode(receiverNumber);
   }
-  document.getElementById("summary-order-id").innerText =
-    orderId !== "demo_order_id" ? `#${orderId.slice(0, 8)}...` : "#DEMO-9912";
+  const initOrderLabel = orderId !== "demo_order_id" ? `#${orderId.slice(0, 8)}...` : "#DEMO-9912";
+  document.getElementById("summary-order-id").innerText = initOrderLabel;
+  const initBadge = document.getElementById("summary-order-badge");
+  if (initBadge) initBadge.innerText = initOrderLabel;
 
   setLanguage("en");
   selectMFS(initialMethod, methodColorMap[initialMethod] || "#E2125A");
@@ -349,8 +351,10 @@ function fetchOrderFromMerchantDB() {
         setAmountDisplay(formatted);
       }
 
-      document.getElementById("summary-order-id").innerText =
-        order.tran_id || `#${order.id.slice(0, 8)}...`;
+      const orderDisplayId = order.tran_id || `#${order.id.slice(0, 8)}...`;
+      document.getElementById("summary-order-id").innerText = orderDisplayId;
+      const orderBadge = document.getElementById("summary-order-badge");
+      if (orderBadge) orderBadge.innerText = orderDisplayId;
 
       // Load form submission logo/description
       if (order.form_submissions && order.form_submissions.length > 0) {
@@ -421,6 +425,8 @@ function fetchOrderFromBackendAPI() {
       }
       if (data.tran_id) {
         document.getElementById("summary-order-id").innerText = data.tran_id;
+        const oBadge = document.getElementById("summary-order-badge");
+        if (oBadge) oBadge.innerText = data.tran_id;
       }
       if (data.product_name) {
         const descEl = document.getElementById("summary-desc");
@@ -1315,6 +1321,7 @@ function setAmountDisplay(amount) {
   document.getElementById("amount-text").innerText = `৳${amount}`;
   document.getElementById("amount-text-input").value = `৳${amount}`;
   document.getElementById("receipt-amount").innerText = `৳${amount}`;
+  if (selectedMethod) updateLabelsForMfs(selectedMethod);
 }
 
 function setMerchantNameDisplay(name) {
@@ -1392,9 +1399,79 @@ function selectMFS(method, color) {
   updateLabelsForMfs(method);
 }
 
+const mfsInfo = {
+  bKash: {
+    ussd: "*247#",
+    app: "bKash App",
+    appBn: "বিকাশ অ্যাপ",
+    color: "#E2125A",
+    icon: "BKash-Icon2-Logo.wine.svg",
+    personalText: { en: "Send Money", bn: "সেন্ড মানি" },
+    merchantText: { en: "Make Payment", bn: "পেমেন্ট" }
+  },
+  Nagad: {
+    ussd: "*167#",
+    app: "Nagad App",
+    appBn: "নগদ অ্যাপ",
+    color: "#EC5A24",
+    icon: "Nagad-Logo.wine.svg",
+    personalText: { en: "Send Money", bn: "সেন্ড মানি" },
+    merchantText: { en: "Merchant Pay", bn: "মার্চেন্ট পে" }
+  },
+  Rocket: {
+    ussd: "*322#",
+    app: "Rocket App",
+    appBn: "রকেট অ্যাপ",
+    color: "#8C3494",
+    icon: "Rocket.png",
+    personalText: { en: "Send Money", bn: "সেন্ড মানি" },
+    merchantText: { en: "Merchant Payment", bn: "মার্চেন্ট পেমেন্ট" }
+  },
+  Upay: {
+    ussd: "*268#",
+    app: "Upay App",
+    appBn: "উপায় অ্যাপ",
+    color: "#10B981",
+    icon: "upay-seeklogo.png",
+    personalText: { en: "Send Money", bn: "সেন্ড মানি" },
+    merchantText: { en: "Make Payment", bn: "পেমেন্ট" }
+  }
+};
+
+function updateSupportContacts(phone) {
+  if (!phone || isFakeNumber(phone)) return;
+  const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+  const callEl = document.getElementById("support-merchant-call");
+  const waEl = document.getElementById("support-merchant-wa");
+  const numEl = document.getElementById("support-merchant-num");
+  if (callEl) callEl.href = `tel:${phone}`;
+  if (numEl) numEl.innerText = phone;
+  if (waEl) {
+    const waNum = cleanPhone.startsWith('880') ? cleanPhone : cleanPhone.startsWith('0') ? `88${cleanPhone}` : `880${cleanPhone}`;
+    waEl.href = `https://wa.me/${waNum}?text=${encodeURIComponent("Hello, I need assistance with payment on SwapnoPay")}`;
+  }
+}
+
+async function pasteTrxId() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      const inp = document.getElementById("step2-trx-input");
+      if (inp) {
+        inp.value = text.trim().toUpperCase().replace(/\s+/g, '');
+        inp.dispatchEvent(new Event('input'));
+      }
+    }
+  } catch (err) {
+    console.warn("Clipboard paste unavailable:", err);
+  }
+}
+
 function updateLabelsForMfs(method) {
+  const currentMethod = method || selectedMethod || "bKash";
+  const info = mfsInfo[currentMethod] || mfsInfo.bKash;
   const nameEl = document.getElementById("mfs-selected-name");
-  if (nameEl) nameEl.innerText = method;
+  if (nameEl) nameEl.innerText = currentMethod;
 
   const phoneLabel   = document.getElementById("phone-label");
   const numLabel     = document.getElementById("merchant-num-label");
@@ -1404,15 +1481,16 @@ function updateLabelsForMfs(method) {
   const instructionsHeader = document.querySelector('[data-translate="scanPay"]');
 
   const urlAccType = new URLSearchParams(window.location.search).get("account_type") || "";
-  const accTypeVal = getMethodValue(merchantAccountTypes, method) || urlAccType;
+  const accTypeVal = getMethodValue(merchantAccountTypes, currentMethod) || urlAccType;
   const accType = String(accTypeVal).trim().toLowerCase();
   const isPersonal = accType.includes("personal");
   const anyReceivingNum = Object.values(merchantReceivingNumbers || {}).find(n => n && !isFakeNumber(n)) || "";
-  const targetNum = getMethodValue(merchantReceivingNumbers, method) || (!isFakeNumber(merchantDefaultNumber) ? merchantDefaultNumber : "") || anyReceivingNum;
+  const targetNum = getMethodValue(merchantReceivingNumbers, currentMethod) || (!isFakeNumber(merchantDefaultNumber) ? merchantDefaultNumber : "") || anyReceivingNum;
 
   const disp = document.getElementById("merchant-num-display");
   if (disp) disp.value = targetNum;
   const currentReceiverNum = targetNum || "";
+  updateSupportContacts(currentReceiverNum || merchantDefaultNumber);
 
   if (qrCard) {
     if (isPersonal) {
@@ -1425,61 +1503,220 @@ function updateLabelsForMfs(method) {
 
   updateQrCode(targetNum);
 
+  const typeTextEn = isPersonal ? info.personalText.en : info.merchantText.en;
+  const typeTextBn = isPersonal ? info.personalText.bn : info.merchantText.bn;
+
+  // Selected method badges
+  const selTypeBadge = document.getElementById("mfs-selected-type-badge");
+  if (selTypeBadge) selTypeBadge.innerText = currentLang === "en" ? typeTextEn : typeTextBn;
+
+  // Step 1 guide box
+  const step1GuideTitle = document.getElementById("step1-guide-title");
+  const step1GuideType  = document.getElementById("step1-guide-type");
+  const step1GuideDesc  = document.getElementById("step1-guide-desc");
+  const step1GuideIcon  = document.getElementById("step1-guide-icon");
+  if (step1GuideIcon) step1GuideIcon.src = info.icon;
+  if (step1GuideTitle) {
+    step1GuideTitle.innerText = currentLang === "en" ? `Paying with ${currentMethod}` : `${currentMethod}-এ পেমেন্ট`;
+  }
+  if (step1GuideType) {
+    step1GuideType.innerText = currentLang === "en" ? typeTextEn : typeTextBn;
+  }
+  if (step1GuideDesc) {
+    if (currentLang === "en") {
+      step1GuideDesc.innerText = `Enter your ${currentMethod} mobile number below. You will receive the merchant ${isPersonal ? 'personal' : 'merchant'} wallet details and step-by-step instructions to transfer on the next step.`;
+    } else {
+      step1GuideDesc.innerText = `নিচে আপনার ${currentMethod} মোবাইল নম্বর লিখুন। পরবর্তী ধাপে আপনি মার্চেন্টের ${isPersonal ? 'ব্যক্তিগত' : 'মার্চেন্ট'} নম্বর ও বিস্তারিত ${typeTextBn} করার নিয়ম দেখতে পাবেন।`;
+    }
+  }
+
+  // Common order reference & amount
+  const orderRef = orderId && orderId !== "demo_order_id" ? (document.getElementById("summary-order-id")?.innerText || orderId) : "ORD-XXXX";
+  const displayAmt = payableAmount || (document.getElementById("amount-text-input")?.value?.replace('৳', '') || "0.00");
+
+  // Step 2 Instructions Box elements
+  const step2Title    = document.getElementById("step2-instructions-title");
+  const step2Subtitle = document.getElementById("step2-instructions-subtitle");
+  const step2TypeBadge= document.getElementById("step2-type-badge");
+  const step2List     = document.getElementById("step2-instructions-list");
+  const step2UssdCode = document.getElementById("step2-ussd-code");
+  const step2CopyText = document.getElementById("step2-copy-num-text");
+
+  if (step2Title) {
+    step2Title.innerText = currentLang === "en" ? `How to Pay with ${currentMethod}` : `${currentMethod} দিয়ে কীভাবে পেমেন্ট করবেন`;
+  }
+  if (step2Subtitle) {
+    step2Subtitle.innerText = currentLang === "en" ? `Follow these steps to complete ${typeTextEn}` : `${typeTextBn} সম্পন্ন করতে নিচের ধাপগুলো অনুসরণ করুন`;
+  }
+  if (step2TypeBadge) {
+    step2TypeBadge.innerText = currentLang === "en" ? typeTextEn : typeTextBn;
+  }
+  if (step2UssdCode) {
+    step2UssdCode.innerText = currentLang === "en" ? `Dial ${info.ussd} (if using USSD)` : `ডায়াল করুন ${info.ussd} (ইউএসএসডি)`;
+  }
+  if (step2CopyText) {
+    step2CopyText.innerText = currentLang === "en" ? "Copy Number" : "নম্বর কপি করুন";
+  }
+
   if (currentLang === "en") {
     if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "Send Money Instructions" : "Scan & Pay Instructions";
-    if (phoneLabel) phoneLabel.innerText = `Payment Number (Your ${method} Number) *`;
-    if (numLabel)   numLabel.innerText   = `${method} Merchant Number`;
-    if (numLabel)   numLabel.innerText   = isPersonal ? `${method} Personal Number (Send Money)` : `${method} Merchant Number (Payment)`;
-    if (qrHint)     qrHint.innerText     = `Scan this QR code with your ${method} app to pay instantly.`;
-    if (instructions) instructions.innerHTML = `
-      <li>1. Open your ${method} App</li>
-      <li>2. Go to Send Money or Scan</li>
-      <li>3. Enter the Merchant Wallet Number</li>
-      <li>4. Input the exact Amount and confirm</li>
-    `;
+    if (phoneLabel) phoneLabel.innerText = `Payment Number (Your ${currentMethod} Number) *`;
+    if (numLabel)   numLabel.innerText   = isPersonal ? `${currentMethod} Personal Number (Send Money)` : `${currentMethod} Merchant Number (Payment)`;
+    if (qrHint)     qrHint.innerText     = `Scan this QR code with your ${currentMethod} app to pay instantly.`;
+
     if (instructions) {
       if (isPersonal) {
         instructions.innerHTML = `
-          <li>1. Open your ${method} App</li>
+          <li>1. Open your ${info.app} or dial <strong class="text-blue-700">${info.ussd}</strong></li>
           <li>2. Select <strong>Send Money</strong> (সেন্ড মানি)</li>
-          <li>3. Enter Personal Number: <strong>${currentReceiverNum}</strong></li>
-          <li>4. Input exact Amount and confirm transfer</li>
+          <li>3. Enter Receiver Number: <strong class="text-blue-600">${currentReceiverNum}</strong></li>
+          <li>4. Input exact Amount <strong>৳${displayAmt}</strong> & confirm</li>
         `;
       } else {
         instructions.innerHTML = `
-          <li>1. Open your ${method} App</li>
-          <li>2. Scan QR or go to <strong>Payment</strong></li>
-          <li>3. Enter Merchant Number: <strong>${currentReceiverNum}</strong></li>
-          <li>4. Input exact Amount and confirm</li>
+          <li>1. Open your ${info.app} or dial <strong class="text-blue-700">${info.ussd}</strong></li>
+          <li>2. Scan QR code or select <strong>Make Payment</strong></li>
+          <li>3. Enter Merchant Number: <strong class="text-blue-600">${currentReceiverNum}</strong></li>
+          <li>4. Input exact Amount <strong>৳${displayAmt}</strong> & confirm</li>
+        `;
+      }
+    }
+
+    if (step2List) {
+      if (isPersonal) {
+        step2List.innerHTML = `
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+            <span>Open your <strong>${info.app}</strong> or dial <strong class="font-mono text-blue-700">${info.ussd}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+            <span>Choose <strong>Send Money</strong> (সেন্ড মানি)</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+            <span>Enter Receiver Number: <strong class="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded select-all cursor-pointer" onclick="copyNumber()">${currentReceiverNum}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">4</span>
+            <span>Enter exact Amount: <strong class="font-mono text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">৳${displayAmt}</strong> and Reference: <strong class="font-mono text-gray-800">${orderRef}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">5</span>
+            <span>Enter your <strong>${currentMethod} PIN</strong> to complete the transfer</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">6</span>
+            <span>Copy the <strong>TrxID</strong> from SMS/App, paste it into the box below and click <strong>"I Have Completed Payment"</strong>.</span>
+          </li>
+        `;
+      } else {
+        step2List.innerHTML = `
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+            <span>Open your <strong>${info.app}</strong> or dial <strong class="font-mono text-blue-700">${info.ussd}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+            <span>Scan the <strong>QR Code</strong> above OR choose <strong>Make Payment</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+            <span>Enter Merchant Number: <strong class="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded select-all cursor-pointer" onclick="copyNumber()">${currentReceiverNum}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">4</span>
+            <span>Enter exact Amount: <strong class="font-mono text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">৳${displayAmt}</strong> and Reference: <strong class="font-mono text-gray-800">${orderRef}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">5</span>
+            <span>Enter your <strong>${currentMethod} PIN</strong> to complete the payment</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">6</span>
+            <span>Enter the <strong>TrxID</strong> in the box below and click <strong>"I Have Completed Payment"</strong>.</span>
+          </li>
         `;
       }
     }
   } else {
     if (instructionsHeader) instructionsHeader.innerText = isPersonal ? "সেন্ড মানি করার নির্দেশিকা" : "পেমেন্ট নির্দেশিকা";
-    if (phoneLabel) phoneLabel.innerText = `পেমেন্ট মোবাইল নম্বর (আপনার ${method} নম্বর) *`;
-    if (numLabel)   numLabel.innerText   = `${method} মার্চেন্ট নম্বর`;
-    if (numLabel)   numLabel.innerText   = isPersonal ? `${method} ব্যক্তিগত নম্বর (সেন্ড মানি)` : `${method} মার্চেন্ট নম্বর (পেমেন্ট)`;
-    if (qrHint)     qrHint.innerText     = `তাত্ক্ষণিকভাবে অর্থ প্রদানের জন্য আপনার ${method} অ্যাপ দিয়ে এই QR কোডটি স্ক্যান করুন।`;
-    if (instructions) instructions.innerHTML = `
-      <li>১. আপনার ${method} অ্যাপ খুলুন</li>
-      <li>২. 'সেন্ড মানি' বা 'স্ক্যান' অপশনে যান</li>
-      <li>৩. মার্চেন্ট ওয়ালেট নম্বরটি লিখুন</li>
-      <li>৪. সঠিক পরিমাণ লিখে পেমেন্ট নিশ্চিত করুন</li>
-    `;
+    if (phoneLabel) phoneLabel.innerText = `পেমেন্ট মোবাইল নম্বর (আপনার ${currentMethod} নম্বর) *`;
+    if (numLabel)   numLabel.innerText   = isPersonal ? `${currentMethod} ব্যক্তিগত নম্বর (সেন্ড মানি)` : `${currentMethod} মার্চেন্ট নম্বর (পেমেন্ট)`;
+    if (qrHint)     qrHint.innerText     = `তাত্ক্ষণিকভাবে অর্থ প্রদানের জন্য আপনার ${currentMethod} অ্যাপ দিয়ে এই QR কোডটি স্ক্যান করুন।`;
+
     if (instructions) {
       if (isPersonal) {
         instructions.innerHTML = `
-          <li>১. আপনার ${method} অ্যাপ ওপেন করুন</li>
-          <li>২. <strong>'সেন্ড মানি'</strong> অপশনে যান</li>
-          <li>৩. ব্যক্তিগত নম্বরটি লিখুন: <strong>${currentReceiverNum}</strong></li>
-          <li>৪. সঠিক টাকার পরিমাণ লিখে সেন্ড মানি করুন</li>
+          <li>১. আপনার ${info.appBn} খুলুন অথবা ডায়াল করুন <strong class="text-blue-700">${info.ussd}</strong></li>
+          <li>২. <strong>'সেন্ড মানি'</strong> (Send Money) অপশনে যান</li>
+          <li>৩. ব্যক্তিগত নম্বরটি লিখুন: <strong class="text-blue-600">${currentReceiverNum}</strong></li>
+          <li>৪. সঠিক পরিমাণ <strong>৳${displayAmt}</strong> লিখে সেন্ড মানি করুন</li>
         `;
       } else {
         instructions.innerHTML = `
-          <li>১. আপনার ${method} অ্যাপ ওপেন করুন</li>
+          <li>১. আপনার ${info.appBn} খুলুন অথবা ডায়াল করুন <strong class="text-blue-700">${info.ussd}</strong></li>
           <li>২. কিউআর স্ক্যান করুন বা <strong>'পেমেন্ট'</strong> অপশনে যান</li>
-          <li>৩. মার্চেন্ট নম্বরটি লিখুন: <strong>${currentReceiverNum}</strong></li>
-          <li>৪. সঠিক টাকার পরিমাণ লিখে পেমেন্ট নিশ্চিত করুন</li>
+          <li>৩. মার্চেন্ট নম্বরটি লিখুন: <strong class="text-blue-600">${currentReceiverNum}</strong></li>
+          <li>৪. সঠিক পরিমাণ <strong>৳${displayAmt}</strong> লিখে পেমেন্ট নিশ্চিত করুন</li>
+        `;
+      }
+    }
+
+    if (step2List) {
+      if (isPersonal) {
+        step2List.innerHTML = `
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">১</span>
+            <span>আপনার <strong>${info.appBn}</strong> ওপেন করুন অথবা ডায়াল করুন <strong class="font-mono text-blue-700">${info.ussd}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">২</span>
+            <span><strong>'সেন্ড মানি' (Send Money)</strong> অপশন নির্বাচন করুন</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৩</span>
+            <span>প্রাপক নম্বর লিখুন: <strong class="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded select-all cursor-pointer" onclick="copyNumber()">${currentReceiverNum}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৪</span>
+            <span>সঠিক টাকার পরিমাণ: <strong class="font-mono text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">৳${displayAmt}</strong> এবং রেফারেন্স: <strong class="font-mono text-gray-800">${orderRef}</strong> লিখুন</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৫</span>
+            <span>আপনার <strong>${currentMethod} পিন (PIN)</strong> দিয়ে সেন্ড মানি সম্পন্ন করুন</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৬</span>
+            <span>প্রাপ্ত <strong>TrxID</strong> (ট্রানজেকশন আইডি) কপি করে নিচের বক্সে লিখুন এবং <strong>"আমি পেমেন্ট সম্পন্ন করেছি"</strong> বাটনে ক্লিক করুন।</span>
+          </li>
+        `;
+      } else {
+        step2List.innerHTML = `
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">১</span>
+            <span>আপনার <strong>${info.appBn}</strong> ওপেন করুন অথবা ডায়াল করুন <strong class="font-mono text-blue-700">${info.ussd}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">২</span>
+            <span>উপরের <strong>কিউআর কোড স্ক্যান করুন</strong> অথবা <strong>'পেমেন্ট'</strong> অপশনে যান</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৩</span>
+            <span>মার্চেন্ট নম্বর লিখুন: <strong class="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded select-all cursor-pointer" onclick="copyNumber()">${currentReceiverNum}</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৪</span>
+            <span>সঠিক টাকার পরিমাণ: <strong class="font-mono text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">৳${displayAmt}</strong> এবং রেফারেন্স: <strong class="font-mono text-gray-800">${orderRef}</strong> লিখুন</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৫</span>
+            <span>আপনার <strong>${currentMethod} পিন (PIN)</strong> দিয়ে পেমেন্ট সম্পন্ন করুন</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৬</span>
+            <span>প্রাপ্ত <strong>TrxID</strong> নিচের বক্সে লিখুন এবং <strong>"আমি পেমেন্ট সম্পন্ন করেছি"</strong> বাটনে ক্লিক করুন।</span>
+          </li>
         `;
       }
     }
@@ -1972,12 +2209,18 @@ function closeWidget() {
 // Help & support popup
 // ──────────────────────────────────────────────────────────────────────────────
 let supportPopupVisible = false;
-function toggleSupportPopup() {
+function toggleSupportPopup(forceState) {
   const popup = document.getElementById("support-popup");
   const icon  = document.getElementById("support-icon-symbol");
+  const backdrop = document.getElementById("support-backdrop");
   if (!popup || !icon) return;
-  supportPopupVisible = !supportPopupVisible;
+  if (typeof forceState === "boolean") {
+    supportPopupVisible = forceState;
+  } else {
+    supportPopupVisible = !supportPopupVisible;
+  }
   popup.classList.toggle("hidden", !supportPopupVisible);
+  if (backdrop) backdrop.classList.toggle("hidden", !supportPopupVisible);
   icon.innerText = supportPopupVisible ? "close" : "support_agent";
 }
 
